@@ -9,68 +9,73 @@ use Illuminate\Validation\Rule;
 
 class CabangController extends Controller
 {
-  public function index(Request $request)
-  {
-    $q = Cabang::query()->with('wilayah:id,kode,nama');
+    public function index(Request $request)
+    {
+        $q = Cabang::query();
 
-    if ($request->filled('wilayah_id')) {
-      $q->where('wilayah_id', $request->integer('wilayah_id'));
+        // search kode/nama
+        if ($request->filled('search')) {
+            $s = (string) $request->input('search');
+            $q->where(function ($qq) use ($s) {
+                $qq->where('kode', 'like', "%{$s}%")
+                   ->orWhere('nama', 'like', "%{$s}%");
+            });
+        }
+
+        // filter status
+        if ($request->filled('is_active')) {
+            $q->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
+        }
+
+        // filter wilayah
+        if ($request->filled('wilayah_id')) {
+            $q->where('wilayah_id', (int) $request->input('wilayah_id'));
+        }
+
+        $perPage = (int) $request->input('per_page', 15);
+
+        return response()->json(
+            $q->orderBy('nama')->paginate($perPage)
+        );
     }
 
-    if ($request->filled('search')) {
-      $s = $request->string('search')->toString();
-      $q->where(function ($qq) use ($s) {
-        $qq->where('kode', 'ilike', "%{$s}%")
-           ->orWhere('nama', 'ilike', "%{$s}%");
-      });
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'kode' => ['required', 'string', 'max:20', 'unique:cabang,kode'],
+            'nama' => ['required', 'string', 'max:150'],
+            'wilayah_id' => ['required', 'integer'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $row = Cabang::create($data);
+
+        return response()->json($row, 201);
     }
 
-    if ($request->filled('is_active')) {
-      $q->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
+    public function show(Cabang $cabang)
+    {
+        return response()->json($cabang);
     }
 
-    return response()->json(
-      $q->orderBy('nama')->paginate($request->integer('per_page', 15))
-    );
-  }
+    public function update(Request $request, Cabang $cabang)
+    {
+        $data = $request->validate([
+            'kode' => ['required', 'string', 'max:20', Rule::unique('cabang', 'kode')->ignore($cabang->id)],
+            'nama' => ['required', 'string', 'max:150'],
+            'wilayah_id' => ['required', 'integer'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
 
-  public function store(Request $request)
-  {
-    $data = $request->validate([
-      'wilayah_id' => ['required','integer','exists:wilayah,id'],
-      'kode' => ['required','string','max:20','unique:cabangs,kode'],
-      'nama' => ['required','string','max:150'],
-      'alamat' => ['nullable','string','max:255'],
-      'is_active' => ['nullable','boolean'],
-    ]);
+        $cabang->update($data);
 
-    $row = Cabang::create($data);
-    return response()->json($row->load('wilayah:id,kode,nama'), 201);
-  }
+        return response()->json($cabang);
+    }
 
-  public function show(Cabang $cabang)
-  {
-    return response()->json($cabang->load('wilayah:id,kode,nama'));
-  }
+    public function destroy(Cabang $cabang)
+    {
+        $cabang->delete();
 
-  public function update(Request $request, Cabang $cabang)
-  {
-    $data = $request->validate([
-      'wilayah_id' => ['required','integer','exists:wilayah,id'],
-      'kode' => ['required','string','max:20', Rule::unique('cabangs','kode')->ignore($cabang->id)],
-      'nama' => ['required','string','max:150'],
-      'alamat' => ['nullable','string','max:255'],
-      
-      'is_active' => ['nullable','boolean'],
-    ]);
-
-    $cabang->update($data);
-    return response()->json($cabang->load('wilayah:id,kode,nama'));
-  }
-
-  public function destroy(Cabang $cabang)
-  {
-    $cabang->delete();
-    return response()->json(['message' => 'Deleted']);
-  }
+        return response()->json(['message' => 'Deleted']);
+    }
 }

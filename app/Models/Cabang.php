@@ -3,25 +3,19 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Cabang extends Model
 {
-  protected $fillable = [
-    'wilayah_id',
-    'kode',
-    'nama',
-    'alamat',
-    // 'telp',
-    'is_active',
-  ];
+    protected $table = 'cabang';
 
-  protected $casts = [
-    'is_active' => 'boolean',
-  ];
+    protected $fillable = [
+        'kode',
+        'nama',
+        'wilayah_id',
+        'is_active',
+    ];
 
-  public function wilayah(): BelongsTo
-  {
-    return $this->belongsTo(Wilayah::class);
-  }
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 }
