@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\Master\KabupatenController;
 use App\Http\Controllers\Api\Master\VendorController;
 use App\Http\Controllers\Api\Master\AreaController;
 use App\Http\Controllers\Api\Master\TerminalController;
+use App\Http\Controllers\Api\Master\UserController;
+use App\Http\Controllers\Api\Master\RoleController;
 
 
 
@@ -30,4 +32,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('master/vendor', VendorController::class);
     Route::apiResource('master/area', AreaController::class);
     Route::apiResource('master/terminal', TerminalController::class);
+    Route::get('master/roles', [RoleController::class, 'index']);
+    Route::apiResource('master/users', UserController::class);
 });

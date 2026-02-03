@@ -74,6 +74,8 @@ class InitialSetupSeeder extends Seeder
                 'updated_at' => now(),
             ]);
 
+
+
             $masterMenuId = DB::table('menus')->insertGetId([
                 'parent_id' => null,
                 'name' => 'Master',
@@ -81,6 +83,19 @@ class InitialSetupSeeder extends Seeder
                 'route_name' => null,
                 'icon' => 'tabler-settings',
                 'order_no' => 2,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $userMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId,
+                'name' => 'Users',
+                'path' => '/master/users',
+                'route_name' => 'master-users',
+                'icon' => 'tabler-user',
+                'order_no' => 99,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -211,7 +226,7 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             // 8) Attach menus to ADMIN role (biar ADMIN lihat semua menu)
-            $menuIds = [$dashboardMenuId, $masterMenuId, $wilayahMenuId, $cabangMenuId, $deptMenuId, $provinsiMenuId, $kabMenuId,  $vendorMenuId, $areaMenuId, $terminalMenuId];
+            $menuIds = [$dashboardMenuId, $masterMenuId, $wilayahMenuId, $cabangMenuId, $deptMenuId, $provinsiMenuId, $kabMenuId,  $vendorMenuId, $areaMenuId, $terminalMenuId, $userMenuId];
             foreach ($menuIds as $mid) {
                 DB::table('role_menus')->insert([
                     'role_id' => $roleIds['ADMIN'],
