@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Master\DepartemenController;
 use App\Http\Controllers\Api\Master\ProvinsiController;
 use App\Http\Controllers\Api\Master\KabupatenController;
 use App\Http\Controllers\Api\Master\VendorController;
+use App\Http\Controllers\Api\Master\AreaController;
 
 
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -25,4 +26,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('master/provinsi', ProvinsiController::class);
     Route::apiResource('master/kabupaten', KabupatenController::class);
     Route::apiResource('master/vendor', VendorController::class);
+    Route::apiResource('master/area', AreaController::class);
 });
