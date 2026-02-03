@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\Master\RoleController;
 
 
 
+
 Route::post('/auth/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -34,4 +35,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('master/terminal', TerminalController::class);
     Route::get('master/roles', [RoleController::class, 'index']);
     Route::apiResource('master/users', UserController::class);
+    Route::apiResource('master/roles', RoleController::class);
 });
