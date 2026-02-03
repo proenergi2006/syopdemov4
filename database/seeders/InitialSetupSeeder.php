@@ -100,6 +100,32 @@ class InitialSetupSeeder extends Seeder
                 'updated_at' => now(),
             ]);
 
+            $provinsiMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId,
+                'name' => 'Provinsi',
+                'path' => '/master/provinsi',
+                'route_name' => 'master-provinsi',
+                'icon' => 'tabler-map-pin',
+                'order_no' => 4,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $kabMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId,
+                'name' => 'Kabupaten',
+                'path' => '/master/kabupaten',
+                'route_name' => 'master-kabupaten',
+                'icon' => 'tabler-map-pin',
+                'order_no' => 5,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+              ]);
+
             $cabangMenuId = DB::table('menus')->insertGetId([
                 'parent_id' => $masterMenuId,
                 'name' => 'Cabang',
@@ -145,7 +171,7 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             // 8) Attach menus to ADMIN role (biar ADMIN lihat semua menu)
-            $menuIds = [$dashboardMenuId, $masterMenuId, $wilayahMenuId, $cabangMenuId, $deptMenuId];
+            $menuIds = [$dashboardMenuId, $masterMenuId, $wilayahMenuId, $cabangMenuId, $deptMenuId, $provinsiMenuId, $kabMenuId];
             foreach ($menuIds as $mid) {
                 DB::table('role_menus')->insert([
                     'role_id' => $roleIds['ADMIN'],
