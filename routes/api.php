@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Api\Master\Controllers\ProdukController as ControllersProdukController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -12,12 +13,11 @@ use App\Http\Controllers\Api\Master\ProvinsiController;
 use App\Http\Controllers\Api\Master\KabupatenController;
 use App\Http\Controllers\Api\Master\VendorController;
 use App\Http\Controllers\Api\Master\AreaController;
+use App\Http\Controllers\Api\Master\PbbkbController;
 use App\Http\Controllers\Api\Master\TerminalController;
 use App\Http\Controllers\Api\Master\UserController;
 use App\Http\Controllers\Api\Master\RoleController;
-
-
-
+use App\Http\Controllers\Api\Master\ProdukController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -36,4 +36,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('master/roles', [RoleController::class, 'index']);
     Route::apiResource('master/users', UserController::class);
     Route::apiResource('master/roles', RoleController::class);
+    Route::apiResource('master/produk', ProdukController::class);
+    Route::apiResource('master/pbbkb', PbbkbController::class);
 });
