@@ -108,7 +108,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/users',
                 'route_name' => 'master-users',
                 'icon' => 'tabler-user',
-                'order_no' => 1,
+                'order_no' => 4,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -122,7 +122,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/wilayah',
                 'route_name' => 'master-wilayah',
                 'icon' => 'tabler-map',
-                'order_no' => 1,
+                'order_no' => 5,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -135,7 +135,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/provinsi',
                 'route_name' => 'master-provinsi',
                 'icon' => 'tabler-map-pin',
-                'order_no' => 4,
+                'order_no' => 6,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -148,7 +148,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/kabupaten',
                 'route_name' => 'master-kabupaten',
                 'icon' => 'tabler-map-pin',
-                'order_no' => 5,
+                'order_no' => 7,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -161,7 +161,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/cabang',
                 'route_name' => 'master-cabang',
                 'icon' => 'tabler-building',
-                'order_no' => 2,
+                'order_no' => 8,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -174,7 +174,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/departemen',
                 'route_name' => 'master-departemen',
                 'icon' => 'tabler-users',
-                'order_no' => 3,
+                'order_no' => 9,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -187,7 +187,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/vendor',
                 'route_name' => 'master-vendor',
                 'icon' => 'tabler-building-store',
-                'order_no' => 4,
+                'order_no' => 10,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -200,7 +200,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/terminal',
                 'route_name' => 'master-terminal',
                 'icon' => 'tabler-gas-station',
-                'order_no' => 99, // sesuaikan urutan
+                'order_no' => 11, // sesuaikan urutan
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -213,7 +213,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/area',
                 'route_name' => 'master-area',
                 'icon' => 'tabler-map-pin',
-                'order_no' => 4,
+                'order_no' => 12,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -226,7 +226,7 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/roles',
                 'route_name' => 'master-roles',
                 'icon' => 'tabler-shield',
-                'order_no' => 2,
+                'order_no' => 13,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -239,7 +239,31 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/role-menus',
                 'route_name' => 'master-role-menus',
                 'icon' => 'tabler-lock',
-                'order_no' => 3,
+                'order_no' => 14,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $produkId = DB::table('menus')->insertGetId([
+                'parent_id' => $authMenuId, // ✅ pindah ke Auth
+                'name' => 'Role Menu',
+                'path' => '/master/produk',
+                'route_name' => 'master-produk',
+                'icon' => 'tabler-archive',
+                'order_no' => 15,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $pbbkbId = DB::table('menus')->insertGetId([
+                'parent_id' => $authMenuId, // ✅ pindah ke Auth
+                'name' => 'Role Menu',
+                'path' => '/master/pbbkb',
+                'route_name' => 'master-pbbkb',
+                'icon' => 'tabler-article',
+                'order_no' => 16,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -278,7 +302,9 @@ class InitialSetupSeeder extends Seeder
             $authMenuId,
             $userMenuId,
             $roleMenuId,
-            $roleMenuSettingId,];
+            $roleMenuSettingId,
+            $produkId,
+            $pbbkbId,];
             foreach ($menuIds as $mid) {
                 DB::table('role_menus')->insert([
                     'role_id' => $roleIds['ADMIN'],
