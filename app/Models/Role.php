@@ -8,18 +8,14 @@ class Role extends Model
 {
     protected $table = 'roles';
 
-    protected $fillable = [
-        'kode',
-        'nama',
-        'is_active',
-    ];
+    protected $fillable = ['kode', 'nama', 'is_active'];
 
-    protected $casts = [
-        'is_active' => 'boolean',
-    ];
+    protected $casts = ['is_active' => 'boolean'];
 
-    public function users()
+    public function menus()
     {
-        return $this->belongsToMany(User::class, 'user_roles', 'role_id', 'user_id');
+        // PENTING: pivot table role_menus, key role_id & menu_id
+        return $this->belongsToMany(Menu::class, 'role_menus', 'role_id', 'menu_id');
+        // JANGAN withTimestamps kalau role_menus tidak punya created_at/updated_at
     }
 }

@@ -89,18 +89,32 @@ class InitialSetupSeeder extends Seeder
                 'updated_at' => now(),
             ]);
 
-            $userMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Users',
-                'path' => '/master/users',
-                'route_name' => 'master-users',
-                'icon' => 'tabler-user',
-                'order_no' => 99,
+            $authMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => null,
+                'name' => 'Auth',
+                'path' => null,
+                'route_name' => null,
+                'icon' => 'tabler-lock',
+                'order_no' => 3, // setelah Master
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $userMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $authMenuId, // ✅ pindah ke Auth
+                'name' => 'Users',
+                'path' => '/master/users',
+                'route_name' => 'master-users',
+                'icon' => 'tabler-user',
+                'order_no' => 1,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
 
             $wilayahMenuId = DB::table('menus')->insertGetId([
                 'parent_id' => $masterMenuId,
@@ -207,17 +221,29 @@ class InitialSetupSeeder extends Seeder
               ]);
 
               $roleMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
+                'parent_id' => $authMenuId, // ✅ pindah ke Auth
                 'name' => 'Roles',
                 'path' => '/master/roles',
                 'route_name' => 'master-roles',
                 'icon' => 'tabler-shield',
-                'order_no' => 4,
+                'order_no' => 2,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
-              ]);
+            ]);
+
+            $roleMenuSettingId = DB::table('menus')->insertGetId([
+                'parent_id' => $authMenuId, // ✅ pindah ke Auth
+                'name' => 'Role Menu',
+                'path' => '/master/role-menus',
+                'route_name' => 'master-role-menus',
+                'icon' => 'tabler-lock',
+                'order_no' => 3,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
               
 
             // 6) Admin User
@@ -239,7 +265,20 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             // 8) Attach menus to ADMIN role (biar ADMIN lihat semua menu)
-            $menuIds = [$dashboardMenuId, $masterMenuId, $wilayahMenuId, $cabangMenuId, $deptMenuId, $provinsiMenuId, $kabMenuId,  $vendorMenuId, $areaMenuId, $terminalMenuId, $userMenuId, $roleMenuId];
+            $menuIds = [$dashboardMenuId, 
+            $masterMenuId, 
+            $wilayahMenuId, 
+            $cabangMenuId, 
+            $deptMenuId, 
+            $provinsiMenuId, 
+            $kabMenuId,  
+            $vendorMenuId, 
+            $areaMenuId, 
+            $terminalMenuId, 
+            $authMenuId,
+            $userMenuId,
+            $roleMenuId,
+            $roleMenuSettingId,];
             foreach ($menuIds as $mid) {
                 DB::table('role_menus')->insert([
                     'role_id' => $roleIds['ADMIN'],
