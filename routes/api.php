@@ -17,13 +17,9 @@ use App\Http\Controllers\Api\Master\PbbkbController;
 use App\Http\Controllers\Api\Master\TerminalController;
 use App\Http\Controllers\Api\Master\UserController;
 use App\Http\Controllers\Api\Master\RoleController;
-<<<<<<< HEAD
 use App\Http\Controllers\Api\Master\ProdukController;
-=======
 use App\Http\Controllers\Api\Master\RoleMenuController;
 
-
->>>>>>> cdc5d1f (perbaikan)
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -42,11 +38,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('master/roles', [RoleController::class, 'index']);
     Route::apiResource('master/users', UserController::class);
     Route::apiResource('master/roles', RoleController::class);
-<<<<<<< HEAD
+
     Route::apiResource('master/produk', ProdukController::class);
     Route::apiResource('master/pbbkb', PbbkbController::class);
-=======
+
     Route::get('/master/role-menus', [RoleMenuController::class, 'index']);
     Route::post('/master/role-menus', [RoleMenuController::class, 'store']);
->>>>>>> cdc5d1f (perbaikan)
+
 });
