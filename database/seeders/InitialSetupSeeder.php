@@ -74,8 +74,6 @@ class InitialSetupSeeder extends Seeder
                 'updated_at' => now(),
             ]);
 
-
-
             $masterMenuId = DB::table('menus')->insertGetId([
                 'parent_id' => null,
                 'name' => 'Master',
@@ -89,13 +87,26 @@ class InitialSetupSeeder extends Seeder
                 'updated_at' => now(),
             ]);
 
+            $regionalMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId,
+                'name' => 'Regional',
+                'path' => null,
+                'route_name' => null,
+                'icon' => 'tabler-map-2',
+                'order_no' => 1,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             $authMenuId = DB::table('menus')->insertGetId([
                 'parent_id' => null,
                 'name' => 'Auth',
                 'path' => null,
                 'route_name' => null,
                 'icon' => 'tabler-lock',
-                'order_no' => 3, // setelah Master
+                'order_no' => 3,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -103,39 +114,26 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             $userMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId, // ✅ pindah ke Auth
+                'parent_id' => $authMenuId,
                 'name' => 'Users',
                 'path' => '/master/users',
                 'route_name' => 'master-users',
                 'icon' => 'tabler-user',
-                'order_no' => 4,
+                'order_no' => 1,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-
-            $wilayahMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Wilayah',
-                'path' => '/master/wilayah',
-                'route_name' => 'master-wilayah',
-                'icon' => 'tabler-map',
-                'order_no' => 5,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
+            // --- Regional children (urut rapi)
             $provinsiMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
+                'parent_id' => $regionalMenuId,
                 'name' => 'Provinsi',
                 'path' => '/master/provinsi',
                 'route_name' => 'master-provinsi',
                 'icon' => 'tabler-map-pin',
-                'order_no' => 6,
+                'order_no' => 2,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -143,18 +141,45 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             $kabMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
+                'parent_id' => $regionalMenuId,
                 'name' => 'Kabupaten',
                 'path' => '/master/kabupaten',
                 'route_name' => 'master-kabupaten',
                 'icon' => 'tabler-map-pin',
-                'order_no' => 7,
+                'order_no' => 3,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
-              ]);
+            ]);
 
+            $wilayahMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $regionalMenuId,
+                'name' => 'Wilayah',
+                'path' => '/master/wilayah',
+                'route_name' => 'master-wilayah',
+                'icon' => 'tabler-map',
+                'order_no' => 4,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $areaMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $regionalMenuId,
+                'name' => 'Area',
+                'path' => '/master/area',
+                'route_name' => 'master-area',
+                'icon' => 'tabler-map-pin',
+                'order_no' => 5,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // --- Master children
             $cabangMenuId = DB::table('menus')->insertGetId([
                 'parent_id' => $masterMenuId,
                 'name' => 'Cabang',
@@ -200,33 +225,21 @@ class InitialSetupSeeder extends Seeder
                 'path' => '/master/terminal',
                 'route_name' => 'master-terminal',
                 'icon' => 'tabler-gas-station',
-                'order_no' => 11, // sesuaikan urutan
+                'order_no' => 11,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            $areaMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Area',
-                'path' => '/master/area',
-                'route_name' => 'master-area',
-                'icon' => 'tabler-map-pin',
-                'order_no' => 12,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-              ]);
-
-              $roleMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId, // ✅ pindah ke Auth
+            // --- Auth children
+            $roleMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $authMenuId,
                 'name' => 'Roles',
                 'path' => '/master/roles',
                 'route_name' => 'master-roles',
                 'icon' => 'tabler-shield',
-                'order_no' => 13,
+                'order_no' => 2,
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -234,41 +247,40 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             $roleMenuSettingId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId, // ✅ pindah ke Auth
+                'parent_id' => $authMenuId,
                 'name' => 'Role Menu',
                 'path' => '/master/role-menus',
                 'route_name' => 'master-role-menus',
                 'icon' => 'tabler-lock',
-                'order_no' => 14,
+                'order_no' => 3,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             $produkId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId, // ✅ pindah ke Auth
-                'name' => 'Role Menu',
+                'parent_id' => $authMenuId,
+                'name' => 'Produk',
                 'path' => '/master/produk',
                 'route_name' => 'master-produk',
                 'icon' => 'tabler-archive',
-                'order_no' => 15,
+                'order_no' => 4,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             $pbbkbId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId, // ✅ pindah ke Auth
-                'name' => 'Role Menu',
+                'parent_id' => $authMenuId,
+                'name' => 'PBBKB',
                 'path' => '/master/pbbkb',
                 'route_name' => 'master-pbbkb',
                 'icon' => 'tabler-article',
-                'order_no' => 16,
+                'order_no' => 5,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-              
 
             // 6) Admin User
             $adminUserId = DB::table('users')->insertGetId([
@@ -288,23 +300,28 @@ class InitialSetupSeeder extends Seeder
                 'role_id' => $roleIds['ADMIN'],
             ]);
 
-            // 8) Attach menus to ADMIN role (biar ADMIN lihat semua menu)
-            $menuIds = [$dashboardMenuId, 
-            $masterMenuId, 
-            $wilayahMenuId, 
-            $cabangMenuId, 
-            $deptMenuId, 
-            $provinsiMenuId, 
-            $kabMenuId,  
-            $vendorMenuId, 
-            $areaMenuId, 
-            $terminalMenuId, 
-            $authMenuId,
-            $userMenuId,
-            $roleMenuId,
-            $roleMenuSettingId,
-            $produkId,
-            $pbbkbId,];
+            // 8) Attach menus to ADMIN role
+            $menuIds = [
+                $dashboardMenuId,
+                $masterMenuId,
+                $regionalMenuId,
+                $provinsiMenuId,
+                $kabMenuId,
+                $wilayahMenuId,
+                $areaMenuId,
+                $cabangMenuId,
+                $deptMenuId,
+                $vendorMenuId,
+                $terminalMenuId,
+
+                $authMenuId,
+                $userMenuId,
+                $roleMenuId,
+                $roleMenuSettingId,
+                $produkId,
+                $pbbkbId,
+            ];
+
             foreach ($menuIds as $mid) {
                 DB::table('role_menus')->insert([
                     'role_id' => $roleIds['ADMIN'],
