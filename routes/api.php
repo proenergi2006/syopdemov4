@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Api\Master\Controllers\ProdukController as ControllersProdukController;
+// use App\Http\Api\Master\Controllers\ProdukController as ControllersProdukController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +19,8 @@ use App\Http\Controllers\Api\Master\UserController;
 use App\Http\Controllers\Api\Master\RoleController;
 use App\Http\Controllers\Api\Master\ProdukController;
 use App\Http\Controllers\Api\Master\RoleMenuController;
+use App\Http\Controllers\Api\Master\TransportirController;
+use App\Http\Controllers\Api\Master\TransportirSopirController;
 
 
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -27,6 +29,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/my-menus', [MenuController::class, 'myMenus']);
+    Route::get('master/cabang/options', [CabangController::class, 'options']);
+
+
     Route::apiResource('master/wilayah', WilayahController::class);
     Route::apiResource('master/cabang', CabangController::class);
     Route::apiResource('master/departemen', DepartemenController::class);
@@ -44,5 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/master/role-menus', [RoleMenuController::class, 'index']);
     Route::post('/master/role-menus', [RoleMenuController::class, 'store']);
+    Route::apiResource('master/transportir', TransportirController::class);
+
+    Route::apiResource('master/sopir', TransportirSopirController::class);
+
 
 });

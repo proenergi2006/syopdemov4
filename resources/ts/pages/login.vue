@@ -1,22 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { VForm } from 'vuetify/components'
-import { useRoute, useRouter } from 'vue-router'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
-import AuthProvider from '@/views/pages/authentication/AuthProvider.vue'
 import axios from '@axios'
-import { useGenerateImageVariant } from '@core/composable/useGenerateImageVariant'
-import tree from '@images/pages/tree.png'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
 import { themeConfig } from '@themeConfig'
 import { emailValidator, requiredValidator } from '@validators'
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { VForm } from 'vuetify/components'
 
-import authV2LoginIllustrationBorderedDark from '@images/pages/auth-v2-login-illustration-bordered-dark.png'
-import authV2LoginIllustrationBorderedLight from '@images/pages/auth-v2-login-illustration-bordered-light.png'
-import authV2LoginIllustrationDark from '@images/pages/auth-v2-login-illustration-dark.png'
-import authV2LoginIllustrationLight from '@images/pages/auth-v2-login-illustration-light.png'
-import authV2MaskDark from '@images/pages/auth-v2-mask-dark.png'
-import authV2MaskLight from '@images/pages/auth-v2-mask-light.png'
+// ✅ gambar kiri (full cover)
+import authBg from '@images/pages/bg.png'
 
 const isPasswordVisible = ref(false)
 const refVForm = ref<VForm>()
@@ -34,16 +27,6 @@ const route = useRoute()
 const router = useRouter()
 const ability = useAppAbility()
 
-const authThemeImg = useGenerateImageVariant(
-  authV2LoginIllustrationLight,
-  authV2LoginIllustrationDark,
-  authV2LoginIllustrationBorderedLight,
-  authV2LoginIllustrationBorderedDark,
-  true,
-)
-
-const authThemeMask = useGenerateImageVariant(authV2MaskLight, authV2MaskDark)
-
 const login = async () => {
   try {
     const { data } = await axios.post('/auth/login', {
@@ -51,30 +34,24 @@ const login = async () => {
       password: password.value,
     })
 
-    // ✅ simpan token (pakai 1 key saja, konsisten)
     localStorage.setItem('accessToken', data.token)
 
-    // ✅ userData
     localStorage.setItem(
       'userData',
       JSON.stringify({
         id: data.user.id,
         name: data.user.name,
         email: data.user.email,
-        role: 'admin', // sementara
+        role: 'admin',
       }),
     )
 
-    // ✅ abilities
     const abilities = [{ action: 'manage', subject: 'all' }]
     localStorage.setItem('userAbilities', JSON.stringify(abilities))
     ability.update(abilities)
 
-    // ✅ set auth header untuk request selanjutnya
     axios.defaults.headers.common.Authorization = `Bearer ${data.token}`
 
-    // ✅ (optional) ambil menu dulu (kalau endpoint ini sudah beres)
-    // kalau masih error 500, comment dulu agar redirect tetap jalan
     try {
       const menuRes = await axios.get('/auth/my-menus')
       localStorage.setItem('navItems', JSON.stringify(menuRes.data))
@@ -82,11 +59,9 @@ const login = async () => {
       console.warn('Fetch menu failed, redirect anyway:', err)
     }
 
-    // ✅ redirect ke halaman setelah login
     const redirectTo = (route.query.to as string) || '/dashboards/crm'
     router.replace(redirectTo)
-  }
-  catch (e: any) {
+  } catch (e: any) {
     const res = e?.response
     console.error('LOGIN ERROR:', res?.status, res?.data || e)
 
@@ -115,17 +90,15 @@ const login = async () => {
   }
 }
 
-
 const onSubmit = () => {
   refVForm.value?.validate().then(({ valid }) => {
-    if (valid)
-      login()
+    if (valid) login()
   })
 }
 </script>
 
 <template>
-  <div>
+  <div class="auth-page">
     <div class="auth-logo d-flex align-start gap-x-3">
       <VNodeRenderer :nodes="themeConfig.app.logo" />
       <h1 class="font-weight-medium leading-normal text-2xl text-uppercase">
@@ -134,21 +107,21 @@ const onSubmit = () => {
     </div>
 
     <VRow no-gutters class="auth-wrapper">
-      <VCol lg="8" class="d-none d-lg-flex align-center justify-center position-relative">
-        <VImg max-width="768px" :src="authThemeImg" class="auth-illustration" />
-        <VImg :width="276" :src="tree" class="auth-footer-start-tree" />
-        <VImg class="auth-footer-mask" :src="authThemeMask" />
+      <!-- ✅ LEFT: FULL IMAGE (cover) -->
+      <VCol lg="8" class="d-none d-lg-flex auth-left">
+        <VImg :src="authBg" cover class="auth-bg" />
       </VCol>
 
+      <!-- RIGHT: LOGIN FORM -->
       <VCol cols="12" lg="4" class="auth-card-v2 d-flex align-center justify-center">
         <VCard flat :max-width="500" class="mt-12 mt-sm-0 pa-4">
           <VCardText>
             <h5 class="text-h5 mb-1">
-  Welcome to {{ themeConfig.app.title }}
-</h5>
-<p class="mb-0">
-  Please sign in with your account.
-</p>
+             System Operasional
+            </h5>
+            <p class="mb-0">
+              Please sign in with your account.
+            </p>
           </VCardText>
 
           <VCardText>
@@ -179,7 +152,6 @@ const onSubmit = () => {
                     <VCheckbox v-model="rememberMe" label="Remember me" />
                   </div>
 
-                  <!-- ✅ HAPUS @click biar tidak dobel -->
                   <VBtn block type="submit">
                     Login
                   </VBtn>
@@ -192,15 +164,14 @@ const onSubmit = () => {
                 </VCol>
 
                 <VCol cols="12" class="text-center mt-6">
-  <div class="text-body-2 font-weight-medium text-primary">
-    SYOP Version 4.0
-  </div>
+                  <div class="text-body-2 font-weight-medium text-primary">
+                    SYOP Version 4.0
+                  </div>
 
-  <div class="text-caption text-medium-emphasis">
-    Proenergi Operational System
-  </div>
-</VCol>
-
+                  <div class="text-caption text-medium-emphasis">
+                    Proenergi Operational System
+                  </div>
+                </VCol>
               </VRow>
             </VForm>
           </VCardText>
@@ -212,6 +183,27 @@ const onSubmit = () => {
 
 <style lang="scss">
 @use "@core-scss/template/pages/page-auth.scss";
+
+/* ✅ override supaya kiri full seperti Materio */
+.auth-page {
+  min-height: 100vh;
+}
+
+.auth-wrapper {
+  min-height: 100vh;
+}
+
+.auth-left {
+  position: relative;
+  padding: 0 !important;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+.auth-bg {
+  width: 100%;
+  height: 100vh;
+}
 </style>
 
 <route lang="yaml">

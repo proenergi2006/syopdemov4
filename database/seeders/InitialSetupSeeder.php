@@ -87,6 +87,45 @@ class InitialSetupSeeder extends Seeder
                 'updated_at' => now(),
             ]);
 
+            $fleetMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId,
+                'name' => 'Fleet Management',
+                'path' => null,
+                'route_name' => null,
+                'icon' => 'tabler-truck',
+                'order_no' => 6, // sesuaikan urutan di menu Master
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $sopirMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $fleetMenuId, // parent Fleet Management
+                'name' => 'Sopir',
+                'path' => '/master/sopir',
+                'route_name' => 'master-sopir',
+                'icon' => 'tabler-user-circle',
+                'order_no' => 2,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            
+
+            $transportirMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $fleetMenuId,
+                'name' => 'Transportir',
+                'path' => '/master/transportir',
+                'route_name' => 'master-transportir',
+                'icon' => 'tabler-building-store',
+                'order_no' => 1,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             $regionalMenuId = DB::table('menus')->insertGetId([
                 'parent_id' => $masterMenuId,
                 'name' => 'Regional',
@@ -309,6 +348,9 @@ class InitialSetupSeeder extends Seeder
                 $kabMenuId,
                 $wilayahMenuId,
                 $areaMenuId,
+                $fleetMenuId,
+                $sopirMenuId,
+                $transportirMenuId,
                 $cabangMenuId,
                 $deptMenuId,
                 $vendorMenuId,

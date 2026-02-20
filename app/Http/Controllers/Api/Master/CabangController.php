@@ -78,4 +78,15 @@ class CabangController extends Controller
 
         return response()->json(['message' => 'Deleted']);
     }
+
+    public function options()
+    {
+    $data = \App\Models\Cabang::query()
+        ->where('is_active', true)
+        ->orderBy('nama')
+        ->get(['id', 'kode', 'nama']); // kita ambil kode+nama
+
+    return response()->json($data);
+    }
+
 }
