@@ -298,7 +298,7 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             $produkId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId,
+                'parent_id' => $masterMenuId, 
                 'name' => 'Produk',
                 'path' => '/master/produk',
                 'route_name' => 'master-produk',
@@ -310,7 +310,7 @@ class InitialSetupSeeder extends Seeder
             ]);
 
             $pbbkbId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId,
+                'parent_id' => $masterMenuId, 
                 'name' => 'PBBKB',
                 'path' => '/master/pbbkb',
                 'route_name' => 'master-pbbkb',
@@ -320,6 +320,52 @@ class InitialSetupSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $volumeId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId, 
+                'name' => 'Volume',
+                'path' => '/master/volume',
+                'route_name' => 'master-volume',
+                'icon' => 'tabler-cylinder',
+                'order_no' => 16,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $wilAngkutId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId, 
+                'name' => 'Wilayah Angkut',
+                'path' => '/master/wilayah-angkut',
+                'route_name' => 'master-wilayah-angkut',
+                'icon' => 'tabler-location-pin',
+                'order_no' => 17,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $hargaJualId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId, 
+                'name' => 'Harga Jual',
+                'path' => '/master/harga-jual',
+                'route_name' => 'master-harga-jual',
+                'icon' => 'tabler-receipt-dollar',
+                'order_no' => 18,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $hargaPertaminaId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId, 
+                'name' => 'Harga Dasar Pertamina',
+                'path' => '/master/harga-pertamina',
+                'route_name' => 'master-harga-pertamina',
+                'icon' => 'tabler-file-dollar ',
+                'order_no' => 19,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+              
 
             // 6) Admin User
             $adminUserId = DB::table('users')->insertGetId([
@@ -362,6 +408,10 @@ class InitialSetupSeeder extends Seeder
                 $roleMenuSettingId,
                 $produkId,
                 $pbbkbId,
+                $volumeId,
+                $wilAngkutId,
+                $hargaJualId,
+                $hargaPertaminaId
             ];
 
             foreach ($menuIds as $mid) {

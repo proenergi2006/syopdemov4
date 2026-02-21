@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\Master\ProvinsiController;
 use App\Http\Controllers\Api\Master\KabupatenController;
 use App\Http\Controllers\Api\Master\VendorController;
 use App\Http\Controllers\Api\Master\AreaController;
+use App\Http\Controllers\Api\Master\HargaJualController;
+use App\Http\Controllers\Api\Master\HargaPertaminaController;
 use App\Http\Controllers\Api\Master\PbbkbController;
 use App\Http\Controllers\Api\Master\TerminalController;
 use App\Http\Controllers\Api\Master\UserController;
@@ -22,6 +24,8 @@ use App\Http\Controllers\Api\Master\RoleMenuController;
 use App\Http\Controllers\Api\Master\TransportirController;
 use App\Http\Controllers\Api\Master\TransportirSopirController;
 
+use App\Http\Controllers\Api\Master\VolumeController;
+use App\Http\Controllers\Api\Master\WilayahAngkutController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -52,6 +56,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('master/transportir', TransportirController::class);
 
     Route::apiResource('master/sopir', TransportirSopirController::class);
-
-
-});
+    Route::apiResource('master/volume', VolumeController::class);
+    Route::apiResource('master/wilayah-angkut', WilayahAngkutController::class);
+    Route::apiResource('master/harga-jual', HargaJualController::class);
+    Route::apiResource('master/harga-pertamina', HargaPertaminaController::class);
+    Route::get('/provinsi', [WilayahAngkutController::class, 'provinsi']);
+    Route::get('/kabupaten/{provinsi}', [WilayahAngkutController::class, 'kabupaten']);
+    Route::get('/area', [HargaPertaminaController::class, 'area']);
+    Route::get('/produk', [HargaPertaminaController::class, 'produk']);
+    });
