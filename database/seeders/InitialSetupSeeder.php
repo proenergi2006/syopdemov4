@@ -111,6 +111,32 @@ class InitialSetupSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $mobilMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $fleetMenuId,
+                'name' => 'Mobil',
+                'path' => '/master/mobil',
+                'route_name' => 'master-mobil',
+                'icon' => 'tabler-car',
+                'order_no' => 3,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $ongkosAngkutMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $fleetMenuId,
+                'name' => 'Ongkos Angkut',
+                'path' => '/master/ongkos-angkut',
+                'route_name' => 'master-ongkos-angkut',
+                'icon' => 'tabler-currency-rupiah',
+                'order_no' => 4, // setelah Transportir(1), Sopir(2), Mobil(3)
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
             
 
             $transportirMenuId = DB::table('menus')->insertGetId([
@@ -226,6 +252,19 @@ class InitialSetupSeeder extends Seeder
                 'route_name' => 'master-cabang',
                 'icon' => 'tabler-building',
                 'order_no' => 8,
+                'permission_key' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $customerMenuId = DB::table('menus')->insertGetId([
+                'parent_id' => $masterMenuId,
+                'name' => 'Customer',
+                'path' => '/master/customer',
+                'route_name' => 'master-customer',
+                'icon' => 'tabler-users',
+                'order_no' => 12, // sesuaikan urutan
                 'permission_key' => null,
                 'is_active' => true,
                 'created_at' => now(),
@@ -396,11 +435,14 @@ class InitialSetupSeeder extends Seeder
                 $areaMenuId,
                 $fleetMenuId,
                 $sopirMenuId,
+                $mobilMenuId,
+                $ongkosAngkutMenuId,
                 $transportirMenuId,
                 $cabangMenuId,
                 $deptMenuId,
                 $vendorMenuId,
                 $terminalMenuId,
+                $customerMenuId,  
 
                 $authMenuId,
                 $userMenuId,

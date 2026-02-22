@@ -27,6 +27,12 @@ use App\Http\Controllers\Api\Master\TransportirSopirController;
 use App\Http\Controllers\Api\Master\VolumeController;
 use App\Http\Controllers\Api\Master\WilayahAngkutController;
 
+use App\Http\Controllers\Api\Master\TransportirMobilController;
+
+use App\Http\Controllers\Api\Master\OngkosAngkutController;
+use App\Http\Controllers\Api\Master\CustomerController;
+
+
 Route::post('/auth/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -64,4 +70,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kabupaten/{provinsi}', [WilayahAngkutController::class, 'kabupaten']);
     Route::get('/area', [HargaPertaminaController::class, 'area']);
     Route::get('/produk', [HargaPertaminaController::class, 'produk']);
+
+    Route::get('master/transportir-mobil', [TransportirMobilController::class, 'index']);
+    Route::post('master/transportir-mobil', [TransportirMobilController::class, 'store']);
+    Route::get('master/transportir-mobil/{id}', [TransportirMobilController::class, 'show']);
+    Route::post('master/transportir-mobil/{id}', [TransportirMobilController::class, 'update']);
+    Route::delete('master/transportir-mobil/{id}', [TransportirMobilController::class, 'destroy']);
+
+    Route::apiResource('master/ongkos-angkut', OngkosAngkutController::class);
+    Route::apiResource('master/customers', CustomerController::class);
     });
