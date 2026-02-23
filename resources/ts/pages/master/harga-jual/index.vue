@@ -605,9 +605,7 @@ const formatDate = (dateStr: string) => {
     padding-block-start: 0.3rem;
   }
 }
-.hint-blue >>> .v-field__hint {
-  color: #1976d2; /* biru material */
-}
+
 </style>
 
 <route lang="yaml">
