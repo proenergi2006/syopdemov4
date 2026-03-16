@@ -1,1 +1,77 @@
 // Write your overrides
+.swal2-confirm.swal-confirm-btn {
+  color: #fff !important;
+}
+
+.swal2-cancel.swal-cancel-btn {
+  color: #fff !important;
+}
+
+.swal2-actions {
+  gap: 0.5rem;
+}
+
+.trx-card {
+  cursor: pointer;
+  height: 100%;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  transition: all .2s ease;
+}
+
+.app-brand-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.app-brand-custom .app-brand-logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.app-brand-custom .brand-text-full {
+  display: inline-block;
+  font-weight: 700;
+}
+
+/* Saat sidebar collapse */
+.layout-vertical-nav-collapsed .app-brand-custom {
+  justify-content: center;
+}
+
+.layout-vertical-nav-collapsed .app-brand-custom .brand-text-full {
+  display: none !important;
+}
+
+.layout-vertical-nav-collapsed .app-brand-custom .app-brand-logo {
+  height: 24px;
+}
+
+.pagination-footer-left,
+.pagination-footer-right {
+  min-height: 40px;
+}
+
+.user-pagination-select {
+  max-width: 80px;
+}
+
+.user-pagination-select .v-field {
+  min-height: 32px !important;
+}
+
+.user-pagination-select .v-field__input {
+  min-height: 32px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.pagination-footer-right .v-pagination {
+  margin: 0;
+}

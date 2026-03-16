@@ -31,7 +31,9 @@ use App\Http\Controllers\Api\Master\TransportirMobilController;
 
 use App\Http\Controllers\Api\Master\OngkosAngkutController;
 use App\Http\Controllers\Api\Master\CustomerController;
-
+use App\Http\Controllers\Api\Master\MasterDokumenPendukungController;
+use App\Http\Controllers\Api\Master\MasterKeteranganTransaksiController;
+use App\Http\Controllers\Api\Master\MasterVendorController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -79,4 +81,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('master/ongkos-angkut', OngkosAngkutController::class);
     Route::apiResource('master/customers', CustomerController::class);
-    });
+
+    Route::get('master/keterangan-transaksi', [MasterKeteranganTransaksiController::class, 'index']);
+    Route::get('master/dokumen-pendukung', [MasterDokumenPendukungController::class, 'index']);
+
+    Route::apiResource('master/vendor', MasterVendorController::class);
+    Route::get('/master/vendor/{publicId}', [MasterVendorController::class, 'show']);
+    Route::patch('/master/vendor/{id}/status', [MasterVendorController::class, 'updateStatus']);
+});

@@ -3,7 +3,8 @@ import { breakpointsVuetify } from '@vueuse/core'
 import { VIcon } from 'vuetify/components'
 
 // ❗ Logo SVG must be imported with ?raw suffix
-import logo from '@images/logo.svg?raw'
+import logo from '@images/logo-proenergi.svg?raw'
+import proenergiLogo from '@images/proenergi.png'
 
 import { defineThemeConfig } from '@core'
 import { RouteTransitions, Skins } from '@core/enums'
@@ -11,10 +12,28 @@ import { AppContentLayoutNav, ContentWidth, FooterType, NavbarType } from '@layo
 
 export const { themeConfig, layoutConfig } = defineThemeConfig({
   app: {
-    title: 'SYOP',
+    title: '',
 
     // ❗ if you have SVG logo and want it to adapt according to theme color, you have to apply color as `color: rgb(var(--v-global-theme-primary))`
-    logo: h('div', { innerHTML: logo, style: 'line-height:0; color: rgb(var(--v-global-theme-primary))' }),
+    logo: h(
+      'div',
+      {
+        class: 'app-brand-custom d-flex align-center',
+        style: 'gap: 8px; overflow: hidden; white-space: nowrap;',
+      },
+      [
+        h('img', {
+          src: proenergiLogo,
+          alt: 'SYOP',
+          class: 'app-brand-logo',
+          style: 'height: 28px; width: auto; display: block; object-fit: contain; flex-shrink: 0;',
+        }),
+        h('span', {
+          class: 'brand-text-full',
+          style: 'font-size: 18px; font-weight: 700; line-height: 1; color: inherit;',
+        }, 'SYOP'),
+      ],
+    ),
     contentWidth: ContentWidth.Boxed,
     contentLayoutNav: AppContentLayoutNav.Vertical,
     overlayNavFromBreakpoint: breakpointsVuetify.md + 16, // 16 for scrollbar. Docs: https://next.vuetifyjs.com/en/features/display-and-platform/
