@@ -11,37 +11,60 @@ class InitialSetupSeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function () {
+            $now = now();
 
-            // 1) Wilayah
-            $wilayahId = DB::table('wilayah')->insertGetId([
-                'kode' => 'WIL-01',
-                'nama' => 'JABODETABEK',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            /*
+            |--------------------------------------------------------------------------
+            | 1) Wilayah
+            |--------------------------------------------------------------------------
+            */
+            $wilayahId = $this->upsertAndGetId(
+                'wilayah',
+                ['kode' => 'WIL-01'],
+                [
+                    'nama' => 'JABODETABEK',
+                    'is_active' => true,
+                    'updated_at' => $now,
+                ]
+            );
 
-            // 2) Cabang
-            $cabangId = DB::table('cabang')->insertGetId([
-                'wilayah_id' => $wilayahId,
-                'kode' => 'CBG-01',
-                'nama' => 'JAKARTA',
-                'alamat' => 'Head Office',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            /*
+            |--------------------------------------------------------------------------
+            | 2) Cabang
+            |--------------------------------------------------------------------------
+            */
+            $cabangId = $this->upsertAndGetId(
+                'cabang',
+                ['kode' => 'CBG-01'],
+                [
+                    'wilayah_id' => $wilayahId,
+                    'nama' => 'JAKARTA',
+                    'alamat' => 'Head Office',
+                    'is_active' => true,
+                    'updated_at' => $now,
+                ]
+            );
 
-            // 3) Departemen
-            $deptIT = DB::table('departemen')->insertGetId([
-                'kode' => 'DEP-IT',
-                'nama' => 'IT',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            /*
+            |--------------------------------------------------------------------------
+            | 3) Departemen
+            |--------------------------------------------------------------------------
+            */
+            $deptIT = $this->upsertAndGetId(
+                'departemen',
+                ['kode' => 'DEP-IT'],
+                [
+                    'nama' => 'IT',
+                    'is_active' => true,
+                    'updated_at' => $now,
+                ]
+            );
 
-            // 4) Roles
+            /*
+            |--------------------------------------------------------------------------
+            | 4) Roles
+            |--------------------------------------------------------------------------
+            */
             $roles = [
                 ['kode' => 'ADMIN', 'nama' => 'Administrator'],
                 ['kode' => 'BM', 'nama' => 'Branch Manager'],
@@ -50,400 +73,444 @@ class InitialSetupSeeder extends Seeder
             ];
 
             $roleIds = [];
-            foreach ($roles as $r) {
-                $roleIds[$r['kode']] = DB::table('roles')->insertGetId([
-                    'kode' => $r['kode'],
-                    'nama' => $r['nama'],
-                    'is_active' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+            foreach ($roles as $role) {
+                $roleIds[$role['kode']] = $this->upsertAndGetId(
+                    'roles',
+                    ['kode' => $role['kode']],
+                    [
+                        'nama' => $role['nama'],
+                        'is_active' => true,
+                        'updated_at' => $now,
+                    ]
+                );
             }
 
-            // 5) Menus (tree)
-            $dashboardMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => null,
-                'name' => 'Dashboard',
-                'path' => '/dashboard',
-                'route_name' => 'dashboard',
-                'icon' => 'tabler-smart-home',
-                'order_no' => 1,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            /*
+            |--------------------------------------------------------------------------
+            | 5) Menus
+            |--------------------------------------------------------------------------
+            */
 
-            $masterMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => null,
-                'name' => 'Master',
-                'path' => null,
-                'route_name' => null,
-                'icon' => 'tabler-settings',
-                'order_no' => 2,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Top level
+            $dashboardMenuId = $this->upsertMenu(
+                ['name' => 'Dashboard', 'parent_id' => null],
+                [
+                    'path' => '/dashboard',
+                    'route_name' => 'dashboard',
+                    'icon' => 'tabler-smart-home',
+                    'order_no' => 1,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $fleetMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Fleet Management',
-                'path' => null,
-                'route_name' => null,
-                'icon' => 'tabler-truck',
-                'order_no' => 6, // sesuaikan urutan di menu Master
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $masterMenuId = $this->upsertMenu(
+                ['name' => 'Master', 'parent_id' => null],
+                [
+                    'path' => null,
+                    'route_name' => null,
+                    'icon' => 'tabler-settings',
+                    'order_no' => 2,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $sopirMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $fleetMenuId, // parent Fleet Management
-                'name' => 'Sopir',
-                'path' => '/master/sopir',
-                'route_name' => 'master-sopir',
-                'icon' => 'tabler-user-circle',
-                'order_no' => 2,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $purchaseMenuId = $this->upsertMenu(
+                ['name' => 'Purchase Non Trading', 'parent_id' => null],
+                [
+                    'path' => null,
+                    'route_name' => null,
+                    'icon' => 'tabler-shopping-cart',
+                    'order_no' => 3,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $mobilMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $fleetMenuId,
-                'name' => 'Mobil',
-                'path' => '/master/mobil',
-                'route_name' => 'master-mobil',
-                'icon' => 'tabler-car',
-                'order_no' => 3,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $authMenuId = $this->upsertMenu(
+                ['name' => 'Auth', 'parent_id' => null],
+                [
+                    'path' => null,
+                    'route_name' => null,
+                    'icon' => 'tabler-lock',
+                    'order_no' => 4,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $ongkosAngkutMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $fleetMenuId,
-                'name' => 'Ongkos Angkut',
-                'path' => '/master/ongkos-angkut',
-                'route_name' => 'master-ongkos-angkut',
-                'icon' => 'tabler-currency-rupiah',
-                'order_no' => 4, // setelah Transportir(1), Sopir(2), Mobil(3)
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            
+            // Purchase children
+            $purchaseRequestMenuId = $this->upsertMenu(
+                ['name' => 'Purchase Request', 'parent_id' => $purchaseMenuId],
+                [
+                    'path' => '/purchase/request',
+                    'route_name' => 'purchase-request',
+                    'icon' => 'tabler-file-invoice',
+                    'order_no' => 1,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $transportirMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $fleetMenuId,
-                'name' => 'Transportir',
-                'path' => '/master/transportir',
-                'route_name' => 'master-transportir',
-                'icon' => 'tabler-building-store',
-                'order_no' => 1,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $purchaseOrderMenuId = $this->upsertMenu(
+                ['name' => 'Purchase Order', 'parent_id' => $purchaseMenuId],
+                [
+                    'path' => '/purchase/order',
+                    'route_name' => 'purchase-order',
+                    'icon' => 'tabler-file-invoice',
+                    'order_no' => 2,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $regionalMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Regional',
-                'path' => null,
-                'route_name' => null,
-                'icon' => 'tabler-map-2',
-                'order_no' => 1,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Master children
+            $regionalMenuId = $this->upsertMenu(
+                ['name' => 'Regional', 'parent_id' => $masterMenuId],
+                [
+                    'path' => null,
+                    'route_name' => null,
+                    'icon' => 'tabler-map-2',
+                    'order_no' => 1,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $authMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => null,
-                'name' => 'Auth',
-                'path' => null,
-                'route_name' => null,
-                'icon' => 'tabler-lock',
-                'order_no' => 3,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $produkId = $this->upsertMenu(
+                ['name' => 'Produk', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/produk',
+                    'route_name' => 'master-produk',
+                    'icon' => 'tabler-archive',
+                    'order_no' => 4,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $userMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId,
-                'name' => 'Users',
-                'path' => '/master/users',
-                'route_name' => 'master-users',
-                'icon' => 'tabler-user',
-                'order_no' => 1,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $pbbkbId = $this->upsertMenu(
+                ['name' => 'PBBKB', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/pbbkb',
+                    'route_name' => 'master-pbbkb',
+                    'icon' => 'tabler-article',
+                    'order_no' => 5,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            // --- Regional children (urut rapi)
-            $provinsiMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $regionalMenuId,
-                'name' => 'Provinsi',
-                'path' => '/master/provinsi',
-                'route_name' => 'master-provinsi',
-                'icon' => 'tabler-map-pin',
-                'order_no' => 2,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $fleetMenuId = $this->upsertMenu(
+                ['name' => 'Fleet Management', 'parent_id' => $masterMenuId],
+                [
+                    'path' => null,
+                    'route_name' => null,
+                    'icon' => 'tabler-truck',
+                    'order_no' => 6,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $kabMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $regionalMenuId,
-                'name' => 'Kabupaten',
-                'path' => '/master/kabupaten',
-                'route_name' => 'master-kabupaten',
-                'icon' => 'tabler-map-pin',
-                'order_no' => 3,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $cabangMenuId = $this->upsertMenu(
+                ['name' => 'Cabang', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/cabang',
+                    'route_name' => 'master-cabang',
+                    'icon' => 'tabler-building',
+                    'order_no' => 8,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $wilayahMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $regionalMenuId,
-                'name' => 'Wilayah',
-                'path' => '/master/wilayah',
-                'route_name' => 'master-wilayah',
-                'icon' => 'tabler-map',
-                'order_no' => 4,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $deptMenuId = $this->upsertMenu(
+                ['name' => 'Departemen', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/departemen',
+                    'route_name' => 'master-departemen',
+                    'icon' => 'tabler-users',
+                    'order_no' => 9,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $areaMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $regionalMenuId,
-                'name' => 'Area',
-                'path' => '/master/area',
-                'route_name' => 'master-area',
-                'icon' => 'tabler-map-pin',
-                'order_no' => 5,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $vendorMenuId = $this->upsertMenu(
+                ['name' => 'Vendor', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/vendor',
+                    'route_name' => 'master-vendor',
+                    'icon' => 'tabler-building-store',
+                    'order_no' => 10,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            // --- Master children
-            $cabangMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Cabang',
-                'path' => '/master/cabang',
-                'route_name' => 'master-cabang',
-                'icon' => 'tabler-building',
-                'order_no' => 8,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $terminalMenuId = $this->upsertMenu(
+                ['name' => 'Terminal', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/terminal',
+                    'route_name' => 'master-terminal',
+                    'icon' => 'tabler-gas-station',
+                    'order_no' => 11,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $customerMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Customer',
-                'path' => '/master/customer',
-                'route_name' => 'master-customer',
-                'icon' => 'tabler-users',
-                'order_no' => 12, // sesuaikan urutan
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $customerMenuId = $this->upsertMenu(
+                ['name' => 'Customer', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/customer',
+                    'route_name' => 'master-customer',
+                    'icon' => 'tabler-users',
+                    'order_no' => 12,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $deptMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Departemen',
-                'path' => '/master/departemen',
-                'route_name' => 'master-departemen',
-                'icon' => 'tabler-users',
-                'order_no' => 9,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $volumeId = $this->upsertMenu(
+                ['name' => 'Volume', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/volume',
+                    'route_name' => 'master-volume',
+                    'icon' => 'tabler-cylinder',
+                    'order_no' => 16,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $vendorMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Vendor',
-                'path' => '/master/vendor',
-                'route_name' => 'master-vendor',
-                'icon' => 'tabler-building-store',
-                'order_no' => 10,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $wilAngkutId = $this->upsertMenu(
+                ['name' => 'Wilayah Angkut', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/wilayah-angkut',
+                    'route_name' => 'master-wilayah-angkut',
+                    'icon' => 'tabler-location-pin',
+                    'order_no' => 17,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $terminalMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId,
-                'name' => 'Terminal',
-                'path' => '/master/terminal',
-                'route_name' => 'master-terminal',
-                'icon' => 'tabler-gas-station',
-                'order_no' => 11,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $hargaJualId = $this->upsertMenu(
+                ['name' => 'Harga Jual', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/harga-jual',
+                    'route_name' => 'master-harga-jual',
+                    'icon' => 'tabler-receipt-dollar',
+                    'order_no' => 18,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            // --- Auth children
-            $roleMenuId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId,
-                'name' => 'Roles',
-                'path' => '/master/roles',
-                'route_name' => 'master-roles',
-                'icon' => 'tabler-shield',
-                'order_no' => 2,
-                'permission_key' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $hargaPertaminaId = $this->upsertMenu(
+                ['name' => 'Harga Dasar Pertamina', 'parent_id' => $masterMenuId],
+                [
+                    'path' => '/master/harga-pertamina',
+                    'route_name' => 'master-harga-pertamina',
+                    'icon' => 'tabler-file-dollar',
+                    'order_no' => 19,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $roleMenuSettingId = DB::table('menus')->insertGetId([
-                'parent_id' => $authMenuId,
-                'name' => 'Role Menu',
-                'path' => '/master/role-menus',
-                'route_name' => 'master-role-menus',
-                'icon' => 'tabler-lock',
-                'order_no' => 3,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Fleet children
+            $transportirMenuId = $this->upsertMenu(
+                ['name' => 'Transportir', 'parent_id' => $fleetMenuId],
+                [
+                    'path' => '/master/transportir',
+                    'route_name' => 'master-transportir',
+                    'icon' => 'tabler-building-store',
+                    'order_no' => 1,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $produkId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId, 
-                'name' => 'Produk',
-                'path' => '/master/produk',
-                'route_name' => 'master-produk',
-                'icon' => 'tabler-archive',
-                'order_no' => 4,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $sopirMenuId = $this->upsertMenu(
+                ['name' => 'Sopir', 'parent_id' => $fleetMenuId],
+                [
+                    'path' => '/master/sopir',
+                    'route_name' => 'master-sopir',
+                    'icon' => 'tabler-user-circle',
+                    'order_no' => 2,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $pbbkbId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId, 
-                'name' => 'PBBKB',
-                'path' => '/master/pbbkb',
-                'route_name' => 'master-pbbkb',
-                'icon' => 'tabler-article',
-                'order_no' => 5,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $mobilMenuId = $this->upsertMenu(
+                ['name' => 'Mobil', 'parent_id' => $fleetMenuId],
+                [
+                    'path' => '/master/mobil',
+                    'route_name' => 'master-mobil',
+                    'icon' => 'tabler-car',
+                    'order_no' => 3,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            $volumeId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId, 
-                'name' => 'Volume',
-                'path' => '/master/volume',
-                'route_name' => 'master-volume',
-                'icon' => 'tabler-cylinder',
-                'order_no' => 16,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $wilAngkutId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId, 
-                'name' => 'Wilayah Angkut',
-                'path' => '/master/wilayah-angkut',
-                'route_name' => 'master-wilayah-angkut',
-                'icon' => 'tabler-location-pin',
-                'order_no' => 17,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $hargaJualId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId, 
-                'name' => 'Harga Jual',
-                'path' => '/master/harga-jual',
-                'route_name' => 'master-harga-jual',
-                'icon' => 'tabler-receipt-dollar',
-                'order_no' => 18,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $hargaPertaminaId = DB::table('menus')->insertGetId([
-                'parent_id' => $masterMenuId, 
-                'name' => 'Harga Dasar Pertamina',
-                'path' => '/master/harga-pertamina',
-                'route_name' => 'master-harga-pertamina',
-                'icon' => 'tabler-file-dollar ',
-                'order_no' => 19,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-              
+            $ongkosAngkutMenuId = $this->upsertMenu(
+                ['name' => 'Ongkos Angkut', 'parent_id' => $fleetMenuId],
+                [
+                    'path' => '/master/ongkos-angkut',
+                    'route_name' => 'master-ongkos-angkut',
+                    'icon' => 'tabler-currency-rupiah',
+                    'order_no' => 4,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            // 6) Admin User
-            $adminUserId = DB::table('users')->insertGetId([
-                'name' => 'Admin SYOP',
-                'email' => 'admin@syop.local',
-                'password' => Hash::make('admin123'),
-                'cabang_id' => $cabangId,
-                'departemen_id' => $deptIT,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Regional children
+            $provinsiMenuId = $this->upsertMenu(
+                ['name' => 'Provinsi', 'parent_id' => $regionalMenuId],
+                [
+                    'path' => '/master/provinsi',
+                    'route_name' => 'master-provinsi',
+                    'icon' => 'tabler-map-pin',
+                    'order_no' => 2,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
 
-            // 7) Attach admin role
-            DB::table('user_roles')->insert([
+            $kabMenuId = $this->upsertMenu(
+                ['name' => 'Kabupaten', 'parent_id' => $regionalMenuId],
+                [
+                    'path' => '/master/kabupaten',
+                    'route_name' => 'master-kabupaten',
+                    'icon' => 'tabler-map-pin',
+                    'order_no' => 3,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $wilayahMenuId = $this->upsertMenu(
+                ['name' => 'Wilayah', 'parent_id' => $regionalMenuId],
+                [
+                    'path' => '/master/wilayah',
+                    'route_name' => 'master-wilayah',
+                    'icon' => 'tabler-map',
+                    'order_no' => 4,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $areaMenuId = $this->upsertMenu(
+                ['name' => 'Area', 'parent_id' => $regionalMenuId],
+                [
+                    'path' => '/master/area',
+                    'route_name' => 'master-area',
+                    'icon' => 'tabler-map-pin',
+                    'order_no' => 5,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            // Auth children
+            $userMenuId = $this->upsertMenu(
+                ['name' => 'Users', 'parent_id' => $authMenuId],
+                [
+                    'path' => '/master/users',
+                    'route_name' => 'master-users',
+                    'icon' => 'tabler-user',
+                    'order_no' => 1,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $roleMenuId = $this->upsertMenu(
+                ['name' => 'Roles', 'parent_id' => $authMenuId],
+                [
+                    'path' => '/master/roles',
+                    'route_name' => 'master-roles',
+                    'icon' => 'tabler-shield',
+                    'order_no' => 2,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $roleMenuSettingId = $this->upsertMenu(
+                ['name' => 'Role Menu', 'parent_id' => $authMenuId],
+                [
+                    'path' => '/master/role-menus',
+                    'route_name' => 'master-role-menus',
+                    'icon' => 'tabler-lock',
+                    'order_no' => 3,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | 6) Admin User
+            |--------------------------------------------------------------------------
+            */
+            $adminUserId = $this->upsertAndGetId(
+                'users',
+                ['email' => 'admin@syop.local'],
+                [
+                    'name' => 'Admin SYOP',
+                    'password' => Hash::make('admin123'),
+                    'cabang_id' => $cabangId,
+                    'departemen_id' => $deptIT,
+                    'is_active' => true,
+                    'updated_at' => $now,
+                ]
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | 7) Attach Admin Role
+            |--------------------------------------------------------------------------
+            */
+            $this->upsertPivot('user_roles', [
                 'user_id' => $adminUserId,
                 'role_id' => $roleIds['ADMIN'],
             ]);
 
-            // 8) Attach menus to ADMIN role
+            /*
+            |--------------------------------------------------------------------------
+            | 8) Attach menus to ADMIN role
+            |--------------------------------------------------------------------------
+            */
             $menuIds = [
                 $dashboardMenuId,
                 $masterMenuId,
+                $purchaseMenuId,
+                $purchaseRequestMenuId,
+                $purchaseOrderMenuId,
                 $regionalMenuId,
                 $provinsiMenuId,
                 $kabMenuId,
                 $wilayahMenuId,
                 $areaMenuId,
                 $fleetMenuId,
+                $transportirMenuId,
                 $sopirMenuId,
                 $mobilMenuId,
                 $ongkosAngkutMenuId,
-                $transportirMenuId,
                 $cabangMenuId,
                 $deptMenuId,
                 $vendorMenuId,
                 $terminalMenuId,
-                $customerMenuId,  
-
+                $customerMenuId,
                 $authMenuId,
                 $userMenuId,
                 $roleMenuId,
@@ -453,21 +520,61 @@ class InitialSetupSeeder extends Seeder
                 $volumeId,
                 $wilAngkutId,
                 $hargaJualId,
-                $hargaPertaminaId
+                $hargaPertaminaId,
             ];
 
-            foreach ($menuIds as $mid) {
-                DB::table('role_menus')->insert([
+            foreach ($menuIds as $menuId) {
+                $this->upsertPivot('role_menus', [
                     'role_id' => $roleIds['ADMIN'],
-                    'menu_id' => $mid,
+                    'menu_id' => $menuId,
                 ]);
             }
 
-            // 9) Multi-cabang user (opsional)
-            DB::table('user_cabang')->insert([
+            /*
+            |--------------------------------------------------------------------------
+            | 9) Multi-cabang user
+            |--------------------------------------------------------------------------
+            */
+            $this->upsertPivot('user_cabang', [
                 'user_id' => $adminUserId,
                 'cabang_id' => $cabangId,
             ]);
         });
+    }
+
+    private function upsertAndGetId(string $table, array $uniqueBy, array $values): int
+    {
+        $existing = DB::table($table)->where($uniqueBy)->first();
+
+        if ($existing) {
+            DB::table($table)
+                ->where($uniqueBy)
+                ->update(array_merge($values, [
+                    'updated_at' => now(),
+                ]));
+
+            return (int) $existing->id;
+        }
+
+        return (int) DB::table($table)->insertGetId(array_merge(
+            $uniqueBy,
+            $values,
+            [
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        ));
+    }
+
+    private function upsertMenu(array $uniqueBy, array $values): int
+    {
+        return $this->upsertAndGetId('menus', $uniqueBy, $values);
+    }
+
+    private function upsertPivot(string $table, array $uniqueBy): void
+    {
+        if (!DB::table($table)->where($uniqueBy)->exists()) {
+            DB::table($table)->insert($uniqueBy);
+        }
     }
 }
