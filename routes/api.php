@@ -1,10 +1,12 @@
 <?php
 
 // use App\Http\Api\Master\Controllers\ProdukController as ControllersProdukController;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AccurateController;
 use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\Master\WilayahController;
 use App\Http\Controllers\Api\Master\CabangController;
@@ -35,6 +37,7 @@ use App\Http\Controllers\Api\Master\GroupCabangController;
 use App\Http\Controllers\Api\Master\MasterDokumenPendukungController;
 use App\Http\Controllers\Api\Master\MasterKeteranganTransaksiController;
 use App\Http\Controllers\Api\Master\MasterVendorController;
+use App\Http\Controllers\Api\PurchaseOrderInventoryController;
 use App\Http\Controllers\Api\Master\UnitController as MasterUnitController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PurchaseOrderController;
@@ -81,10 +84,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('master/wilayah-angkut', WilayahAngkutController::class);
     Route::apiResource('master/harga-jual', HargaJualController::class);
     Route::apiResource('master/harga-pertamina', HargaPertaminaController::class);
+    //get API
     Route::get('/provinsi', [WilayahAngkutController::class, 'provinsi']);
     Route::get('/kabupaten/{provinsi}', [WilayahAngkutController::class, 'kabupaten']);
     Route::get('/area', [HargaPertaminaController::class, 'area']);
     Route::get('/produk', [HargaPertaminaController::class, 'produk']);
+    Route::get('/terminal', [TerminalController::class, 'terminal']);
 
     Route::get('master/transportir-mobil', [TransportirMobilController::class, 'index']);
     Route::post('master/transportir-mobil', [TransportirMobilController::class, 'store']);
@@ -154,5 +159,29 @@ Route::middleware('auth:sanctum')->group(function () {
             ->parameters([
                 'purchase-order' => 'publicId',
             ]);
+    });
+
+    //API ACCURATE
+    Route::get('accurate/products', [AccurateController::class, 'products']);
+    Route::get('accurate/accounts', [AccurateController::class, 'accounts']);
+    Route::get('accurate/detail-po', [AccurateController::class, 'getDetailPO']);
+
+    // ===================== PURCHASE ORDER INVERNTORY =========================
+    Route::prefix('inventory')->group(function () {
+        Route::apiResource('purchase-order', PurchaseOrderInventoryController::class);
+        Route::post('purchase-order/{id}/approve-cfo',[PurchaseOrderInventoryController::class, 'approveCFO']
+);
+    });
+
+    //API ACCURATE
+    Route::get('accurate/products', [AccurateController::class, 'products']);
+    Route::get('accurate/accounts', [AccurateController::class, 'accounts']);
+    Route::get('accurate/detail-po', [AccurateController::class, 'getDetailPO']);
+
+    // ===================== PURCHASE ORDER INVERNTORY =========================
+    Route::prefix('inventory')->group(function () {
+        Route::apiResource('purchase-order', PurchaseOrderInventoryController::class);
+        Route::post('purchase-order/{id}/approve-cfo',[PurchaseOrderInventoryController::class, 'approveCFO']
+);
     });
 });
