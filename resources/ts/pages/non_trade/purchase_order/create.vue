@@ -212,7 +212,7 @@ const loadVendors = async (showAlert = true): Promise<void> => {
   isLoadingVendor.value = true
 
   try {
-    const res = await axios.get('/master/vendor/dropdown-select', {
+    const res = await axios.get('/master/vendor/dropdown-po', {
       headers: { Accept: 'application/json' },
       params: {
         id_department: form.id_department,
@@ -681,6 +681,7 @@ onMounted(async () => {
           variant="text"
           color="secondary"
           @click="goBack"
+          class="text-none"
         >
           Kembali
         </VBtn>
@@ -856,7 +857,7 @@ onMounted(async () => {
                   </tr>
 
                   <tr v-else-if="!purchaseRequestList.length">
-                    <td colspan="6" class="text-center text-medium-emphasis py-6">
+                    <td colspan="7" class="text-center text-medium-emphasis py-6">
                       Tidak ada Purchase Request tersedia untuk department ini.
                     </td>
                   </tr>
@@ -1303,6 +1304,7 @@ onMounted(async () => {
             color="secondary"
             variant="outlined"
             @click.prevent.stop="confirmCancel"
+            class="text-none"
           >
             Batal
           </VBtn>
@@ -1312,6 +1314,7 @@ onMounted(async () => {
             color="primary"
             :loading="isSaving"
             @click="savePurchaseOrder"
+            class="text-none"
           >
             Simpan
           </VBtn>
@@ -1323,8 +1326,8 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .pr-attachment-cell {
-  min-width: 220px;
-  max-width: 280px;
+  min-width: 150px;
+  max-width: 150px;
   vertical-align: middle;
 }
 

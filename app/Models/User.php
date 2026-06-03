@@ -18,7 +18,10 @@ class User extends Authenticatable
         'departemen_id',
         'is_active',
         'signature_path',
-        'signature_uploaded_at'
+        'signature_uploaded_at',
+        'username',
+        'last_login_at',
+        'last_logout_at'
     ];
 
     protected $hidden = [

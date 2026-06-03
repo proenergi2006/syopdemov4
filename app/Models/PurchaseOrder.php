@@ -98,4 +98,13 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchaseOrderApproval::class, 'purchase_order_id')
             ->orderBy('step_order');
     }
+
+    public function goodsReceives()
+    {
+        return $this->hasMany(GoodsReceive::class);
+    }
+
+    public const STATUS_RECEIVE_OPEN = 'OPEN';
+    public const STATUS_RECEIVE_PARTIAL = 'PARTIAL RECEIVED';
+    public const STATUS_RECEIVE_FULL = 'FULL RECEIVED';
 }

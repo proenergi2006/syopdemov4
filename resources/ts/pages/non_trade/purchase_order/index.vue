@@ -15,7 +15,9 @@ import {
 
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { useNativeDatePicker } from '@core/composable/useNativeDatePicker'
+import { useDeleteConfirm } from '@core/composable/useDeleteConfirm'
 import { formatDate, formatStatusPKP, formatNumberWithoutRp, toTitleCase, formatDecimalQty } from '@/utils/textFormatter'
+import { usePolling } from '@core/composable/usePolling'
 
 interface PurchaseOrderItem {
   id: number
@@ -76,6 +78,12 @@ const submitLoading = ref(false)
 const approveLoading = ref(false)
 const approveNotes = ref('')
 
+// Reject
+const rejectDialog = ref(false)
+const rejectTarget = ref<any>(null)
+const rejectNotes = ref('')
+const rejectLoading = ref(false)
+
 const pendingAction = ref<'submit' | 'approve' | null>(null)
 const selectedPo = ref<any>(null)
 
@@ -97,12 +105,7 @@ const totalPage = ref(1)
 
 const loadError = ref(false)
 
-const deleteDialog = ref(false)
-const deleteLoading = ref(false)
-const deleteTarget = ref<any | null>(null)
-
 const detailDialog = ref(false)
-const detailLoading = ref(false)
 const detailError = ref('')
 const detailPurchaseOrder = ref<any | null>(null)
 const detailPurchaseOrderPublicId = ref<string | null>(null)
@@ -158,10 +161,10 @@ const detailItems = computed(() => detailPurchaseOrder.value?.items || [])
 
 const statusItems = [
   { title: 'Semua', value: '' },
-  { title: 'Draft', value: 'DRAFT' },
-  { title: 'In Progress', value: 'IN PROGRESS' },
-  { title: 'Approved', value: 'APPROVED' },
-  { title: 'Rejected', value: 'REJECTED' },
+  { title: 'Draft', value: 'Draft' },
+  { title: 'In Progress', value: 'In Progress' },
+  { title: 'Approved', value: 'Approved' },
+  { title: 'Rejected', value: 'Rejected' },
 ]
 
 const paginationData = computed(() => {
@@ -178,10 +181,10 @@ const formatStatus = (status: string | null): string => {
 
   const normalized = String(status).toLowerCase()
 
-  if (normalized === 'draft') return 'DRAFT'
-  if (normalized === 'in progress') return 'IN PROGRESS'
-  if (normalized === 'approved') return 'APPROVED'
-  if (normalized === 'rejected') return 'REJECTED'
+  if (normalized === 'draft') return 'Draft'
+  if (normalized === 'in progress') return 'In Progress'
+  if (normalized === 'approved') return 'Approved'
+  if (normalized === 'rejected') return 'Rejected'
 
   return status
 }
@@ -262,8 +265,6 @@ const fetchPurchaseOrders = async (): Promise<void> => {
 
     const err = error as AxiosErrorShape
 
-    console.error('[Purchase Order] FETCH ERROR:', err)
-
     showErrorToast({
       title: 'Error',
       text: getApiErrorMessage(err, 'Gagal memuat data purchase order'),
@@ -277,6 +278,11 @@ const fetchPurchaseOrders = async (): Promise<void> => {
   }
 }
 
+// UsePolling
+usePolling(fetchPurchaseOrders, {
+  interval: 30000,
+})
+
 const calcPOTotal = (items: any[] = []) => {
   return items.reduce((total, item) => total + Number(item.subtotal || 0), 0)
 }
@@ -287,6 +293,76 @@ const checkUserSignature = async (): Promise<boolean> => {
   })
 
   return response.data?.has_signature === true
+}
+
+const openRejectPO = (po: any): void => {
+  rejectTarget.value = po
+  rejectNotes.value = ''
+  rejectDialog.value = true
+}
+
+const rejectPurchaseOrder = async (): Promise<void> => {
+  if (!rejectTarget.value || rejectLoading.value) return
+
+  const target = { ...rejectTarget.value }
+  const notes = rejectNotes.value || null
+
+  // tutup modal notes dulu supaya SweetAlert tidak ketutup
+  rejectDialog.value = false
+
+  await nextTick()
+
+  const confirm = await showConfirmAlert({
+    title: 'Reject Purchase Order?',
+    text: `Purchase Order "${target.nomor_po}" akan ditolak.`,
+    confirmButtonText: 'Ya, reject',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) {
+    // kalau batal, buka lagi modal notes agar catatan tidak hilang
+    rejectDialog.value = true
+    return
+  }
+
+  rejectLoading.value = true
+
+  try {
+    showLoadingAlert('Reject Purchase Order...', 'Mohon tunggu sebentar')
+
+    const response = await axios.patch(`/transaction/purchase-order/${target.public_id}/reject`, {
+      notes,
+    }, {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+
+    closeAlert()
+
+    rejectNotes.value = ''
+    rejectTarget.value = null
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text: response.data?.message || `Purchase Order "${target.nomor_po}" berhasil direject`,
+    })
+
+    await fetchPurchaseOrders()
+  } catch (error: unknown) {
+    closeAlert()
+
+    // kalau gagal, modal notes dibuka lagi supaya user bisa koreksi/ulang
+    rejectDialog.value = true
+
+    showErrorToast({
+      title: 'Error',
+      text: getApiErrorMessage(error, 'Gagal reject Purchase Order'),
+    })
+  } finally {
+    rejectLoading.value = false
+  }
 }
 
 const openSubmitPO = async (po: any): Promise<void> => {
@@ -445,8 +521,6 @@ const printPurchaseOrder = async (publicId: string): Promise<void> => {
 }
 
 const openDetail = async (publicId: string): Promise<void> => {
-  detailDialog.value = true
-  detailLoading.value = true
   detailError.value = ''
   detailPurchaseOrder.value = null
   detailPurchaseOrderPublicId.value = publicId
@@ -455,15 +529,28 @@ const openDetail = async (publicId: string): Promise<void> => {
   detailItemPerPage.value = 10
 
   try {
+    showLoadingAlert(
+      'Memuat data Purchase Order',
+      'Mohon tunggu sebentar',
+    )
+
     const response = await axios.get(`/transaction/purchase-order/${publicId}`, {
       headers: { Accept: 'application/json' },
     })
 
     detailPurchaseOrder.value = response.data?.data || null
+
+    closeAlert()
+    detailDialog.value = true
   } catch (error: unknown) {
-    detailError.value = getApiErrorMessage(error, 'Gagal memuat detail Purchase Order.')
-  } finally {
-    detailLoading.value = false
+    closeAlert()
+
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Error',
+      text: getApiErrorMessage(err, 'Gagal memuat data Purchase Order.'),
+    })
   }
 }
 
@@ -485,91 +572,28 @@ const goToEdit = (publicId: string): void => {
   router.push(`/non_trade/purchase_order/edit?id=${publicId}`)
 }
 
+const { openDeleteConfirm } = useDeleteConfirm()
+
 const openDelete = (row: any): void => {
-  deleteTarget.value = row
-  deleteDialog.value = true
-}
-
-const closeDelete = (): void => {
-  deleteDialog.value = false
-  deleteTarget.value = null
-}
-
-const confirmDelete = async (): Promise<void> => {
-  if (!deleteTarget.value || deleteLoading.value) return
-
-  deleteLoading.value = true
-
-  const poPublicId = deleteTarget.value.public_id
-  const nomorPo = deleteTarget.value.nomor_po
-
-  try {
-    closeDelete()
-
-    showLoadingAlert('Menghapus Purchase Order...', 'Mohon tunggu sebentar')
-
-    await axios.delete(`/transaction/purchase-order/${poPublicId}`)
-
-    closeAlert()
-
-    showSuccessToast({
-      title: 'Berhasil',
-      text: `Purchase Order "${nomorPo}" berhasil dihapus`,
-    })
-
-    await fetchPurchaseOrders()
-  } catch (error: unknown) {
-    closeAlert()
-
-    const err = error as AxiosErrorShape
-
+  if (String(row.status || '').toUpperCase() !== 'DRAFT') {
     showErrorToast({
-      title: 'Error',
-      text: getApiErrorMessage(err, 'Gagal menghapus Purchase Order'),
+      title: 'Tidak dapat dihapus',
+      text: 'Purchase Order hanya dapat dihapus jika status masih DRAFT.',
     })
 
-    console.error('[Purchase Order] DELETE ERROR:', err)
-  } finally {
-    deleteLoading.value = false
+    return
   }
+
+  openDeleteConfirm({
+    title: 'Hapus Purchase Order?',
+    message: `Apakah Anda yakin ingin menghapus Purchase Order <strong>${row.nomor_po}</strong>?`,
+    loadingTitle: 'Menghapus Purchase Order...',
+    successText: `Purchase Order "${row.nomor_po}" berhasil dihapus`,
+    errorText: 'Gagal menghapus Purchase Order',
+    url: `/transaction/purchase-order/${encodeURIComponent(row.public_id)}`,
+    onSuccess: fetchPurchaseOrders,
+  })
 }
-
-// const submitPurchaseOrder = async (po: any): Promise<void> => {
-//   if (!po?.public_id) return
-
-//   const confirm = await showConfirmAlert({
-//     title: 'Submit Purchase Order?',
-//     text: `Purchase Order "${po.nomor_po}" akan masuk proses approval.`,
-//     confirmButtonText: 'Ya, submit',
-//     cancelButtonText: 'Batal',
-//   })
-
-//   if (!confirm.isConfirmed) return
-
-//   try {
-//     showLoadingAlert('Submit Purchase Order...', 'Mohon tunggu sebentar')
-
-//     await axios.patch(`/transaction/purchase-order/${po.public_id}/submit`, null, {
-//       headers: { Accept: 'application/json' },
-//     })
-
-//     closeAlert()
-
-//     showSuccessToast({
-//       title: 'Berhasil',
-//       text: `Purchase Order "${po.nomor_po}" berhasil disubmit`,
-//     })
-
-//     await fetchPurchaseOrders()
-//   } catch (error: unknown) {
-//     closeAlert()
-
-//     showErrorToast({
-//       title: 'Error',
-//       text: getApiErrorMessage(error, 'Gagal submit Purchase Order'),
-//     })
-//   }
-// }
 
 const submitPurchaseOrder = async (): Promise<void> => {
   if (!selectedPo.value || submitLoading.value) return
@@ -679,69 +703,6 @@ const approvePurchaseOrder = async (): Promise<void> => {
   }
 }
 
-const handleSubmitPurchaseOrder = async (po: any): Promise<void> => {
-  selectedPo.value = po
-  pendingAction.value = 'submit'
-
-  const hasSignature = await checkUserSignature()
-
-  if (!hasSignature) {
-    await openSignatureDialog()
-    return
-  }
-
-  await submitPurchaseOrder()
-}
-
-const handleApprovePurchaseOrder = async (po: any): Promise<void> => {
-  selectedPo.value = po
-  pendingAction.value = 'approve'
-
-  const hasSignature = await checkUserSignature()
-
-  if (!hasSignature) {
-    await openSignatureDialog()
-    return
-  }
-
-  await approvePurchaseOrder()
-}
-
-// Polling
-let pollingTimer: ReturnType<typeof setInterval> | null = null
-
-const startPolling = (): void => {
-  if (pollingTimer) return
-
-  pollingTimer = setInterval(async () => {
-    if (document.hidden) return
-
-    await fetchPurchaseOrders()
-  }, 30000)
-}
-
-const stopPolling = (): void => {
-  if (pollingTimer) {
-    clearInterval(pollingTimer)
-    pollingTimer = null
-  }
-}
-
-const handleVisibilityChange = (): void => {
-  if (document.hidden) {
-    stopPolling()
-  } else {
-    fetchPurchaseOrders()
-    startPolling()
-  }
-}
-
-onBeforeUnmount(() => {
-  stopPolling()
-
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
-})
-
 watch(currentPage, async () => {
   await fetchPurchaseOrders()
 })
@@ -795,10 +756,6 @@ onMounted(async () => {
   window.addEventListener('purchase-order:refresh', handlePurchaseOrderRefresh)
 
   fetchPurchaseOrders()
-
-  startPolling()
-
-  document.addEventListener('visibilitychange', handleVisibilityChange)
 
   window.addEventListener('resize', resizeSignatureCanvas)
 
@@ -922,10 +879,11 @@ onBeforeUnmount(() => {
         <VRow class="mt-1">
           <VCol cols="12" class="d-flex justify-end">
             <VBtn
-              variant="outlined"
               color="secondary"
               prepend-icon="tabler-refresh"
               @click="resetFilters"
+              class="text-none"
+              block
             >
               Reset Filter
             </VBtn>
@@ -937,7 +895,7 @@ onBeforeUnmount(() => {
     <!-- Table -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
-        <VBtn color="primary" @click="goToCreate">
+        <VBtn color="primary" @click="goToCreate" class="text-none">
           + Tambah Purchase Order
         </VBtn>
 
@@ -970,14 +928,14 @@ onBeforeUnmount(() => {
       <VTable class="text-no-wrap">
         <thead>
           <tr>
-            <th scope="col" class="text-center">NO</th>
-            <th scope="col" class="text-center">NOMOR PO</th>
-            <th scope="col" class="text-center">TANGGAL</th>
-            <th scope="col" class="text-center">CABANG</th>
-            <th scope="col" class="text-center">DEPARTMENT</th>
-            <th scope="col" class="text-right">TOTAL</th>
-            <th scope="col" class="text-center">STATUS APPROVAL</th>
-            <th scope="col" class="text-center" style="width: 5rem;">ACTIONS</th>
+            <th scope="col" class="text-center">No</th>
+            <th scope="col" class="text-center">Nomor PO</th>
+            <th scope="col" class="text-center">Tanggal</th>
+            <th scope="col" class="text-center">Cabang</th>
+            <th scope="col" class="text-center">Department</th>
+            <th scope="col" class="text-right">Total</th>
+            <th scope="col" class="text-center">Status Pengajuan</th>
+            <th scope="col" class="text-center" style="width: 5rem;">Actions</th>
           </tr>
         </thead>
 
@@ -1032,7 +990,7 @@ onBeforeUnmount(() => {
                     </VListItem>
 
                     <VListItem
-                      v-if="String(v.status).toLowerCase() !== 'draft'"
+                      v-if="String(v.status).toLowerCase() !== 'draft' && String(v.status).toLowerCase() !== 'rejected'"
                       href="javascript:void(0)"
                       :disabled="printLoadingId === v.public_id"
                       @click="printPurchaseOrder(v.public_id)"
@@ -1075,6 +1033,24 @@ onBeforeUnmount(() => {
                     </VListItem>
 
                     <VListItem
+                      v-if="v.status === 'IN PROGRESS' && v.can_approve"
+                      @click="openRejectPO(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-close-circle-outline"
+                          :size="20"
+                          color="error"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-error">
+                        Reject
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
                       v-if="String(v.status).toLowerCase() === 'draft'"
                       href="javascript:void(0)"
                       @click="openSubmitPO(v)"
@@ -1103,9 +1079,9 @@ onBeforeUnmount(() => {
                       @click="openDelete(v)"
                     >
                       <template #prepend>
-                        <VIcon icon="mdi-delete-outline" :size="20" class="me-3" />
+                        <VIcon icon="tabler-trash" :size="20" class="me-3 text-error" />
                       </template>
-                      <VListItemTitle>Delete</VListItemTitle>
+                      <VListItemTitle class="text-error">Delete</VListItemTitle>
                     </VListItem>
                   </VList>
                 </VMenu>
@@ -1153,44 +1129,6 @@ onBeforeUnmount(() => {
       </VCardText>
     </VCard>
 
-    <!-- Delete Dialog -->
-    <VDialog
-      v-model="deleteDialog"
-      max-width="460"
-    >
-      <VCard>
-        <VCardTitle class="text-h6">
-          Hapus Purchase Order?
-        </VCardTitle>
-
-        <VCardText>
-          Apakah Anda yakin ingin menghapus Purchase Order
-          <strong>{{ deleteTarget?.nomor_po }}</strong>?
-          <br>
-          Data yang dihapus tidak dapat dikembalikan.
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            :disabled="deleteLoading"
-            @click="closeDelete"
-          >
-            Batal
-          </VBtn>
-
-          <VBtn
-            color="error"
-            :loading="deleteLoading"
-            @click="confirmDelete"
-          >
-            Ya, Hapus
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
     <VDialog
       v-model="detailDialog"
       max-width="1250"
@@ -1234,44 +1172,7 @@ onBeforeUnmount(() => {
         <VDivider />
 
         <VCardText class="pa-6">
-          <div
-            v-if="detailLoading"
-            class="d-flex flex-column align-center justify-center py-12"
-          >
-            <VProgressCircular
-              indeterminate
-              size="46"
-              width="4"
-              color="primary"
-            />
-
-            <div class="mt-4 text-medium-emphasis">
-              Memuat detail purchase order...
-            </div>
-          </div>
-
-          <VAlert
-            v-else-if="detailError"
-            type="error"
-            variant="tonal"
-            border="start"
-          >
-            <div class="d-flex align-center justify-space-between w-100">
-              <div>{{ detailError }}</div>
-
-              <VBtn
-                size="small"
-                color="error"
-                variant="outlined"
-                prepend-icon="tabler-refresh"
-                @click="detailPurchaseOrderPublicId && openDetail(detailPurchaseOrderPublicId)"
-              >
-                Coba Lagi
-              </VBtn>
-            </div>
-          </VAlert>
-
-          <div v-else-if="detailPurchaseOrder">
+          <div v-if="detailPurchaseOrder">
             <VRow class="mb-5">
               <VCol cols="12" md="8">
                 <VCard class="h-100 rounded-xl po-info-card">
@@ -1579,6 +1480,7 @@ onBeforeUnmount(() => {
           <VBtn
             variant="tonal"
             @click="detailDialog = false"
+            class="text-none"
           >
             Tutup
           </VBtn>
@@ -1686,6 +1588,68 @@ onBeforeUnmount(() => {
             @click="saveSignatureAndContinue"
           >
             Simpan & Lanjutkan
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="rejectDialog"
+      max-width="560"
+      persistent
+    >
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2">
+          <VIcon
+            icon="mdi-close-circle-outline"
+            color="error"
+          />
+          Reject Purchase Order
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <p class="text-body-2 mb-4">
+            Anda akan menolak Purchase Order:
+            <strong>{{ rejectTarget?.nomor_po || '-' }}</strong>
+          </p>
+
+          <VTextarea
+            v-model="rejectNotes"
+            label="Catatan reject"
+            placeholder="Masukkan alasan reject jika diperlukan"
+            rows="4"
+            auto-grow
+            clearable
+            :disabled="rejectLoading"
+          />
+
+          <div class="text-caption text-medium-emphasis mt-2">
+            Catatan bersifat optional, namun disarankan diisi agar requester mengetahui alasan penolakan.
+          </div>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions>
+          <VSpacer />
+
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            :disabled="rejectLoading"
+            @click="rejectDialog = false"
+          >
+            Batal
+          </VBtn>
+
+          <VBtn
+            color="error"
+            :loading="rejectLoading"
+            @click="rejectPurchaseOrder"
+          >
+            Reject
           </VBtn>
         </VCardActions>
       </VCard>

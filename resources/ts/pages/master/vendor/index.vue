@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, onMounted, ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from '@axios'
 import {
@@ -10,10 +10,12 @@ import {
   showSuccessToast,
   showErrorToast,
   showWarningToast,
-  showInfoToast
+  showInfoToast,
+  showConfirmAlert
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
-import { formatStatusPKP, formatKategoriVendor } from '@/utils/textFormatter'
+import { formatStatusPKP, formatKategoriVendor, toTitleCase } from '@/utils/textFormatter'
+import { usePolling } from '@core/composable/usePolling'
 
 interface Vendor {
   id: number
@@ -61,6 +63,13 @@ type SnackbarColor = 'success' | 'error' | 'warning' | 'info'
 
 const route = useRoute()
 const router = useRouter()
+
+const vendorApprovalLoading = ref(false)
+
+const rejectVendorDialog = ref(false)
+const rejectVendorTarget = ref<any>(null)
+const rejectVendorNotes = ref('')
+const rejectVendorLoading = ref(false)
 
 // =========================
 // Navigation
@@ -132,11 +141,125 @@ const confirmUpdateStatus = async (): Promise<void> => {
   }
 }
 
+const approveVendor = async (vendor: any): Promise<void> => {
+  if (!vendor?.public_id || vendorApprovalLoading.value) return
+
+  const confirm = await showConfirmAlert({
+    title: 'Approve Vendor?',
+    text: `Vendor "${vendor.nama_vendor}" akan disetujui.`,
+    confirmButtonText: 'Ya, approve',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) return
+
+  vendorApprovalLoading.value = true
+
+  try {
+    showLoadingAlert('Approve Vendor...', 'Mohon tunggu sebentar')
+
+    const response = await axios.patch(`/master/vendor/${vendor.public_id}/approve`, {}, {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+
+    closeAlert()
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text: response.data?.message || `Vendor "${vendor.nama_vendor}" berhasil diapprove.`,
+    })
+
+    await fetchRows()
+  } catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: 'Error',
+      text: getApiErrorMessage(error, 'Gagal approve Vendor'),
+    })
+  } finally {
+    vendorApprovalLoading.value = false
+  }
+}
+
+const openRejectVendor = (vendor: any): void => {
+  rejectVendorTarget.value = vendor
+  rejectVendorNotes.value = ''
+  rejectVendorDialog.value = true
+}
+
+const rejectVendor = async (): Promise<void> => {
+  if (!rejectVendorTarget.value || rejectVendorLoading.value) return
+
+  const target = { ...rejectVendorTarget.value }
+  const notes = rejectVendorNotes.value || null
+
+  rejectVendorDialog.value = false
+
+  await nextTick()
+
+  const confirm = await showConfirmAlert({
+    title: 'Reject Vendor?',
+    text: `Vendor "${target.nama_vendor}" akan ditolak.`,
+    confirmButtonText: 'Ya, reject',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) {
+    rejectVendorDialog.value = true
+    return
+  }
+
+  rejectVendorLoading.value = true
+
+  try {
+    showLoadingAlert('Reject Vendor...', 'Mohon tunggu sebentar')
+
+    const response = await axios.patch(`/master/vendor/${target.public_id}/reject`, {
+      notes,
+    }, {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+
+    closeAlert()
+
+    rejectVendorNotes.value = ''
+    rejectVendorTarget.value = null
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text: response.data?.message || `Vendor "${target.nama_vendor}" berhasil direject.`,
+    })
+
+    await fetchRows()
+  } catch (error: unknown) {
+    closeAlert()
+
+    rejectVendorDialog.value = true
+
+    showErrorToast({
+      title: 'Error',
+      text: getApiErrorMessage(error, 'Gagal reject Vendor'),
+    })
+  } finally {
+    rejectVendorLoading.value = false
+  }
+}
+
 // =========================
 // Main state
 // =========================
 const loading = ref<boolean>(false)
 const rows = ref<Vendor[]>([])
+const isVendorDraft = (vendor: any): boolean => {
+  return String(vendor?.status_approval || '').toUpperCase() === 'DRAFT'
+}
 
 // =========================
 // Filters
@@ -336,6 +459,52 @@ const selectedTransaksiList = computed(() => {
     })
 })
 
+const submitVendorLoading = ref(false)
+
+const submitVendor = async (vendor: any): Promise<void> => {
+  if (!vendor?.public_id || submitVendorLoading.value) return
+
+  const confirm = await showConfirmAlert({
+    title: 'Submit Vendor?',
+    text: `Vendor "${vendor.nama_vendor}" akan masuk proses review Finance.`,
+    confirmButtonText: 'Ya, submit',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) return
+
+  submitVendorLoading.value = true
+
+  try {
+    showLoadingAlert('Submit Vendor...', 'Mohon tunggu sebentar')
+
+    const response = await axios.patch(`/master/vendor/${vendor.public_id}/submit`, {}, {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+
+    closeAlert()
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text: response.data?.message || `Vendor "${vendor.nama_vendor}" berhasil disubmit.`,
+    })
+
+    await fetchRows()
+  } catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: 'Error',
+      text: getApiErrorMessage(error, 'Gagal submit Vendor'),
+    })
+  } finally {
+    submitVendorLoading.value = false
+  }
+}
+
 // =========================
 // Snackbar
 // =========================
@@ -492,6 +661,15 @@ const fetchRows = async (): Promise<void> => {
   }
 }
 
+// UsePolling
+// usePolling(fetchRows, {
+//   interval: 30000,
+// })
+
+const handleMasterVendorRefresh = async (): Promise<void> => {
+  await fetchRows()
+}
+
 // =========================
 // Watchers
 // =========================
@@ -529,6 +707,7 @@ watch(currentPage, async (newPage, oldPage) => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('master-vendor:refresh', handleMasterVendorRefresh)
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)
   }
@@ -543,6 +722,8 @@ onMounted(async () => {
     loadMasterDokumen(),
     loadTransaksi(),
   ])
+
+  window.addEventListener('master-vendor:refresh', handleMasterVendorRefresh)
 
   const success = route.query.success
 
@@ -600,10 +781,11 @@ onMounted(async () => {
 
           <VCol cols="12" sm="3" class="d-flex align-end">
             <VBtn
-              variant="outlined"
               color="secondary"
+              prepend-icon="tabler-refresh"
               block
               @click="resetFilters"
+              class="text-none"
             >
               Reset Filter
             </VBtn>
@@ -615,7 +797,7 @@ onMounted(async () => {
     <!-- Table -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
-        <VBtn color="primary" @click="goToCreate">
+        <VBtn color="primary" @click="goToCreate" class="text-none">
           + Tambah Vendor
         </VBtn>
 
@@ -650,14 +832,13 @@ onMounted(async () => {
       <VTable class="text-no-wrap">
         <thead>
           <tr>
-            <th scope="col">NO</th>
-            <th scope="col">KODE</th>
-            <th scope="col">NAMA VENDOR</th>
-            <th scope="col">INISIAL</th>
-            <th scope="col">KATEGORI VENDOR</th>
-            <th scope="col">STATUS</th>
-            <th scope="col">STATUS APPROVAL</th>
-            <th scope="col" class="text-center" style="width: 5rem;">ACTIONS</th>
+            <th scope="col">No</th>
+            <th scope="col">Kode</th>
+            <th scope="col">Nama Vendor</th>
+            <th scope="col">Inisial</th>
+            <th scope="col">Status</th>
+            <th scope="col">Status Pengajuan</th>
+            <th scope="col" class="text-center" style="width: 5rem;">Actions</th>
           </tr>
         </thead>
 
@@ -667,35 +848,27 @@ onMounted(async () => {
             <td class="text-medium-emphasis">{{ v.kode_vendor }}</td>
             <td class="text-medium-emphasis">{{ v.nama_vendor }}</td>
             <td class="text-medium-emphasis">{{ v.inisial_vendor ?? '-' }}</td>
-            <td class="text-medium-emphasis">{{ formatKategoriVendor(v.kategori_vendor) }}</td>
             <td>
-              <VChip :color="v.is_active ? 'success' : 'secondary'" size="small" class="text-capitalize">
-                {{ v.is_active ? 'active' : 'inactive' }}
+              <VChip :color="v.is_active ? 'success' : 'secondary'" size="small">
+                {{ v.is_active ? 'Aktif' : 'Tidak Aktif' }}
               </VChip>
             </td>
             <td>
               <VChip
                 :color="
-                  v.status_approval === 'APPROVED'
+                  v.status_approval === 'DRAFT'
+                    ? 'secondary'
+                    : v.status_approval === 'APPROVED'
                     ? 'success'
                     : v.status_approval === 'REJECTED'
                     ? 'error'
-                    : v.status_approval === 'PENDING_REVIEW'
-                    ? 'grey'
+                    : v.status_approval === 'PENDING REVIEW'
+                    ? 'warning'
                     : 'secondary'
                 "
                 size="small"
-                class="text-capitalize"
               >
-                {{
-                  v.status_approval === 'APPROVED'
-                    ? 'Approved'
-                    : v.status_approval === 'REJECTED'
-                    ? 'Rejected'
-                    : v.status_approval === 'PENDING_REVIEW'
-                    ? 'Pending Review'
-                    : '-'
-                }}
+                {{toTitleCase(v.status_approval)}}
               </VChip>
             </td>
             <td class="text-center" style="width: 5rem;">
@@ -704,37 +877,118 @@ onMounted(async () => {
 
                 <VMenu activator="parent">
                   <VList>
-                    <VListItem href="javascript:void(0)" @click="openDetail(v.public_id)">
-                      <template #prepend>
-                        <VIcon icon="tabler-eye" :size="20" class="me-3" />
-                      </template>
-                      <VListItemTitle>Lihat Detail</VListItemTitle>
-                    </VListItem>
-                    <VListItem href="javascript:void(0)" @click="goToEdit(v.public_id)">
-                      <template #prepend>
-                        <VIcon icon="mdi-pencil-outline" :size="20" class="me-3" />
-                      </template>
-                      <VListItemTitle>Edit</VListItemTitle>
-                    </VListItem>
-                    <VListItem href="javascript:void(0)" @click="openDelete(v)">
-                      <template #prepend>
-                        <VIcon icon="mdi-delete-outline" :size="20" class="me-3" />
-                      </template>
-                      <VListItemTitle>Delete</VListItemTitle>
-                    </VListItem>
-
-                    <VListItem href="javascript:void(0)" @click="openStatusDialog(v)">
+                    <!-- Selalu muncul -->
+                    <VListItem
+                      href="javascript:void(0)"
+                      @click="openDetail(v.public_id)"
+                    >
                       <template #prepend>
                         <VIcon
-                          :icon="v.is_active ? 'mdi-toggle-switch-off-outline' : 'mdi-toggle-switch-outline'"
+                          icon="tabler-eye"
                           :size="20"
                           class="me-3"
                         />
                       </template>
-                      <VListItemTitle>
-                        {{ v.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                      </VListItemTitle>
+
+                      <VListItemTitle>Lihat Detail</VListItemTitle>
                     </VListItem>
+
+                    <!-- Hanya muncul jika DRAFT -->
+                    <template v-if="isVendorDraft(v)">
+                      <VListItem
+                        href="javascript:void(0)"
+                        @click="goToEdit(v.public_id)"
+                      >
+                        <template #prepend>
+                          <VIcon
+                            icon="mdi-pencil-outline"
+                            :size="20"
+                            class="me-3"
+                          />
+                        </template>
+
+                        <VListItemTitle>Edit</VListItemTitle>
+                      </VListItem>
+
+                      <VListItem @click="submitVendor(v)">
+                        <template #prepend>
+                          <VIcon
+                            :size="20"
+                            class="me-3"
+                            icon="mdi-send-outline"
+                          />
+                        </template>
+
+                        <VListItemTitle>Submit</VListItemTitle>
+                      </VListItem>
+
+                      <VListItem
+                        href="javascript:void(0)"
+                        @click="openDelete(v)"
+                      >
+                        <template #prepend>
+                          <VIcon
+                            icon="mdi-delete-outline"
+                            :size="20"
+                            class="me-3"
+                          />
+                        </template>
+
+                        <VListItemTitle>Delete</VListItemTitle>
+                      </VListItem>
+
+                      <VListItem
+                        href="javascript:void(0)"
+                        @click="openStatusDialog(v)"
+                      >
+                        <template #prepend>
+                          <VIcon
+                            :icon="v.is_active ? 'mdi-toggle-switch-off-outline' : 'mdi-toggle-switch-outline'"
+                            :size="20"
+                            class="me-3"
+                          />
+                        </template>
+
+                        <VListItemTitle>
+                          {{ v.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                        </VListItemTitle>
+                      </VListItem>
+                    </template>
+
+                    <!-- ========================= -->
+                    <!-- ACTION PENDING REVIEW -->
+                    <!-- ========================= -->
+                    <template v-if="String(v.status_approval).toUpperCase() === 'PENDING REVIEW'">
+                      <VListItem @click="approveVendor(v)">
+                        <template #prepend>
+                          <VIcon
+                            icon="mdi-check-circle-outline"
+                            :size="20"
+                            class="me-3"
+                            color="success"
+                          />
+                        </template>
+
+                        <VListItemTitle>
+                          Approve
+                        </VListItemTitle>
+                      </VListItem>
+
+                      <VListItem @click="openRejectVendor(v)">
+                        <template #prepend>
+                          <VIcon
+                            icon="mdi-close-circle-outline"
+                            :size="20"
+                            class="me-3"
+                            color="error"
+                          />
+                        </template>
+
+                        <VListItemTitle>
+                          Reject
+                        </VListItemTitle>
+                      </VListItem>
+                    </template>
                   </VList>
                 </VMenu>
               </VBtn>
@@ -1236,8 +1490,71 @@ onMounted(async () => {
               color="secondary"
               variant="tonal"
               @click="closeDetail"
+              class="text-none"
             >
               Tutup
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VDialog>
+
+      <VDialog
+        v-model="rejectVendorDialog"
+        max-width="560"
+        persistent
+      >
+        <VCard>
+          <VCardTitle class="d-flex align-center gap-2">
+            <VIcon
+              icon="mdi-close-circle-outline"
+              color="error"
+            />
+            Reject Vendor
+          </VCardTitle>
+
+          <VDivider />
+
+          <VCardText>
+            <p class="text-body-2 mb-4">
+              Anda akan menolak Vendor:
+              <strong>{{ rejectVendorTarget?.nama_vendor || '-' }}</strong>
+            </p>
+
+            <VTextarea
+              v-model="rejectVendorNotes"
+              label="Catatan reject"
+              placeholder="Masukkan alasan reject jika diperlukan"
+              rows="4"
+              auto-grow
+              clearable
+              :disabled="rejectVendorLoading"
+            />
+
+            <div class="text-caption text-medium-emphasis mt-2">
+              Catatan bersifat optional, namun disarankan diisi agar pembuat vendor mengetahui alasan penolakan.
+            </div>
+          </VCardText>
+
+          <VDivider />
+
+          <VCardActions>
+            <VSpacer />
+
+            <VBtn
+              variant="tonal"
+              color="secondary"
+              :disabled="rejectVendorLoading"
+              @click="rejectVendorDialog = false"
+            >
+              Batal
+            </VBtn>
+
+            <VBtn
+              color="error"
+              :loading="rejectVendorLoading"
+              @click="rejectVendor"
+            >
+              Reject
             </VBtn>
           </VCardActions>
         </VCard>
@@ -1257,10 +1574,6 @@ onMounted(async () => {
     </VSnackbar>
   </section>
 </template>
-
-<style lang="scss">
-.text-capitalize { text-transform: capitalize; }
-</style>
 
 <style lang="scss" scoped>
 .user-pagination-select {

@@ -612,6 +612,7 @@ class PurchaseRequestController extends Controller
                     'purchase_request_id' => $pr->id,
                     'nama_item'           => $clean($item['nama_item'] ?? ''),
                     'qty'                 => $qty,
+                    'qty_outstanding'     => $qty,
                     'satuan'              => $clean($item['satuan'] ?? ''),
                     'spesifikasi'         => $clean($item['spesifikasi'] ?? ''),
                     'keterangan'          => $clean($item['keterangan'] ?? ''),

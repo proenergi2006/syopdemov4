@@ -43,4 +43,17 @@ class PurchaseOrderItem extends Model
     {
         return $this->belongsTo(PurchaseRequestItem::class, 'purchase_request_item_id', 'id');
     }
+
+    public function goodsReceiveItems()
+    {
+        return $this->hasMany(
+            GoodsReceiveItem::class,
+            'purchase_order_item_id'
+        );
+    }
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class, 'satuan', 'id');
+    }
 }

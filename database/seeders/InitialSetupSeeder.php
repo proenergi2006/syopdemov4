@@ -140,7 +140,7 @@ class InitialSetupSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
-             /*
+            /*
             |--------------------------------------------------------------------------
             | 7) Procurement Menu
             |--------------------------------------------------------------------------
@@ -177,6 +177,18 @@ class InitialSetupSeeder extends Seeder
                     'route_name' => 'purchase-order',
                     'icon' => 'tabler-file-invoice',
                     'order_no' => 2,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $goodsReceiveMenuId = $this->upsertMenu(
+                ['name' => 'Goods Receipt', 'parent_id' => $purchaseMenuId],
+                [
+                    'path' => '/non_trade/goods_receive',
+                    'route_name' => 'goods-receive',
+                    'icon' => 'tabler-archive',
+                    'order_no' => 3,
                     'permission_key' => null,
                     'is_active' => true,
                 ]
@@ -494,7 +506,7 @@ class InitialSetupSeeder extends Seeder
 
             // Purchases Supplier children
             $poSupplierMenuId = $this->upsertMenu(
-                ['name' => 'PO Supplier', 'parent_id' =>$purchSupplierMenuId],
+                ['name' => 'PO Supplier', 'parent_id' => $purchSupplierMenuId],
                 [
                     'path' => '/purchaseSupplier/po-supplier',
                     'route_name' => 'po-supplier',
@@ -506,7 +518,7 @@ class InitialSetupSeeder extends Seeder
             );
 
             $receiveItemMenuId = $this->upsertMenu(
-                ['name' => 'Received Item', 'parent_id' =>$purchSupplierMenuId],
+                ['name' => 'Received Item', 'parent_id' => $purchSupplierMenuId],
                 [
                     'path' => '/purchaseSupplier/receive-item',
                     'route_name' => 'receive-item',
@@ -537,6 +549,7 @@ class InitialSetupSeeder extends Seeder
                 $purchaseMenuId,
                 $purchaseRequestMenuId,
                 $purchaseOrderMenuId,
+                $goodsReceiveMenuId,
                 $regionalMenuId,
                 $provinsiMenuId,
                 $kabMenuId,

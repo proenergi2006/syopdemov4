@@ -44,7 +44,36 @@ const triggerNotificationToast = (): void => {
 
   notificationToastTimer = setTimeout(() => {
     showNotificationToast.value = false
-  }, 4000)
+  }, 5000)
+}
+
+const buildRefreshEventName = (module?: string | null): string | null => {
+  if (!module) return null
+
+  const normalizedModule = String(module)
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-')
+
+  if (!normalizedModule) return null
+
+  return `${normalizedModule}:refresh`
+}
+
+const dispatchRefreshEventsByModules = (items: any[]): void => {
+  const modules = new Set<string>()
+
+  items.forEach(item => {
+    const eventName = buildRefreshEventName(item?.module)
+
+    if (eventName) {
+      modules.add(eventName)
+    }
+  })
+
+  modules.forEach(eventName => {
+    window.dispatchEvent(new CustomEvent(eventName))
+  })
 }
 
 const fetchNotifications = async (): Promise<void> => {
@@ -57,12 +86,14 @@ const fetchNotifications = async (): Promise<void> => {
     })
 
     const newUnreadCount = Number(response.data?.unread_count || 0)
+    const newNotifications = response.data?.data || []
 
-    notifications.value = response.data?.data || []
+    notifications.value = newNotifications
 
     if (newUnreadCount > previousUnreadNotificationCount.value) {
       triggerNotificationToast()
-      window.dispatchEvent(new CustomEvent('purchase-order:refresh'))
+
+      dispatchRefreshEventsByModules(newNotifications)
     }
 
     unreadNotificationCount.value = newUnreadCount

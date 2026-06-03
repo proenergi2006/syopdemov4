@@ -112,6 +112,19 @@ const form = reactive<PurchaseRequestForm>({
   items: [createEmptyItem()],
 })
 
+const currentUser = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('userData') || '{}')
+  } catch {
+    return {}
+  }
+})
+
+const setUserDefaultBranchAndDepartment = (): void => {
+  form.cabang = currentUser.value?.cabang_id || null
+  form.id_department = currentUser.value?.department_id || null
+}
+
 const tanggalPR = useNativeDatePicker(toRef(form, 'tanggal_pr'))
 
 const errors = reactive<PurchaseRequestErrors>({
@@ -207,7 +220,7 @@ const loadVendors = async (showAlert = true): Promise<void> => {
   isLoadingVendor.value = true
 
   try {
-    const response = await axios.get('/master/vendor/dropdown-select', {
+    const response = await axios.get('/master/vendor/dropdown-pr', {
       headers: { Accept: 'application/json' },
       params: {
         id_department: form.id_department || null,
@@ -736,6 +749,8 @@ onMounted(async () => {
   await loadVendors(false)
   await fetchCabangList(false)
   await fetchDepartmentList(false)
+
+  setUserDefaultBranchAndDepartment()
 })
 </script>
 
@@ -759,6 +774,7 @@ onMounted(async () => {
             variant="text"
             color="secondary"
             @click="goBack"
+            class="text-none"
           >
             Kembali
           </VBtn>
@@ -804,14 +820,17 @@ onMounted(async () => {
                 :items="cabangList"
                 item-title="title"
                 item-value="value"
-                clearable
+                readonly
                 density="comfortable"
                 :loading="isLoadingCabang"
                 :menu-props="{
                   location: 'bottom',
                   offset: 8,
                   maxHeight: 300,
+                  disabled: true
                 }"
+                :menu="false"
+                :clearable="false"
                 :error="isSubmitted && !form.cabang"
                 :error-messages="isSubmitted && !form.cabang ? ['Cabang wajib dipilih'] : []"
                 no-data-text="Cabang tidak ditemukan"
@@ -847,14 +866,17 @@ onMounted(async () => {
                 :items="departmentList"
                 item-title="label"
                 item-value="id"
-                clearable
+                readonly
                 density="comfortable"
                 :menu-props="{
                   location: 'bottom',
                   offset: 8,
                   maxHeight: 300,
                   maxWidth: 100,
+                  disabled: true
                 }"
+                :menu="false"
+                :clearable="false"
                 :loading="isLoadingDepartment"
                 :error="isSubmitted && !form.id_department"
                 :error-messages="isSubmitted && !form.id_department ? ['Department wajib dipilih'] : []"
@@ -931,6 +953,7 @@ onMounted(async () => {
                     size="small"
                     prepend-icon="tabler-plus"
                     @click="openItemFullscreen"
+                    class="text-none"
                   >
                     Tambah Item
                   </VBtn>
@@ -941,6 +964,7 @@ onMounted(async () => {
                     variant="outlined"
                     size="small"
                     @click="resetItems"
+                    class="text-none"
                   >
                     Reset Item
                   </VBtn>
@@ -1118,6 +1142,7 @@ onMounted(async () => {
                       variant="outlined"
                       size="small"
                       @click="triggerFileInput"
+                      class="text-none"
                     >
                       + Tambah Lampiran
                     </VBtn>
@@ -1202,6 +1227,7 @@ onMounted(async () => {
               color="secondary"
               variant="outlined"
               @click.prevent.stop="confirmCancel"
+              class="text-none"
             >
               Batal
             </VBtn>
@@ -1211,6 +1237,7 @@ onMounted(async () => {
               color="primary"
               :loading="isSaving"
               @click.prevent.stop="savePurchaseRequest($event)"
+              class="text-none"
             >
               Simpan
             </VBtn>
@@ -1241,7 +1268,7 @@ onMounted(async () => {
 
           <VBtn
             variant="flat"
-            class="me-3"
+            class="me-3 text-none"
             @click="saveItemsFromDialog"
           >
             Simpan Item
@@ -1435,6 +1462,7 @@ onMounted(async () => {
                 variant="tonal"
                 prepend-icon="tabler-plus"
                 @click="addTempItemRow"
+                class="text-none"
               >
                 Tambah Baris Item
               </VBtn>
@@ -1468,6 +1496,7 @@ onMounted(async () => {
             variant="tonal"
             color="secondary"
             @click="confirmCloseItemDialog = false"
+            class="text-none"
           >
             Batal
           </VBtn>
@@ -1475,6 +1504,7 @@ onMounted(async () => {
           <VBtn
             color="primary"
             @click="confirmCloseFullscreenItem"
+            class="text-none"
           >
             Ya, Tutup
           </VBtn>

@@ -1,14 +1,51 @@
 @php
     $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', config('app.url'))), '/');
     $poUrl = $frontendUrl . '/non_trade/purchase_order';
-    $logoUrl = asset('logo-proenergi.png');
+    $logoUrl = 'https://syop.proenergi.com/proEnergi/libraries/themes/images/logo-proenergi.png';
+
+    $title = match ($mode ?? 'approval_request') {
+        'final_approved' => 'Purchase Order Telah Disetujui',
+        'step_approved' => 'Update Approval Purchase Order',
+        default => 'Approval Purchase Order',
+    };
+
+    $description = match ($mode ?? 'approval_request') {
+        'final_approved' => 'Purchase Order Anda telah mendapatkan final approval oleh ' . optional($actor)->name . '.',
+        'step_approved' => 'Purchase Order Anda telah disetujui oleh ' . optional($actor)->name . ' dan masih menunggu approval berikutnya.',
+        default => 'Terdapat Purchase Order yang membutuhkan approval Anda.',
+    };
+
+    $displayStatus = match ($mode ?? 'approval_request') {
+        'final_approved' => 'APPROVED',
+        'step_approved' => 'IN PROGRESS',
+        default => $po->status,
+    };
+
+    $statusStyle = match (strtoupper($displayStatus ?? '')) {
+        'APPROVED' => [
+            'background' => '#dcfce7',
+            'color' => '#166534',
+        ],
+
+        'REJECTED' => [
+            'background' => '#fee2e2',
+            'color' => '#991b1b',
+        ],
+
+        default => [
+            'background' => '#fef3c7',
+            'color' => '#92400e',
+        ],
+    };
 @endphp
 
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Approval Purchase Order</title>
+    <h2 style="margin:0 0 10px;font-size:22px;color:#111827;">
+        {{ $title }}
+    </h2>
 </head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0;">
@@ -28,8 +65,8 @@
                             </h2>
 
                             <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#4b5563;">
-                                Dear <strong>{{ $approver->name }}</strong>,<br>
-                                Terdapat Purchase Order yang membutuhkan approval Anda.
+                                Dear <strong>{{ $recipient->name }}</strong>,<br>
+                                {{ $description }}
                             </p>
 
                             <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:18px 0;">
@@ -50,8 +87,17 @@
                                 <tr>
                                     <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Status</td>
                                     <td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;">
-                                        <span style="display:inline-block;padding:5px 10px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:bold;">
-                                            {{ $po->status }}
+                                        <span style="
+                                            display:inline-block;
+                                            padding:5px 10px;
+                                            border-radius:999px;
+                                            background:{{ $statusStyle['background'] }};
+                                            color:{{ $statusStyle['color'] }};
+                                            font-weight:bold;
+                                            font-size:12px;
+                                            letter-spacing:0.3px;
+                                        ">
+                                            {{ strtoupper($displayStatus) }}
                                         </span>
                                     </td>
                                 </tr>

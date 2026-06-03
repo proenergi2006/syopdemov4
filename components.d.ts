@@ -21,6 +21,7 @@ declare module '@vue/runtime-core' {
     CardStatisticsWithImages: typeof import('./resources/ts/@core/components/CardStatisticsWithImages.vue')['default']
     ConfirmDialog: typeof import('./resources/ts/@core/components/ConfirmDialog.vue')['default']
     CustomizerSection: typeof import('./resources/ts/@core/components/CustomizerSection.vue')['default']
+    DeleteConfirmDialog: typeof import('./resources/ts/@core/components/DeleteConfirmDialog.vue')['default']
     DemoAlertBasic: typeof import('./resources/ts/views/demos/components/alert/DemoAlertBasic.vue')['default']
     DemoAlertBorder: typeof import('./resources/ts/views/demos/components/alert/DemoAlertBorder.vue')['default']
     DemoAlertClosable: typeof import('./resources/ts/views/demos/components/alert/DemoAlertClosable.vue')['default']

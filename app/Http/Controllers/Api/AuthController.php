@@ -6,31 +6,85 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
-        ]);
+        try {
+            $request->validate([
+                'username' => ['required', 'string'],
+                'password' => ['required', 'string'],
+            ], [
+                'username.required' => 'Username wajib diisi.',
+                'password.required' => 'Password wajib diisi.',
+            ]);
 
-        $user = User::where('email', $request->email)->first();
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Email atau password salah'], 401);
+            $user = User::where('username', $request->username)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'field' => 'username',
+                    'message' => 'Username tidak ditemukan.',
+                ], 401);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'field' => 'password',
+                    'message' => 'Password salah.',
+                ], 401);
+            }
+
+            if (isset($user->is_active) && !$user->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User nonaktif.',
+                ], 403);
+            }
+
+            $user->forceFill([
+                'last_login_at' => now(),
+            ])->save();
+
+            $token = $user->createToken('syop-v4')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Login berhasil.',
+                'token' => $token,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                ],
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('[Auth] Login error', [
+                'username' => $request->username,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat login.',
+                'debug' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
+            ], 500);
         }
-
-        if (isset($user->is_active) && !$user->is_active) {
-            return response()->json(['message' => 'User nonaktif'], 403);
-        }
-
-        $token = $user->createToken('syop-v4')->plainTextToken;
-
-        return response()->json([
-            'token' => $token,
-            'user' => $user,
-        ]);
     }
 
     public function me(Request $request)
@@ -74,7 +128,44 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['message' => 'Logged out']);
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User tidak ditemukan.',
+                ], 401);
+            }
+
+            $user->forceFill([
+                'last_logout_at' => now(),
+            ])->save();
+
+            $token = $user->currentAccessToken();
+
+            if ($token) {
+                $token->delete();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Logout berhasil.',
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('[Auth] Logout error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal logout.',
+                'debug' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
+            ], 500);
+        }
     }
 }

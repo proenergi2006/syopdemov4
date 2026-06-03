@@ -18,13 +18,15 @@ import 'vue3-toastify/dist/index.css'
 
 loadFonts()
 
-// Create vue app
 const app = createApp(App)
 
-// Use plugins
-app.use(vuetify)
+// 1. DAFTARKAN VUETIFY & PINIA DI URUTAN PALING ATAS
 app.use(createPinia())
+app.use(vuetify)
+
+// 2. BARU DAFTARKAN ROUTER DAN PLUGIN LAYOUTS LAINNYA
 app.use(router)
+
 app.use(layoutsPlugin)
 app.use(i18n)
 app.use(abilitiesPlugin, ability, {
@@ -37,5 +39,5 @@ app.use(Vue3Toastify, {
   theme: 'colored',
 })
 
-// Mount vue app
+// 3. SELESAI MOUNT
 app.mount('#app')

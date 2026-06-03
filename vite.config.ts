@@ -14,6 +14,9 @@ import laravel from 'laravel-vite-plugin'
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
+    host: '127.0.0.1',
+    port: 5173,
+
     watch: {
       ignored: [
         '**/storage/**',
@@ -21,15 +24,18 @@ export default defineConfig({
         '**/public/uploads/**',
       ],
     },
+
     hmr: {
-      host: "127.0.0.1",
+      host: '127.0.0.1',
+      port: 5173,
     },
   },
+
   plugins: [
     laravel({
-  input: ['resources/ts/main.ts'],
-  refresh: true,
-}),
+      input: ['resources/ts/main.ts'],
+      refresh: true,
+    }),
     vue({
   template: {
       transformAssetUrls: {

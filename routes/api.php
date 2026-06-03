@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccurateController;
+use App\Http\Controllers\Api\GoodsReceiveController;
 use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\Master\WilayahController;
 use App\Http\Controllers\Api\Master\CabangController;
@@ -114,7 +115,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Vendor
         Route::get('vendor/dropdown-select', [MasterVendorController::class, 'dropdownSelect']);
+        Route::get('vendor/dropdown-pr', [MasterVendorController::class, 'dropdownSelectForPurchaseRequest']);
+        Route::get('vendor/dropdown-po', [MasterVendorController::class, 'dropdownSelectForPurchaseOrder']);
         Route::patch('vendor/{id}/status', [MasterVendorController::class, 'updateStatus']);
+        Route::patch('vendor/{publicId}/submit', [MasterVendorController::class, 'submit']);
+        Route::patch('vendor/{publicId}/approve', [MasterVendorController::class, 'approve']);
+        Route::patch('vendor/{publicId}/reject', [MasterVendorController::class, 'reject']);
 
         Route::apiResource('vendor', MasterVendorController::class)
             ->parameters([
@@ -140,7 +146,7 @@ Route::middleware('auth:sanctum')->group(function () {
         );
     });
 
-    Route::prefix('transaction')->group(function () {
+    Route::prefix('transaction')->name('transaction.')->group(function () {
         // ===================== PURCHASE REQUEST =========================
         Route::get('purchase-request/dropdown-approved', [PurchaseRequestController::class, 'dropdownApproved']);
         Route::get('purchase-request/{publicId}/edit', [PurchaseRequestController::class, 'edit']);
@@ -155,33 +161,37 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('purchase-order/{publicId}/print', [PurchaseOrderController::class, 'print']);
         Route::patch('purchase-order/{publicId}/submit', [PurchaseOrderController::class, 'submit']);
         Route::patch('purchase-order/{publicId}/approve', [PurchaseOrderController::class, 'approve']);
+        Route::patch('purchase-order/{publicId}/reject', [PurchaseOrderController::class, 'reject']);
+        Route::get('purchase-order/dropdown-receivable', [PurchaseOrderController::class, 'dropdownReceivable']);
+        Route::get('purchase-order/{publicId}/receivable-items', [PurchaseOrderController::class, 'receivableItems']);
         Route::apiResource('purchase-order', PurchaseOrderController::class)
             ->parameters([
                 'purchase-order' => 'publicId',
             ]);
+
+        // ===================== GOODS RECEIVE =========================
+        Route::post('goods-receive', [GoodsReceiveController::class, 'store']);
+        Route::patch('goods-receive/{publicId}/post', [GoodsReceiveController::class, 'post']);
+        Route::patch('goods-receive/{publicId}/cancel', [GoodsReceiveController::class, 'cancel']);
+        Route::get('goods-receive/{publicId}/edit', [GoodsReceiveController::class, 'edit']);
+        Route::patch('goods-receive/{publicId}/post', [GoodsReceiveController::class, 'post']);
+        Route::apiResource('goods-receive', GoodsReceiveController::class)
+            ->parameters([
+                'goods-receive' => 'publicId',
+            ]);
     });
 
     //API ACCURATE
-    Route::get('accurate/products', [AccurateController::class, 'products']);
-    Route::get('accurate/accounts', [AccurateController::class, 'accounts']);
-    Route::get('accurate/detail-po', [AccurateController::class, 'getDetailPO']);
+    // Route::get('accurate/products', [AccurateController::class, 'products']);
+    // Route::get('accurate/accounts', [AccurateController::class, 'accounts']);
+    // Route::get('accurate/detail-po', [AccurateController::class, 'getDetailPO']);
 
-    // ===================== PURCHASE ORDER INVERNTORY =========================
-    Route::prefix('inventory')->group(function () {
-        Route::apiResource('purchase-order', PurchaseOrderInventoryController::class);
-        Route::post('purchase-order/{id}/approve-cfo',[PurchaseOrderInventoryController::class, 'approveCFO']
-);
-    });
-
-    //API ACCURATE
-    Route::get('accurate/products', [AccurateController::class, 'products']);
-    Route::get('accurate/accounts', [AccurateController::class, 'accounts']);
-    Route::get('accurate/detail-po', [AccurateController::class, 'getDetailPO']);
-
-    // ===================== PURCHASE ORDER INVERNTORY =========================
-    Route::prefix('inventory')->group(function () {
-        Route::apiResource('purchase-order', PurchaseOrderInventoryController::class);
-        Route::post('purchase-order/{id}/approve-cfo',[PurchaseOrderInventoryController::class, 'approveCFO']
-);
-    });
+    // // ===================== PURCHASE ORDER INVERNTORY =========================
+    // Route::prefix('inventory')->group(function () {
+    //     Route::apiResource('purchase-order', PurchaseOrderInventoryController::class);
+    //     Route::post(
+    //         'purchase-order/{id}/approve-cfo',
+    //         [PurchaseOrderInventoryController::class, 'approveCFO']
+    //     );
+    // });
 });

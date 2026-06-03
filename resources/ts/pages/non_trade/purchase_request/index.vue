@@ -12,6 +12,7 @@ import {
   showInfoToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import { useDeleteConfirm } from '@core/composable/useDeleteConfirm'
 import { formatStatusPKP, formatNumberWithoutRp, toTitleCase, formatDecimalQty } from '@/utils/textFormatter'
 import { useNativeDatePicker } from '@core/composable/useNativeDatePicker'
 import { formatDate } from '@/utils/textFormatter'
@@ -77,25 +78,21 @@ const detailPurchaseRequest = ref<any | null>(null)
 const detailPurchaseRequestPublicId = ref<string | null>(null)
 const openedVendorPanels = ref<number[]>([])
 
-const deleteDialog = ref(false)
-const deleteLoading = ref(false)
-const deleteTarget = ref<any | null>(null)
-
 const selectedStatusPO = ref('')
 
 const statusItems = [
   { title: 'Semua', value: '' },
-  { title: 'Draft', value: 'DRAFT' },
-  { title: 'In Progress', value: 'IN PROGRESS' },
-  { title: 'Approved', value: 'APPROVED' },
-  { title: 'Rejected', value: 'REJECTED' },
+  { title: 'Draft', value: 'Draft' },
+  { title: 'In Progress', value: 'In Progress' },
+  { title: 'Approved', value: 'Approved' },
+  { title: 'Rejected', value: 'Rejected' },
 ]
 
 const statusPOItems = [
   { title: 'Semua', value: '' },
-  { title: 'Open', value: 'OPEN' },
-  { title: 'Partial PO', value: 'PARTIAL' },
-  { title: 'Completed', value: 'COMPLETED' },
+  { title: 'Open', value: 'Open' },
+  { title: 'Partial PO', value: 'Partial' },
+  { title: 'Completed', value: 'Completed' },
 ]
 
 const paginationData = computed(() => {
@@ -138,10 +135,10 @@ const formatStatus = (status: string | null): string => {
 
   const normalized = String(status).toLowerCase()
 
-  if (normalized === 'draft') return 'DRAFT'
-  if (normalized === 'in progress') return 'IN PROGRESS'
-  if (normalized === 'approved') return 'APPROVED'
-  if (normalized === 'rejected') return 'REJECTED'
+  if (normalized === 'draft') return 'Draft'
+  if (normalized === 'in progress') return 'In Progress'
+  if (normalized === 'approved') return 'Approved'
+  if (normalized === 'rejected') return 'Rejected'
 
   return status
 }
@@ -162,9 +159,9 @@ const formatStatusPO = (status: string | null): string => {
 
   const normalized = String(status).toUpperCase()
 
-  if (normalized === 'OPEN') return 'OPEN'
-  if (normalized === 'PARTIAL') return 'PARTIAL PO'
-  if (normalized === 'COMPLETED') return 'COMPLETED'
+  if (normalized === 'OPEN') return 'Open'
+  if (normalized === 'PARTIAL') return 'Partial PO'
+  if (normalized === 'COMPLETED') return 'Completed'
 
   return status
 }
@@ -294,49 +291,27 @@ const goToEdit = (publicId: string): void => {
   router.push(`/non_trade/purchase_request/edit?id=${publicId}`)
 }
 
+const { openDeleteConfirm } = useDeleteConfirm()
+
 const openDelete = (row: any): void => {
-  deleteTarget.value = row
-  deleteDialog.value = true
-}
-
-const closeDelete = (): void => {
-  deleteDialog.value = false
-  deleteTarget.value = null
-}
-
-const confirmDelete = async (): Promise<void> => {
-  if (!deleteTarget.value || deleteLoading.value) return
-
-  deleteLoading.value = true
-
-  const prPublicId = deleteTarget.value.public_id
-  const nomorPr = deleteTarget.value.nomor_pr
-
-  try {
-    closeDelete()
-
-    showLoadingAlert('Menghapus Purchase Request...', 'Mohon tunggu sebentar')
-
-    await axios.delete(`/transaction/purchase-request/${prPublicId}`)
-
-    closeAlert()
-
-    showSuccessToast({
-      title: 'Berhasil',
-      text: `Purchase Request "${nomorPr}" berhasil dihapus`,
-    })
-
-    await fetchPurchaseRequests()
-  } catch (error: unknown) {
-    closeAlert()
-
+  if (String(row.status || '').toUpperCase() !== 'DRAFT') {
     showErrorToast({
-      title: 'Error',
-      text: getApiErrorMessage(error, 'Gagal menghapus Purchase Request'),
+      title: 'Tidak dapat dihapus',
+      text: 'Purchase Request hanya dapat dihapus jika status masih DRAFT.',
     })
-  } finally {
-    deleteLoading.value = false
+
+    return
   }
+
+  openDeleteConfirm({
+    title: 'Hapus Purchase Request?',
+    message: `Apakah Anda yakin ingin menghapus Purchase Request <strong>${row.nomor_po}</strong>?`,
+    loadingTitle: 'Menghapus Purchase Request...',
+    successText: `Purchase Request "${row.nomor_po}" berhasil dihapus`,
+    errorText: 'Gagal menghapus Purchase Request',
+    url: `/transaction/purchase-request/${encodeURIComponent(row.public_id)}`,
+    onSuccess: fetchPurchaseRequests,
+  })
 }
 
 const openDetail = async (publicId: string): Promise<void> => {
@@ -565,10 +540,11 @@ onMounted(async () => {
 
           <VCol cols="12" md="4" class="d-flex justify-end">
             <VBtn
-              variant="outlined"
               color="secondary"
               prepend-icon="tabler-refresh"
               @click="resetFilters"
+              block
+              class="text-none"
             >
               Reset Filter
             </VBtn>
@@ -580,7 +556,7 @@ onMounted(async () => {
     <!-- Table -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
-        <VBtn color="primary" @click="goToCreate">
+        <VBtn color="primary" @click="goToCreate" class="text-none">
           + Tambah Purchase Request
         </VBtn>
 
@@ -615,14 +591,14 @@ onMounted(async () => {
       <VTable class="text-no-wrap">
         <thead>
           <tr>
-            <th scope="col">NO</th>
-            <th scope="col">NOMOR PR</th>
-            <th scope="col">TANGGAL</th>
-            <th scope="col">CABANG</th>
-            <th scope="col">DEPARTMENT</th>
-            <th scope="col">STATUS APPROVAL</th>
-            <th scope="col">STATUS PO</th>
-            <th scope="col" class="text-center" style="width: 5rem;">ACTIONS</th>
+            <th scope="col">No</th>
+            <th scope="col">Nomor PR</th>
+            <th scope="col">Tanggal</th>
+            <th scope="col">Cabang</th>
+            <th scope="col">Department</th>
+            <th scope="col">Status Pengajuan</th>
+            <th scope="col">Status PO</th>
+            <th scope="col" class="text-center" style="width: 5rem;">Actions</th>
           </tr>
         </thead>
 
@@ -720,13 +696,13 @@ onMounted(async () => {
                     >
                       <template #prepend>
                         <VIcon
-                          icon="mdi-delete-outline"
+                          icon="tabler-trash"
                           :size="20"
-                          class="me-3"
+                          class="me-3 text-error"
                         />
                       </template>
 
-                      <VListItemTitle>Delete</VListItemTitle>
+                      <VListItemTitle class="text-error">Hapus</VListItemTitle>
                     </VListItem>
                   </VList>
                 </VMenu>
@@ -1274,45 +1250,9 @@ onMounted(async () => {
           <VBtn
             variant="tonal"
             @click="detailDialog = false"
+            class="text-none"
           >
             Tutup
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <VDialog
-      v-model="deleteDialog"
-      max-width="460"
-    >
-      <VCard>
-        <VCardTitle class="text-h6">
-          Hapus Purchase Request?
-        </VCardTitle>
-
-        <VCardText>
-          Apakah Anda yakin ingin menghapus Purchase Request
-          <strong>{{ deleteTarget?.nomor_pr }}</strong>?
-          <br>
-          Data yang dihapus tidak dapat dikembalikan.
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            :disabled="deleteLoading"
-            @click="closeDelete"
-          >
-            Batal
-          </VBtn>
-
-          <VBtn
-            color="error"
-            :loading="deleteLoading"
-            @click="confirmDelete"
-          >
-            Ya, Hapus
           </VBtn>
         </VCardActions>
       </VCard>

@@ -866,6 +866,7 @@ onMounted(async () => {
                 variant="text"
                 color="secondary"
                 @click="goBack"
+                class="text-none"
             >
                 Kembali
             </VBtn>
@@ -1401,6 +1402,7 @@ onMounted(async () => {
                         color="primary"
                         variant="outlined"
                         size="small"
+                        class="text-none"
                         @click="addBank"
                       >
                         + Tambah Bank
@@ -1853,6 +1855,7 @@ onMounted(async () => {
                     color="secondary"
                     variant="outlined"
                     @click.prevent.stop="confirmCancel"
+                    class="text-none"
                 >
                     Batal
                 </VBtn>
@@ -1862,6 +1865,7 @@ onMounted(async () => {
                     color="primary"
                     :loading="isSaving"
                     @click.prevent.stop="saveVendor"
+                    class="text-none"
                 >
                     Simpan
                 </VBtn>

@@ -16,14 +16,24 @@ class ApprovalFlowSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $flow = ApprovalFlow::updateOrCreate(
+        ApprovalFlow::updateOrCreate(
+            [
+                'module_name' => 'PURCHASE_REQUEST',
+                'name' => 'Approval Purchase Request',
+                'is_active' => true,
+            ],
+
             [
                 'module_name' => 'PURCHASE_ORDER',
-            ],
-            [
                 'name' => 'Approval Purchase Order',
                 'is_active' => true,
-            ]
+            ],
+
+            [
+                'module_name' => 'MASTER_VENDOR',
+                'name' => 'Approval Master Vendor',
+                'is_active' => true,
+            ],
         );
 
         /*
@@ -36,17 +46,17 @@ class ApprovalFlowSeeder extends Seeder
         |
         */
 
-        ApprovalFlowStep::updateOrCreate(
-            [
-                'approval_flow_id' => $flow->id,
-                'step_order' => 1,
-            ],
-            [
-                'approver_type' => 'USER',
-                'approver_id' => 1,
-                'label' => 'CEO Approval',
-                'is_required' => true,
-            ]
-        );
+        // ApprovalFlowStep::updateOrCreate(
+        //     [
+        //         'approval_flow_id' => $flow->id,
+        //         'step_order' => 1,
+        //     ],
+        //     [
+        //         'approver_type' => 'USER',
+        //         'approver_id' => 1,
+        //         'label' => 'CEO Approval',
+        //         'is_required' => true,
+        //     ]
+        // );
     }
 }

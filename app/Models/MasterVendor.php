@@ -43,6 +43,9 @@ class MasterVendor extends Model
         'jenis_pembayaran',
         'top',
         'id_department',
+
+        'submitted_at',
+        'submitted_by'
     ];
 
     protected $casts = [
@@ -73,5 +76,10 @@ class MasterVendor extends Model
     public function department()
     {
         return $this->belongsTo(Department::class, 'id_department');
+    }
+
+    public function approvals()
+    {
+        return $this->hasMany(MasterVendorApproval::class, 'vendor_id');
     }
 }

@@ -45,4 +45,12 @@ class PurchaseRequestItem extends Model
     {
         return $this->belongsTo(Unit::class, 'satuan', 'id');
     }
+
+    public function goodsReceiveItems()
+    {
+        return $this->hasMany(
+            GoodsReceiveItem::class,
+            'purchase_request_item_id'
+        );
+    }
 }

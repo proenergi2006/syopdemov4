@@ -10,4 +10,9 @@ class Unit extends Model
 {
     use HasFactory;
     protected $fillable = ['kode', 'nama', 'kategori'];
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class, 'satuan', 'id');
+    }
 }
