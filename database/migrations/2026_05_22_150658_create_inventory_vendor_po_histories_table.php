@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::create('inventory_vendor_po_history', function (Blueprint $table) {
-           $table->bigInteger('id_master')->primary();
+            $table->id('id_master');
 
             $table->integer('id_accurate')->nullable();
 
@@ -111,30 +111,30 @@ return new class extends Migration
             $table->text('keterangan_resubmission')->nullable();
 
             // INDEX
-            $table->index('id_po_supplier', 'new_pro_inventory_vendor_po_idx1');
-            $table->index('id_vendor', 'new_pro_inventory_vendor_po_idx4');
-            $table->index('id_produk', 'new_pro_inventory_vendor_po_idx2');
-            $table->index('id_terminal', 'new_pro_inventory_vendor_po_idx3');
+            $table->index('id_po_supplier', 'idx_po_supplier');
+            $table->index('id_vendor', 'idx_vendor');
+            $table->index('id_produk', 'idx_produk');
+            $table->index('id_terminal', 'idx_terminal');
 
             // FOREIGN KEY
-            $table->foreign('id_po_supplier', 'new_pro_inventory_vendor_po_fk1')
-                ->references('id')
+            $table->foreign('id_po_supplier', 'id_po_fk1_history')
+                ->references('id_master')
                 ->on('inventory_vendor_po')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
-            $table->foreign('id_vendor', 'new_pro_inventory_vendor_po_fk1')
+            $table->foreign('id_vendor', 'id_vendor_fk2_history')
                 ->references('id')
                 ->on('master_vendor')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
-            $table->foreign('id_produk', 'new_pro_inventory_vendor_po_fk2')
+            $table->foreign('id_produk', 'id_produk_fk3_history')
                 ->references('id')
                 ->on('produk')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
-            $table->foreign('id_terminal', 'new_pro_inventory_vendor_po_fk3')
+            $table->foreign('id_terminal', 'id_terminal_fk4_history')
                 ->references('id')
                 ->on('terminal')
                 ->cascadeOnUpdate()

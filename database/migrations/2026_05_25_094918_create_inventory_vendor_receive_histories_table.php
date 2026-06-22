@@ -13,8 +13,8 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('inventory_vendor_receive_histories', function (Blueprint $table) {
-            $table->bigInteger('id_master');
+        Schema::create('inventory_vendor_receive_history', function (Blueprint $table) {
+            $table->id('id_master');
             $table->bigInteger('id_po_receive');
             $table->bigInteger('id_po_supplier');
 
@@ -42,25 +42,13 @@ return new class extends Migration
 
             $table->tinyInteger('is_updated')->default(0);
             $table->tinyInteger('updated_count')->default(0);
+            $table->text('keterangan_updated');
 
-            // composite primary key
-            $table->primary('id_master');
 
             // index
-            $table->index('id_po_receive', 'inventory_vendor_po_receive_fk1');
-            $table->index('id_po_supplier', 'inventory_vendor_po_receive_fk1');
+            $table->index('id_po_receive', 'receive_log_fk1');
+            $table->index('id_po_supplier', 'receive_log_fk2');
 
-            // foreign key
-            $table->foreign('id_po_receive', 'inventory_vendor_po_receive_fk1')
-                ->references('id_master')
-                ->on('inventory_vendor_receive')
-                ->onUpdate('cascade')
-                ->onDelete('restrict');
-            $table->foreign('id_po_supplier', 'inventory_vendor_po_receive_fk1')
-                ->references('id_master')
-                ->on('inventory_vendor_po')
-                ->onUpdate('cascade')
-                ->onDelete('restrict');
         });
     }
 
@@ -71,6 +59,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('inventory_vendor_receive_histories');
+        Schema::dropIfExists('inventory_vendor_receive_history');
     }
 };
