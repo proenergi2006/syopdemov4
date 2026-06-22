@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::create('inventory_vendor_receive', function (Blueprint $table) {
-            $table->bigInteger('id_po_receive');
+            $table->bigInteger('id_po_receive')->primary();
             $table->bigInteger('id_po_supplier');
 
             $table->integer('id_accurate')->nullable();
@@ -43,7 +43,7 @@ return new class extends Migration
             $table->tinyInteger('updated_count')->default(0);
 
             // composite primary key
-            $table->primary(['id_po_recive', 'id_po_supplier']);
+            // $table->primary(['id_po_receive', 'id_po_supplier']);
 
             // index
             $table->index('id_po_supplier', 'inventory_vendor_po_receive_fk1');
