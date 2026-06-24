@@ -6,6 +6,7 @@ import { useAppAbility } from '@/plugins/casl/useAppAbility'
 const router = useRouter()
 const ability = useAppAbility()
 const userData = JSON.parse(localStorage.getItem('userData') || 'null')
+console.log(userData)
 
 const logout = () => {
   // Remove "userData" from localStorage
@@ -84,7 +85,7 @@ const avatarBadgeProps = {
             </template>
 
             <VListItemTitle class="font-weight-medium">
-              {{ userData.fullName }}
+              {{ userData.name }}
             </VListItemTitle>
             <VListItemSubtitle>
               {{ userData.role }}

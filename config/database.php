@@ -92,6 +92,19 @@ return [
             // 'encrypt' => env('DB_ENCRYPT', 'yes'),
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
+        'mysql_old' => [
+            'driver' => 'mysql',
+            'host' => env('DB_OLD_HOST'),
+            'port' => env('DB_OLD_PORT'),
+            'database' => env('DB_OLD_DATABASE'),
+            'username' => env('DB_OLD_USERNAME'),
+            'password' => env('DB_OLD_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+        ],
 
     ],
 

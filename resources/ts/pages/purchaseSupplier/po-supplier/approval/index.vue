@@ -37,6 +37,9 @@ type InventoryPO = {
   ceo_result: 0,
   ceo_pic: '',
   ceo_tanggal: '',
+  is_resubmission:number,
+  resubmission_count:number,
+
 
   vendor?: { nama_vendor: string }
   produk?: { merk_dagang: string, jenis_produk: string }
@@ -47,14 +50,17 @@ type InventoryPO = {
 const rows = ref<InventoryPO[]>([])
 const loading = ref(false)
 
-const searchQuery = ref('')
-const selectedStatus = ref('')
-
 const rowPerPage = ref(10)
 const currentPage = ref(1)
 
 const totalData = ref(0)
 const totalPage = ref(1)
+const userRoles = ref<string[]>([])
+
+const search = ref({
+  search: '',
+  status: '',
+})
 
 // PAGINATION TEXT
 const paginationData = computed(() => {
@@ -68,7 +74,22 @@ const formatDate = (date: string) => {
   if (!date) return '-'
   return new Date(date).toLocaleDateString('id-ID')
 }
+const getProfile = async () => {
+  try {
+    const res = await axios.get('/auth/me')
 
+    userRoles.value = res.data.role
+
+    // console.log('ROLE:', res)
+  } catch (err) {
+    console.error(err)
+  }
+}
+const canApprove = (item: any) => {
+  if (userRoles.value.includes('CFO') && item.disposisi_po === 1) return true
+  if (userRoles.value.includes('CEO') && item.disposisi_po === 2) return true
+  return false
+}
 // FETCH DATA
 const getData = async () => {
   try {
@@ -78,8 +99,8 @@ const getData = async () => {
       params: {
         page: currentPage.value,
         per_page: rowPerPage.value,
-        keyword: searchQuery.value,
-        status: selectedStatus.value,
+        search: search.value.search,
+        status: search.value.status,
       },
     })
 
@@ -131,17 +152,11 @@ const getTerminal = async () => {
   }))
 }
 
-const formatMoney = (value: any) => {
-  if (value === null || value === undefined || value === '') return '0,0000'
-
-  const num = Number(String(value))
-
-  if (isNaN(num)) return '0,0000'
-
+const formatNumber = (value: number) => {
   return new Intl.NumberFormat('id-ID', {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
-  }).format(num)
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 20,
+  }).format(value)
 }
 
 const goToEdit = (public_id: number): void => {
@@ -155,13 +170,13 @@ const goToEdit = (public_id: number): void => {
 }
 const getRowClass = (item: any) => {
   // CFO role
-  if (item.disposisi_po === 1 && item.cfo_result === 0) {
-    return 'row-pending'
+  if (userRoles.value.includes('CFO') && item.disposisi_po === 1 && item.cfo_result === 0) {
+    return 'bg-grey-100'
   }
 
   // CEO role
-  if (item.disposisi_po === 2 && item.ceo_result === 0) {
-    return 'row-pending'
+  if (userRoles.value.includes('CEO') &&item.disposisi_po === 2 && item.ceo_result === 0) {
+    return 'bg-grey-100'
   }
 
   return ''
@@ -172,23 +187,29 @@ onMounted(() => {
   getData()
   getVendor()
   getTerminal()
+  getProfile()
 })
 
 // kalau page berubah
-watch(currentPage, () => {
-  getData()
-})
+watch(
+  [search, currentPage, rowPerPage],
+  async () => {
+    await getData()
+  },
+  { deep: true }
+)
+
 
 // kalau per page berubah
-watch(rowPerPage, () => {
-  currentPage.value = 1
-  getData()
-})
+// watch(rowPerPage, () => {
+//   currentPage.value = 1
+//   getData()
+// })
 
 const getStatusLabel = (val: unknown) => {
   const map: Record<number, string> = {
-    1: 'Verifikasi CFO',
-    2: 'Verifikasi CEO',
+    1: 'Menunggu CFO',
+    2: 'Menunggu CEO',
     3: 'Ditolak CFO',
     4: 'Terverifikasi',
     5: 'Ditolak CEO',
@@ -197,10 +218,19 @@ const getStatusLabel = (val: unknown) => {
   return map[Number(val)] ?? '-'
 }
 
+const chipColor: Record<number, string> = {
+  1: 'info',
+  2: 'info',
+  3: 'error',
+  4: 'success',
+  5: 'error',
+}
 const statusItems = [
   { title: 'Semua', value: '' },
-  { title: 'Approve', value: 'DRAFT' },
-  { title: 'Reject', value: 'IN PROGRESS' },
+  { title: 'Pending CFO', value: '1' },
+  { title: 'Pending CEO', value: '2' },
+  { title: 'Approved', value: '4' },
+  { title: 'Reject CEO', value: '5' },
 ]
 
 </script>
@@ -215,6 +245,7 @@ const statusItems = [
       <VRow>
         <VCol cols="12" md="6">
           <VTextField
+            v-model="search.search"
             label="Kata Kunci"
             density="comfortable"
           />
@@ -222,7 +253,7 @@ const statusItems = [
       
         <VCol cols="12" sm="3">
           <VSelect
-            v-model="selectedStatus"
+            v-model="search.status"
             label="Status"
             :items="statusItems"
             item-title="title"
@@ -232,11 +263,11 @@ const statusItems = [
         </VCol>
       </VRow>
 
-      <div class="d-flex gap-2 mt-4">
+      <!-- <div class="d-flex gap-2 mt-4">
         <VBtn color="info">
           Cari
         </VBtn>
-      </div>
+      </div> -->
     </VCard>
     <!-- Table -->
     <VCard>
@@ -251,7 +282,7 @@ const statusItems = [
 
       <VDivider />
 
-      <VTable class="text-no-wrap">
+      <VTable >
         <thead>
          <tr>
            <th>No </th>
@@ -269,13 +300,22 @@ const statusItems = [
           <tr
             v-for="(v, index) in rows"
             :key="v.id_master"
-            :style="v.cfo_result === 0 ? 'background:#f5f5f5' : ''"
+            :class="getRowClass(v)"
           >
             <td>
               {{ (currentPage - 1) * rowPerPage + index + 1 }}
             </td>
 
-            <td>{{ v.nomor_po || '-' }}</td>
+            <td class="text-no-wrap">{{ v.nomor_po || '-' }}
+              <br>
+                <VChip v-if="v.is_resubmission == 1"
+                  size="small"
+                  color="warning"
+                  class="mb-0"
+                >
+                   Pengajuan ulang ke - {{ v.resubmission_count }}
+                </VChip>
+            </td>
 
             <td>{{ formatDate(v.tanggal_inven) }}</td>
 
@@ -286,21 +326,21 @@ const statusItems = [
               </div>
             </td>
 
-            <td>{{ v.produk?.jenis_produk +' - '+v.produk?.merk_dagang  || '-' }}</td>
+            <td class="text-no-wrap">{{ v.produk?.jenis_produk +' - '+v.produk?.merk_dagang  || '-' }}</td>
 
-            <td>{{ formatMoney(v.volume_po) }}</td>
+            <td>{{ formatNumber(v.volume_po) }}</td>
 
-            <td>{{ formatMoney(v.harga_tebus) }}</td>
+            <td>{{ formatNumber(v.harga_tebus) }}</td>
 
             <td>
-              <VChip size="small" color="info">
+              <VChip size="small"  :color="chipColor[v.disposisi_po??0]">
                {{ getStatusLabel(v.disposisi_po) }}
               </VChip>
             </td>
 
               <td class="text-center" style="width: 5rem;">
-                <VBtn size="34" class="mr-1" variant="tonal" color="primary" @click="goToEdit(v.id_master)" >
-                  <VIcon icon="ri-edit-2-line"/>
+                <VBtn size="34" class="mr-1" variant="tonal" color="primary" @click="goToEdit(v.id_master)">
+                  <VIcon icon="ri-information-2-line"/>
                 </VBtn>
               </td>
           </tr>

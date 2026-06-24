@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccurateController;
+use App\Http\Controllers\Api\GainLossInventoryController;
+use App\Http\Controllers\Api\GoodsReceiptInventoryController;
 use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\Master\WilayahController;
 use App\Http\Controllers\Api\Master\CabangController;
@@ -37,13 +39,18 @@ use App\Http\Controllers\Api\Master\GroupCabangController;
 use App\Http\Controllers\Api\Master\MasterDokumenPendukungController;
 use App\Http\Controllers\Api\Master\MasterKeteranganTransaksiController;
 use App\Http\Controllers\Api\Master\MasterVendorController;
+use App\Http\Controllers\Api\OngkosAngkutKapalController;
 use App\Http\Controllers\Api\PurchaseOrderInventoryController;
 use App\Http\Controllers\Api\PurchaseRequestController;
+use App\Http\Controllers\Api\ShippingInstructionController;
 use App\Http\Controllers\MasterBankController;
 use App\Http\Controllers\UnitController;
+use Illuminate\Support\Facades\Mail;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
+// routes/api.php
 
+Route::post('/auth/sso', [AuthController::class, 'sso']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -75,12 +82,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('master/wilayah-angkut', WilayahAngkutController::class);
     Route::apiResource('master/harga-jual', HargaJualController::class);
     Route::apiResource('master/harga-pertamina', HargaPertaminaController::class);
+    Route::apiResource('master/oa-kapal', OngkosAngkutKapalController::class);
+
     //get API
     Route::get('/provinsi', [WilayahAngkutController::class, 'provinsi']);
     Route::get('/kabupaten/{provinsi}', [WilayahAngkutController::class, 'kabupaten']);
     Route::get('/area', [HargaPertaminaController::class, 'area']);
     Route::get('/produk', [HargaPertaminaController::class, 'produk']);
     Route::get('/terminal', [TerminalController::class, 'terminal']);
+    Route::get('/transportir', [TransportirController::class, 'transportir']);
+    Route::get('/oa-kapal', [OngkosAngkutKapalController::class, 'oaKapal']);
 
     Route::get('master/transportir-mobil', [TransportirMobilController::class, 'index']);
     Route::post('master/transportir-mobil', [TransportirMobilController::class, 'store']);
@@ -126,9 +137,30 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('accurate/detail-po', [AccurateController::class, 'getDetailPO']);
 
     // ===================== PURCHASE ORDER INVERNTORY =========================
-    Route::prefix('inventory')->group(function () {
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('purchase-order/export', [PurchaseOrderInventoryController::class, 'export']);
         Route::apiResource('purchase-order', PurchaseOrderInventoryController::class);
-        Route::post('purchase-order/{id}/approve-cfo',[PurchaseOrderInventoryController::class, 'approveCFO']
-);
-    });
+        Route::post('purchase-order/{id}/approve-cfo',[PurchaseOrderInventoryController::class, 'approveCFO']);
+        Route::post('purchase-order/{id}/approve-ceo',[PurchaseOrderInventoryController::class, 'approveCEO']);
+        Route::get('purchase-order/print/{id}', [PurchaseOrderInventoryController::class, 'print']);
+        Route::get('purchase-order/print-gain-loss/{id}', [PurchaseOrderInventoryController::class, 'printGainLoss']);
+        Route::get('purchase-order/{id}/history', [PurchaseOrderInventoryController::class, 'history']);
+        Route::post('purchase-order/{id}/cancel', [PurchaseOrderInventoryController::class, 'cancel']);
+        Route::post('purchase-order/{id}/close', [PurchaseOrderInventoryController::class, 'close']);
+        
+        //Goods Receipt
+        Route::apiResource('goods-receipt', GoodsReceiptInventoryController::class);
+        Route::get('goods-receipt/history/{id}', [GoodsReceiptInventoryController::class, 'grHistory']);
+        
+        //Gain Loss
+        Route::apiResource('gain-loss', GainLossInventoryController::class);
+        Route::post('gain-loss/approval', [GainLossInventoryController::class,'approval']);
+        
+        //Shipping Instruction
+        Route::apiResource('shipping-instruction', ShippingInstructionController::class);
+        Route::get('shipping-instruction/by-po/{id}', [ShippingInstructionController::class,'byPo']);
+        Route::post('shipping-instruction/{id}/cancel', [ShippingInstructionController::class,'cancel']);
+        Route::post('shipping-instruction/{id}/approve', [ShippingInstructionController::class,'approve']);
+        Route::get('shipping-instruction/print/{id}', [ShippingInstructionController::class, 'print']);
+        });
 });

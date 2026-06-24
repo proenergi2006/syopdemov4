@@ -2,11 +2,20 @@
 import { ref, reactive, onMounted } from 'vue'
 import axios from '@axios'
 import { useRoute } from 'vue-router'
-
+import {
+  showConfirmAlert,
+  showErrorAlert,
+  showLoadingAlert,
+  showSuccessAlert,
+  showWarningAlert,
+  closeAlert,
+} from '@/utils/alert'
+import { getApiErrorMessage } from '@/utils/apiHelper'
 const route = useRoute()
 const router = useRouter()
 
 const id = route.params.id
+
 
 const po = reactive<any>({
   nomor_po: '',
@@ -17,6 +26,13 @@ const po = reactive<any>({
   vendor: '',
   produk: '',
   terminal: '',
+  nilai_pbbkb: '',
+  iuran_migas: false,
+  kd_tax: '',
+  ongkos_angkut: '',
+  kategori_plat: '',
+  terms: '',
+  terms_day: '',
   catatan_po: '',
   internal_notes: '',
   disposisi_po: 0,
@@ -29,12 +45,21 @@ const po = reactive<any>({
   ceo_result: 0,
   ceo_pic: '',
   ceo_tanggal: '',
+  ceo_summary: '',
+  revert_ceo_summary: '',
 
+  pbbkb_po: 0,
   harga_tebus: 0,
   subtotal: 0,
   ppn: 0,
+  pph_22: 0,
+  nominal_migas: 0,
   total: 0,
 })
+
+const showHistory = ref(false)
+const latestHistory = ref<any>(null)
+const histories = ref<any[]>([])
 
 // ====== APPROVAL STATE ======
 const approvalCEO = reactive({
@@ -54,9 +79,9 @@ const isWaitingCEO = computed(() => {
 
 const isWaitingCFO = computed(() => po.disposisi_po === 1)
 
-const isApprovedCFO = computed(() => po.disposisi_po === 2)
+const isApprovedCFO = computed(() => po.cfo_result === 1)
 
-const isRejectedCFO = computed(() => po.disposisi_po === 3)
+const isRejectedCFO = computed(() => po.cfo_result === 2)
 // ====== LOADING ======
 const loading = ref(false)
 
@@ -75,14 +100,25 @@ const fetchPO = async (id: any) => {
         volume_bol: data.volume_bol,
 
         vendor: data.vendor.nama_vendor,
-        produk: data.produk.jenis_produk,
+        produk: data.produk.merk_dagang,
         terminal: data.terminal.nama_terminal,
+
+        kategori_plat: data.kategori_plat,
+        kd_tax: data.kd_tax,
+        ongkos_kirim: data.ongkos_kirim,
+        terms: data.terms,
+        terms_day: data.terms_day,
+        nilai_pbbkb: data.nilai_pbbkb,
+        iuran_migas: data.iuran_migas,
 
         catatan_po: data.keterangan,
         internal_notes: data.internal_notes,
         harga_tebus: data.harga_tebus,
+        pbbkb_po: data.pbbkb_po,
+        nominal_migas: data.nominal_migas,
         subtotal: data.subtotal,
         ppn: data.ppn_12,
+        pph_22: data.pph_22,
         total: data.total_order,
         disposisi_po: data.disposisi_po,
         cfo_result: data.cfo_result,
@@ -92,12 +128,22 @@ const fetchPO = async (id: any) => {
         ceo_result: data.ceo_result,
         ceo_pic: data.ceo_pic,
         ceo_tanggal: data.ceo_tanggal,
+        ceo_summary: data.ceo_summary,
+        revert_ceo_summary: data.revert_ceo_summary,
+
     })
   } catch (err) {
     console.error(err)
   } finally {
     loading.value = false
   }
+}
+
+const fetchHistory = async () => {
+  const res = await axios.get(`/inventory/purchase-order/${id}/history`)
+  latestHistory.value = res.data.latest || null
+  histories.value = res.data.history || []
+  console.log(res)
 }
 
 const confirmDialog = ref(false)
@@ -107,11 +153,21 @@ const submitApproval = () => {
   confirmDialog.value = true
 }
 
+const isSaving = ref(false)
 const doSubmit = async () => {
 
-  loadingSubmit.value = true
+//   loadingSubmit.value = true
+  const confirm = await showConfirmAlert({
+    title: 'Apakah yakin ingin melakukan approval PO?',
+    confirmButtonText: 'Ya, simpan',
+    cancelButtonText: 'Batal',
+  })
+    if (!confirm.isConfirmed) return
 
-  try {
+    isSaving.value = true
+
+    try {
+      showLoadingAlert('Menyimpan data...', 'Mohon menunggu')
 
     let url = ''
 
@@ -130,25 +186,85 @@ const doSubmit = async () => {
       note: po.note,
     })
 
-    confirmDialog.value = false
+    // confirmDialog.value = false
+    await showSuccessAlert({
+      title: 'Berhasil',
+      text: `Approve PO berhasil`,
+      timer: 1800,
+    })
 
-    alert('Approval berhasil')
 
     await fetchPO(id)
 
   } catch (err) {
-
+    closeAlert()
     console.error(err)
+
+    await showErrorAlert({
+      title: 'Error',
+      text: getApiErrorMessage(err, 'Gagal menghapus vendor'),
+    })
   } finally {
-    loadingSubmit.value = false
+    closeAlert()
+    isSaving.value = false
+
+    // loadingSubmit.value = false
   }
 }
+const userRoles = ref<string[]>([])
 
-// const noteLabel = computed(() => {
-//   return po.result === '1'
-//     ? 'Catatan Aprove'
-//     : 'CEO Summary'
-// })
+const getProfile = async () => {
+  try {
+    const res = await axios.get('/auth/me')
+
+    userRoles.value = res.data.role
+
+    console.log('ROLE:', res)
+  } catch (err) {
+    console.error(err)
+  }
+}
+const canApprove = (item: any) => {
+  if (userRoles.value.includes('CFO') && item.disposisi_po === 1) return true
+  if (userRoles.value.includes('CEO') && item.disposisi_po === 2) return true
+  return false
+}
+
+const statusMap: Record<number, {
+  text: string
+  color: string
+  icon: string
+}> = {
+  1: {
+    text: 'Waiting CFO',
+    color: 'warning',
+    icon: 'tabler-clock',
+  },
+
+  2: {
+    text: 'Waiting CEO',
+    color: 'info',
+    icon: 'tabler-user-check',
+  },
+
+  3: {
+    text: 'Rejected CFO',
+    color: 'error',
+    icon: 'tabler-x',
+  },
+
+  4: {
+    text: 'Approved',
+    color: 'success',
+    icon: 'tabler-check',
+  },
+
+  5: {
+    text: 'Rejected CEO',
+    color: 'error',
+    icon: 'tabler-x',
+  },
+}
 
 const noteLabel = computed(() => {
 
@@ -172,6 +288,8 @@ const formatMoney = (value: number | null): string => {
 // ====== INIT ======
 onMounted(() => {
   fetchPO(id)
+  getProfile()
+  fetchHistory()
 })
 </script>
 <template>
@@ -247,6 +365,31 @@ onMounted(() => {
                             <strong> {{ po.terminal || '-' }}</strong>
                         </div>
 
+                        <div class="d-flex justify-space-between">
+                            <span class="text-medium-emphasis">Harga Dasar</span>
+                            <strong> {{ po.harga_tebus || '-' }}</strong>
+                        </div>
+                        <div v-if="po.ongkos_angkut" class="d-flex justify-space-between">
+                            <span class="text-medium-emphasis">Ongkos Angkut</span>
+                            <strong> {{ po.ongkos_angkut || '-' }}</strong>
+                        </div>
+                        <div v-if="po.ongkos_angkut" class="d-flex justify-space-between">
+                            <span class="text-medium-emphasis">Kategori Plat</span>
+                            <strong> {{ po.kategori_plat || '-' }}</strong>
+                        </div>
+                        <div class="d-flex justify-space-between">
+                            <span class="text-medium-emphasis">Kode Tax</span>
+                            <strong> {{ po.kd_tax || '-' }}</strong>
+                        </div>
+                        <div class="d-flex justify-space-between">
+                            <span class="text-medium-emphasis">Terms</span>
+                            <strong> {{ po.terms || '-' }}</strong>
+                        </div>
+                        <div v-if="po.terms == 'NET'" class="d-flex justify-space-between">
+                            <span class="text-medium-emphasis">Terms Day</span>
+                            <strong> {{ po.terms_day || '-' }}</strong>
+                        </div>
+
                         <VDivider class="my-2" />
 
                         <div class="d-flex justify-space-between">
@@ -262,6 +405,18 @@ onMounted(() => {
                         <div class="d-flex justify-space-between">
                             <span>PPN</span>
                             <strong>{{ formatMoney(po.ppn) || '-' }}</strong>
+                        </div>
+                        <div v-if="Number(po.pph_22) !== 0" class="d-flex justify-space-between">
+                            <span>PBBKB</span>
+                            <strong>{{ formatMoney(po.pbbkb_po) || '-' }}</strong>
+                        </div>
+                        <div  v-if="Number(po.pph_22) !== 0" class="d-flex justify-space-between">
+                            <span>PPH 22</span>
+                            <strong>{{ formatMoney(po.pph_22) || '-' }}</strong>
+                        </div>
+                        <div v-if="po.iuran_migas" class="d-flex justify-space-between">
+                            <span>Iuran Migas</span>
+                            <strong>{{ formatMoney(po.nominal_migas) || '-' }}</strong>
                         </div>
 
                         <div class="d-flex justify-space-between text-h6">
@@ -285,87 +440,93 @@ onMounted(() => {
                 </VCol>
 
                 <!-- PERUBAHAN TERAKHIR -->
-                <VCol cols="12" md="6">
-                    <VCard rounded="md">
-
-                    <VCardTitle class="d-flex justify-space-between align-center">
-                        <span class="text-subtitle-1 font-weight-bold">
-                        Perubahan Terakhir
-                        </span>
-
-                        <VChip size="small" color="warning" variant="tonal">
-                        Updated
-                        </VChip>
-                    </VCardTitle>
-
-                    <VDivider />
-
-                    <VCardText class="pt-4">
-
-                        <div class="d-flex flex-column ga-3">
+                <!-- <VCol cols="12" md="6">
+                    <VCard variant="tonal" color="error" class="pa-4">
+                        <div class="font-weight-bold mb-2">Sebelum</div>
 
                         <div class="d-flex justify-space-between">
-                            <span class="text-medium-emphasis">Vendor</span>
-                            <strong>-</strong>
+                            <span>Volume</span>
+                            <strong>{{ latestHistory.volume_po }}</strong>
                         </div>
 
                         <div class="d-flex justify-space-between">
-                            <span class="text-medium-emphasis">Produk</span>
-                            <strong>-</strong>
-                        </div>
-
-                        <div class="d-flex justify-space-between">
-                            <span class="text-medium-emphasis">Terminal</span>
-                            <strong>-</strong>
-                        </div>
-
-                        <VDivider class="my-2" />
-
-                        <!-- PRICE CHANGE BLOCK -->
-                        <div class="pa-3 rounded bg-grey-lighten-4">
-
-                            <div class="d-flex justify-space-between">
                             <span>Harga</span>
-
-                            <div class="d-flex align-center ga-2">
-                                <span class="text-red">-</span>
-                                <VIcon size="16">tabler-arrow-right</VIcon>
-                                <span class="text-success font-weight-bold">-</span>
-                            </div>
-                            </div>
-
+                            <strong>{{ latestHistory.harga_tebus }}</strong>
                         </div>
 
-                        <div class="pa-3 rounded bg-grey-lighten-4">
-
-                            <div class="d-flex justify-space-between">
+                        <div class="d-flex justify-space-between">
                             <span>Total</span>
-
-                            <div class="d-flex align-center ga-2">
-                                <span class="text-red">-</span>
-                                <VIcon size="16">tabler-arrow-right</VIcon>
-                                <span class="text-success font-weight-bold">-</span>
-                            </div>
-                            </div>
-
+                            <strong>{{ latestHistory.total_order }}</strong>
                         </div>
 
-                        </div>
-
-                    </VCardText>
-
-                    </VCard>
-                </VCol>
+                        </VCard>
+                </VCol> -->
 
                 </VRow>
             </VCardText>
         
 
         </VCard>
-            <!-- 2 column comparison -->
-     
-        
-            
+       <div class="mt-6" v-if="histories.length > 0">
+        <VCard class="mb-4">
+            <VCardTitle>Riwayat Pengajuan PO</VCardTitle>
+            <VDivider/>
+            <VCardText>
+                
+            <VExpansionPanels multiple>
+                <VExpansionPanel
+                v-for="(h, index) in histories"
+                :key="index"
+                >
+                <VExpansionPanelTitle>
+                    Riwayat Pengajuan ke - {{ index + 1 }}
+                </VExpansionPanelTitle>
+    
+                <VExpansionPanelText>
+                    <VCard variant="tonal" class="pa-4">
+    
+                    <div class="d-flex flex-column ga-2">
+    
+                        <div class="d-flex justify-space-between">
+                        <strong>Nomor PO</strong>
+                        <span>{{ h.nomor_po }}</span>
+                        </div>
+    
+                        <div class="d-flex justify-space-between">
+                        <strong>Volume</strong>
+                        <span>{{ h.volume_po }} L</span>
+                        </div>
+    
+                        <div class="d-flex justify-space-between">
+                        <strong>Harga</strong>
+                        <span>{{ h.harga_tebus }}</span>
+                        </div>
+    
+                        <div class="d-flex justify-space-between">
+                        <strong>Total</strong>
+                        <span>{{ h.total_order }}</span>
+                        </div>
+    
+                        <div class="d-flex justify-space-between">
+                        <strong>Updated By</strong>
+                        <span>{{ h.lastupdate_by }}</span>
+                        </div>
+    
+                        <div class="d-flex justify-space-between">
+                        <strong>Tanggal</strong>
+                        <span>{{ h.lastupdate_time }}</span>
+                        </div>
+    
+                    </div>
+    
+                    </VCard>
+                </VExpansionPanelText>
+                </VExpansionPanel>
+            </VExpansionPanels>
+            </VCardText>
+        </VCard>
+
+        </div>
         <VRow>
            <!-- TIMELINE -->
             <VCol cols="12" md="6">
@@ -401,24 +562,8 @@ onMounted(() => {
 
                         <!-- CFO -->
                         <VTimelineItem
-                        :dot-color="
-                            isWaitingCFO
-                            ? 'warning'
-                            : po.disposisi_po === 2
-                                ? 'success'
-                                : po.disposisi_po === 3
-                                ? 'error'
-                                : 'grey'
-                        "
-                        :icon="
-                            isWaitingCFO
-                            ? 'tabler-clock'
-                            :  po.disposisi_po === 2
-                                ? 'tabler-check'
-                                :  po.disposisi_po === 3
-                                ? 'tabler-x'
-                                : 'tabler-minus'
-                        "
+                        :dot-color="statusMap[po.disposisi_po]?.color || 'grey'"
+                        :icon="statusMap[po.disposisi_po]?.icon"
                         >
 
                         <div class="d-flex justify-space-between align-center">
@@ -450,29 +595,13 @@ onMounted(() => {
 
                             </div>
 
-                           <VChip
-                            :color="
-                                isWaitingCFO
-                                ? 'warning'
-                                : po.disposisi_po === 2
-                                    ? 'success'
-                                    : po.disposisi_po === 3
-                                    ? 'error'
-                                    : 'grey'
-                            "
-                            variant="tonal"
-                            size="small"
-                            >
-                            {{
-                                isWaitingCFO
-                                ? 'Waiting'
-                                : po.disposisi_po === 2
-                                    ? 'Approved'
-                                    : po.disposisi_po === 3
-                                    ? 'Rejected'
-                                    : 'Pending'
-                            }}
-                            </VChip>
+                          <VChip
+                        :color="statusMap[po.disposisi_po]?.color || 'grey'"
+                        variant="tonal"
+                        size="small"
+                        >
+                      {{ isApprovedCFO === true ? 'Approved' : isRejectedCFO === true ? 'Rejected' : 'Pending' }}
+                        </VChip>
 
                         </div>
 
@@ -482,13 +611,6 @@ onMounted(() => {
                         >
                         Catatan CFO : {{ po.cfo_summary }}
                         </div>
-    <!-- 
-                        <div
-                            v-if="po.cfo_tanggal"
-                            class="text-caption"
-                        >
-                        
-                        </div> -->
 
                         </VTimelineItem>
 
@@ -529,11 +651,11 @@ onMounted(() => {
                                 </template>
 
                                 <template v-else-if="po.ceo_result === 1">
-                                Approved
+                                Approved  {{ po.ceo_pic }} - {{ po.ceo_tanggal }}
                                 </template>
 
                                 <template v-else-if="po.ceo_result === 2">
-                                Rejected
+                                Rejected  {{ po.ceo_pic }} - {{ po.ceo_tanggal }}
                                 </template>
 
                                 <template v-else>
@@ -569,21 +691,12 @@ onMounted(() => {
                             </VChip>
 
                         </div>
-
                         <div
-                            v-if="po.ceo_pic"
-                            class="text-caption mt-2"
-                        >
-                            By {{ po.ceo_pic }}
+                            v-if="po.ceo_summary"
+                            class="text-body-2 mt-2 border rounded pa-4 mb-2"
+                            >
+                            Catatan ceo : {{ po.ceo_summary }}
                         </div>
-
-                        <div
-                            v-if="po.ceo_tanggal"
-                            class="text-caption"
-                        >
-                            {{ po.ceo_tanggal }}
-                        </div>
-
                         </VTimelineItem>
 
                     </VTimeline>
@@ -599,7 +712,10 @@ onMounted(() => {
             <VCol cols="12" md="6">
 
             <VCard
-                v-if="po.disposisi_po === 1 || po.disposisi_po === 2"
+                 v-if="
+                    (userRoles.includes('CFO') && po.disposisi_po === 1) ||
+                    (userRoles.includes('CEO') && po.disposisi_po === 2)
+                "
             >
 
                 <VCardTitle>
@@ -639,7 +755,7 @@ onMounted(() => {
                 <VBtn
                     color="primary"
                     class="mt-4"
-                    @click="submitApproval"
+                    @click="doSubmit"
                 >
                     Submit Approval
                 </VBtn>
@@ -650,7 +766,7 @@ onMounted(() => {
 
             </VCol>
         </VRow>
-           
+ 
     <VDialog v-model="confirmDialog" max-width="400">
         <VCard>
             <VCardTitle>
@@ -696,11 +812,14 @@ onMounted(() => {
     </VCardText>
     </VCard>
     </VDialog>
-    <VBtn
-        variant="tonal" color="secondary" size="large"  @click="router.back()"
-        class="mt-2"
-    >
-        Kembali
-    </VBtn>
+      <VCardActions class="pa-4 d-flex justify-end">
+
+          <VBtn
+              variant="tonal" color="secondary" size="large"  @click="router.back()"
+              class="mt-2"
+          >
+              Kembali
+          </VBtn>
+      </VCardActions>
     </section>
 </template>

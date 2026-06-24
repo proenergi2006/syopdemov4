@@ -2,12 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exports\PurchaseOrderInventoryExport;
 use App\Http\Controllers\Controller;
+use App\Models\InventoryGainLoss;
 use App\Models\InventoryVendorPo;
+use App\Models\InventoryVendorPoOld;
+use App\Models\InventoryVendorReceive;
 use App\Services\AccurateApiService;
 use App\Services\PurchaseOrderInventoryService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PurchaseOrderInventoryController extends Controller
 {
@@ -30,21 +36,27 @@ class PurchaseOrderInventoryController extends Controller
             'vendor',
             'produk',
             'terminal'
-        ]);
+        ])
+        ->withSum('goodReceipt as total_bl', 'volume_bol')
+        ->withSum('goodReceipt as total_ri', 'volume_terima');
 
         // FILTER
-        if ($request->keyword) {
+        if ($request->search) {
             $query->where(function ($q) use ($request) {
-                $q->where('nomor_po', 'like', '%' . $request->keyword . '%');
+                $q->where('nomor_po', 'ILIKE', '%' . $request->search . '%');
             });
         }
 
-        if ($request->id_vendor) {
-            $query->where('id_vendor', $request->id_vendor);
+        if ($request->vendor) {
+            $query->where('id_vendor', $request->vendor);
         }
 
-        if ($request->id_terminal) {
-            $query->where('id_terminal', $request->id_terminal);
+        if ($request->terminal) {
+            $query->where('id_terminal', $request->terminal);
+        }
+
+        if ($request->status) {
+            $query->where('disposisi_po', $request->status);
         }
 
         if ($request->tanggal_awal && $request->tanggal_akhir) {
@@ -110,14 +122,17 @@ class PurchaseOrderInventoryController extends Controller
                 'data' => $result
             ]);
 
-        } catch (\Throwable $e) {
+        }catch (\Throwable $e) {
 
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ], 500);
 
-        }
+            }
     }
     /**
      * Display the specified resource.
@@ -186,5 +201,97 @@ class PurchaseOrderInventoryController extends Controller
         );
 
         return response()->json($result);
+    }
+    public function approveCEO(Request $request, $id)
+    {
+        $result =$this->poService->approveCEO(
+            $id,
+            $request->all(),
+            [
+                'name' => auth()->user()->name,
+            ]
+        );
+
+        return response()->json($result);
+    }
+
+    public function print($id)
+    {
+        $po = InventoryVendorPo::with(['vendor', 'produk'])->findOrFail($id);
+
+        $pdf = Pdf::loadView('pdf.trading.po', compact('po'));
+
+        return $pdf->stream('purchase-order.pdf');
+        
+    }
+
+    public function printGainLoss($id)
+    {
+        $po = InventoryVendorPo::with(['vendor', 'produk'])->findOrFail($id);
+        $gr = InventoryVendorReceive::where('id_po_supplier', $id)->firstOrFail();
+        $gl = InventoryGainLoss::where('id_po_supplier', $id)->firstOrFail();
+
+        $pdf = Pdf::loadView('pdf.trading.poGainLoss', compact('po','gr','gl'));
+
+        return $pdf->stream('purchase-order-gain-loss.pdf');
+        
+    }
+
+    public function history($id)
+    {
+        $histories = DB::table('inventory_vendor_po_history')
+            ->where('id_po_supplier', $id)
+            ->get();
+
+        $latestHistory = $histories->first(); // perubahan terakhir
+
+        return response()->json([
+            'history' => $histories,
+            'latest' => $latestHistory
+        ]);
+    }
+    
+    public function cancel(Request $request, $id)
+    {
+        try {
+            $this->poService->cancel($id, $request->cancel_reason);
+
+            return redirect()
+                ->back()
+                ->with('success', 'PO berhasil dicancel');
+
+        } catch (\Exception $e) {
+            return redirect()
+                ->back()
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    // public function close(Request $request, $id)
+    // {
+    //     try {
+    //         $this->poService->close(
+    //             $id,
+    //             $request->tanggal_close,
+    //             $request->volume_close
+    //         );
+
+    //         return redirect()
+    //             ->back()
+    //             ->with('success', 'PO berhasil close');
+
+    //     } catch (\Exception $e) {
+    //         return redirect()
+    //             ->back()
+    //             ->with('error', $e->getMessage());
+    //     }
+    // }
+    
+    public function export(Request $request)
+    {
+        return Excel::download(
+            new PurchaseOrderInventoryExport($request),
+            'Rekap-PO-' . now()->format('dmYHis') . '.xlsx'
+        );
     }
 }

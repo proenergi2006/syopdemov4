@@ -102,4 +102,8 @@ class TransportirController extends Controller
         $transportir->delete();
         return response()->json(['message' => 'Deleted']);
     }
+
+    public function transportir() {
+        return response()->json(Transportir::all(['id', 'nama_transportir','nama_suplier']));
+    }
 }

@@ -36,15 +36,18 @@ const login = async () => {
 
     localStorage.setItem('accessToken', data.token)
 
-    localStorage.setItem(
-      'userData',
-      JSON.stringify({
-        id: data.user.id,
-        name: data.user.name,
-        email: data.user.email,
-        role: 'admin',
-      }),
-    )
+    const me = await axios.get('/auth/me')
+    localStorage.setItem('userData', JSON.stringify(me.data))
+
+    // localStorage.setItem(
+    //   'userData',
+    //   JSON.stringify({
+    //     id: data.user.id,
+    //     name: data.user.name,
+    //     email: data.user.email,
+    //     role: 'admin',
+    //   }),
+    // )
 
     const abilities = [{ action: 'manage', subject: 'all' }]
     localStorage.setItem('userAbilities', JSON.stringify(abilities))

@@ -4,12 +4,19 @@ import axios from '@axios'
 import { debounce } from 'lodash-es'
 import {
   onlyNumberKeypress,
-  formatSanitizedNumberInput,
-  getClipboardText,
 } from '@/utils/textFormatter'
 import { reactive } from 'vue'
 import { VForm } from 'vuetify/components/VForm'
 import { useRoute } from 'vue-router'
+import { getApiErrorMessage } from '@/utils/apiHelper'
+import {
+  showConfirmAlert,
+  showErrorAlert,
+  showLoadingAlert,
+  showSuccessAlert,
+  showWarningAlert,
+  closeAlert,
+} from '@/utils/alert'
 
 const dialogSubmit = ref(false)
 const route = useRoute()
@@ -91,6 +98,13 @@ const form = reactive({
   total_order: 0,
   catatan_po: '',
   internal_notes: '',
+
+  // approval
+  disposisi_po : 0,
+  revert_cfo:0,
+  revert_ceo:0,
+  revert_cfo_summary:0,
+  revert_ceo_summary:0,
 })
 const produkAccList = ref<any[]>([])
 const akunAccList = ref<any[]>([])
@@ -313,6 +327,10 @@ const onScroll = (e: any) => {
       nominal_migas: data.nominal_migas,
       catatan_po: data.keterangan,
       internal_notes: data.internal_notes,
+      revert_cfo: data.revert_cfo,
+      revert_ceo: data.revert_ceo,
+      revert_ceo_summary: data.revert_ceo_summary,
+      revert_cfo_Summary: data.revert_cfo_Summary,
     })
 
        // DETAIL ACCURATE
@@ -402,7 +420,7 @@ const requiredNotZero = (label: string)=> {
   return (v: any) =>
     v !== null &&
     v !== undefined &&
-    v !== '' &&
+    v !== '' && v !== '0' &&
     v !== 0
       || `${label} wajib diisi dan tidak boleh 0`
 }
@@ -554,11 +572,12 @@ const submit = async () => {
   } catch (err: any) {
 
     console.error(err)
+    isSaving.value = false
 
-    notify(
-      err?.response?.data?.message || 'Terjadi kesalahan',
-      'error',
-    )
+    await showErrorAlert({
+      title: 'Error',
+      text: getApiErrorMessage(err, 'gagal menyimpan data'),
+    })
 
   } finally {
 
@@ -684,6 +703,50 @@ const submit = async () => {
     
               </div>
             </VAlert>
+          </section>
+
+          <section class="mb-6" v-if="form.revert_cfo==1 || form.revert_ceo==1">
+          <VAlert
+            v-if="form.revert_cfo == 1 || form.revert_ceo == 1"
+            color="error"
+            variant="tonal"
+            border="start"
+            class="mb-6"
+          >
+            <div class="d-flex align-center mb-3">
+              <VAvatar
+                color="error"
+                size="32"
+                class="me-3"
+              >
+                <VIcon size="18">mdi-close</VIcon>
+              </VAvatar>
+
+              <div>
+                <div class="font-weight-bold">
+                  Purchase Order Ditolak
+                </div>
+
+                <div class="text-caption ">
+                  Oleh {{ form.revert_cfo == 1 ? 'CFO' : 'CEO' }}
+                </div>
+              </div>
+            </div>
+
+            <VSheet
+              rounded="lg"
+              color="surface"
+              class="pa-3"
+            >
+              <div class="text-caption text-medium-emphasis mb-1">
+                Alasan Pengembalian :
+              </div>
+
+              <div class="text-body-2">
+                {{ form.revert_cfo_summary || form.revert_ceo_summary }}
+              </div>
+            </VSheet>
+          </VAlert>
           </section>
     
             <!-- ===================================================== -->
@@ -1195,8 +1258,7 @@ const submit = async () => {
     
                   <!-- sebagai kode item -->
                   <VSheet v-if="showKodeItemOA" class="mt-3 pa-4 mb-4"
-                  border rounded="lg"
-                  color="pink-lighten-5">
+                  border rounded="lg" color="pink-lighten-5">
     
                     <div class="text-subtitle-2 font-weight-bold mb-3">
                       Akun OA Accurate *
@@ -1738,7 +1800,7 @@ const submit = async () => {
             <!-- ACTION -->
             <section>
     
-              <div class="d-flex justify-start flex-wrap gap-3">
+              <div class="d-flex justify-end flex-wrap gap-3">
     
                 <!-- <VBtn color="primary" size="large" @click="step = 'review'"> -->
                 <VBtn color="primary" size="large" @click="goToReview">
@@ -1836,9 +1898,7 @@ const submit = async () => {
                   {{ resolveLabelById(vendorList, form.vendor, 'nama_vendor') }}
                 </div>
               </div>
-            </VCol>
-            <VCol cols="12" md="6">
-                <div class="mb-4">
+               <div class="mb-4">
                   <div class="text-caption text-black">Jenis Kirim</div>
                   <div class="text-black font-weight-semibold">
                     {{  form.jenis_kirim === 1 ? 'Truck'
@@ -1847,7 +1907,8 @@ const submit = async () => {
                           : '-' }}
                   </div>
                 </div>
-
+            </VCol>
+            <VCol cols="12" md="6">
                 <div class="mb-4">
                   <div class="text-caption text-black">Terms</div>
                   <div class="text-black font-weight-semibold">
@@ -1867,11 +1928,14 @@ const submit = async () => {
                     {{ form.kd_tax || '-' }} 
                   </div>
                 </div>
-                <div class="mb-4">
-                  <div class="text-caption text-black">Tax</div>
-                  <div class="text-black font-weight-semibold">
-                    {{ form.iuran_migas || '-' }} 
-                  </div>
+                <div class="mb-4" v-if="form.iuran_migas">
+                  <div class="text-caption text-black">Iuran Migas</div>
+                  <VChip
+                    :color="form.iuran_migas ? 'success' : 'error'"
+                    size="small"
+                  >
+                    {{ form.iuran_migas ? 'Ya' : 'Tidak' }}
+                  </VChip>
                 </div>
 
                 <div class="mb-0">
@@ -2130,7 +2194,7 @@ const submit = async () => {
       <!-- ACTION -->
       <VDivider />
 
-      <VCardActions class="pa-4 d-flex justify-space-between">
+      <VCardActions class="pa-4 d-flex justify-end">
 
         <VBtn variant="tonal" color="secondary" @click="step = 'form'">
           Revisi PO

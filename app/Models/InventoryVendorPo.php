@@ -104,4 +104,13 @@ class InventoryVendorPo extends Model
             'id'
         );
     }
+
+    public function goodReceipt()
+    {
+        return $this->hasMany(
+            InventoryVendorReceive::class,
+            'id_po_supplier',
+            'id_master'
+        );
+    }
 }

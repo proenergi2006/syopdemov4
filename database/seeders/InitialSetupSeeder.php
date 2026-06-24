@@ -70,6 +70,8 @@ class InitialSetupSeeder extends Seeder
                 ['kode' => 'BM', 'nama' => 'Branch Manager'],
                 ['kode' => 'OM', 'nama' => 'Operation Manager'],
                 ['kode' => 'PROC', 'nama' => 'Procurement'],
+                ['kode' => 'CFO', 'nama' => 'CFO'],
+                ['kode' => 'CEO', 'nama' => 'CEO'],
             ];
 
             $roleIds = [];
@@ -145,7 +147,7 @@ class InitialSetupSeeder extends Seeder
             |--------------------------------------------------------------------------
             */
             $purchSupplierMenuId = $this->upsertMenu(
-                ['name' => 'Purchase', 'parent_id' => null],
+                ['name' => 'Purchase Trading', 'parent_id' => null],
                 [
                     'path' => null,
                     'route_name' => null,
@@ -387,6 +389,18 @@ class InitialSetupSeeder extends Seeder
                 ]
             );
 
+            $kapalMenuId = $this->upsertMenu(
+                ['name' => 'Kapal', 'parent_id' => $fleetMenuId],
+                [
+                    'path' => '/master/kapal',
+                    'route_name' => 'master-kapal',
+                    'icon' => 'tabler-ship',
+                    'order_no' => 5,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
             // Regional children
             $provinsiMenuId = $this->upsertMenu(
                 ['name' => 'Provinsi', 'parent_id' => $regionalMenuId],
@@ -490,6 +504,30 @@ class InitialSetupSeeder extends Seeder
                     'updated_at' => $now,
                 ]
             );
+            $cfoUserId = $this->upsertAndGetId(
+                'users',
+                ['email' => 'cfo@syop.local'],
+                [
+                    'name' => 'CFO',
+                    'password' => Hash::make('admin123'),
+                    'cabang_id' => $cabangId,
+                    'departemen_id' => $deptIT,
+                    'is_active' => true,
+                    'updated_at' => $now,
+                ]
+            );
+            $ceoUserId = $this->upsertAndGetId(
+                'users',
+                ['email' => 'ceo@syop.local'],
+                [
+                    'name' => 'CEO',
+                    'password' => Hash::make('admin123'),
+                    'cabang_id' => $cabangId,
+                    'departemen_id' => $deptIT,
+                    'is_active' => true,
+                    'updated_at' => $now,
+                ]
+            );
 
             // Purchases Supplier children
             $poSupplierMenuId = $this->upsertMenu(
@@ -505,12 +543,36 @@ class InitialSetupSeeder extends Seeder
             );
 
             $receiveItemMenuId = $this->upsertMenu(
-                ['name' => 'Received Item', 'parent_id' =>$purchSupplierMenuId],
+                ['name' => 'Goods Receipt', 'parent_id' =>$purchSupplierMenuId],
                 [
-                    'path' => '/purchaseSupplier/receive-item',
-                    'route_name' => 'receive-item',
+                    'path' => '/purchaseSupplier/goods-receipt',
+                    'route_name' => 'goods-receipt',
                     'icon' => 'tabler-truck-return',
                     'order_no' => 2,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $approvalMenuId = $this->upsertMenu(
+                ['name' => 'Approval PO', 'parent_id' =>$purchSupplierMenuId],
+                [
+                    'path' => '/purchaseSupplier/po-supplier/approval',
+                    'route_name' => 'po-supplier/approval',
+                    'icon' => 'tabler-user-check',
+                    'order_no' => 3,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $shippingMenuId = $this->upsertMenu(
+                ['name' => 'Shipping Request', 'parent_id' =>$purchSupplierMenuId],
+                [
+                    'path' => '/purchaseSupplier/shipping-instruction',
+                    'route_name' => 'shipping-instruction',
+                    'icon' => 'tabler-ship',
+                    'order_no' => 4,
                     'permission_key' => null,
                     'is_active' => true,
                 ]
@@ -524,6 +586,14 @@ class InitialSetupSeeder extends Seeder
             $this->upsertPivot('user_roles', [
                 'user_id' => $adminUserId,
                 'role_id' => $roleIds['ADMIN'],
+            ]);
+            $this->upsertPivot('user_roles', [
+                'user_id' => $cfoUserId,
+                'role_id' => $roleIds['CFO'],
+            ]);
+            $this->upsertPivot('user_roles', [
+                'user_id' => $ceoUserId,
+                'role_id' => $roleIds['CEO'],
             ]);
             /*
             |--------------------------------------------------------------------------
@@ -546,6 +616,7 @@ class InitialSetupSeeder extends Seeder
                 $sopirMenuId,
                 $mobilMenuId,
                 $ongkosAngkutMenuId,
+                $kapalMenuId,
                 $cabangMenuId,
                 $deptMenuId,
                 $vendorMenuId,
@@ -563,7 +634,9 @@ class InitialSetupSeeder extends Seeder
                 $hargaPertaminaId,
                 $purchSupplierMenuId,
                 $poSupplierMenuId,
-                $receiveItemMenuId
+                $receiveItemMenuId,
+                $approvalMenuId,
+                $shippingMenuId,
             ];
 
             foreach ($menuIds as $menuId) {

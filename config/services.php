@@ -34,5 +34,6 @@ return [
     'accurate' => [
         'token' => env('ACCURATE_API_TOKEN'),
         'secret' => env('ACCURATE_API_SECRET'),
+        'base_url' => env('ACCURATE_BASE_URL'),
     ],
 ];

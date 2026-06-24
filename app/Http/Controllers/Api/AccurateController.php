@@ -25,7 +25,7 @@ class AccurateController extends Controller
             $query_params['filter.no.val'] = $request->q;
         }
 
-        $url = 'https://zeus.accurate.id/accurate/api/item/list.do?' . http_build_query($query_params);
+        $url = config('services.accurate.base_url') . '/accurate/api/item/list.do?' . http_build_query($query_params);
 
         $result = $api->get($url);
 
@@ -68,7 +68,7 @@ class AccurateController extends Controller
             $query_params['filter.keywords.val'] = $request->q;
         }
 
-        $url = 'https://zeus.accurate.id/accurate/api/glaccount/list.do?' . http_build_query($query_params);
+        $url = config('services.accurate.base_url') . '/accurate/api/glaccount/list.do?' . http_build_query($query_params);
 
         $result = $api->get($url);
 
@@ -104,7 +104,7 @@ class AccurateController extends Controller
             'id' => $request->id_accurate,
         ];
 
-        $url = 'https://zeus.accurate.id/accurate/api/purchase-order/detail.do?' . http_build_query($query_params);
+        $url = config('services.accurate.base_url') . '/accurate/api/purchase-order/detail.do?' . http_build_query($query_params);
 
         $result = $api->get($url);
 
