@@ -225,7 +225,7 @@ const save = async () => {
 
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
-        <VBtn color="primary" @click="openCreate">
+        <VBtn color="primary" @click="openCreate" v-permission="'auth_role_menu.update'">
           + Add Role
         </VBtn>
 

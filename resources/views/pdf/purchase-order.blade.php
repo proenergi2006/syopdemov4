@@ -1,5 +1,17 @@
+@php
+    $printLanguage = strtolower(
+        (string) ($lang ?? app()->getLocale() ?? 'id')
+    );
+
+    if (!in_array($printLanguage, ['id', 'en'], true)) {
+        $printLanguage = 'id';
+    }
+
+    app()->setLocale($printLanguage);
+@endphp
+
 <!DOCTYPE html>
-<html lang="id">
+<html lang="{{ $printLanguage }}">
 <head>
     <meta charset="utf-8">
     <title>Purchase Order</title>
@@ -79,7 +91,7 @@
         <table class="header-table">
             <tr>
                 <td width="65%">
-                    <div class="document-title">PURCHASE ORDER</div>
+                    <div class="document-title">{{ __('purchase_order.document_title') }}</div>
                     {{-- <div class="document-line"></div> --}}
                 </td>
                 <td width="35%" align="right">
@@ -93,13 +105,13 @@
         <tr>
             <td class="top-info-left">
                 <div class="info-card">
-                    <div class="info-card-title">Order To</div>
+                    <div class="info-card-title">{{ __('purchase_order.order_to') }}</div>
                     <div class="info-card-body">
                         <div class="vendor-name">{{ $po->vendor->nama_vendor ?? '-' }}</div>
                         <div class="vendor-address">{{ $po->vendor->alamat ?? '-' }}</div>
 
                         @if (!empty($po->vendor->telepon))
-                            <div class="contact-line"><span class="bold">Telp:</span> {{ $po->vendor->telepon }}</div>
+                            <div class="contact-line"><span class="bold">{{ __('purchase_order.phone') }}:</span> {{ $po->vendor->telepon }}</div>
                         @endif
 
                         @if (!empty($po->vendor->email))
@@ -110,7 +122,7 @@
 
                         @if (!empty($po->vendor->nama_pic))
                             <div class="contact-line">
-                                <span class="bold">Up:</span> {{ $po->vendor->nama_pic }}
+                                <span class="bold">{{ __('purchase_order.attention') }}:</span> {{ $po->vendor->nama_pic }}
                                 @if (!empty($po->vendor->jabatan_pic))
                                     ({{ $po->vendor->jabatan_pic }})
                                 @endif
@@ -118,7 +130,7 @@
                         @endif
 
                         <div class="contact-line">
-                            <span class="bold">Tlp.:</span>
+                            <span class="bold">{{ __('purchase_order.phone') }}:</span>
                             {{ $po->vendor->telp_pic ?? $po->vendor->phone_vendor ?? '-' }}
                         </div>
 
@@ -133,36 +145,36 @@
                 <div class="meta-card">
                     <table class="po-meta">
                         <tr>
-                            <td class="po-meta-label">PO. Number</td>
+                            <td class="po-meta-label">{{ __('purchase_order.po_number') }}</td>
                             <td class="po-meta-separator">:</td>
                             <td class="po-meta-value po-number-value">{{ $po->nomor_po }}</td>
                         </tr>
                         <tr>
-                            <td class="po-meta-label">PO. Date</td>
+                            <td class="po-meta-label">{{ __('purchase_order.po_date') }}</td>
                             <td class="po-meta-separator">:</td>
                             <td class="po-meta-value">{{ \Carbon\Carbon::parse($po->tanggal_po)->format('d-M-Y') }}</td>
                         </tr>
                         <tr>
-                            <td class="po-meta-label">T.O.P</td>
+                            <td class="po-meta-label">{{ __('purchase_order.top') }}</td>
                             <td class="po-meta-separator">:</td>
-                            <td class="po-meta-value">{{ $po->vendor->top ? $po->vendor->top . ' Hari' : $po->vendor->jenis_pembayaran }}</td>
+                            <td class="po-meta-value">{{ $po->vendor->top ? $po->vendor->top . ' ' . __('purchase_order.days') : $po->vendor->jenis_pembayaran }}</td>
                         </tr>
                     </table>
                 </div>
 
                 <div class="delivery-card">
-                    <div class="delivery-card-title">Informasi Pengiriman dan Penagihan</div>
+                    <div class="delivery-card-title">{{ __('purchase_order.delivery_billing_information') }}</div>
                     <div class="delivery-card-body">
                         <div class="company-name">PT PRO ENERGI</div>
                         <div>Gedung Graha Irama LT. 6 Unit G</div>
                         <div>Jl. HR Rasuna Said Blok X1, Kav. 1 - 2</div>
                         <div>Jakarta Selatan 12950</div>
 
-                        <div class="tax-address-title">Alamat Faktur Pajak : PT PRO ENERGI</div>
+                        <div class="tax-address-title">{{ __('purchase_order.tax_invoice_address') }} : PT PRO ENERGI</div>
                         <div>Graha Irama Lantai 6 Unit G</div>
                         <div>Jl. HR Rasuna Said Kav 1-2X</div>
                         <div>RT.006-RW.04 Kel. Kuningan Timur Kec Setiabudi Jak-sel</div>
-                        <div class="bold" style="margin-top: 5px;">No NPWP 0025.2732.2806.2000</div>
+                        <div class="bold" style="margin-top: 5px;">{{ __('purchase_order.tax_id') }} 0025.2732.2806.2000</div>
                     </div>
                 </div>
             </td>
@@ -173,11 +185,11 @@
         <thead>
             <tr>
                 <th width="5%">No</th>
-                <th width="35%">Nama Item</th>
-                <th width="10%">Qty</th>
-                <th width="12%">Satuan</th>
-                <th width="18%">Harga Unit</th>
-                <th width="20%">Subtotal</th>
+                <th width="35%">{{ __('purchase_order.item_name') }}</th>
+                <th width="10%">{{ __('purchase_order.qty') }}</th>
+                <th width="12%">{{ __('purchase_order.unit') }}</th>
+                <th width="18%">{{ __('purchase_order.unit_price') }}</th>
+                <th width="20%">{{ __('purchase_order.subtotal') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -195,36 +207,36 @@
         <tfoot>
             @if (($po->vendor->status_pkp ?? '') === 'PKP')
                 <tr>
-                    <td colspan="5" class="right summary-label">Subtotal</td>
+                    <td colspan="5" class="right summary-label">{{ __('purchase_order.subtotal') }}</td>
                     <td class="right summary-value nowrap">Rp {{ number_format($po->items->sum('subtotal'), 0, ',', '.') }}</td>
                 </tr>
                 <tr>
-                    <td colspan="5" class="right summary-label">DPP</td>
+                    <td colspan="5" class="right summary-label">{{ __('purchase_order.dpp') }}</td>
                     <td class="right summary-value nowrap">Rp {{ number_format($po->dpp, 0, ',', '.') }}</td>
                 </tr>
                 <tr>
-                    <td colspan="5" class="right summary-label">PPN</td>
+                    <td colspan="5" class="right summary-label">{{ __('purchase_order.vat') }}</td>
                     <td class="right summary-value nowrap">Rp {{ number_format($po->ppn, 0, ',', '.') }}</td>
                 </tr>
             @endif
             <tr>
-                <td colspan="5" class="right grand-total-label">Grand Total</td>
+                <td colspan="5" class="right grand-total-label">{{ __('purchase_order.grand_total') }}</td>
                 <td class="right grand-total-value nowrap">Rp {{ number_format($po->total_nilai, 0, ',', '.') }}</td>
             </tr>
         </tfoot>
     </table>
 
     <div class="terbilang-box">
-        <div class="terbilang-label">Terbilang</div>
+        <div class="terbilang-label">{{ __('purchase_order.amount_in_words') }}</div>
         <div class="terbilang-text">{{ $terbilang }}</div>
     </div>
 
     <div class="terms">
-        <div class="terms-title">Syarat dan Ketentuan</div>
-        <div class="term-line">1. Harap mencantumkan nomor PO ini di invoice atau kwitansi.</div>
-        <div class="term-line">2. Harap melampirkan PO ini saat penagihan beserta nomor rekening pembayarannya.</div>
-        <div class="term-line">3. Syarat pembayaran: {{ $po->vendor->top ? $po->vendor->top . ' Hari' : $po->vendor->jenis_pembayaran }}</div>
-        <div class="term-line">4. PO ini mengacu pada PR nomor: {{ $po->purchaseRequests->pluck('nomor_pr')->implode(', ') }}</div>
+        <div class="terms-title">{{ __('purchase_order.terms_conditions') }}</div>
+        <div class="term-line">1. {{ __('purchase_order.term_po_number') }}</div>
+        <div class="term-line">2. {{ __('purchase_order.term_attach_po') }}</div>
+        <div class="term-line">3. {{ __('purchase_order.payment_terms') }}: {{ $po->vendor->top ? $po->vendor->top . ' ' . __('purchase_order.days') : $po->vendor->jenis_pembayaran }}</div>
+        <div class="term-line">4. {{ __('purchase_order.reference_pr') }}: {{ $po->purchaseRequests->pluck('nomor_pr')->implode(', ') }}</div>
     </div>
 
     @php
@@ -260,10 +272,10 @@
             $status = strtoupper((string) ($approval->status ?? ''));
 
             return match ($status) {
-                'WAITING' => 'Menunggu approval',
-                'PENDING' => 'Belum diproses',
-                'REJECTED' => 'Ditolak',
-                'CANCELLED' => 'Dibatalkan',
+                'WAITING' => __('purchase_order.waiting_approval'),
+                'PENDING' => __('purchase_order.not_processed'),
+                'REJECTED' => __('purchase_order.rejected'),
+                'CANCELLED' => __('purchase_order.cancelled'),
                 default => '-',
             };
         };
@@ -280,10 +292,10 @@
             <table class="signature">
                 <tr>
                     <td width="50%" class="signature-cell">
-                        <div class="signature-title">Dibuat oleh</div>
+                        <div class="signature-title">{{ __('purchase_order.created_by') }}</div>
                         <div class="signature-area">
                             @if ($requesterSignatureExists)
-                                <img src="{{ $requesterSignature }}" class="signature-img" alt="Tanda Tangan Requester">
+                                <img src="{{ $requesterSignature }}" class="signature-img" alt="{{ __('purchase_order.requester_signature') }}">
                             @endif
                         </div>
                         <div class="signature-name">{{ optional($po->requesterSignedBy)->name ?? '-' }}</div>
@@ -291,18 +303,18 @@
                     </td>
 
                     <td width="50%" class="signature-cell">
-                        <div class="signature-title">Menyetujui</div>
+                        <div class="signature-title">{{ __('purchase_order.approved_by') }}</div>
 
                         @if ($firstApproval && strtoupper((string) $firstApproval->status) === 'APPROVED')
                             <div class="signature-area">
                                 @if ($approverSignatureExists)
-                                    <img src="{{ $approverSignature }}" class="signature-img" alt="Tanda Tangan Approver">
+                                    <img src="{{ $approverSignature }}" class="signature-img" alt="{{ __('purchase_order.approver_signature') }}">
                                 @endif
                             </div>
                             <div class="signature-name">{{ $firstApproval->approver_name_snapshot ?: ($firstApproval->label ?: '-') }}</div>
                             <div class="signature-date">{{ $firstApproval->approved_at ? \Carbon\Carbon::parse($firstApproval->approved_at)->format('d/m/Y H:i') : '-' }}</div>
                         @else
-                            <div class="signature-area signature-placeholder">{{ $firstApproval ? $getApprovalPlaceholder($firstApproval) : 'Menunggu approval' }}</div>
+                            <div class="signature-area signature-placeholder">{{ $firstApproval ? $getApprovalPlaceholder($firstApproval) : __('purchase_order.waiting_approval') }}</div>
                             <div class="signature-name">{{ $firstApproval->label ?? '-' }}</div>
                             <div class="signature-date">-</div>
                         @endif
@@ -317,14 +329,14 @@
 
             <table class="signature signature-merged">
                 <tr>
-                    <td width="{{ $columnWidth }}%" class="signature-header-cell">Dibuat oleh</td>
-                    <td width="{{ $columnWidth * $approvalCount }}%" colspan="{{ $approvalCount }}" class="signature-header-cell">Menyetujui</td>
+                    <td width="{{ $columnWidth }}%" class="signature-header-cell">{{ __('purchase_order.created_by') }}</td>
+                    <td width="{{ $columnWidth * $approvalCount }}%" colspan="{{ $approvalCount }}" class="signature-header-cell">{{ __('purchase_order.approved_by') }}</td>
                 </tr>
                 <tr>
                     <td width="{{ $columnWidth }}%" class="signature-cell">
                         <div class="signature-area">
                             @if ($requesterSignatureExists)
-                                <img src="{{ $requesterSignature }}" class="signature-img" alt="Tanda Tangan Requester">
+                                <img src="{{ $requesterSignature }}" class="signature-img" alt="{{ __('purchase_order.requester_signature') }}">
                             @endif
                         </div>
                         <div class="signature-name">{{ optional($po->requesterSignedBy)->name ?? '-' }}</div>
@@ -342,7 +354,7 @@
                             @if ($approvalStatus === 'APPROVED')
                                 <div class="signature-area">
                                     @if ($approvalSignatureExists)
-                                        <img src="{{ $approvalSignature }}" class="signature-img" alt="Tanda Tangan Approver">
+                                        <img src="{{ $approvalSignature }}" class="signature-img" alt="{{ __('purchase_order.approver_signature') }}">
                                     @endif
                                 </div>
                                 <div class="signature-name">{{ $approval->approver_name_snapshot ?: ($approval->label ?: '-') }}</div>

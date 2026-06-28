@@ -1,4 +1,8 @@
 @php
+    $printLanguage = in_array(($lang ?? 'id'), ['id', 'en'], true)
+        ? ($lang ?? 'id')
+        : 'id';
+
     $tanggalPr = $pr->tanggal_pr
         ? \Carbon\Carbon::parse($pr->tanggal_pr)->format('d/m/Y')
         : '-';
@@ -21,12 +25,12 @@
 @endphp
 
 <!DOCTYPE html>
-<html lang="id">
+<html lang="{{ $printLanguage }}">
 <head>
     <meta charset="UTF-8">
 
     <title>
-        Purchase Requisition {{ $pr->nomor_pr }}
+        {{ __('purchase_request.document_title') }} {{ $pr->nomor_pr }}
     </title>
 
     <style>
@@ -424,7 +428,7 @@
 
                 <td style="width: 58%;">
                     <div class="document-title">
-                        Purchase Requisition
+                        {{ __('purchase_request.document_title') }}
                     </div>
 
                     <div class="document-number">
@@ -442,13 +446,13 @@
          ============================================================ --}}
     <div class="info-card">
         <div class="info-card-title">
-            Informasi Purchase Requisition
+            {{ __('purchase_request.information_title') }}
         </div>
 
         <table class="info-table">
             <tr>
                 <td class="info-label">
-                    Nomor PR
+                    {{ __('purchase_request.pr_number') }}
                 </td>
 
                 <td class="info-separator">
@@ -460,7 +464,7 @@
                 </td>
 
                 <td class="info-label">
-                    Tanggal
+                    {{ __('purchase_request.date') }}
                 </td>
 
                 <td class="info-separator">
@@ -474,7 +478,7 @@
 
             <tr>
                 <td class="info-label">
-                    Cabang
+                    {{ __('purchase_request.branch') }}
                 </td>
 
                 <td class="info-separator">
@@ -486,7 +490,7 @@
                 </td>
 
                 <td class="info-label">
-                    Department
+                    {{ __('purchase_request.department') }}
                 </td>
 
                 <td class="info-separator">
@@ -500,7 +504,7 @@
 
             <tr>
                 <td class="info-label">
-                    Kategori
+                    {{ __('purchase_request.category') }}
                 </td>
 
                 <td class="info-separator">
@@ -512,7 +516,7 @@
                 </td>
 
                 <td class="info-label">
-                    Tipe
+                    {{ __('purchase_request.type') }}
                 </td>
 
                 <td class="info-separator">
@@ -526,7 +530,7 @@
 
             <tr>
                 <td class="info-label">
-                    Dibuat Oleh
+                    {{ __('purchase_request.created_by') }}
                 </td>
 
                 <td class="info-separator">
@@ -538,7 +542,7 @@
                 </td>
 
                 <td class="info-label">
-                    Disubmit Oleh
+                    {{ __('purchase_request.submitted_by') }}
                 </td>
 
                 <td class="info-separator">
@@ -563,27 +567,27 @@
                 </th>
 
                 <th style="width: 20%;">
-                    Nama Item
+                    {{ __('purchase_request.item_name') }}
                 </th>
 
                 <th style="width: 25%;">
-                    Keterangan
+                    {{ __('purchase_request.description') }}
                 </th>
 
                 <th style="width: 8%;">
-                    Qty
+                    {{ __('purchase_request.qty') }}
                 </th>
 
                 <th style="width: 9%;">
-                    Satuan
+                    {{ __('purchase_request.unit') }}
                 </th>
 
                 <th style="width: 14%;">
-                    Estimasi Harga
+                    {{ __('purchase_request.estimated_price') }}
                 </th>
 
                 <th style="width: 20%;">
-                    Subtotal
+                    {{ __('purchase_request.subtotal') }}
                 </th>
             </tr>
         </thead>
@@ -656,7 +660,7 @@
                         colspan="7"
                         class="text-center"
                     >
-                        Tidak ada item.
+                        {{ __('purchase_request.no_items') }}
                     </td>
                 </tr>
             @endforelse
@@ -670,7 +674,7 @@
         <table class="summary-table">
             <tr>
                 <td class="text-center summary-label">
-                    Total Estimasi
+                    {{ __('purchase_request.total_estimate') }}
                 </td>
 
                 <td class="text-right summary-value nowrap">
@@ -693,7 +697,7 @@
             <td class="additional-left">
                 <div class="detail-box terbilang-box">
                     <div class="box-title">
-                        Terbilang
+                        {{ __('purchase_request.amount_in_words') }}
                     </div>
 
                     <div class="box-content terbilang-text">
@@ -705,7 +709,7 @@
             <td class="additional-right">
                 <div class="detail-box">
                     <div class="box-title">
-                        Catatan
+                        {{ __('purchase_request.notes') }}
                     </div>
 
                     <div class="box-content">
@@ -721,7 +725,7 @@
          ============================================================ --}}
     <div class="approval-section">
         <div class="approval-title">
-            Persetujuan
+            {{ __('purchase_request.approval') }}
         </div>
 
         @foreach ($signers->chunk(3) as $signerRow)
@@ -762,7 +766,7 @@
                                     <img
                                         src="{{ $signaturePath }}"
                                         class="signature-image"
-                                        alt="Signature"
+                                        alt="{{ __('purchase_request.signature') }}"
                                     >
                                 @else
                                     <div style="height: 45px;"></div>
@@ -790,7 +794,7 @@
     </div>
 
     <div class="footer">
-        Dokumen ini dicetak otomatis melalui sistem SYOP v4.
+        {{ __('purchase_request.footer') }}
     </div>
 </body>
 </html>

@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\Master\ProdukController;
 use App\Http\Controllers\Api\Master\RoleMenuController;
 use App\Http\Controllers\Api\Master\TransportirController;
 use App\Http\Controllers\Api\Master\TransportirSopirController;
+use App\Http\Controllers\Api\Master\UserPermissionController;
 
 use App\Http\Controllers\Api\Master\VolumeController;
 use App\Http\Controllers\Api\Master\WilayahAngkutController;
@@ -165,12 +166,82 @@ Route::middleware('auth:sanctum')->group(function () {
             [PermissionModuleController::class, 'index'],
         );
 
+        Route::post(
+            'permission-modules',
+            [
+                PermissionModuleController::class,
+                'store',
+            ],
+        );
+
+        Route::post(
+            'permission-modules/{id}/permissions',
+            [
+                PermissionModuleController::class,
+                'storePermission',
+            ],
+        )->whereNumber('id');
+
+        Route::get(
+            'permission-modules/{id}',
+            [
+                PermissionModuleController::class,
+                'show',
+            ],
+        )->whereNumber('id');
+
+        Route::put(
+            'permission-modules/{id}',
+            [
+                PermissionModuleController::class,
+                'update',
+            ],
+        )->whereNumber('id');
+
+        Route::put(
+            'permission-modules/{moduleId}/permissions/{permissionId}',
+            [
+                PermissionModuleController::class,
+                'updatePermission',
+            ],
+        )
+            ->whereNumber('moduleId')
+            ->whereNumber('permissionId');
+
+        Route::delete(
+            'permission-modules/{moduleId}/permissions/{permissionId}',
+            [
+                PermissionModuleController::class,
+                'destroyPermission',
+            ],
+        )
+            ->whereNumber('moduleId')
+            ->whereNumber('permissionId');
+
+        Route::delete(
+            'permission-modules/{id}',
+            [
+                PermissionModuleController::class,
+                'destroy',
+            ],
+        )->whereNumber('id');
+
         // Permissions
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::get('permissions/{permission}', [PermissionController::class, 'show']);
 
         Route::get('role-permissions', [RolePermissionController::class, 'index']);
         Route::put('role-permissions/bulk', [RolePermissionController::class, 'bulkUpdate']);
+
+        Route::get(
+            'user-permissions',
+            [UserPermissionController::class, 'index'],
+        );
+
+        Route::put(
+            'user-permissions/bulk',
+            [UserPermissionController::class, 'bulkUpdate'],
+        );
 
         // Users
         Route::apiResource('users', UserController::class);
@@ -402,27 +473,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('purchase-order/export', [PurchaseOrderInventoryController::class, 'export']);
         Route::apiResource('purchase-order', PurchaseOrderInventoryController::class);
-        Route::post('purchase-order/{id}/approve-cfo',[PurchaseOrderInventoryController::class, 'approveCFO']);
-        Route::post('purchase-order/{id}/approve-ceo',[PurchaseOrderInventoryController::class, 'approveCEO']);
+        Route::post('purchase-order/{id}/approve-cfo', [PurchaseOrderInventoryController::class, 'approveCFO']);
+        Route::post('purchase-order/{id}/approve-ceo', [PurchaseOrderInventoryController::class, 'approveCEO']);
         Route::get('purchase-order/print/{id}', [PurchaseOrderInventoryController::class, 'print']);
         Route::get('purchase-order/print-gain-loss/{id}', [PurchaseOrderInventoryController::class, 'printGainLoss']);
         Route::get('purchase-order/{id}/history', [PurchaseOrderInventoryController::class, 'history']);
         Route::post('purchase-order/{id}/cancel', [PurchaseOrderInventoryController::class, 'cancel']);
         Route::post('purchase-order/{id}/close', [PurchaseOrderInventoryController::class, 'close']);
-        
+
         //Goods Receipt
         Route::apiResource('goods-receipt', GoodsReceiptInventoryController::class);
         Route::get('goods-receipt/history/{id}', [GoodsReceiptInventoryController::class, 'grHistory']);
-        
+
         //Gain Loss
         Route::apiResource('gain-loss', GainLossInventoryController::class);
-        Route::post('gain-loss/approval', [GainLossInventoryController::class,'approval']);
-        
+        Route::post('gain-loss/approval', [GainLossInventoryController::class, 'approval']);
+
         //Shipping Instruction
         Route::apiResource('shipping-instruction', ShippingInstructionController::class);
-        Route::get('shipping-instruction/by-po/{id}', [ShippingInstructionController::class,'byPo']);
-        Route::post('shipping-instruction/{id}/cancel', [ShippingInstructionController::class,'cancel']);
-        Route::post('shipping-instruction/{id}/approve', [ShippingInstructionController::class,'approve']);
+        Route::get('shipping-instruction/by-po/{id}', [ShippingInstructionController::class, 'byPo']);
+        Route::post('shipping-instruction/{id}/cancel', [ShippingInstructionController::class, 'cancel']);
+        Route::post('shipping-instruction/{id}/approve', [ShippingInstructionController::class, 'approve']);
         Route::get('shipping-instruction/print/{id}', [ShippingInstructionController::class, 'print']);
-        });
+    });
 });

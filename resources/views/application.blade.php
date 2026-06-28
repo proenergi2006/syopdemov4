@@ -3,9 +3,9 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" href="{{ asset('favicon.ico') }}" />
+  <link rel="icon" href="{{ asset('logo-proenergi.png') }}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SYOP Pro Energi</title>
+  <title>SYOP v4 Pro Energi</title>
   <link rel="stylesheet" type="text/css" href="{{ asset('loader.css') }}" />
   @vite(['resources/ts/main.ts'])
 </head>
@@ -13,13 +13,29 @@
 <body>
   <div id="app">
     <div id="loading-bg">
-      <div class="loading-logo">
-        <img src="{{ asset('logo.png') }}" height="50" alt="Logo" />
-      </div>
-      <div class="loading">
-        <div class="effect-1 effects"></div>
-        <div class="effect-2 effects"></div>
-        <div class="effect-3 effects"></div>
+      <div class="loading-container">
+        <div class="loading-logo">
+          <img
+            src="{{ asset('logo-proenergi.png') }}"
+            alt="Logo Pro Energi"
+          />
+        </div>
+
+        <div class="loading-title">
+          SYOP
+        </div>
+
+        <div class="loading-version">
+          Version 4.0
+        </div>
+
+        <div class="loading-progress">
+          <div class="loading-progress-bar"></div>
+        </div>
+
+        <div class="loading-status">
+          Mohon tunggu...
+        </div>
       </div>
     </div>
   </div>

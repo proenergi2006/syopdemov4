@@ -535,6 +535,30 @@ class InitialSetupSeeder extends Seeder
                 ]
             );
 
+            $userPermissionSettingId = $this->upsertMenu(
+                ['name' => 'User Permissions', 'parent_id' => $authMenuId],
+                [
+                    'path' => '/master/user-permission',
+                    'route_name' => 'master-user-permission',
+                    'icon' => 'tabler-license',
+                    'order_no' => 5,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
+            $permissionModuleSettingId = $this->upsertMenu(
+                ['name' => 'Permission Modules', 'parent_id' => $authMenuId],
+                [
+                    'path' => '/master/permission-modules',
+                    'route_name' => 'master-permission-modules',
+                    'icon' => 'tabler-license',
+                    'order_no' => 6,
+                    'permission_key' => null,
+                    'is_active' => true,
+                ]
+            );
+
             /*
             |--------------------------------------------------------------------------
             | 6) Admin User
@@ -591,7 +615,7 @@ class InitialSetupSeeder extends Seeder
             );
 
             $receiveItemMenuId = $this->upsertMenu(
-                ['name' => 'Goods Receipt', 'parent_id' =>$purchSupplierMenuId],
+                ['name' => 'Goods Receipt', 'parent_id' => $purchSupplierMenuId],
                 [
                     'path' => '/purchaseSupplier/goods-receipt',
                     'route_name' => 'goods-receipt',
@@ -603,7 +627,7 @@ class InitialSetupSeeder extends Seeder
             );
 
             $approvalMenuId = $this->upsertMenu(
-                ['name' => 'Approval PO', 'parent_id' =>$purchSupplierMenuId],
+                ['name' => 'Approval PO', 'parent_id' => $purchSupplierMenuId],
                 [
                     'path' => '/purchaseSupplier/po-supplier/approval',
                     'route_name' => 'po-supplier/approval',
@@ -615,7 +639,7 @@ class InitialSetupSeeder extends Seeder
             );
 
             $shippingMenuId = $this->upsertMenu(
-                ['name' => 'Shipping Request', 'parent_id' =>$purchSupplierMenuId],
+                ['name' => 'Shipping Request', 'parent_id' => $purchSupplierMenuId],
                 [
                     'path' => '/purchaseSupplier/shipping-instruction',
                     'route_name' => 'shipping-instruction',
@@ -678,6 +702,7 @@ class InitialSetupSeeder extends Seeder
                 $roleMenuId,
                 $roleMenuSettingId,
                 $permissionSettingId,
+                $userPermissionSettingId,
                 $produkId,
                 $pbbkbId,
                 $volumeId,

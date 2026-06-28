@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
+use App\Models\PermissionModule;
 
 class AuthController extends Controller
 {
@@ -147,6 +148,20 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            $modules = PermissionModule::query()
+                ->where('is_active', true)
+                ->whereNotNull('route_prefix')
+                ->where('route_prefix', '<>', '')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get([
+                    'id',
+                    'code',
+                    'name',
+                    'route_prefix',
+                    'sort_order',
+                ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Permission user berhasil dimuat.',
@@ -157,6 +172,7 @@ class AuthController extends Controller
                         'email' => $user->email,
                     ],
                     'permissions' => $user->getPermissionAbilities(),
+                    'modules' => $modules,
                 ],
             ]);
         } catch (\Throwable $e) {
@@ -171,7 +187,7 @@ class AuthController extends Controller
             ], 500);
         }
     }
-    
+
 
     public function logout(Request $request)
     {

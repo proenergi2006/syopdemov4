@@ -1475,6 +1475,7 @@ onMounted(async () => {
               </VBtn>
 
               <VBtn
+                v-permission="'auth_role_permission.update'"
                 color="primary"
                 prepend-icon="tabler-device-floppy"
                 :loading="isSubmitting"

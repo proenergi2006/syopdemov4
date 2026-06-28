@@ -97,6 +97,30 @@ const canUpdate = computed(() => {
   return permissionStore.can('purchase_order.update')
 })
 
+/*
+|--------------------------------------------------------------------------
+| Department Scope Permission
+|--------------------------------------------------------------------------
+| Hak membuka halaman tetap memakai purchase_order.update.
+| Batas department mengikuti scope purchase_order.create karena endpoint
+| dropdown PR dan sumber PO menggunakan aturan department creator PO.
+|--------------------------------------------------------------------------
+*/
+
+const departmentPermissionCode = 'purchase_order.create'
+
+const departmentPermissionScope = computed(() => {
+  return permissionStore.scope(
+    departmentPermissionCode,
+  )
+})
+
+const assignedEditDepartmentIds = computed<number[]>(() => {
+  return permissionStore.departmentIds(
+    departmentPermissionCode,
+  )
+})
+
 const isCheckingPermission = ref(true)
 
 const route = useRoute()
@@ -142,6 +166,141 @@ const form = reactive<PurchaseOrderForm>({
   notes: '',
   purchase_request_ids: [],
 })
+
+/*
+|--------------------------------------------------------------------------
+| User dan Department Access
+|--------------------------------------------------------------------------
+*/
+
+const currentUser = computed<Record<string, any>>(() => {
+  try {
+    return JSON.parse(
+      localStorage.getItem('userData') || '{}',
+    )
+  }
+  catch {
+    return {}
+  }
+})
+
+const ownDepartmentId = computed<number>(() => {
+  return Number(
+    currentUser.value?.department_id
+    ?? currentUser.value?.departemen_id
+    ?? 0,
+  )
+})
+
+/*
+|--------------------------------------------------------------------------
+| Allowed Department IDs
+|--------------------------------------------------------------------------
+| null berarti seluruh department diizinkan.
+|--------------------------------------------------------------------------
+*/
+
+const allowedEditDepartmentIds = computed<number[] | null>(() => {
+  const scope = departmentPermissionScope.value
+
+  if (scope === 'ALL')
+    return null
+
+  if (scope === 'OWN_DEPARTMENT') {
+    return ownDepartmentId.value > 0
+      ? [ownDepartmentId.value]
+      : []
+  }
+
+  if (scope === 'ASSIGNED_DEPARTMENTS') {
+    return Array.from(
+      new Set(
+        assignedEditDepartmentIds.value
+          .map(id => Number(id))
+          .filter(id => id > 0),
+      ),
+    )
+  }
+
+  return []
+})
+
+const availableDepartmentList = computed(() => {
+  const allowedDepartmentIds
+    = allowedEditDepartmentIds.value
+
+  if (allowedDepartmentIds === null)
+    return departmentList.value
+
+  const allowedDepartmentSet = new Set(
+    allowedDepartmentIds.map(id => Number(id)),
+  )
+
+  return departmentList.value.filter(department => {
+    return allowedDepartmentSet.has(
+      Number(department.id),
+    )
+  })
+})
+
+const isDepartmentLocked = computed<boolean>(() => {
+  return departmentPermissionScope.value
+    === 'OWN_DEPARTMENT'
+})
+
+const hasValidEditDepartmentScope = computed<boolean>(() => {
+  return [
+    'OWN_DEPARTMENT',
+    'ASSIGNED_DEPARTMENTS',
+    'ALL',
+  ].includes(
+    departmentPermissionScope.value,
+  )
+})
+
+const canUseDepartmentForEdit = (
+  departmentId: number | null,
+): boolean => {
+  const normalizedDepartmentId = Number(
+    departmentId || 0,
+  )
+
+  if (normalizedDepartmentId <= 0)
+    return false
+
+  const allowedDepartmentIds
+    = allowedEditDepartmentIds.value
+
+  if (allowedDepartmentIds === null)
+    return true
+
+  return allowedDepartmentIds.includes(
+    normalizedDepartmentId,
+  )
+}
+
+const isDepartmentAvailableForEdit = (
+  departmentId: number | null,
+): boolean => {
+  const normalizedDepartmentId = Number(
+    departmentId || 0,
+  )
+
+  if (
+    normalizedDepartmentId <= 0
+    || !canUseDepartmentForEdit(
+      normalizedDepartmentId,
+    )
+  ) {
+    return false
+  }
+
+  return availableDepartmentList.value.some(
+    department =>
+      Number(department.id)
+      === normalizedDepartmentId,
+  )
+}
 
 const tanggalPO = useNativeDatePicker(toRef(form, 'tanggal_po'))
 
@@ -1021,6 +1180,31 @@ const loadPurchaseOrderDetail = async (): Promise<void> => {
       throw new Error('Data Purchase Order tidak ditemukan.')
     }
 
+    const detailDepartmentId = Number(
+      detail?.department_id
+      ?? detail?.id_department
+      ?? 0,
+    )
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validasi department PO existing
+    |--------------------------------------------------------------------------
+    | Jangan mengubah department PO secara otomatis. User hanya boleh membuka
+    | dan mengedit PO apabila department existing masih termasuk aksesnya.
+    |--------------------------------------------------------------------------
+    */
+    if (
+      !isDepartmentAvailableForEdit(
+        detailDepartmentId,
+      )
+    ) {
+      loadError.value
+        = 'Anda tidak memiliki akses untuk mengubah Purchase Order pada department ini.'
+
+      return
+    }
+
     await mapEditDetailToForm(detail)
 
     isInitialLoaded.value = true
@@ -1042,6 +1226,19 @@ const validateForm = async (): Promise<boolean> => {
     showWarningToast({
       title: 'Warning',
       text: 'Lengkapi data wajib.',
+    })
+
+    return false
+  }
+
+  if (
+    !isDepartmentAvailableForEdit(
+      form.id_department,
+    )
+  ) {
+    showErrorToast({
+      title: 'Department Tidak Diizinkan',
+      text: 'Anda tidak memiliki akses mengubah Purchase Order untuk department yang dipilih.',
     })
 
     return false
@@ -1256,14 +1453,19 @@ const confirmCancel = async (): Promise<void> => {
 }
 
 onMounted(async () => {
-  await permissionStore.loadPermissions()
+  /*
+   * Force reload agar direct permission terbaru langsung digunakan.
+   */
+  await permissionStore.loadPermissions(true)
 
-  if (!canUpdate.value) {
+  if (
+    !canUpdate.value
+    || !hasValidEditDepartmentScope.value
+  ) {
     await router.replace('/forbidden')
+
     return
   }
-
-  isCheckingPermission.value = false
 
   isLoadingDetail.value = true
   isInitialLoaded.value = false
@@ -1275,9 +1477,17 @@ onMounted(async () => {
     ])
 
     await loadPurchaseOrderDetail()
-  } catch (error: unknown) {
-    loadError.value = getApiErrorMessage(error, 'Gagal memuat data Purchase Order.')
+  }
+  catch (error: unknown) {
+    loadError.value = getApiErrorMessage(
+      error,
+      'Gagal memuat data Purchase Order.',
+    )
+
     isLoadingDetail.value = false
+  }
+  finally {
+    isCheckingPermission.value = false
   }
 })
 </script>
@@ -1451,18 +1661,71 @@ onMounted(async () => {
             <VAutocomplete
               v-model="form.id_department"
               label="Department *"
-              :items="departmentList"
+              :items="availableDepartmentList"
               item-title="label"
               item-value="id"
-              clearable
               density="comfortable"
               :loading="isLoadingDepartment"
-              :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
-              :error="isSubmitted && !form.id_department"
-              :error-messages="isSubmitted && !form.id_department ? ['Department wajib dipilih'] : []"
+              :disabled="
+                isCheckingPermission
+                  || isDepartmentLocked
+              "
+              :clearable="!isDepartmentLocked"
+              persistent-hint
+              :hint="
+                departmentPermissionScope === 'OWN_DEPARTMENT'
+                  ? 'Department dikunci sesuai department akun Anda.'
+                  : departmentPermissionScope === 'ASSIGNED_DEPARTMENTS'
+                    ? 'Hanya department yang ditetapkan pada direct permission yang dapat dipilih.'
+                    : departmentPermissionScope === 'ALL'
+                      ? 'Anda dapat mengubah Purchase Order untuk seluruh department.'
+                      : 'Anda tidak memiliki akses department untuk mengubah Purchase Order.'
+              "
+              no-data-text="Tidak ada department yang diizinkan"
+              :menu-props="{
+                location: 'bottom',
+                offset: 8,
+                maxHeight: 300,
+              }"
+              :error="
+                isSubmitted
+                  && !form.id_department
+              "
+              :error-messages="
+                isSubmitted && !form.id_department
+                  ? [
+                      departmentPermissionScope === 'OWN_DEPARTMENT'
+                        ? 'Department akun login tidak ditemukan.'
+                        : departmentPermissionScope === 'ASSIGNED_DEPARTMENTS'
+                          ? 'Pilih salah satu department yang telah ditetapkan.'
+                          : departmentPermissionScope === 'ALL'
+                            ? 'Department wajib dipilih.'
+                            : 'Anda tidak memiliki akses department untuk mengubah Purchase Order.',
+                    ]
+                  : []
+              "
               placeholder="Pilih Department"
               @update:model-value="handleSelectPRFilter"
-            />
+            >
+              <template #append-inner>
+                <VProgressCircular
+                  v-if="isLoadingDepartment"
+                  indeterminate
+                  size="18"
+                  width="2"
+                />
+
+                <VIcon
+                  v-else-if="
+                    isDepartmentLocked
+                      && form.id_department
+                  "
+                  icon="tabler-lock"
+                  size="18"
+                  color="secondary"
+                />
+              </template>
+            </VAutocomplete>
           </VCol>
 
           <VCol cols="12">

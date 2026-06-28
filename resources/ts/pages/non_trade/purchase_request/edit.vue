@@ -328,7 +328,7 @@ const normalizeItem = (item: any): PrItem => {
 
 const loadPurchaseRequestDetail = async (): Promise<void> => {
   if (!publicId.value) {
-    loadError.value = 'ID Purchase Request tidak ditemukan.'
+    loadError.value = 'ID Purchase Requisition tidak ditemukan.'
     return
   }
 
@@ -343,7 +343,7 @@ const loadPurchaseRequestDetail = async (): Promise<void> => {
     const detail = response.data?.data
 
     if (!detail) {
-      throw new Error('Data purchase request tidak ditemukan.')
+      throw new Error('Data purchase requisition tidak ditemukan.')
     }
 
     form.tanggal_pr = detail.tanggal_pr ?? ''
@@ -380,7 +380,7 @@ const loadPurchaseRequestDetail = async (): Promise<void> => {
         }))
       : []
   } catch (error: unknown) {
-    loadError.value = getApiErrorMessage(error, 'Gagal memuat detail Purchase Request.')
+    loadError.value = getApiErrorMessage(error, 'Gagal memuat detail Purchase Requisition.')
   } finally {
     isLoadingDetail.value = false
   }
@@ -849,7 +849,7 @@ const updatePurchaseRequest = async (event?: Event): Promise<void> => {
   if (!isValid) return
 
   const confirm = await showConfirmAlert({
-    title: 'Update Purchase Request?',
+    title: 'Update Purchase Requisition?',
     text: 'Pastikan perubahan data sudah benar.',
     confirmButtonText: 'Ya, update',
     cancelButtonText: 'Batal',
@@ -885,7 +885,7 @@ const updatePurchaseRequest = async (event?: Event): Promise<void> => {
 
     showErrorToast({
       title: 'Error',
-      text: err?.response?.data?.message || getApiErrorMessage(error, 'Gagal memperbarui Purchase Request.'),
+      text: err?.response?.data?.message || getApiErrorMessage(error, 'Gagal memperbarui Purchase Requisition.'),
     })
   } finally {
     isSaving.value = false
@@ -927,7 +927,7 @@ onMounted(async () => {
 
     await loadPurchaseRequestDetail()
   } catch (error: unknown) {
-    loadError.value = getApiErrorMessage(error, 'Gagal memuat data Purchase Request.')
+    loadError.value = getApiErrorMessage(error, 'Gagal memuat data Purchase Requisition.')
   } finally {
     pageLoading.value = false
   }
@@ -952,7 +952,7 @@ onMounted(async () => {
 
         <div>
           <div class="text-h6 font-weight-medium">
-            Memuat data Purchase Request...
+            Memuat data Purchase Requisition...
           </div>
           <div class="text-body-2 text-medium-emphasis">
             Mohon tunggu sebentar
@@ -1025,10 +1025,10 @@ onMounted(async () => {
           <VCardTitle class="d-flex align-center justify-space-between">
             <div>
               <div class="text-h6 font-weight-bold">
-                Form Edit Purchase Request
+                Form Edit Purchase Requisition
               </div>
               <div class="text-body-2 text-medium-emphasis">
-                Silakan lengkapi data purchase request dengan benar
+                Silakan lengkapi data purchase requisition dengan benar
               </div>
             </div>
 
@@ -1534,7 +1534,7 @@ onMounted(async () => {
                 <VTextarea
                   v-model="form.notes"
                   label="Catatan"
-                  placeholder="Tambahkan catatan purchase request"
+                  placeholder="Tambahkan catatan purchase requisition"
                   rows="3"
                   auto-grow
                 />

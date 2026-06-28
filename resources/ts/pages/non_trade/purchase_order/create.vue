@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, toRef } from 'vue'
+import { computed, onMounted, reactive, ref, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from '@axios'
 import {
@@ -89,6 +89,20 @@ const permissionStore = usePermissionStore()
 
 const canCreate = computed(() => {
   return permissionStore.can('purchase_order.create')
+})
+
+const createPermissionCode = 'purchase_order.create'
+
+const createPermissionScope = computed(() => {
+  return permissionStore.scope(
+    createPermissionCode,
+  )
+})
+
+const assignedCreateDepartmentIds = computed<number[]>(() => {
+  return permissionStore.departmentIds(
+    createPermissionCode,
+  )
 })
 
 const isCheckingPermission = ref(true)
@@ -302,6 +316,240 @@ const currentUser = computed(() => {
     return {}
   }
 })
+
+/*
+|--------------------------------------------------------------------------
+| Department Access for Create PO
+|--------------------------------------------------------------------------
+*/
+
+const ownDepartmentId = computed<number>(() => {
+  return Number(
+    currentUser.value?.department_id
+    ?? currentUser.value?.departemen_id
+    ?? 0,
+  )
+})
+
+/*
+|--------------------------------------------------------------------------
+| Department IDs yang boleh digunakan
+|--------------------------------------------------------------------------
+|
+| null:
+| - seluruh department diizinkan.
+|
+| array kosong:
+| - tidak ada department yang diizinkan.
+|--------------------------------------------------------------------------
+*/
+
+const allowedCreateDepartmentIds = computed<number[] | null>(() => {
+  const scope = createPermissionScope.value
+
+  if (scope === 'ALL')
+    return null
+
+  if (scope === 'OWN_DEPARTMENT') {
+    return ownDepartmentId.value > 0
+      ? [ownDepartmentId.value]
+      : []
+  }
+
+  if (scope === 'ASSIGNED_DEPARTMENTS') {
+    return Array.from(
+      new Set(
+        assignedCreateDepartmentIds.value
+          .map(id => Number(id))
+          .filter(id => id > 0),
+      ),
+    )
+  }
+
+  return []
+})
+
+const availableDepartmentList = computed(() => {
+  const allowedDepartmentIds
+    = allowedCreateDepartmentIds.value
+
+  /*
+   * null berarti scope ALL.
+   */
+  if (allowedDepartmentIds === null)
+    return departmentList.value
+
+  const allowedDepartmentSet = new Set(
+    allowedDepartmentIds.map(id => Number(id)),
+  )
+
+  return departmentList.value.filter(department => {
+    return allowedDepartmentSet.has(
+      Number(department.id),
+    )
+  })
+})
+
+const isDepartmentLocked = computed<boolean>(() => {
+  return createPermissionScope.value === 'OWN_DEPARTMENT'
+})
+
+const hasValidCreateScope = computed<boolean>(() => {
+  return [
+    'OWN_DEPARTMENT',
+    'ASSIGNED_DEPARTMENTS',
+    'ALL',
+  ].includes(
+    createPermissionScope.value,
+  )
+})
+
+const applyCreateDepartmentPermission = (): boolean => {
+  const scope = createPermissionScope.value
+
+  const allDepartmentIds = departmentList.value
+    .map(department => Number(department.id))
+    .filter(departmentId => departmentId > 0)
+
+  /*
+  |--------------------------------------------------------------------------
+  | OWN DEPARTMENT
+  |--------------------------------------------------------------------------
+  */
+  if (scope === 'OWN_DEPARTMENT') {
+    const departmentId = Number(
+      ownDepartmentId.value || 0,
+    )
+
+    const departmentExists
+      = departmentId > 0
+        && allDepartmentIds.includes(
+          departmentId,
+        )
+
+    form.id_department = departmentExists
+      ? departmentId
+      : null
+
+    return departmentExists
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | ASSIGNED DEPARTMENTS
+  |--------------------------------------------------------------------------
+  */
+  if (scope === 'ASSIGNED_DEPARTMENTS') {
+    const assignedDepartmentSet = new Set(
+      assignedCreateDepartmentIds.value
+        .map(departmentId =>
+          Number(departmentId),
+        )
+        .filter(departmentId =>
+          departmentId > 0,
+        ),
+    )
+
+    const availableIds = allDepartmentIds.filter(
+      departmentId =>
+        assignedDepartmentSet.has(
+          departmentId,
+        ),
+    )
+
+    if (!availableIds.length) {
+      form.id_department = null
+
+      return false
+    }
+
+    /*
+     * Pertahankan department yang sudah dipilih
+     * jika masih termasuk assignment.
+     */
+    if (
+      form.id_department
+      && availableIds.includes(
+        Number(form.id_department),
+      )
+    ) {
+      return true
+    }
+
+    /*
+     * Jika hanya satu department, pilih otomatis.
+     * Jika lebih dari satu, biarkan user memilih.
+     */
+    form.id_department
+      = availableIds.length === 1
+        ? availableIds[0]
+        : null
+
+    return true
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | ALL
+  |--------------------------------------------------------------------------
+  */
+  if (scope === 'ALL') {
+    if (!allDepartmentIds.length) {
+      form.id_department = null
+
+      return false
+    }
+
+    /*
+     * Pertahankan pilihan yang masih valid.
+     */
+    if (
+      form.id_department
+      && allDepartmentIds.includes(
+        Number(form.id_department),
+      )
+    ) {
+      return true
+    }
+
+    form.id_department = null
+
+    return true
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Scope tidak diizinkan
+  |--------------------------------------------------------------------------
+  */
+  form.id_department = null
+
+  return false
+}
+
+const canUseDepartmentForCreate = (
+  departmentId: number | null,
+): boolean => {
+  const normalizedDepartmentId = Number(
+    departmentId || 0,
+  )
+
+  if (normalizedDepartmentId <= 0)
+    return false
+
+  const allowedDepartmentIds
+    = allowedCreateDepartmentIds.value
+
+  /*
+   * null berarti scope ALL.
+   */
+  if (allowedDepartmentIds === null)
+    return true
+
+  return allowedDepartmentIds.includes(
+    normalizedDepartmentId,
+  )
+}
 
 // const setUserDefaultDepartment = (): void => {
 //   form.id_department
@@ -619,6 +867,19 @@ const validateForm = async (): Promise<boolean> => {
     return false
   }
 
+  if (
+    !canUseDepartmentForCreate(
+      form.id_department,
+    )
+  ) {
+    showErrorToast({
+      title: 'Department Tidak Diizinkan',
+      text: 'Anda tidak memiliki akses membuat Purchase Order untuk department yang dipilih.',
+    })
+
+    return false
+  }
+
   if (!form.purchase_request_ids.length) {
     showWarningToast({
       title: 'Warning',
@@ -875,24 +1136,68 @@ watch(
   },
 )
 
-onMounted(async () => {
-  await permissionStore.loadPermissions()
+watch(
+  [
+    createPermissionScope,
+    assignedCreateDepartmentIds,
+    () => departmentList.value.length,
+  ],
+  () => {
+    if (!departmentList.value.length)
+      return
 
-  if (!canCreate.value) {
+    /*
+     * Hanya sesuaikan pilihan department.
+     * Jangan menampilkan toast dari watcher.
+     */
+    applyCreateDepartmentPermission()
+  },
+)
+
+onMounted(async () => {
+  await permissionStore.loadPermissions(true)
+
+  if (
+    !canCreate.value
+    || !hasValidCreateScope.value
+  ) {
     await router.replace('/forbidden')
+
     return
   }
-
-  isCheckingPermission.value = false
 
   form.tanggal_po = today()
 
   await Promise.all([
-    loadVendors(false),
     fetchCabangList(false),
     fetchDepartmentList(false),
-    // setUserDefaultDepartment()
   ])
+
+  /*
+   * Fungsi langsung memeriksa master department,
+   * permission scope, dan department akun.
+   */
+  const hasDepartmentAccess
+    = applyCreateDepartmentPermission()
+
+  if (!hasDepartmentAccess) {
+    showErrorToast({
+      title: 'Department Tidak Tersedia',
+      text:
+        createPermissionScope.value
+          === 'OWN_DEPARTMENT'
+          ? 'Department pada akun Anda belum tersedia atau belum sesuai dengan master department.'
+          : createPermissionScope.value
+            === 'ASSIGNED_DEPARTMENTS'
+            ? 'Tidak ada department yang diberikan pada permission Create Purchase Order.'
+            : createPermissionScope.value
+              === 'ALL'
+              ? 'Master department belum tersedia.'
+              : 'Anda tidak memiliki akses department untuk membuat Purchase Order.',
+    })
+  }
+
+  isCheckingPermission.value = false
 })
 </script>
 
@@ -1011,21 +1316,47 @@ onMounted(async () => {
             <VAutocomplete
               v-model="form.id_department"
               label="Department *"
-              :items="departmentList"
+              :items="availableDepartmentList"
               item-title="label"
               item-value="id"
               density="comfortable"
               :loading="isLoadingDepartment"
+              :disabled="
+                isCheckingPermission
+                  || isDepartmentLocked
+              "
+              :clearable="!isDepartmentLocked"
               persistent-hint
+              :hint="
+                createPermissionScope === 'OWN_DEPARTMENT'
+                  ? 'Department otomatis mengikuti department akun Anda.'
+                  : createPermissionScope === 'ASSIGNED_DEPARTMENTS'
+                    ? 'Hanya department yang ditetapkan pada direct permission yang dapat dipilih.'
+                    : createPermissionScope === 'ALL'
+                      ? 'Anda dapat membuat Purchase Order untuk seluruh department.'
+                      : 'Anda tidak memiliki akses department untuk membuat Purchase Order.'
+              "
+              no-data-text="Tidak ada department yang diizinkan"
               :menu-props="{
                 location: 'bottom',
                 offset: 8,
                 maxHeight: 300,
               }"
-              :error="isSubmitted && !form.id_department"
+              :error="
+                isSubmitted
+                  && !form.id_department
+              "
               :error-messages="
                 isSubmitted && !form.id_department
-                  ? ['Department akun login tidak ditemukan']
+                  ? [
+                      createPermissionScope === 'OWN_DEPARTMENT'
+                        ? 'Department akun login tidak ditemukan.'
+                        : createPermissionScope === 'ASSIGNED_DEPARTMENTS'
+                          ? 'Pilih salah satu department yang telah ditetapkan.'
+                          : createPermissionScope === 'ALL'
+                            ? 'Department wajib dipilih.'
+                            : 'Anda tidak memiliki akses department untuk membuat Purchase Order.',
+                    ]
                   : []
               "
             >
@@ -1035,6 +1366,16 @@ onMounted(async () => {
                   indeterminate
                   size="18"
                   width="2"
+                />
+
+                <VIcon
+                  v-else-if="
+                    isDepartmentLocked
+                      && form.id_department
+                  "
+                  icon="tabler-lock"
+                  size="18"
+                  color="secondary"
                 />
               </template>
             </VAutocomplete>

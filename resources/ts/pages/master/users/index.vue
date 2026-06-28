@@ -942,6 +942,7 @@ onMounted(async () => {
           </div>
 
           <VBtn
+            v-permission="'auth_user.create'"
             color="primary"
             prepend-icon="tabler-user-plus"
             class="text-none"
@@ -1044,6 +1045,7 @@ onMounted(async () => {
                 <td class="text-center">
                   <div class="d-flex justify-center gap-2">
                     <VBtn
+                      v-permission="'auth_user.update'"
                       icon
                       size="small"
                       color="primary"

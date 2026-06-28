@@ -139,7 +139,7 @@ const startPolling = (): void => {
     if (document.hidden) return
 
     fetchNotifications()
-  }, 10000)
+  }, 30000)
 }
 
 const stopPolling = (): void => {

@@ -6,6 +6,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
@@ -112,9 +114,326 @@ class User extends Authenticatable
         return $this->belongsToMany(Cabang::class, 'user_cabang', 'user_id', 'cabang_id');
     }
 
-    // Permissions
-    public function hasPermission(string $permissionCode): bool
+    /*
+    |--------------------------------------------------------------------------
+    | Direct Permission Records
+    |--------------------------------------------------------------------------
+    | Konfigurasi permission yang diberikan langsung kepada akun.
+    |--------------------------------------------------------------------------
+    */
+    public function userPermissions(): HasMany
     {
+        return $this->hasMany(
+            UserPermission::class,
+            'user_id',
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Direct Permissions
+    |--------------------------------------------------------------------------
+    | Relasi langsung ke master permissions melalui user_permissions.
+    |--------------------------------------------------------------------------
+    */
+    public function directPermissions(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Permission::class,
+            'user_permissions',
+            'user_id',
+            'permission_id',
+        )
+            ->withPivot([
+                'scope',
+                'is_active',
+                'created_by',
+                'updated_by',
+            ])
+            ->withTimestamps();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active Direct Permission
+    |--------------------------------------------------------------------------
+    | Mengambil konfigurasi permission aktif yang diberikan langsung
+    | kepada akun berdasarkan permission code.
+    |--------------------------------------------------------------------------
+    */
+    public function getActiveDirectPermission(
+        string $permissionCode,
+    ): ?UserPermission {
+        $permissionCode = trim($permissionCode);
+
+        if ($permissionCode === '') {
+            return null;
+        }
+
+        return UserPermission::query()
+            ->with([
+                'permission:id,code,name,is_active',
+                'departments:id,nama',
+            ])
+            ->where('user_id', $this->id)
+            ->where('is_active', true)
+            ->whereHas(
+                'permission',
+                function ($query) use ($permissionCode) {
+                    $query
+                        ->where('code', $permissionCode)
+                        ->where('is_active', true);
+                },
+            )
+            ->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Has Direct Permission
+    |--------------------------------------------------------------------------
+    | Hanya mengecek permission yang diberikan langsung kepada akun.
+    | Belum melakukan fallback ke role.
+    |--------------------------------------------------------------------------
+    */
+    public function hasDirectPermission(
+        string $permissionCode,
+    ): bool {
+        return $this->getActiveDirectPermission(
+            $permissionCode,
+        ) !== null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Direct Permission Scope
+    |--------------------------------------------------------------------------
+    | Return null apabila direct permission tidak ditemukan.
+    |
+    | Null berbeda dengan NONE:
+    | - null = tidak ada direct permission, nanti boleh fallback ke role
+    | - NONE = direct permission ada tetapi tidak memiliki data scope
+    |--------------------------------------------------------------------------
+    */
+    public function getDirectPermissionScope(
+        string $permissionCode,
+    ): ?string {
+        $directPermission
+            = $this->getActiveDirectPermission(
+                $permissionCode,
+            );
+
+        if (!$directPermission) {
+            return null;
+        }
+
+        return $this->normalizePermissionScope(
+            $directPermission->scope,
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assigned Department IDs
+    |--------------------------------------------------------------------------
+    | Mengambil daftar department dari direct permission tertentu.
+    | Hanya berlaku saat scope = ASSIGNED_DEPARTMENTS.
+    |--------------------------------------------------------------------------
+    */
+    public function getAssignedDepartmentIds(
+        string $permissionCode,
+    ): array {
+        $directPermission
+            = $this->getActiveDirectPermission(
+                $permissionCode,
+            );
+
+        if (!$directPermission) {
+            return [];
+        }
+
+        $scope = $this->normalizePermissionScope(
+            $directPermission->scope,
+        );
+
+        if ($scope !== UserPermission::SCOPE_ASSIGNED_DEPARTMENTS) {
+            return [];
+        }
+
+        return $directPermission
+            ->departments
+            ->pluck('id')
+            ->map(
+                fn($departmentId): int =>
+                (int) $departmentId,
+            )
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /*
+|--------------------------------------------------------------------------
+| Allowed Department IDs for Permission
+|--------------------------------------------------------------------------
+|
+| Return:
+| - null     = seluruh department diizinkan
+| - []       = tidak ada department yang diizinkan
+| - [1,2,3]  = hanya department tersebut yang diizinkan
+|
+| Method ini menggunakan permission efektif:
+| direct permission terlebih dahulu, kemudian fallback ke role.
+|--------------------------------------------------------------------------
+*/
+    public function getAllowedDepartmentIdsForPermission(
+        string $permissionCode,
+    ): ?array {
+        $permissionCode = trim($permissionCode);
+
+        if (
+            $permissionCode === ''
+            || !$this->hasPermission($permissionCode)
+        ) {
+            return [];
+        }
+
+        $scope = $this->getPermissionScope(
+            $permissionCode,
+        );
+
+        return match ($scope) {
+            UserPermission::SCOPE_ALL => null,
+
+            UserPermission::SCOPE_OWN_DEPARTMENT =>
+            $this->departemen_id
+                ? [(int) $this->departemen_id]
+                : [],
+
+            UserPermission::SCOPE_ASSIGNED_DEPARTMENTS =>
+            $this->getAssignedDepartmentIds(
+                $permissionCode,
+            ),
+
+            default => [],
+        };
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Can Access Department for Permission
+    |--------------------------------------------------------------------------
+    |
+    | Mengecek apakah permission efektif user mengizinkan akses
+    | ke department tertentu.
+    |--------------------------------------------------------------------------
+    */
+    public function canAccessDepartmentForPermission(
+        string $permissionCode,
+        int $departmentId,
+    ): bool {
+        if ($departmentId <= 0) {
+            return false;
+        }
+
+        $allowedDepartmentIds
+            = $this->getAllowedDepartmentIdsForPermission(
+                $permissionCode,
+            );
+
+        /*
+     * Null berarti scope ALL.
+     */
+        if ($allowedDepartmentIds === null) {
+            return true;
+        }
+
+        return in_array(
+            $departmentId,
+            $allowedDepartmentIds,
+            true,
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Can Access Department by Direct Permission
+    |--------------------------------------------------------------------------
+    | Helper khusus untuk mengecek scope direct permission terhadap department.
+    |
+    | Belum melakukan fallback ke role.
+    |--------------------------------------------------------------------------
+    */
+    public function canAccessDepartmentByDirectPermission(
+        string $permissionCode,
+        int $departmentId,
+    ): bool {
+        if ($departmentId <= 0) {
+            return false;
+        }
+
+        $directPermission
+            = $this->getActiveDirectPermission(
+                $permissionCode,
+            );
+
+        if (!$directPermission) {
+            return false;
+        }
+
+        $scope = $this->normalizePermissionScope(
+            $directPermission->scope,
+        );
+
+        return match ($scope) {
+            UserPermission::SCOPE_ALL => true,
+
+            UserPermission::SCOPE_OWN_DEPARTMENT =>
+            (int) $this->departemen_id
+                === $departmentId,
+
+            UserPermission::SCOPE_ASSIGNED_DEPARTMENTS =>
+            in_array(
+                $departmentId,
+                $this->getAssignedDepartmentIds(
+                    $permissionCode,
+                ),
+                true,
+            ),
+
+            default => false,
+        };
+    }
+
+    // Permissions
+    public function hasPermission(
+        string $permissionCode,
+    ): bool {
+        $permissionCode = trim($permissionCode);
+
+        if ($permissionCode === '') {
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prioritas 1: Direct Permission
+        |--------------------------------------------------------------------------
+        | Jika permission aktif diberikan langsung kepada akun,
+        | permission tersebut langsung berlaku.
+        |--------------------------------------------------------------------------
+        */
+        if ($this->hasDirectPermission($permissionCode)) {
+            return true;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prioritas 2: Role Permission Existing
+        |--------------------------------------------------------------------------
+        | Jika direct permission tidak ditemukan, gunakan mekanisme role lama.
+        |--------------------------------------------------------------------------
+        */
         $roleId = $this->getActiveRoleId();
 
         if (!$roleId) {
@@ -128,10 +447,22 @@ class User extends Authenticatable
                 '=',
                 'role_permissions.permission_id',
             )
-            ->where('role_permissions.role_id', $roleId)
-            ->where('permissions.code', $permissionCode)
-            ->where('role_permissions.is_active', true)
-            ->where('permissions.is_active', true)
+            ->where(
+                'role_permissions.role_id',
+                $roleId,
+            )
+            ->where(
+                'permissions.code',
+                $permissionCode,
+            )
+            ->where(
+                'role_permissions.is_active',
+                true,
+            )
+            ->where(
+                'permissions.is_active',
+                true,
+            )
             ->exists();
     }
 
@@ -146,57 +477,148 @@ class User extends Authenticatable
             : null;
     }
 
-    public function getPermissionScope(string $permissionCode): string
-    {
+    public function getPermissionScope(
+        string $permissionCode,
+    ): string {
+        $permissionCode = trim($permissionCode);
+
+        if ($permissionCode === '') {
+            return UserPermission::SCOPE_NONE;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prioritas 1: Direct Permission Scope
+        |--------------------------------------------------------------------------
+        | null berarti direct permission tidak ditemukan,
+        | sehingga masih boleh fallback ke role.
+        |
+        | NONE berarti direct permission ditemukan dengan scope NONE,
+        | sehingga hasilnya tetap NONE dan tidak fallback ke role.
+        |--------------------------------------------------------------------------
+        */
+        $directScope = $this->getDirectPermissionScope(
+            $permissionCode,
+        );
+
+        if ($directScope !== null) {
+            return $directScope;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prioritas 2: Role Permission Existing
+        |--------------------------------------------------------------------------
+        */
         $roleId = $this->getActiveRoleId();
 
         if (!$roleId) {
-            return 'NONE';
+            return UserPermission::SCOPE_NONE;
         }
 
-        $scope = RolePermission::query()
+        $roleScope = RolePermission::query()
             ->join(
                 'permissions',
                 'permissions.id',
                 '=',
                 'role_permissions.permission_id',
             )
-            ->where('role_permissions.role_id', $roleId)
-            ->where('permissions.code', $permissionCode)
-            ->where('role_permissions.is_active', true)
-            ->where('permissions.is_active', true)
+            ->where(
+                'role_permissions.role_id',
+                $roleId,
+            )
+            ->where(
+                'permissions.code',
+                $permissionCode,
+            )
+            ->where(
+                'role_permissions.is_active',
+                true,
+            )
+            ->where(
+                'permissions.is_active',
+                true,
+            )
             ->value('role_permissions.scope');
 
-        return $this->normalizePermissionScope($scope);
+        return $this->normalizePermissionScope(
+            $roleScope,
+        );
     }
 
     public function getPermissionAbilities(): array
     {
         $permissions = [];
 
+        /*
+    |--------------------------------------------------------------------------
+    | Load Role Permission dan Direct User Permission
+    |--------------------------------------------------------------------------
+    */
         $this->loadMissing([
             'roles.permissions' => function ($query) {
                 $query
-                    ->where('permissions.is_active', true)
-                    ->wherePivot('is_active', true);
+                    ->where(
+                        'permissions.is_active',
+                        true,
+                    )
+                    ->wherePivot(
+                        'is_active',
+                        true,
+                    );
+            },
+
+            'userPermissions' => function ($query) {
+                $query
+                    ->where(
+                        'is_active',
+                        true,
+                    )
+                    ->with([
+                        'permission' => function ($permissionQuery) {
+                            $permissionQuery->where(
+                                'permissions.is_active',
+                                true,
+                            );
+                        },
+
+                        'departments:id',
+                    ]);
             },
         ]);
 
+        /*
+    |--------------------------------------------------------------------------
+    | 1. Permission dari Role
+    |--------------------------------------------------------------------------
+    */
         foreach ($this->roles as $role) {
             foreach ($role->permissions as $permission) {
-                $code = (string) $permission->code;
-                $scope = strtoupper((string) ($permission->pivot->scope ?? 'NONE'));
+                $code = trim(
+                    (string) $permission->code,
+                );
+
+                if ($code === '') {
+                    continue;
+                }
+
+                $scope = $this->normalizePermissionScope(
+                    $permission->pivot->scope
+                        ?? UserPermission::SCOPE_NONE,
+                );
 
                 if (!isset($permissions[$code])) {
                     $permissions[$code] = [
                         'allowed' => true,
                         'scope' => $scope,
+                        'department_ids' => [],
                     ];
 
                     continue;
                 }
 
-                $currentScope = $permissions[$code]['scope'];
+                $currentScope = $permissions[$code]['scope']
+                    ?? UserPermission::SCOPE_NONE;
 
                 if (
                     $this->getScopePriority($scope)
@@ -206,6 +628,63 @@ class User extends Authenticatable
                 }
             }
         }
+
+        /*
+    |--------------------------------------------------------------------------
+    | 2. Direct Permission dari User
+    |--------------------------------------------------------------------------
+    | Direct permission menimpa role permission dengan code yang sama.
+    |--------------------------------------------------------------------------
+    */
+        foreach ($this->userPermissions as $userPermission) {
+            $permission = $userPermission->permission;
+
+            /*
+         * Permission master mungkin sudah tidak aktif.
+         */
+            if (!$permission) {
+                continue;
+            }
+
+            $code = trim(
+                (string) $permission->code,
+            );
+
+            if ($code === '') {
+                continue;
+            }
+
+            $scope = $this->normalizePermissionScope(
+                $userPermission->scope
+                    ?? UserPermission::SCOPE_NONE,
+            );
+
+            $departmentIds = [];
+
+            if (
+                $scope
+                === UserPermission::SCOPE_ASSIGNED_DEPARTMENTS
+            ) {
+                $departmentIds = $userPermission
+                    ->departments
+                    ->pluck('id')
+                    ->map(
+                        fn($departmentId): int =>
+                        (int) $departmentId,
+                    )
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+
+            $permissions[$code] = [
+                'allowed' => true,
+                'scope' => $scope,
+                'department_ids' => $departmentIds,
+            ];
+        }
+
+        ksort($permissions);
 
         return $permissions;
     }
@@ -219,6 +698,7 @@ class User extends Authenticatable
             'OWN_DATA',
             'OWN_DEPARTMENT',
             'OWN_CABANG',
+            'ASSIGNED_DEPARTMENTS',
             'ALL',
         ];
 

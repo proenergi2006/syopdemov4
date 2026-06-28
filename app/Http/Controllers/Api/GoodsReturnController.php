@@ -829,6 +829,18 @@ class GoodsReturnController extends Controller
         | dikurangi total qty Goods Return berstatus POSTED.
         |--------------------------------------------------------------------------
         */
+            $user = $request->user();
+
+            $departmentId = $user->departemen_id;
+
+            if (!$departmentId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Department pengguna belum dikonfigurasi.',
+                    'data' => [],
+                ], 422);
+            }
+
             $goodsReceiveQuery = GoodsReceive::query()
                 ->with([
                     'purchaseOrder:id,nomor_po,tanggal_po,vendor_id,cabang,id_department',
@@ -842,6 +854,15 @@ class GoodsReturnController extends Controller
                 ->whereRaw(
                     'UPPER(TRIM(goods_receives.status)) = ?',
                     ['POSTED'],
+                )
+                ->whereHas(
+                    'purchaseOrder',
+                    function ($query) use ($departmentId) {
+                        $query->where(
+                            'id_department',
+                            $departmentId,
+                        );
+                    },
                 )
                 ->whereExists(function ($query) {
                     $query
@@ -879,6 +900,7 @@ class GoodsReturnController extends Controller
         | Daftar GR untuk dropdown
         |--------------------------------------------------------------------------
         */
+
             $goodsReceives = (clone $goodsReceiveQuery)
                 ->orderByDesc('goods_receives.tanggal_gr')
                 ->orderByDesc('goods_receives.id')

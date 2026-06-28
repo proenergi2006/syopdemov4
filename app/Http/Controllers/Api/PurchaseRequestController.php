@@ -2360,10 +2360,39 @@ class PurchaseRequestController extends Controller
         }
     }
 
-    public function print($publicId)
-    {
+    public function print(
+        Request $request,
+        string $publicId,
+    ) {
         try {
-            $id = Crypt::decryptString($publicId);
+            /*
+        |--------------------------------------------------------------------------
+        | Bahasa cetakan
+        |--------------------------------------------------------------------------
+        */
+            $lang = strtolower(
+                trim(
+                    (string) $request->query(
+                        'lang',
+                        'id',
+                    ),
+                ),
+            );
+
+            if (!in_array($lang, ['id', 'en'], true)) {
+                $lang = 'id';
+            }
+
+            app()->setLocale($lang);
+
+            /*
+        |--------------------------------------------------------------------------
+        | Load Purchase Requisition
+        |--------------------------------------------------------------------------
+        */
+            $id = Crypt::decryptString(
+                $publicId,
+            );
 
             $pr = PurchaseRequest::with([
                 'cabangData:id,nama_cabang,inisial_cabang',
@@ -2386,39 +2415,88 @@ class PurchaseRequestController extends Controller
 
             $items = $pr->getRelation('items');
 
-            $currentStatus = strtoupper(trim((string) $pr->status));
+            /*
+        |--------------------------------------------------------------------------
+        | Validasi status
+        |--------------------------------------------------------------------------
+        */
+            $currentStatus = strtoupper(
+                trim(
+                    (string) $pr->status,
+                ),
+            );
 
             $allowedStatuses = [
                 'IN PROGRESS',
                 PurchaseRequest::STATUS_APPROVED,
             ];
 
-            if (!in_array($currentStatus, $allowedStatuses, true)) {
+            if (
+                !in_array(
+                    $currentStatus,
+                    $allowedStatuses,
+                    true,
+                )
+            ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition belum dapat dicetak.',
+                    'message' => $lang === 'en'
+                        ? 'Purchase Requisition cannot be printed yet.'
+                        : 'Purchase Requisition belum dapat dicetak.',
                 ], 422);
             }
 
+            /*
+        |--------------------------------------------------------------------------
+        | Total amount
+        |--------------------------------------------------------------------------
+        */
             $totalAmount = (float) (
                 $pr->total_amount
                 ?? $items->sum(function ($item) {
-                    $subtotal = (float) ($item->subtotal ?? 0);
+                    $subtotal = (float) (
+                        $item->subtotal
+                        ?? 0
+                    );
 
                     if ($subtotal > 0) {
                         return $subtotal;
                     }
 
-                    return (float) ($item->qty ?? 0)
-                        * (float) ($item->harga_unit ?? 0);
+                    return (float) (
+                        $item->qty
+                        ?? 0
+                    ) * (float) (
+                        $item->harga_unit
+                        ?? 0
+                    );
                 })
             );
-            $terbilang = $this->terbilangRupiah($totalAmount);
 
+            /*
+        |--------------------------------------------------------------------------
+        | Terbilang
+        |--------------------------------------------------------------------------
+        */
+            $terbilang = $lang === 'en'
+                ? $this->terbilangRupiahEnglish(
+                    $totalAmount,
+                )
+                : $this->terbilangRupiah(
+                    $totalAmount,
+                );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Approval yang sudah disetujui
+        |--------------------------------------------------------------------------
+        */
             $approvedApprovals = $pr->approvals
                 ->filter(function ($approval) {
                     return strtoupper(
-                        trim((string) $approval->status)
+                        trim(
+                            (string) $approval->status,
+                        ),
                     ) === PurchaseRequestApproval::STATUS_APPROVED;
                 })
                 ->sortBy(function ($approval) {
@@ -2430,29 +2508,58 @@ class PurchaseRequestController extends Controller
                 })
                 ->values();
 
+            /*
+        |--------------------------------------------------------------------------
+        | Requester
+        |--------------------------------------------------------------------------
+        */
             $requesterSigner = collect([
                 (object) [
                     'type' => 'REQUESTER',
-                    'label' => 'Requester',
+
+                    'label' => $lang === 'en'
+                        ? 'Requester'
+                        : 'Pemohon',
+
                     'name' => $pr->submitter?->name
                         ?? $pr->creator?->name
                         ?? '-',
-                    'signature_path' => $pr->requester_signature_path,
-                    'signed_at' => $pr->requester_signed_at
+
+                    'signature_path'
+                    => $pr->requester_signature_path,
+
+                    'signed_at'
+                    => $pr->requester_signed_at
                         ?? $pr->submitted_at,
                 ],
             ]);
 
+            /*
+        |--------------------------------------------------------------------------
+        | Approvers
+        |--------------------------------------------------------------------------
+        */
             $approvalSigners = $approvedApprovals
-                ->map(function ($approval) {
+                ->map(function ($approval) use ($lang) {
                     return (object) [
                         'type' => 'APPROVER',
+
                         'label' => $approval->label
-                            ?? 'Approver',
-                        'name' => $approval->approver_name_snapshot
+                            ?? (
+                                $lang === 'en'
+                                ? 'Approver'
+                                : 'Penyetuju'
+                            ),
+
+                        'name' => $approval
+                            ->approver_name_snapshot
                             ?? '-',
-                        'signature_path' => $approval->signature_path,
-                        'signed_at' => $approval->approved_at
+
+                        'signature_path'
+                        => $approval->signature_path,
+
+                        'signed_at'
+                        => $approval->approved_at
                             ?? $approval->signed_at,
                     ];
                 });
@@ -2461,13 +2568,25 @@ class PurchaseRequestController extends Controller
                 ->concat($approvalSigners)
                 ->values();
 
-            $pdf = Pdf::loadView('pdf.purchase-request', [
-                'pr' => $pr,
-                'totalAmount' => $totalAmount,
-                'terbilang' => $terbilang,
-                'approvedApprovals' => $approvedApprovals,
-                'signers' => $signers,
-            ])->setPaper('a4', 'portrait');
+            /*
+        |--------------------------------------------------------------------------
+        | Generate PDF
+        |--------------------------------------------------------------------------
+        */
+            $pdf = Pdf::loadView(
+                'pdf.purchase-request',
+                [
+                    'pr' => $pr,
+                    'totalAmount' => $totalAmount,
+                    'terbilang' => $terbilang,
+                    'approvedApprovals' => $approvedApprovals,
+                    'signers' => $signers,
+                    'lang' => $lang,
+                ],
+            )->setPaper(
+                'a4',
+                'portrait',
+            );
 
             $fileName = str_replace(
                 ['/', '\\'],
@@ -2476,15 +2595,24 @@ class PurchaseRequestController extends Controller
             );
 
             return $pdf->stream(
-                "PR-{$fileName}.pdf",
+                sprintf(
+                    'PR-%s-%s.pdf',
+                    $fileName,
+                    strtoupper($lang),
+                ),
             );
         } catch (\Throwable $e) {
-            Log::error('[Purchase Requisition] Print error', [
-                'public_id' => $publicId,
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
+            Log::error(
+                '[Purchase Requisition] Print error',
+                [
+                    'public_id' => $publicId,
+                    'lang' => $request->query('lang'),
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'user_id' => $request->user()?->id,
+                ],
+            );
 
             return response()->json([
                 'success' => false,
@@ -2494,6 +2622,145 @@ class PurchaseRequestController extends Controller
                     : null,
             ], 500);
         }
+    }
+
+    private function terbilangRupiahEnglish(
+        float $amount,
+    ): string {
+        $number = (int) round($amount);
+
+        if ($number === 0) {
+            return 'Zero Rupiah';
+        }
+
+        return $this->numberToWordsEnglish(
+            $number,
+        ) . ' Rupiah';
+    }
+
+    private function numberToWordsEnglish(
+        int $number,
+    ): string {
+        if ($number < 0) {
+            return 'Minus '
+                . $this->numberToWordsEnglish(
+                    abs($number),
+                );
+        }
+
+        $ones = [
+            0 => '',
+            1 => 'One',
+            2 => 'Two',
+            3 => 'Three',
+            4 => 'Four',
+            5 => 'Five',
+            6 => 'Six',
+            7 => 'Seven',
+            8 => 'Eight',
+            9 => 'Nine',
+            10 => 'Ten',
+            11 => 'Eleven',
+            12 => 'Twelve',
+            13 => 'Thirteen',
+            14 => 'Fourteen',
+            15 => 'Fifteen',
+            16 => 'Sixteen',
+            17 => 'Seventeen',
+            18 => 'Eighteen',
+            19 => 'Nineteen',
+        ];
+
+        $tens = [
+            2 => 'Twenty',
+            3 => 'Thirty',
+            4 => 'Forty',
+            5 => 'Fifty',
+            6 => 'Sixty',
+            7 => 'Seventy',
+            8 => 'Eighty',
+            9 => 'Ninety',
+        ];
+
+        if ($number < 20) {
+            return $ones[$number];
+        }
+
+        if ($number < 100) {
+            $tenValue = intdiv(
+                $number,
+                10,
+            );
+
+            $remainder = $number % 10;
+
+            return trim(
+                $tens[$tenValue]
+                    . (
+                        $remainder > 0
+                        ? ' ' . $ones[$remainder]
+                        : ''
+                    ),
+            );
+        }
+
+        if ($number < 1_000) {
+            $hundreds = intdiv(
+                $number,
+                100,
+            );
+
+            $remainder = $number % 100;
+
+            return trim(
+                $ones[$hundreds]
+                    . ' Hundred'
+                    . (
+                        $remainder > 0
+                        ? ' '
+                        . $this->numberToWordsEnglish(
+                            $remainder,
+                        )
+                        : ''
+                    ),
+            );
+        }
+
+        $scales = [
+            1_000_000_000_000 => 'Trillion',
+            1_000_000_000 => 'Billion',
+            1_000_000 => 'Million',
+            1_000 => 'Thousand',
+        ];
+
+        foreach ($scales as $scaleValue => $scaleName) {
+            if ($number >= $scaleValue) {
+                $mainNumber = intdiv(
+                    $number,
+                    $scaleValue,
+                );
+
+                $remainder = $number % $scaleValue;
+
+                return trim(
+                    $this->numberToWordsEnglish(
+                        $mainNumber,
+                    )
+                        . ' '
+                        . $scaleName
+                        . (
+                            $remainder > 0
+                            ? ' '
+                            . $this->numberToWordsEnglish(
+                                $remainder,
+                            )
+                            : ''
+                        ),
+                );
+            }
+        }
+
+        return '';
     }
 
     private function terbilangRupiah(float $angka): string
@@ -2588,155 +2855,390 @@ class PurchaseRequestController extends Controller
         return response()->json($prs);
     }
 
-    public function dropdownApproved(Request $request)
-    {
+    public function dropdownApproved(
+        Request $request,
+    ): JsonResponse {
         try {
-            $cabangId = (int) $request->cabang;
-            $departmentId = (int) $request->id_department;
+            $user = $request->user();
 
-            if (!$cabangId || !$departmentId) {
+            /*
+        |--------------------------------------------------------------------------
+        | Permission Create PO
+        |--------------------------------------------------------------------------
+        */
+            if (
+                !$user
+                || !$user->hasPermission(
+                    'purchase_order.create',
+                )
+            ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cabang dan department wajib dipilih.',
+                    'message' => 'Anda tidak memiliki akses untuk membuat Purchase Order.',
                     'data' => [],
-                ], 422);
+                ], 403);
             }
 
+            /*
+        |--------------------------------------------------------------------------
+        | Validation
+        |--------------------------------------------------------------------------
+        */
+            $validated = $request->validate([
+                'cabang' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
+
+                'id_department' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
+            ]);
+
+            $cabangId = (int) $validated['cabang'];
+            $departmentId = (int) $validated['id_department'];
+
+            /*
+        |--------------------------------------------------------------------------
+        | Department Scope Validation
+        |--------------------------------------------------------------------------
+        | Cabang tidak dibatasi.
+        | Department wajib sesuai scope purchase_order.create.
+        |--------------------------------------------------------------------------
+        */
+            if (
+                !$user->canAccessDepartmentForPermission(
+                    'purchase_order.create',
+                    $departmentId,
+                )
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses membuat Purchase Order untuk department tersebut.',
+                    'data' => [],
+                ], 403);
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Approved Purchase Requests
+        |--------------------------------------------------------------------------
+        */
             $prs = PurchaseRequest::query()
                 ->with([
                     'cabangData:id,nama_cabang,inisial_cabang',
+
                     'departmentData:id,kode,nama',
+
                     'recommendedVendor:id,nama_vendor,status_pkp,jenis_pembayaran,top',
+
                     'attachments',
-                    'items' => function ($q) {
-                        $q->with('unit:id,kode,nama')
+
+                    'items' => function ($query) {
+                        $query
+                            ->with(
+                                'unit:id,kode,nama',
+                            )
                             ->whereNull('deleted_at')
-                            ->whereRaw('(COALESCE(qty_outstanding, qty - COALESCE(qty_po, 0)) > 0)');
+                            ->whereRaw(
+                                '(COALESCE(qty_outstanding, qty - COALESCE(qty_po, 0)) > 0)',
+                            );
                     },
                 ])
-                ->where('cabang', $cabangId)
-                ->where('id_department', $departmentId)
-                ->whereRaw('UPPER(status) = ?', ['APPROVED'])
-                ->where(function ($q) {
-                    $q->whereNull('status_po')
-                        ->orWhereRaw('UPPER(status_po) IN (?, ?)', ['OPEN', 'PARTIAL']);
+                ->where(
+                    'cabang',
+                    $cabangId,
+                )
+                ->where(
+                    'id_department',
+                    $departmentId,
+                )
+                ->whereRaw(
+                    'UPPER(status) = ?',
+                    ['APPROVED'],
+                )
+                ->where(function ($query) {
+                    $query
+                        ->whereNull('status_po')
+                        ->orWhereRaw(
+                            'UPPER(status_po) IN (?, ?)',
+                            [
+                                'OPEN',
+                                'PARTIAL',
+                            ],
+                        );
                 })
-                ->whereHas('items', function ($q) {
-                    $q->whereNull('deleted_at')
-                        ->whereRaw('(COALESCE(qty_outstanding, qty - COALESCE(qty_po, 0)) > 0)');
-                })
+                ->whereHas(
+                    'items',
+                    function ($query) {
+                        $query
+                            ->whereNull('deleted_at')
+                            ->whereRaw(
+                                '(COALESCE(qty_outstanding, qty - COALESCE(qty_po, 0)) > 0)',
+                            );
+                    },
+                )
                 ->orderByDesc('id')
                 ->get();
 
-            $data = $prs->map(function ($pr) {
-                $items = $pr->items
-                    ->filter(function ($item) {
-                        $qty = (float) ($item->qty ?? 0);
-                        $qtyPo = (float) ($item->qty_po ?? 0);
+            $data = $prs
+                ->map(function (
+                    PurchaseRequest $pr,
+                ) {
+                    $items = $pr->items
+                        ->filter(function ($item) {
+                            $qty = (float) (
+                                $item->qty ?? 0
+                            );
 
-                        $qtyOutstanding = $item->qty_outstanding !== null
-                            ? (float) $item->qty_outstanding
-                            : ($qty - $qtyPo);
+                            $qtyPo = (float) (
+                                $item->qty_po ?? 0
+                            );
 
-                        return $qtyOutstanding > 0;
-                    })
-                    ->map(function ($item) {
-                        $qty = (float) ($item->qty ?? 0);
-                        $qtyPo = (float) ($item->qty_po ?? 0);
-                        $hargaUnit = (float) ($item->harga_unit ?? 0);
+                            $qtyOutstanding
+                                = $item->qty_outstanding !== null
+                                ? (float) $item->qty_outstanding
+                                : $qty - $qtyPo;
 
-                        $qtyOutstanding = $item->qty_outstanding !== null
-                            ? (float) $item->qty_outstanding
-                            : ($qty - $qtyPo);
+                            return $qtyOutstanding > 0;
+                        })
+                        ->map(function ($item) {
+                            $qty = (float) (
+                                $item->qty ?? 0
+                            );
 
-                        $qtyOutstanding = max($qtyOutstanding, 0);
+                            $qtyPo = (float) (
+                                $item->qty_po ?? 0
+                            );
 
-                        return [
-                            'id' => $item->id,
-                            'nama_item' => $item->nama_item,
-                            'qty' => $qty,
-                            'qty_po' => $qtyPo,
-                            'qty_outstanding' => $qtyOutstanding,
+                            $hargaUnit = (float) (
+                                $item->harga_unit ?? 0
+                            );
 
-                            'satuan_id' => $item->satuan,
-                            'satuan' => [
-                                'id' => $item->unit->id ?? null,
-                                'kode' => $item->unit->kode ?? '-',
-                                'nama' => $item->unit->nama ?? '-',
-                            ],
+                            $qtyOutstanding
+                                = $item->qty_outstanding !== null
+                                ? (float) $item->qty_outstanding
+                                : $qty - $qtyPo;
 
-                            'harga_unit' => $hargaUnit,
-                            'subtotal' => (float) ($item->subtotal ?? 0),
-                            'subtotal_po' => $qtyPo * $hargaUnit,
-                            'subtotal_outstanding' => $qtyOutstanding * $hargaUnit,
-                            'keterangan' => $item->keterangan,
-                        ];
-                    })
-                    ->values();
+                            $qtyOutstanding = max(
+                                $qtyOutstanding,
+                                0,
+                            );
 
-                $totalOutstanding = $items->sum('subtotal_outstanding');
+                            return [
+                                'id' => (int) $item->id,
 
-                return [
-                    'id' => $pr->id,
-                    'public_id' => $pr->encrypted_id,
-                    'nomor_pr' => $pr->nomor_pr,
-                    'tanggal_pr' => $pr->tanggal_pr,
+                                'purchase_request_id'
+                                => (int) $item->purchase_request_id,
 
-                    'cabang' => $pr->cabangData
-                        ? ($pr->cabangData->inisial_cabang ?? '-')
-                        : '-',
+                                'nama_item'
+                                => $item->nama_item,
 
-                    'department' => $pr->departmentData
-                        ? ($pr->departmentData->kode ?? '-')
-                        : '-',
+                                'qty' => $qty,
 
-                    'status' => $pr->status,
-                    'status_po' => $pr->status_po,
+                                'qty_po' => $qtyPo,
 
-                    'total_amount' => (float) ($pr->total_amount ?? 0),
-                    'total_outstanding' => $totalOutstanding,
+                                'qty_outstanding'
+                                => $qtyOutstanding,
 
-                    'attachments' => $pr->attachments->map(function ($a) {
-                        return [
-                            'id' => $a->id,
-                            'filename' => $a->filename,
-                            'original_filename' => $a->original_filename,
-                            'filepath' => asset('storage/' . $a->filepath),
-                            'file_size' => $a->file_size,
-                            'mime_type' => $a->mime_type,
-                        ];
-                    })->values(),
+                                'satuan_id'
+                                => $item->satuan
+                                    ? (int) $item->satuan
+                                    : null,
 
-                    'items' => $items,
+                                'satuan' => [
+                                    'id' => $item->unit?->id
+                                        ? (int) $item->unit->id
+                                        : null,
 
-                    'recommended_vendor_id' => $pr->recommended_vendor_id,
-                    'recommended_vendor' => $pr->recommendedVendor ? [
-                        'id' => $pr->recommendedVendor->id,
-                        'nama_vendor' => $pr->recommendedVendor->nama_vendor ?? '-',
-                        'status_pkp' => $pr->recommendedVendor->status_pkp ?? 'NON_PKP',
-                        'jenis_pembayaran' => $pr->recommendedVendor->jenis_pembayaran ?? null,
-                        'top' => $pr->recommendedVendor->top ?? null,
-                    ] : null,
-                ];
-            })->values();
+                                    'kode'
+                                    => $item->unit?->kode
+                                        ?? '-',
+
+                                    'nama'
+                                    => $item->unit?->nama
+                                        ?? '-',
+                                ],
+
+                                'harga_unit'
+                                => $hargaUnit,
+
+                                'subtotal'
+                                => (float) (
+                                    $item->subtotal
+                                    ?? 0
+                                ),
+
+                                'subtotal_po'
+                                => $qtyPo
+                                    * $hargaUnit,
+
+                                'subtotal_outstanding'
+                                => $qtyOutstanding
+                                    * $hargaUnit,
+
+                                'keterangan'
+                                => $item->keterangan,
+                            ];
+                        })
+                        ->values();
+
+                    $totalOutstanding = $items->sum(
+                        'subtotal_outstanding',
+                    );
+
+                    return [
+                        'id' => (int) $pr->id,
+
+                        'public_id'
+                        => $pr->encrypted_id,
+
+                        'nomor_pr'
+                        => $pr->nomor_pr,
+
+                        'tanggal_pr'
+                        => $pr->tanggal_pr,
+
+                        'cabang_id'
+                        => (int) $pr->cabang,
+
+                        'cabang'
+                        => $pr->cabangData
+                            ? (
+                                $pr->cabangData
+                                ->inisial_cabang
+                                ?? '-'
+                            )
+                            : '-',
+
+                        'department_id'
+                        => (int) $pr->id_department,
+
+                        'department'
+                        => $pr->departmentData
+                            ? (
+                                $pr->departmentData
+                                ->kode
+                                ?? '-'
+                            )
+                            : '-',
+
+                        'status'
+                        => $pr->status,
+
+                        'status_po'
+                        => $pr->status_po,
+
+                        'total_amount'
+                        => (float) (
+                            $pr->total_amount
+                            ?? 0
+                        ),
+
+                        'total_outstanding'
+                        => (float) $totalOutstanding,
+
+                        'attachments'
+                        => $pr->attachments
+                            ->map(function ($attachment) {
+                                return [
+                                    'id'
+                                    => (int) $attachment->id,
+
+                                    'filename'
+                                    => $attachment->filename,
+
+                                    'original_filename'
+                                    => $attachment
+                                        ->original_filename,
+
+                                    'filepath'
+                                    => asset(
+                                        'storage/'
+                                            . $attachment->filepath,
+                                    ),
+
+                                    'file_size'
+                                    => $attachment->file_size,
+
+                                    'mime_type'
+                                    => $attachment->mime_type,
+                                ];
+                            })
+                            ->values(),
+
+                        'items' => $items,
+
+                        'recommended_vendor_id'
+                        => $pr->recommended_vendor_id
+                            ? (int) $pr
+                                ->recommended_vendor_id
+                            : null,
+
+                        'recommended_vendor'
+                        => $pr->recommendedVendor
+                            ? [
+                                'id'
+                                => (int) $pr
+                                    ->recommendedVendor
+                                    ->id,
+
+                                'nama_vendor'
+                                => $pr
+                                    ->recommendedVendor
+                                    ->nama_vendor
+                                    ?? '-',
+
+                                'status_pkp'
+                                => $pr
+                                    ->recommendedVendor
+                                    ->status_pkp
+                                    ?? 'NON_PKP',
+
+                                'jenis_pembayaran'
+                                => $pr
+                                    ->recommendedVendor
+                                    ->jenis_pembayaran,
+
+                                'top'
+                                => $pr
+                                    ->recommendedVendor
+                                    ->top,
+                            ]
+                            : null,
+                    ];
+                })
+                ->values();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Purchase Requisition berhasil dimuat.',
-                'data'    => $data,
+                'data' => $data,
             ], 200);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
-            Log::error('[Purchase Requisition] dropdownApproved error', [
-                'message' => $e->getMessage(),
-                'file'    => $e->getFile(),
-                'line'    => $e->getLine(),
-            ]);
+            Log::error(
+                '[Purchase Requisition] dropdownApproved error',
+                [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'request' => $request->all(),
+                    'user_id' => $request->user()?->id,
+                ],
+            );
 
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memuat Purchase Requisition.',
-                'data'    => [],
-                'debug'   => app()->environment('local') ? $e->getMessage() : null,
+                'data' => [],
+                'debug' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
             ], 500);
         }
     }

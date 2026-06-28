@@ -724,7 +724,7 @@ const savePurchaseRequest = async (event?: Event): Promise<void> => {
   if (!isValid) return
 
   const confirm = await showConfirmAlert({
-    title: 'Simpan Purchase Request?',
+    title: 'Simpan Purchase Requisition?',
     text: 'Pastikan data sudah benar.',
     confirmButtonText: 'Ya, simpan',
     cancelButtonText: 'Batal',
@@ -756,7 +756,7 @@ const savePurchaseRequest = async (event?: Event): Promise<void> => {
 
     const err = error as AxiosErrorShape
 
-    console.error('[Purchase Request] SAVE ERROR:', err)
+    console.error('[Purchase Requisition] SAVE ERROR:', err)
 
     if (err?.response?.status === 401) {
       showErrorToast({
@@ -776,7 +776,7 @@ const savePurchaseRequest = async (event?: Event): Promise<void> => {
       title: 'Error',
       text:
         err?.response?.data?.message
-        || getApiErrorMessage(error, 'Gagal menyimpan Purchase Request.'),
+        || getApiErrorMessage(error, 'Gagal menyimpan Purchase Requisition.'),
     })
   } finally {
     isSaving.value = false
@@ -841,10 +841,10 @@ onMounted(async () => {
         <VCardTitle class="d-flex align-center justify-space-between">
           <div>
             <div class="text-h6 font-weight-bold">
-              Form Purchase Request
+              Form Purchase Requisition
             </div>
             <div class="text-body-2 text-medium-emphasis">
-              Silakan lengkapi data purchase request dengan benar
+              Silakan lengkapi data purchase requisition dengan benar
             </div>
           </div>
 
@@ -1156,7 +1156,7 @@ onMounted(async () => {
                     Vendor Rekomendasi
                   </div>
                   <div class="text-caption text-medium-emphasis">
-                    Opsional, 1 purchase request hanya dapat memilih 1 vendor rekomendasi.
+                    Opsional, 1 purchase requisition hanya dapat memilih 1 vendor rekomendasi.
                   </div>
                 </div>
               </div>
@@ -1307,7 +1307,7 @@ onMounted(async () => {
               <VTextarea
                 v-model="form.notes"
                 label="Catatan"
-                placeholder="Tambahkan catatan purchase request"
+                placeholder="Tambahkan catatan purchase requisition"
                 rows="3"
                 auto-grow
               />

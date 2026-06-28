@@ -151,6 +151,10 @@ const rejectLoading = ref(false)
 | Print Purchase Requisition
 |--------------------------------------------------------------------------
 */
+type PrintLanguage = 'id' | 'en'
+
+const printLanguageDialog = ref(false)
+const selectedPrintPublicId = ref<string | null>(null)
 const printLoadingId = ref<string | null>(null)
 
 /*
@@ -414,23 +418,51 @@ const openApprovalHistory = async (
   }
 }
 
-const printPurchaseRequisition = async (
+const openPrintLanguageDialog = (
   publicId: string,
+): void => {
+  if (!publicId || printLoadingId.value)
+    return
+
+  selectedPrintPublicId.value = publicId
+  printLanguageDialog.value = true
+}
+
+const closePrintLanguageDialog = (): void => {
+  if (printLoadingId.value)
+    return
+
+  printLanguageDialog.value = false
+  selectedPrintPublicId.value = null
+}
+
+const printPurchaseRequisition = async (
+  language: PrintLanguage,
 ): Promise<void> => {
+  const publicId = selectedPrintPublicId.value
+
   if (!publicId || printLoadingId.value)
     return
 
   printLoadingId.value = publicId
+  printLanguageDialog.value = false
 
   try {
     showLoadingAlert(
-      'Membuka cetakan Purchase Requisition...',
-      'Mohon tunggu sebentar',
+      language === 'en'
+        ? 'Opening Purchase Requisition print...'
+        : 'Membuka cetakan Purchase Requisition...',
+      language === 'en'
+        ? 'Please wait a moment'
+        : 'Mohon tunggu sebentar',
     )
 
     const response = await axios.get(
       `/transaction/purchase-request/${encodeURIComponent(publicId)}/print`,
       {
+        params: {
+          lang: language,
+        },
         responseType: 'blob',
         headers: {
           Accept: 'application/pdf',
@@ -455,14 +487,7 @@ const printPurchaseRequisition = async (
       'noopener,noreferrer',
     )
 
-    /*
-    |--------------------------------------------------------------------------
-    | URL blob jangan langsung dicabut
-    |--------------------------------------------------------------------------
-    | Beri waktu browser membuka/membaca file.
-    |--------------------------------------------------------------------------
-    */
-    setTimeout(() => {
+    window.setTimeout(() => {
       URL.revokeObjectURL(fileURL)
     }, 60_000)
   }
@@ -473,12 +498,15 @@ const printPurchaseRequisition = async (
       title: 'Error',
       text: getApiErrorMessage(
         error,
-        'Gagal mencetak Purchase Requisition.',
+        language === 'en'
+          ? 'Failed to print Purchase Requisition.'
+          : 'Gagal mencetak Purchase Requisition.',
       ),
     })
   }
   finally {
     printLoadingId.value = null
+    selectedPrintPublicId.value = null
   }
 }
 
@@ -1520,10 +1548,13 @@ onBeforeUnmount(() => {
                     </VListItem>
 
                     <VListItem
-                      v-if="String(v.status).toLowerCase() == 'approved' && String(v.status).toLowerCase() !== 'rejected'"
+                      v-if="
+                        String(v.status).toLowerCase() === 'approved'
+                        && String(v.status).toLowerCase() !== 'rejected'
+                      "
                       href="javascript:void(0)"
                       :disabled="printLoadingId === v.public_id"
-                      @click="printPurchaseRequisition(v.public_id)"
+                      @click="openPrintLanguageDialog(v.public_id)"
                     >
                       <template #prepend>
                         <VProgressCircular
@@ -1689,6 +1720,94 @@ onBeforeUnmount(() => {
         </div>
       </VCardText>
     </VCard>
+
+    <VDialog
+      v-model="printLanguageDialog"
+      max-width="460"
+      persistent
+    >
+      <VCard class="rounded-lg">
+        <VCardItem>
+          <template #prepend>
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              size="42"
+              class="me-3"
+            >
+              <VIcon
+                icon="tabler-language"
+                size="23"
+              />
+            </VAvatar>
+          </template>
+
+          <VCardTitle>
+            Pilih Bahasa Cetakan
+          </VCardTitle>
+
+          <VCardSubtitle>
+            Pilih bahasa yang akan digunakan
+          </VCardSubtitle>
+        </VCardItem>
+
+        <VDivider />
+
+        <VCardText class="pa-5">
+          <VRow>
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VBtn
+                block
+                size="large"
+                color="primary"
+                variant="tonal"
+                :disabled="Boolean(printLoadingId)"
+                @click="printPurchaseRequisition('id')"
+                class="text-none"
+              >
+
+                Indonesia
+              </VBtn>
+            </VCol>
+
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VBtn
+                block
+                size="large"
+                color="primary"
+                variant="tonal"
+                :disabled="Boolean(printLoadingId)"
+                @click="printPurchaseRequisition('en')"
+                class="text-none"
+              >
+
+                English
+              </VBtn>
+            </VCol>
+          </VRow>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end pa-4">
+          <VBtn
+            variant="text"
+            color="secondary"
+            :disabled="Boolean(printLoadingId)"
+            @click="closePrintLanguageDialog"
+            class="text-none"
+          >
+            Batal
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <VDialog
       v-model="detailDialog"

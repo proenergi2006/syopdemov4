@@ -259,11 +259,11 @@ const onSubmit = async () => {
         >
           <VCardText>
             <h1 class="text-h5 mb-1">
-              System Operasional
+              Operational System
             </h1>
 
             <p class="mb-0 text-medium-emphasis">
-              Please sign in with your account.
+              Masuk gunakan akun anda
             </p>
           </VCardText>
 

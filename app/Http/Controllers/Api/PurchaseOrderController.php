@@ -4,31 +4,27 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApprovalFlow;
-use App\Models\Notification;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderApproval;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
-use App\Models\PurchaseOrderApprovalHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use DocumentHelper;
-use App\Mail\PurchaseOrderApprovalMail;
-use App\Models\User;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderNotificationService;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderMailService;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderRollbackService;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderApprovalService;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderApprovalGeneratorService;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 class PurchaseOrderController extends Controller
 {
@@ -942,133 +938,773 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    public function store(Request $request)
-    {
+    public function store(
+        Request $request,
+    ): JsonResponse {
         $user = $request->user();
-        if (!$user || !$user->hasPermission('purchase_order.create')) {
+
+        /*
+    |--------------------------------------------------------------------------
+    | Permission
+    |--------------------------------------------------------------------------
+    */
+        if (
+            !$user
+            || !$user->hasPermission(
+                'purchase_order.create',
+            )
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Anda tidak memiliki akses untuk membuat Purchase Order.',
             ], 403);
         }
 
-        DB::beginTransaction();
+        /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    | Dijalankan sebelum transaction agar validation error tetap menjadi 422,
+    | bukan tertangkap sebagai error 500.
+    |--------------------------------------------------------------------------
+    */
+        $validated = $request->validate([
+            'tanggal_po' => [
+                'required',
+                'date_format:Y-m-d',
+            ],
+
+            'vendor_id' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'cabang' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'id_department' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'notes' => [
+                'nullable',
+                'string',
+            ],
+
+            'total_nilai' => [
+                'nullable',
+                'numeric',
+                'gte:0',
+            ],
+
+            'dpp' => [
+                'nullable',
+                'numeric',
+                'gte:0',
+            ],
+
+            'ppn' => [
+                'nullable',
+                'numeric',
+                'gte:0',
+            ],
+
+            'purchase_request_ids' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'purchase_request_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:purchase_requests,id',
+            ],
+
+            'items' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'items.*.purchase_request_id' => [
+                'required',
+                'integer',
+                'exists:purchase_requests,id',
+            ],
+
+            'items.*.purchase_request_item_id' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:purchase_request_items,id',
+            ],
+
+            'items.*.qty' => [
+                'required',
+                'numeric',
+                'gt:0',
+            ],
+
+            'items.*.harga_unit' => [
+                'required',
+                'numeric',
+                'gte:0',
+            ],
+
+            'items.*.spesifikasi' => [
+                'nullable',
+                'string',
+            ],
+
+            'items.*.keterangan' => [
+                'nullable',
+                'string',
+            ],
+        ]);
+
+        $requestedDepartmentId = (int) (
+            $validated['id_department']
+        );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Preliminary Department Permission
+    |--------------------------------------------------------------------------
+    */
+        if (
+            !$user->canAccessDepartmentForPermission(
+                'purchase_order.create',
+                $requestedDepartmentId,
+            )
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses membuat Purchase Order untuk department tersebut.',
+            ], 403);
+        }
+
+        $clean = static function (
+            mixed $value,
+        ): string {
+            return htmlspecialchars(
+                strip_tags(
+                    trim(
+                        (string) $value,
+                    ),
+                ),
+                ENT_QUOTES,
+                'UTF-8',
+            );
+        };
+
+        /*
+    |--------------------------------------------------------------------------
+    | Normalize PR IDs
+    |--------------------------------------------------------------------------
+    */
+        $purchaseRequestIds = collect(
+            $validated['purchase_request_ids'],
+        )
+            ->map(
+                fn($id): int => (int) $id,
+            )
+            ->filter(
+                fn($id): bool => $id > 0,
+            )
+            ->unique()
+            ->values();
+
+        $itemPayloads = collect(
+            $validated['items'],
+        )->values();
+
+        $itemPurchaseRequestIds = $itemPayloads
+            ->pluck('purchase_request_id')
+            ->map(
+                fn($id): int => (int) $id,
+            )
+            ->filter(
+                fn($id): bool => $id > 0,
+            )
+            ->unique()
+            ->values();
+
+        /*
+    |--------------------------------------------------------------------------
+    | Daftar PR header harus sama dengan PR dari item
+    |--------------------------------------------------------------------------
+    | Mencegah PR tambahan disisipkan ke pivot tanpa mempunyai item.
+    |--------------------------------------------------------------------------
+    */
+        $normalizedHeaderPrIds = $purchaseRequestIds
+            ->sort()
+            ->values()
+            ->all();
+
+        $normalizedItemPrIds = $itemPurchaseRequestIds
+            ->sort()
+            ->values()
+            ->all();
+
+        if (
+            $normalizedHeaderPrIds
+            !== $normalizedItemPrIds
+        ) {
+            throw ValidationException::withMessages([
+                'purchase_request_ids' => [
+                    'Daftar Purchase Request tidak sesuai dengan item Purchase Order yang dipilih.',
+                ],
+            ]);
+        }
 
         try {
-            $clean = fn($v) => htmlspecialchars(strip_tags(trim((string) $v)), ENT_QUOTES, 'UTF-8');
+            $po = DB::transaction(
+                function () use (
+                    $validated,
+                    $user,
+                    $clean,
+                    $purchaseRequestIds,
+                    $itemPayloads,
+                    $requestedDepartmentId,
+                ) {
+                    /*
+                |--------------------------------------------------------------------------
+                | Lock Purchase Requests
+                |--------------------------------------------------------------------------
+                */
+                    $purchaseRequests = PurchaseRequest::query()
+                        ->whereIn(
+                            'id',
+                            $purchaseRequestIds,
+                        )
+                        ->lockForUpdate()
+                        ->get([
+                            'id',
+                            'nomor_pr',
+                            'cabang',
+                            'id_department',
+                            'status',
+                            'status_po',
+                        ])
+                        ->keyBy(
+                            fn(PurchaseRequest $pr): int =>
+                            (int) $pr->id,
+                        );
 
-            $request->validate([
-                'tanggal_po' => ['required', 'date_format:Y-m-d'],
-                'vendor_id' => ['required', 'integer'],
-                'cabang' => ['required'],
-                'purchase_request_ids' => ['required', 'array', 'min:1'],
-                'items' => ['required', 'array', 'min:1'],
-                'items.*.purchase_request_id' => ['required', 'integer'],
-                'items.*.purchase_request_item_id' => ['required', 'integer'],
-                'items.*.nama_item' => ['required', 'string'],
-                'items.*.qty' => ['required', 'numeric', 'gt:0'],
-                'items.*.satuan' => ['required', 'integer', 'exists:units,id'],
-                'items.*.harga_unit' => ['required', 'numeric', 'gte:0'],
-                'items.*.subtotal' => ['required', 'numeric', 'gte:0'],
-            ]);
+                    if (
+                        $purchaseRequests->count()
+                        !== $purchaseRequestIds->count()
+                    ) {
+                        throw ValidationException::withMessages([
+                            'purchase_request_ids' => [
+                                'Terdapat Purchase Request yang tidak ditemukan.',
+                            ],
+                        ]);
+                    }
 
-            $nomorPo = $this->generateDraftPONumber();
+                    /*
+                |--------------------------------------------------------------------------
+                | Validate PR Status
+                |--------------------------------------------------------------------------
+                */
+                    foreach ($purchaseRequests as $purchaseRequest) {
+                        $status = strtoupper(
+                            trim(
+                                (string) $purchaseRequest->status,
+                            ),
+                        );
 
-            $user = $request->user();
+                        if ($status !== 'APPROVED') {
+                            throw ValidationException::withMessages([
+                                'purchase_request_ids' => [
+                                    "Purchase Request {$purchaseRequest->nomor_pr} belum berstatus APPROVED.",
+                                ],
+                            ]);
+                        }
 
-            $departmentId = (int) $request->id_department;
+                        $statusPo = $purchaseRequest->status_po;
 
-            if ($departmentId <= 0) {
-                DB::rollBack();
+                        if (
+                            $statusPo !== null
+                            && !in_array(
+                                strtoupper(
+                                    trim(
+                                        (string) $statusPo,
+                                    ),
+                                ),
+                                [
+                                    'OPEN',
+                                    'PARTIAL',
+                                ],
+                                true,
+                            )
+                        ) {
+                            throw ValidationException::withMessages([
+                                'purchase_request_ids' => [
+                                    "Purchase Request {$purchaseRequest->nomor_pr} sudah tidak dapat diproses menjadi PO.",
+                                ],
+                            ]);
+                        }
+                    }
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Department wajib dipilih.',
-                    'errors' => [
-                        'id_department' => [
-                            'Department wajib dipilih.',
-                        ],
-                    ],
-                ], 422);
-            }
+                    /*
+                |--------------------------------------------------------------------------
+                | Seluruh PR wajib satu department
+                |--------------------------------------------------------------------------
+                */
+                    $sourceDepartmentIds = $purchaseRequests
+                        ->pluck('id_department')
+                        ->map(
+                            fn($id): int => (int) $id,
+                        )
+                        ->unique()
+                        ->values();
 
-            $po = PurchaseOrder::create([
-                'nomor_po' => $nomorPo,
-                'tanggal_po' => $request->tanggal_po,
-                'vendor_id' => (int) $request->vendor_id,
-                'cabang' => $clean($request->cabang),
-                'id_department' => $departmentId,
-                'notes' => $clean($request->notes),
-                'total_nilai' => (float) ($request->total_nilai ?? 0),
-                'dpp' => (float) ($request->dpp ?? 0),
-                'ppn' => (float) ($request->ppn ?? 0),
-                'status' => 'DRAFT',
-                'created_by' => $request->user()->id ?? null,
-            ]);
+                    if (
+                        $sourceDepartmentIds->count()
+                        !== 1
+                    ) {
+                        throw ValidationException::withMessages([
+                            'purchase_request_ids' => [
+                                'Seluruh Purchase Request dalam satu PO wajib berasal dari department yang sama.',
+                            ],
+                        ]);
+                    }
 
-            $purchaseRequestIds = collect($request->purchase_request_ids)
-                ->map(fn($id) => (int) $id)
-                ->unique()
-                ->values();
+                    $sourceDepartmentId = (int) (
+                        $sourceDepartmentIds->first()
+                    );
 
-            $po->purchaseRequests()->sync($purchaseRequestIds);
+                    /*
+                |--------------------------------------------------------------------------
+                | Department payload wajib sama dengan department PR di database
+                |--------------------------------------------------------------------------
+                */
+                    if (
+                        $sourceDepartmentId
+                        !== $requestedDepartmentId
+                    ) {
+                        throw ValidationException::withMessages([
+                            'id_department' => [
+                                'Department Purchase Order tidak sesuai dengan department Purchase Request.',
+                            ],
+                        ]);
+                    }
 
-            foreach ($request->items as $item) {
-                $prItem = PurchaseRequestItem::whereNull('deleted_at')
-                    ->lockForUpdate()
-                    ->findOrFail((int) $item['purchase_request_item_id']);
+                    /*
+                |--------------------------------------------------------------------------
+                | Authoritative Department Authorization
+                |--------------------------------------------------------------------------
+                */
+                    if (
+                        !$user->canAccessDepartmentForPermission(
+                            'purchase_order.create',
+                            $sourceDepartmentId,
+                        )
+                    ) {
+                        throw new AuthorizationException(
+                            'Anda tidak memiliki akses membuat Purchase Order untuk department Purchase Request tersebut.',
+                        );
+                    }
 
-                $qtyPoInput = (float) $item['qty'];
-                $qtyOutstanding = (float) ($prItem->qty_outstanding ?? 0);
+                    /*
+                |--------------------------------------------------------------------------
+                | Seluruh PR wajib satu cabang
+                |--------------------------------------------------------------------------
+                */
+                    $sourceCabangIds = $purchaseRequests
+                        ->pluck('cabang')
+                        ->map(
+                            fn($id): int => (int) $id,
+                        )
+                        ->unique()
+                        ->values();
 
-                if ($qtyPoInput > $qtyOutstanding) {
-                    throw new \Exception("Qty PO item {$prItem->nama_item} melebihi qty outstanding.");
-                }
+                    if (
+                        $sourceCabangIds->count()
+                        !== 1
+                    ) {
+                        throw ValidationException::withMessages([
+                            'purchase_request_ids' => [
+                                'Seluruh Purchase Request dalam satu PO wajib berasal dari cabang yang sama.',
+                            ],
+                        ]);
+                    }
 
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $po->id,
-                    'purchase_request_item_id' => $prItem->id,
-                    'nama_item' => $clean($item['nama_item']),
-                    'qty' => $qtyPoInput,
-                    'satuan' => (int) $item['satuan'],
-                    'spesifikasi' => $clean($item['spesifikasi'] ?? ''),
-                    'keterangan' => $clean($item['keterangan'] ?? ''),
-                    'harga_unit' => (float) $item['harga_unit'],
-                    'subtotal' => $qtyPoInput * (float) $item['harga_unit'],
-                ]);
+                    $sourceCabangId = (int) (
+                        $sourceCabangIds->first()
+                    );
 
-                $prItem->qty_po = (float) ($prItem->qty_po ?? 0) + $qtyPoInput;
-                $prItem->qty_outstanding = max((float) $prItem->qty - (float) $prItem->qty_po, 0);
-                $prItem->save();
-            }
+                    if (
+                        $sourceCabangId
+                        !== (int) $validated['cabang']
+                    ) {
+                        throw ValidationException::withMessages([
+                            'cabang' => [
+                                'Cabang Purchase Order tidak sesuai dengan cabang Purchase Request.',
+                            ],
+                        ]);
+                    }
 
-            foreach ($purchaseRequestIds as $prId) {
-                $this->refreshPurchaseRequestPOStatus($prId);
-            }
+                    /*
+                |--------------------------------------------------------------------------
+                | Lock Purchase Request Items
+                |--------------------------------------------------------------------------
+                */
+                    $purchaseRequestItemIds = $itemPayloads
+                        ->pluck(
+                            'purchase_request_item_id',
+                        )
+                        ->map(
+                            fn($id): int => (int) $id,
+                        )
+                        ->unique()
+                        ->values();
 
-            DB::commit();
+                    $purchaseRequestItems
+                        = PurchaseRequestItem::query()
+                        ->whereIn(
+                            'id',
+                            $purchaseRequestItemIds,
+                        )
+                        ->whereNull('deleted_at')
+                        ->lockForUpdate()
+                        ->get()
+                        ->keyBy(
+                            fn(PurchaseRequestItem $item): int =>
+                            (int) $item->id,
+                        );
+
+                    if (
+                        $purchaseRequestItems->count()
+                        !== $purchaseRequestItemIds->count()
+                    ) {
+                        throw ValidationException::withMessages([
+                            'items' => [
+                                'Terdapat item Purchase Request yang tidak ditemukan atau sudah dihapus.',
+                            ],
+                        ]);
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Prepare dan validate item
+                |--------------------------------------------------------------------------
+                */
+                    $preparedItems = [];
+
+                    foreach (
+                        $itemPayloads as $index => $itemPayload
+                    ) {
+                        $purchaseRequestItemId = (int) (
+                            $itemPayload['purchase_request_item_id']
+                        );
+
+                        $payloadPurchaseRequestId = (int) (
+                            $itemPayload['purchase_request_id']
+                        );
+
+                        $purchaseRequestItem
+                            = $purchaseRequestItems->get(
+                                $purchaseRequestItemId,
+                            );
+
+                        if (!$purchaseRequestItem) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_item_id" => [
+                                    'Item Purchase Request tidak ditemukan.',
+                                ],
+                            ]);
+                        }
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Item wajib benar-benar milik PR yang dikirim
+                    |--------------------------------------------------------------------------
+                    */
+                        if (
+                            (int) $purchaseRequestItem
+                                ->purchase_request_id
+                            !== $payloadPurchaseRequestId
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_item_id" => [
+                                    'Item tidak sesuai dengan Purchase Request yang dipilih.',
+                                ],
+                            ]);
+                        }
+
+                        if (
+                            !$purchaseRequestIds->contains(
+                                $payloadPurchaseRequestId,
+                            )
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_id" => [
+                                    'Purchase Request item tidak terdapat dalam daftar Purchase Request PO.',
+                                ],
+                            ]);
+                        }
+
+                        $qtyPr = (float) (
+                            $purchaseRequestItem->qty
+                            ?? 0
+                        );
+
+                        $qtyPoExisting = (float) (
+                            $purchaseRequestItem->qty_po
+                            ?? 0
+                        );
+
+                        $qtyOutstanding
+                            = $purchaseRequestItem
+                            ->qty_outstanding !== null
+                            ? (float) $purchaseRequestItem
+                                ->qty_outstanding
+                            : $qtyPr - $qtyPoExisting;
+
+                        $qtyOutstanding = max(
+                            $qtyOutstanding,
+                            0,
+                        );
+
+                        $qtyPoInput = (float) (
+                            $itemPayload['qty']
+                        );
+
+                        if (
+                            $qtyOutstanding <= 0
+                            || $qtyPoInput
+                            > $qtyOutstanding
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.$index.qty" => [
+                                    "Qty PO item {$purchaseRequestItem->nama_item} melebihi qty outstanding.",
+                                ],
+                            ]);
+                        }
+
+                        $unitId = (int) (
+                            $purchaseRequestItem->satuan
+                            ?? 0
+                        );
+
+                        if ($unitId <= 0) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_item_id" => [
+                                    "Satuan item {$purchaseRequestItem->nama_item} tidak valid.",
+                                ],
+                            ]);
+                        }
+
+                        $hargaUnit = (float) (
+                            $itemPayload['harga_unit']
+                        );
+
+                        $preparedItems[] = [
+                            'model' => $purchaseRequestItem,
+
+                            /*
+                         * Nama dan satuan diambil dari database,
+                         * bukan dipercaya dari payload frontend.
+                         */
+                            'nama_item'
+                            => $purchaseRequestItem
+                                ->nama_item,
+
+                            'qty'
+                            => $qtyPoInput,
+
+                            'satuan'
+                            => $unitId,
+
+                            'spesifikasi'
+                            => $clean(
+                                $itemPayload['spesifikasi'] ?? '',
+                            ),
+
+                            'keterangan'
+                            => $clean(
+                                $itemPayload['keterangan'] ?? '',
+                            ),
+
+                            'harga_unit'
+                            => $hargaUnit,
+
+                            'subtotal'
+                            => $qtyPoInput
+                                * $hargaUnit,
+                        ];
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Create PO
+                |--------------------------------------------------------------------------
+                | Cabang dan department berasal dari PR di database.
+                |--------------------------------------------------------------------------
+                */
+                    $nomorPo = $this
+                        ->generateDraftPONumber();
+
+                    $po = PurchaseOrder::create([
+                        'nomor_po' => $nomorPo,
+
+                        'tanggal_po'
+                        => $validated['tanggal_po'],
+
+                        'vendor_id'
+                        => (int) $validated['vendor_id'],
+
+                        'cabang'
+                        => $sourceCabangId,
+
+                        'id_department'
+                        => $sourceDepartmentId,
+
+                        'notes'
+                        => $clean(
+                            $validated['notes']
+                                ?? '',
+                        ),
+
+                        'total_nilai'
+                        => (float) (
+                            $validated['total_nilai']
+                            ?? 0
+                        ),
+
+                        'dpp'
+                        => (float) (
+                            $validated['dpp']
+                            ?? 0
+                        ),
+
+                        'ppn'
+                        => (float) (
+                            $validated['ppn']
+                            ?? 0
+                        ),
+
+                        'status' => 'DRAFT',
+
+                        'created_by'
+                        => (int) $user->id,
+                    ]);
+
+                    $po->purchaseRequests()->sync(
+                        $purchaseRequestIds->all(),
+                    );
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Create PO Items dan update outstanding
+                |--------------------------------------------------------------------------
+                */
+                    foreach ($preparedItems as $preparedItem) {
+                        /** @var PurchaseRequestItem $prItem */
+                        $prItem = $preparedItem['model'];
+
+                        PurchaseOrderItem::create([
+                            'purchase_order_id'
+                            => $po->id,
+
+                            'purchase_request_item_id'
+                            => $prItem->id,
+
+                            'nama_item'
+                            => $preparedItem['nama_item'],
+
+                            'qty'
+                            => $preparedItem['qty'],
+
+                            'satuan'
+                            => $preparedItem['satuan'],
+
+                            'spesifikasi'
+                            => $preparedItem['spesifikasi'],
+
+                            'keterangan'
+                            => $preparedItem['keterangan'],
+
+                            'harga_unit'
+                            => $preparedItem['harga_unit'],
+
+                            'subtotal'
+                            => $preparedItem['subtotal'],
+                        ]);
+
+                        $prItem->qty_po
+                            = (float) (
+                                $prItem->qty_po
+                                ?? 0
+                            )
+                            + (float) $preparedItem['qty'];
+
+                        $prItem->qty_outstanding
+                            = max(
+                                (float) $prItem->qty
+                                    - (float) $prItem->qty_po,
+                                0,
+                            );
+
+                        $prItem->save();
+                    }
+
+                    foreach (
+                        $purchaseRequestIds as $purchaseRequestId
+                    ) {
+                        $this->refreshPurchaseRequestPOStatus(
+                            (int) $purchaseRequestId,
+                        );
+                    }
+
+                    return $po;
+                },
+            );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Purchase Order berhasil disimpan.',
                 'data' => [
-                    'id' => $po->id,
+                    'id' => (int) $po->id,
                     'public_id' => $po->encrypted_id,
                     'nomor_po' => $po->nomor_po,
                 ],
             ], 201);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-
-            Log::error('[Purchase Order] Store error', [
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
                 'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-            ]);
+            ], 403);
+        } catch (\Throwable $e) {
+            Log::error(
+                '[Purchase Order] Store error',
+                [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'request' => $request->all(),
+                    'user_id' => $request->user()?->id,
+                ],
+            );
 
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menyimpan Purchase Order.',
-                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
             ], 500);
         }
     }
@@ -1318,150 +1954,965 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    public function update(Request $request, $publicId)
-    {
-        DB::beginTransaction();
+    public function update(
+        Request $request,
+        string $publicId,
+    ): JsonResponse {
+        $user = $request->user();
+
+        /*
+    |--------------------------------------------------------------------------
+    | Permission Update
+    |--------------------------------------------------------------------------
+    */
+        if (
+            !$user
+            || !$user->hasPermission(
+                'purchase_order.update',
+            )
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses untuk memperbarui Purchase Order.',
+            ], 403);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Decrypt Public ID
+    |--------------------------------------------------------------------------
+    */
+        try {
+            $id = (int) Crypt::decryptString(
+                $publicId,
+            );
+        } catch (DecryptException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID Purchase Order tidak valid.',
+            ], 404);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    | Dijalankan sebelum transaction agar error validasi tetap menghasilkan 422.
+    |--------------------------------------------------------------------------
+    */
+        $validated = $request->validate([
+            'tanggal_po' => [
+                'required',
+                'date_format:Y-m-d',
+            ],
+
+            'vendor_id' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'cabang' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'id_department' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'notes' => [
+                'nullable',
+                'string',
+            ],
+
+            'total_nilai' => [
+                'nullable',
+                'numeric',
+                'gte:0',
+            ],
+
+            'dpp' => [
+                'nullable',
+                'numeric',
+                'gte:0',
+            ],
+
+            'ppn' => [
+                'nullable',
+                'numeric',
+                'gte:0',
+            ],
+
+            'purchase_request_ids' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'purchase_request_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:purchase_requests,id',
+            ],
+
+            'items' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'items.*.purchase_request_id' => [
+                'required',
+                'integer',
+                'exists:purchase_requests,id',
+            ],
+
+            'items.*.purchase_request_item_id' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:purchase_request_items,id',
+            ],
+
+            'items.*.nama_item' => [
+                'required',
+                'string',
+            ],
+
+            'items.*.qty' => [
+                'required',
+                'numeric',
+                'gt:0',
+            ],
+
+            'items.*.satuan' => [
+                'required',
+                'integer',
+                'exists:units,id',
+            ],
+
+            'items.*.harga_unit' => [
+                'required',
+                'numeric',
+                'gte:0',
+            ],
+
+            'items.*.spesifikasi' => [
+                'nullable',
+                'string',
+            ],
+
+            'items.*.keterangan' => [
+                'nullable',
+                'string',
+            ],
+        ]);
+
+        /*
+    |--------------------------------------------------------------------------
+    | Permission Department
+    |--------------------------------------------------------------------------
+    | Scope department edit PO mengikuti purchase_order.create:
+    |
+    | - OWN_DEPARTMENT
+    | - ASSIGNED_DEPARTMENTS
+    | - ALL
+    |
+    | Sedangkan izin membuka aksi edit tetap purchase_order.update.
+    |--------------------------------------------------------------------------
+    */
+        $departmentPermissionCode
+            = 'purchase_order.create';
+
+        $requestedDepartmentId = (int) (
+            $validated['id_department']
+        );
+
+        if (
+            !$user->canAccessDepartmentForPermission(
+                $departmentPermissionCode,
+                $requestedDepartmentId,
+            )
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses memperbarui Purchase Order untuk department tersebut.',
+            ], 403);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Sanitizer
+    |--------------------------------------------------------------------------
+    */
+        $clean = static function (
+            mixed $value,
+        ): string {
+            return htmlspecialchars(
+                strip_tags(
+                    trim(
+                        (string) $value,
+                    ),
+                ),
+                ENT_QUOTES,
+                'UTF-8',
+            );
+        };
+
+        /*
+    |--------------------------------------------------------------------------
+    | Normalize PR IDs
+    |--------------------------------------------------------------------------
+    */
+        $purchaseRequestIds = collect(
+            $validated['purchase_request_ids'],
+        )
+            ->map(
+                fn($prId): int => (int) $prId,
+            )
+            ->filter(
+                fn($prId): bool => $prId > 0,
+            )
+            ->unique()
+            ->values();
+
+        $itemPayloads = collect(
+            $validated['items'],
+        )->values();
+
+        /*
+    |--------------------------------------------------------------------------
+    | PR IDs dari Items
+    |--------------------------------------------------------------------------
+    */
+        $itemPurchaseRequestIds = $itemPayloads
+            ->pluck('purchase_request_id')
+            ->map(
+                fn($prId): int => (int) $prId,
+            )
+            ->filter(
+                fn($prId): bool => $prId > 0,
+            )
+            ->unique()
+            ->values();
+
+        /*
+    |--------------------------------------------------------------------------
+    | Header PR dan Item PR Harus Sama
+    |--------------------------------------------------------------------------
+    | Mencegah PR dimasukkan ke pivot tanpa item, atau item PR disisipkan
+    | tanpa dicantumkan pada purchase_request_ids.
+    |--------------------------------------------------------------------------
+    */
+        $normalizedHeaderPrIds = $purchaseRequestIds
+            ->sort()
+            ->values()
+            ->all();
+
+        $normalizedItemPrIds = $itemPurchaseRequestIds
+            ->sort()
+            ->values()
+            ->all();
+
+        if (
+            $normalizedHeaderPrIds
+            !== $normalizedItemPrIds
+        ) {
+            throw ValidationException::withMessages([
+                'purchase_request_ids' => [
+                    'Daftar Purchase Request tidak sesuai dengan item Purchase Order yang dipilih.',
+                ],
+            ]);
+        }
 
         try {
-            $clean = fn($v) => htmlspecialchars(strip_tags(trim((string) $v)), ENT_QUOTES, 'UTF-8');
+            $po = DB::transaction(
+                function () use (
+                    $id,
+                    $validated,
+                    $user,
+                    $clean,
+                    $purchaseRequestIds,
+                    $itemPayloads,
+                    $requestedDepartmentId,
+                    $departmentPermissionCode,
+                ) {
+                    /*
+                |--------------------------------------------------------------------------
+                | Lock Purchase Order
+                |--------------------------------------------------------------------------
+                */
+                    $po = PurchaseOrder::query()
+                        ->lockForUpdate()
+                        ->findOrFail($id);
 
-            $id = Crypt::decryptString($publicId);
+                    if (
+                        strtoupper(
+                            trim(
+                                (string) $po->status,
+                            ),
+                        ) !== 'DRAFT'
+                    ) {
+                        throw ValidationException::withMessages([
+                            'status' => [
+                                'Purchase Order hanya dapat diperbarui jika status masih Draft.',
+                            ],
+                        ]);
+                    }
 
-            $po = PurchaseOrder::with([
-                'items',
-                'purchaseRequests',
-            ])->findOrFail($id);
+                    /*
+                |--------------------------------------------------------------------------
+                | PR Lama
+                |--------------------------------------------------------------------------
+                */
+                    $oldPrIds = $po
+                        ->purchaseRequests()
+                        ->pluck('purchase_requests.id')
+                        ->map(
+                            fn($prId): int => (int) $prId,
+                        )
+                        ->unique()
+                        ->values();
 
-            if ($po->status !== 'DRAFT') {
-                DB::rollBack();
+                    /*
+                |--------------------------------------------------------------------------
+                | Item PO Lama
+                |--------------------------------------------------------------------------
+                | Digunakan untuk menghitung qty maksimal yang boleh diedit.
+                |
+                | Contoh:
+                | Qty PR            = 10
+                | Qty PO existing   = 10
+                | Qty PO ini        = 4
+                |
+                | Qty yang tersedia untuk edit PO ini:
+                | 10 - (10 - 4) = 4
+                |--------------------------------------------------------------------------
+                */
+                    $oldPoItems = PurchaseOrderItem::query()
+                        ->where(
+                            'purchase_order_id',
+                            $po->id,
+                        )
+                        ->whereNull('deleted_at')
+                        ->lockForUpdate()
+                        ->get([
+                            'id',
+                            'purchase_request_item_id',
+                            'qty',
+                        ]);
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Purchase Order hanya dapat diperbarui jika status masih Draft.',
-                ], 422);
-            }
+                    $oldQtyByPrItemId = $oldPoItems
+                        ->groupBy(
+                            fn(PurchaseOrderItem $item): int =>
+                            (int) $item->purchase_request_item_id,
+                        )
+                        ->map(
+                            fn($items): float =>
+                            (float) $items->sum('qty'),
+                        );
 
-            $request->validate([
-                'tanggal_po' => ['required', 'date_format:Y-m-d'],
-                'vendor_id' => ['required', 'integer'],
-                'cabang' => ['required'],
-                'id_department' => ['required', 'integer'],
+                    /*
+                |--------------------------------------------------------------------------
+                | Lock Purchase Requests Baru
+                |--------------------------------------------------------------------------
+                */
+                    $purchaseRequests = PurchaseRequest::query()
+                        ->whereIn(
+                            'id',
+                            $purchaseRequestIds->all(),
+                        )
+                        ->lockForUpdate()
+                        ->get([
+                            'id',
+                            'nomor_pr',
+                            'cabang',
+                            'id_department',
+                            'status',
+                            'status_po',
+                        ])
+                        ->keyBy(
+                            fn(PurchaseRequest $pr): int =>
+                            (int) $pr->id,
+                        );
 
-                'purchase_request_ids' => ['required', 'array', 'min:1'],
-                'purchase_request_ids.*' => ['required', 'integer'],
+                    if (
+                        $purchaseRequests->count()
+                        !== $purchaseRequestIds->count()
+                    ) {
+                        throw ValidationException::withMessages([
+                            'purchase_request_ids' => [
+                                'Terdapat Purchase Request yang tidak ditemukan.',
+                            ],
+                        ]);
+                    }
 
-                'items' => ['required', 'array', 'min:1'],
-                'items.*.purchase_request_id' => ['required', 'integer'],
-                'items.*.purchase_request_item_id' => ['required', 'integer'],
-                'items.*.nama_item' => ['required', 'string'],
-                'items.*.qty' => ['required', 'numeric', 'gt:0'],
-                'items.*.satuan' => ['required', 'integer', 'exists:units,id'],
-                'items.*.harga_unit' => ['required', 'numeric', 'gte:0'],
-            ]);
+                    /*
+                |--------------------------------------------------------------------------
+                | Validasi Status PR
+                |--------------------------------------------------------------------------
+                */
+                    foreach (
+                        $purchaseRequests as $purchaseRequest
+                    ) {
+                        $prStatus = strtoupper(
+                            trim(
+                                (string) $purchaseRequest->status,
+                            ),
+                        );
 
-            $oldPrIds = $po->purchaseRequests
-                ->pluck('id')
-                ->map(fn($id) => (int) $id)
-                ->values();
+                        if ($prStatus !== 'APPROVED') {
+                            throw ValidationException::withMessages([
+                                'purchase_request_ids' => [
+                                    "Purchase Request {$purchaseRequest->nomor_pr} belum berstatus APPROVED.",
+                                ],
+                            ]);
+                        }
 
-            /*
-        |--------------------------------------------------------------------------
-        | 1. Soft delete item PO lama
-        |--------------------------------------------------------------------------
-        */
-            PurchaseOrderItem::where('purchase_order_id', $po->id)
-                ->whereNull('deleted_at')
-                ->delete();
+                        $statusPo = $purchaseRequest->status_po !== null
+                            ? strtoupper(
+                                trim(
+                                    (string) $purchaseRequest->status_po,
+                                ),
+                            )
+                            : null;
 
-            /*
-        |--------------------------------------------------------------------------
-        | 2. Update header PO
-        |--------------------------------------------------------------------------
-        */
-            $po->update([
-                'tanggal_po'    => $request->tanggal_po,
-                'vendor_id'     => (int) $request->vendor_id,
-                'cabang'        => $clean($request->cabang),
-                'id_department' => (int) $request->id_department,
-                'notes'         => $clean($request->notes),
-                'total_nilai'   => (float) ($request->total_nilai ?? 0),
-                'dpp'           => (float) ($request->dpp ?? 0),
-                'ppn'           => (float) ($request->ppn ?? 0),
-            ]);
+                        $isExistingPurchaseRequest
+                            = $oldPrIds->contains(
+                                (int) $purchaseRequest->id,
+                            );
 
-            /*
-        |--------------------------------------------------------------------------
-        | 3. Sync PR relation
-        |--------------------------------------------------------------------------
-        */
-            $newPrIds = collect($request->purchase_request_ids)
-                ->map(fn($id) => (int) $id)
-                ->unique()
-                ->values();
+                        /*
+                     * PR lama boleh CLOSED karena qty dari PO yang sedang diedit
+                     * mungkin membuat PR tersebut tertutup.
+                     *
+                     * PR baru hanya boleh OPEN, PARTIAL, atau null.
+                     */
+                        $allowedStatuses = $isExistingPurchaseRequest
+                            ? [
+                                'OPEN',
+                                'PARTIAL',
+                                'CLOSED',
+                            ]
+                            : [
+                                'OPEN',
+                                'PARTIAL',
+                            ];
 
-            $po->purchaseRequests()->sync($newPrIds);
+                        if (
+                            $statusPo !== null
+                            && !in_array(
+                                $statusPo,
+                                $allowedStatuses,
+                                true,
+                            )
+                        ) {
+                            throw ValidationException::withMessages([
+                                'purchase_request_ids' => [
+                                    "Purchase Request {$purchaseRequest->nomor_pr} sudah tidak dapat digunakan untuk memperbarui PO.",
+                                ],
+                            ]);
+                        }
+                    }
 
-            /*
-        |--------------------------------------------------------------------------
-        | 4. Insert ulang item PO baru
-        |--------------------------------------------------------------------------
-        */
-            foreach ($request->items as $item) {
-                $prItem = PurchaseRequestItem::whereNull('deleted_at')
-                    ->lockForUpdate()
-                    ->findOrFail((int) $item['purchase_request_item_id']);
+                    /*
+                |--------------------------------------------------------------------------
+                | Seluruh PR Harus Satu Department
+                |--------------------------------------------------------------------------
+                */
+                    $sourceDepartmentIds = $purchaseRequests
+                        ->pluck('id_department')
+                        ->map(
+                            fn($departmentId): int =>
+                            (int) $departmentId,
+                        )
+                        ->unique()
+                        ->values();
 
-                $qtyPoInput = (float) $item['qty'];
-                $hargaUnit = (float) ($item['harga_unit'] ?? 0);
+                    if (
+                        $sourceDepartmentIds->count()
+                        !== 1
+                    ) {
+                        throw ValidationException::withMessages([
+                            'purchase_request_ids' => [
+                                'Seluruh Purchase Request dalam satu Purchase Order wajib berasal dari department yang sama.',
+                            ],
+                        ]);
+                    }
 
-                PurchaseOrderItem::create([
-                    'purchase_order_id'        => $po->id,
-                    'purchase_request_item_id' => $prItem->id,
-                    'nama_item'                => $clean($item['nama_item'] ?? $prItem->nama_item),
-                    'qty'                      => $qtyPoInput,
-                    'satuan'                   => $clean($item['satuan'] ?? ''),
-                    'spesifikasi'              => $clean($item['spesifikasi'] ?? ''),
-                    'keterangan'               => $clean($item['keterangan'] ?? ''),
-                    'harga_unit'               => $hargaUnit,
-                    'subtotal'                 => $qtyPoInput * $hargaUnit,
-                ]);
-            }
+                    $sourceDepartmentId = (int) (
+                        $sourceDepartmentIds->first()
+                    );
 
-            /*
-        |--------------------------------------------------------------------------
-        | 5. Recalculate ulang semua PR terdampak
-        |--------------------------------------------------------------------------
-        */
-            $affectedPrIds = $oldPrIds
-                ->merge($newPrIds)
-                ->unique()
-                ->values();
+                    /*
+                |--------------------------------------------------------------------------
+                | Department Payload Harus Sama dengan PR Database
+                |--------------------------------------------------------------------------
+                */
+                    if (
+                        $sourceDepartmentId
+                        !== $requestedDepartmentId
+                    ) {
+                        throw ValidationException::withMessages([
+                            'id_department' => [
+                                'Department Purchase Order tidak sesuai dengan department Purchase Request.',
+                            ],
+                        ]);
+                    }
 
-            foreach ($affectedPrIds as $prId) {
-                $this->recalculatePurchaseRequestItems((int) $prId);
-                $this->refreshPurchaseRequestPOStatus((int) $prId);
-            }
+                    /*
+                |--------------------------------------------------------------------------
+                | Authoritative Department Authorization
+                |--------------------------------------------------------------------------
+                */
+                    if (
+                        !$user->canAccessDepartmentForPermission(
+                            $departmentPermissionCode,
+                            $sourceDepartmentId,
+                        )
+                    ) {
+                        throw new AuthorizationException(
+                            'Anda tidak memiliki akses memperbarui Purchase Order untuk department Purchase Request tersebut.',
+                        );
+                    }
 
-            DB::commit();
+                    /*
+                |--------------------------------------------------------------------------
+                | Seluruh PR Harus Satu Cabang
+                |--------------------------------------------------------------------------
+                */
+                    $sourceCabangIds = $purchaseRequests
+                        ->pluck('cabang')
+                        ->map(
+                            fn($cabangId): int =>
+                            (int) $cabangId,
+                        )
+                        ->unique()
+                        ->values();
+
+                    if (
+                        $sourceCabangIds->count()
+                        !== 1
+                    ) {
+                        throw ValidationException::withMessages([
+                            'purchase_request_ids' => [
+                                'Seluruh Purchase Request dalam satu Purchase Order wajib berasal dari cabang yang sama.',
+                            ],
+                        ]);
+                    }
+
+                    $sourceCabangId = (int) (
+                        $sourceCabangIds->first()
+                    );
+
+                    if (
+                        $sourceCabangId
+                        !== (int) $validated['cabang']
+                    ) {
+                        throw ValidationException::withMessages([
+                            'cabang' => [
+                                'Cabang Purchase Order tidak sesuai dengan cabang Purchase Request.',
+                            ],
+                        ]);
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Lock Purchase Request Items
+                |--------------------------------------------------------------------------
+                */
+                    $purchaseRequestItemIds = $itemPayloads
+                        ->pluck(
+                            'purchase_request_item_id',
+                        )
+                        ->map(
+                            fn($itemId): int =>
+                            (int) $itemId,
+                        )
+                        ->filter(
+                            fn($itemId): bool =>
+                            $itemId > 0,
+                        )
+                        ->unique()
+                        ->values();
+
+                    $purchaseRequestItems
+                        = PurchaseRequestItem::query()
+                        ->whereIn(
+                            'id',
+                            $purchaseRequestItemIds->all(),
+                        )
+                        ->whereNull('deleted_at')
+                        ->lockForUpdate()
+                        ->get()
+                        ->keyBy(
+                            fn(PurchaseRequestItem $item): int =>
+                            (int) $item->id,
+                        );
+
+                    if (
+                        $purchaseRequestItems->count()
+                        !== $purchaseRequestItemIds->count()
+                    ) {
+                        throw ValidationException::withMessages([
+                            'items' => [
+                                'Terdapat item Purchase Request yang tidak ditemukan atau sudah dihapus.',
+                            ],
+                        ]);
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Validasi dan Persiapkan Item
+                |--------------------------------------------------------------------------
+                */
+                    $preparedItems = [];
+
+                    foreach (
+                        $itemPayloads as $index => $itemPayload
+                    ) {
+                        $purchaseRequestItemId = (int) (
+                            $itemPayload['purchase_request_item_id']
+                        );
+
+                        $payloadPurchaseRequestId = (int) (
+                            $itemPayload['purchase_request_id']
+                        );
+
+                        $purchaseRequestItem
+                            = $purchaseRequestItems->get(
+                                $purchaseRequestItemId,
+                            );
+
+                        if (!$purchaseRequestItem) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_item_id" => [
+                                    'Item Purchase Request tidak ditemukan.',
+                                ],
+                            ]);
+                        }
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Item Wajib Milik PR yang Dikirim
+                    |--------------------------------------------------------------------------
+                    */
+                        if (
+                            (int) $purchaseRequestItem
+                                ->purchase_request_id
+                            !== $payloadPurchaseRequestId
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_item_id" => [
+                                    'Item tidak sesuai dengan Purchase Request yang dipilih.',
+                                ],
+                            ]);
+                        }
+
+                        if (
+                            !$purchaseRequestIds->contains(
+                                $payloadPurchaseRequestId,
+                            )
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_id" => [
+                                    'Purchase Request item tidak terdapat dalam daftar Purchase Request PO.',
+                                ],
+                            ]);
+                        }
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Hitung Qty Maksimal untuk Edit
+                    |--------------------------------------------------------------------------
+                    | qty_po database termasuk qty dari PO yang sedang diedit.
+                    | Maka qty lama PO ini harus dikurangi terlebih dahulu.
+                    |--------------------------------------------------------------------------
+                    */
+                        $qtyPr = (float) (
+                            $purchaseRequestItem->qty
+                            ?? 0
+                        );
+
+                        $qtyPoCurrent = (float) (
+                            $purchaseRequestItem->qty_po
+                            ?? 0
+                        );
+
+                        $oldQtyInCurrentPo = (float) (
+                            $oldQtyByPrItemId->get(
+                                $purchaseRequestItemId,
+                                0,
+                            )
+                        );
+
+                        $qtyPoFromOtherPurchaseOrders = max(
+                            $qtyPoCurrent
+                                - $oldQtyInCurrentPo,
+                            0,
+                        );
+
+                        $maxEditableQty = max(
+                            $qtyPr
+                                - $qtyPoFromOtherPurchaseOrders,
+                            0,
+                        );
+
+                        $qtyPoInput = (float) (
+                            $itemPayload['qty']
+                        );
+
+                        if (
+                            $maxEditableQty <= 0
+                            || $qtyPoInput
+                            > $maxEditableQty
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.$index.qty" => [
+                                    "Qty PO item {$purchaseRequestItem->nama_item} maksimal {$maxEditableQty}.",
+                                ],
+                            ]);
+                        }
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Satuan Diambil dari PR Item Database
+                    |--------------------------------------------------------------------------
+                    */
+                        $unitId = (int) (
+                            $purchaseRequestItem->satuan
+                            ?? 0
+                        );
+
+                        if ($unitId <= 0) {
+                            throw ValidationException::withMessages([
+                                "items.$index.purchase_request_item_id" => [
+                                    "Satuan item {$purchaseRequestItem->nama_item} tidak valid.",
+                                ],
+                            ]);
+                        }
+
+                        $hargaUnit = (float) (
+                            $itemPayload['harga_unit']
+                        );
+
+                        $preparedItems[] = [
+                            'model'
+                            => $purchaseRequestItem,
+
+                            'nama_item'
+                            => $purchaseRequestItem
+                                ->nama_item,
+
+                            'qty'
+                            => $qtyPoInput,
+
+                            'satuan'
+                            => $unitId,
+
+                            'spesifikasi'
+                            => $clean(
+                                $itemPayload['spesifikasi'] ?? '',
+                            ),
+
+                            'keterangan'
+                            => $clean(
+                                $itemPayload['keterangan'] ?? '',
+                            ),
+
+                            'harga_unit'
+                            => $hargaUnit,
+
+                            'subtotal'
+                            => $qtyPoInput
+                                * $hargaUnit,
+                        ];
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Soft Delete Item PO Lama
+                |--------------------------------------------------------------------------
+                | Baru dilakukan setelah seluruh validasi berhasil.
+                |--------------------------------------------------------------------------
+                */
+                    PurchaseOrderItem::query()
+                        ->where(
+                            'purchase_order_id',
+                            $po->id,
+                        )
+                        ->whereNull('deleted_at')
+                        ->delete();
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Update Header PO
+                |--------------------------------------------------------------------------
+                | Cabang dan department berasal dari PR database,
+                | bukan dipercaya dari payload frontend.
+                |--------------------------------------------------------------------------
+                */
+                    $po->update([
+                        'tanggal_po'
+                        => $validated['tanggal_po'],
+
+                        'vendor_id'
+                        => (int) $validated['vendor_id'],
+
+                        'cabang'
+                        => $sourceCabangId,
+
+                        'id_department'
+                        => $sourceDepartmentId,
+
+                        'notes'
+                        => $clean(
+                            $validated['notes']
+                                ?? '',
+                        ),
+
+                        'total_nilai'
+                        => (float) (
+                            $validated['total_nilai']
+                            ?? 0
+                        ),
+
+                        'dpp'
+                        => (float) (
+                            $validated['dpp']
+                            ?? 0
+                        ),
+
+                        'ppn'
+                        => (float) (
+                            $validated['ppn']
+                            ?? 0
+                        ),
+                    ]);
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Sync PR
+                |--------------------------------------------------------------------------
+                */
+                    $po->purchaseRequests()->sync(
+                        $purchaseRequestIds->all(),
+                    );
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Insert Ulang Item PO
+                |--------------------------------------------------------------------------
+                */
+                    foreach (
+                        $preparedItems as $preparedItem
+                    ) {
+                        /** @var PurchaseRequestItem $prItem */
+                        $prItem = $preparedItem['model'];
+
+                        PurchaseOrderItem::create([
+                            'purchase_order_id'
+                            => $po->id,
+
+                            'purchase_request_item_id'
+                            => $prItem->id,
+
+                            'nama_item'
+                            => $preparedItem['nama_item'],
+
+                            'qty'
+                            => $preparedItem['qty'],
+
+                            'satuan'
+                            => $preparedItem['satuan'],
+
+                            'spesifikasi'
+                            => $preparedItem['spesifikasi'],
+
+                            'keterangan'
+                            => $preparedItem['keterangan'],
+
+                            'harga_unit'
+                            => $preparedItem['harga_unit'],
+
+                            'subtotal'
+                            => $preparedItem['subtotal'],
+                        ]);
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Recalculate Semua PR Terdampak
+                |--------------------------------------------------------------------------
+                */
+                    $affectedPrIds = $oldPrIds
+                        ->merge(
+                            $purchaseRequestIds,
+                        )
+                        ->unique()
+                        ->values();
+
+                    foreach (
+                        $affectedPrIds as $purchaseRequestId
+                    ) {
+                        $this->recalculatePurchaseRequestItems(
+                            (int) $purchaseRequestId,
+                        );
+
+                        $this->refreshPurchaseRequestPOStatus(
+                            (int) $purchaseRequestId,
+                        );
+                    }
+
+                    return $po->fresh();
+                },
+            );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Purchase Order berhasil diperbarui.',
+                'data' => [
+                    'id' => (int) $po->id,
+                    'public_id' => $po->encrypted_id,
+                    'nomor_po' => $po->nomor_po,
+                ],
             ], 200);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 403);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order tidak ditemukan.',
+            ], 404);
         } catch (\Throwable $e) {
-            DB::rollBack();
-
-            Log::error('[Purchase Order] Update error', [
-                'public_id' => $publicId,
-                'message'   => $e->getMessage(),
-                'file'      => $e->getFile(),
-                'line'      => $e->getLine(),
-            ]);
+            Log::error(
+                '[Purchase Order] Update error',
+                [
+                    'public_id' => $publicId,
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'request' => $request->all(),
+                    'user_id' => $request->user()?->id,
+                ],
+            );
 
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memperbarui Purchase Order.',
-                'error'   => config('app.debug') ? $e->getMessage() : null,
+                'error' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
             ], 500);
         }
     }
@@ -2394,35 +3845,91 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    public function print($publicId)
-    {
+    public function print(
+        Request $request,
+        $publicId,
+    ) {
         try {
-            $id = Crypt::decryptString($publicId);
+            /*
+        |--------------------------------------------------------------------------
+        | Bahasa Cetakan
+        |--------------------------------------------------------------------------
+        */
+            $lang = strtolower(
+                trim(
+                    (string) $request->query(
+                        'lang',
+                        'id',
+                    ),
+                ),
+            );
+
+            if (!in_array($lang, ['id', 'en'], true)) {
+                $lang = 'id';
+            }
+
+            /*
+         * Translation pada Blade akan membaca locale ini.
+         */
+            app()->setLocale($lang);
+
+            /*
+        |--------------------------------------------------------------------------
+        | Purchase Order
+        |--------------------------------------------------------------------------
+        */
+            $id = Crypt::decryptString(
+                $publicId,
+            );
 
             $po = PurchaseOrder::with([
                 'vendor',
                 'cabangData:id,nama_cabang,inisial_cabang',
                 'departmentData:id,kode,nama',
+
                 'purchaseRequests:id,nomor_pr,tanggal_pr,total_amount',
+
                 'items',
                 'items.unit:id,kode,nama',
+
                 'requesterSignedBy:id,name',
 
-                'approvals' => function ($q) {
-                    $q
+                'approvals' => function ($query) {
+                    $query
                         ->orderBy('step_order')
                         ->orderBy('id');
                 },
             ])->findOrFail($id);
 
-            $terbilang = $this->terbilangRupiah(
-                (float) $po->total_nilai,
-            );
+            /*
+        |--------------------------------------------------------------------------
+        | Amount in Words
+        |--------------------------------------------------------------------------
+        */
+            $terbilang = $lang === 'en'
+                ? $this->terbilangRupiahEnglish(
+                    (float) $po->total_nilai,
+                )
+                : $this->terbilangRupiah(
+                    (float) $po->total_nilai,
+                );
 
-            $pdf = Pdf::loadView('pdf.purchase-order', [
-                'po' => $po,
-                'terbilang' => $terbilang,
-            ])->setPaper('a4', 'portrait');
+            /*
+        |--------------------------------------------------------------------------
+        | Generate PDF
+        |--------------------------------------------------------------------------
+        */
+            $pdf = Pdf::loadView(
+                'pdf.purchase-order',
+                [
+                    'po' => $po,
+                    'terbilang' => $terbilang,
+                    'lang' => $lang,
+                ],
+            )->setPaper(
+                'a4',
+                'portrait',
+            );
 
             $fileName = str_replace(
                 ['/', '\\'],
@@ -2431,9 +3938,25 @@ class PurchaseOrderController extends Controller
             );
 
             return $pdf->stream(
-                "PO-{$fileName}.pdf",
+                sprintf(
+                    'PO-%s-%s.pdf',
+                    $fileName,
+                    strtoupper($lang),
+                ),
             );
         } catch (\Throwable $e) {
+            Log::error(
+                '[Purchase Order] Print error',
+                [
+                    'public_id' => $publicId,
+                    'lang' => $request->query('lang'),
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'user_id' => $request->user()?->id,
+                ],
+            );
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mencetak Purchase Order.',
@@ -3151,6 +4674,145 @@ class PurchaseOrderController extends Controller
     private function terbilangRupiah(float $angka): string
     {
         return trim(preg_replace('/\s+/', ' ', $this->terbilang($angka))) . ' Rupiah';
+    }
+
+    private function terbilangRupiahEnglish(
+        float $amount,
+    ): string {
+        $number = (int) round($amount);
+
+        if ($number === 0) {
+            return 'Zero Rupiah';
+        }
+
+        return $this->numberToWordsEnglish(
+            $number,
+        ) . ' Rupiah';
+    }
+
+    private function numberToWordsEnglish(
+        int $number,
+    ): string {
+        if ($number < 0) {
+            return 'Minus '
+                . $this->numberToWordsEnglish(
+                    abs($number),
+                );
+        }
+
+        $ones = [
+            0 => '',
+            1 => 'One',
+            2 => 'Two',
+            3 => 'Three',
+            4 => 'Four',
+            5 => 'Five',
+            6 => 'Six',
+            7 => 'Seven',
+            8 => 'Eight',
+            9 => 'Nine',
+            10 => 'Ten',
+            11 => 'Eleven',
+            12 => 'Twelve',
+            13 => 'Thirteen',
+            14 => 'Fourteen',
+            15 => 'Fifteen',
+            16 => 'Sixteen',
+            17 => 'Seventeen',
+            18 => 'Eighteen',
+            19 => 'Nineteen',
+        ];
+
+        $tens = [
+            2 => 'Twenty',
+            3 => 'Thirty',
+            4 => 'Forty',
+            5 => 'Fifty',
+            6 => 'Sixty',
+            7 => 'Seventy',
+            8 => 'Eighty',
+            9 => 'Ninety',
+        ];
+
+        if ($number < 20) {
+            return $ones[$number];
+        }
+
+        if ($number < 100) {
+            $tenValue = intdiv(
+                $number,
+                10,
+            );
+
+            $remainder = $number % 10;
+
+            return trim(
+                $tens[$tenValue]
+                    . (
+                        $remainder > 0
+                        ? ' ' . $ones[$remainder]
+                        : ''
+                    ),
+            );
+        }
+
+        if ($number < 1_000) {
+            $hundreds = intdiv(
+                $number,
+                100,
+            );
+
+            $remainder = $number % 100;
+
+            return trim(
+                $ones[$hundreds]
+                    . ' Hundred'
+                    . (
+                        $remainder > 0
+                        ? ' '
+                        . $this->numberToWordsEnglish(
+                            $remainder,
+                        )
+                        : ''
+                    ),
+            );
+        }
+
+        $scales = [
+            1_000_000_000_000 => 'Trillion',
+            1_000_000_000 => 'Billion',
+            1_000_000 => 'Million',
+            1_000 => 'Thousand',
+        ];
+
+        foreach ($scales as $scaleValue => $scaleName) {
+            if ($number >= $scaleValue) {
+                $mainNumber = intdiv(
+                    $number,
+                    $scaleValue,
+                );
+
+                $remainder = $number % $scaleValue;
+
+                return trim(
+                    $this->numberToWordsEnglish(
+                        $mainNumber,
+                    )
+                        . ' '
+                        . $scaleName
+                        . (
+                            $remainder > 0
+                            ? ' '
+                            . $this->numberToWordsEnglish(
+                                $remainder,
+                            )
+                            : ''
+                        ),
+                );
+            }
+        }
+
+        return '';
     }
 
     private function recalculatePurchaseRequestItems(int $purchaseRequestId): void

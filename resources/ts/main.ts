@@ -15,6 +15,7 @@ import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import Vue3Toastify from 'vue3-toastify'
 import 'vue3-toastify/dist/index.css'
+import { permissionDirective } from '@/directives/permission'
 
 loadFonts()
 
@@ -38,6 +39,11 @@ app.use(Vue3Toastify, {
   position: 'top-right',
   theme: 'colored',
 })
+
+app.directive(
+  'permission',
+  permissionDirective,
+)
 
 // 3. SELESAI MOUNT
 app.mount('#app')
