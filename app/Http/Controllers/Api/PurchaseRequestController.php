@@ -2236,7 +2236,7 @@ class PurchaseRequestController extends Controller
             }
 
             if (str_starts_with((string) $pr->nomor_pr, 'DRAFT/')) {
-                $pr->nomor_pr = $this->generatePRNumber($pr);
+                $pr->nomor_pr = generatePRNumber($pr);
             }
 
             /*
