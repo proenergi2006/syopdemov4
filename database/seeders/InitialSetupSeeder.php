@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class InitialSetupSeeder extends Seeder
 {
@@ -33,9 +34,20 @@ class InitialSetupSeeder extends Seeder
             | 2) Cabang
             |--------------------------------------------------------------------------
             */
+            $groupCabangId = DB::table('group_cabang')
+                ->orderBy('id')
+                ->value('id');
+
+            if (!$groupCabangId) {
+                throw new RuntimeException(
+                    'Data group cabang belum tersedia. Jalankan atau tambahkan seeder group_cabang terlebih dahulu.'
+                );
+            }
+
             $cabangId = $this->upsertAndGetId(
                 'cabang',
                 [
+                    'group_cabang_id' => $groupCabangId,
                     'nama_cabang' => 'Jakarta',
                 ],
                 [
