@@ -2,7 +2,7 @@ import axios from 'axios'
 
 
 const axiosIns = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api',
+  baseURL: 'https://demov4.proenergi.com/api',
   timeout: 15000,
 })
 

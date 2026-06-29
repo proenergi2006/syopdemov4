@@ -108,6 +108,18 @@ interface UserForm {
   password_confirmation: string
 }
 
+interface UserSummary {
+  total_user: number
+  total_active_user: number
+  total_inactive_user: number
+}
+
+const userSummary = ref<UserSummary>({
+  total_user: 0,
+  total_active_user: 0,
+  total_inactive_user: 0,
+})
+
 const isLoading = ref(false)
 const isActionLoading = ref(false)
 const isDialogOpen = ref(false)
@@ -159,11 +171,11 @@ const statusOptions = [
 ]
 
 const totalActiveUser = computed(() => {
-  return users.value.filter(item => item.is_active).length
+  return userSummary.value.total_active_user
 })
 
 const totalInactiveUser = computed(() => {
-  return users.value.filter(item => !item.is_active).length
+  return userSummary.value.total_inactive_user
 })
 
 const hasFilter = computed(() => {
@@ -306,6 +318,16 @@ const fetchUsers = async (): Promise<void> => {
     })
 
     assignResponseData(response.data)
+
+    userSummary.value = {
+      total_user: Number(response.data.summary?.total_user ?? 0),
+      total_active_user: Number(
+        response.data.summary?.total_active_user ?? 0,
+      ),
+      total_inactive_user: Number(
+        response.data.summary?.total_inactive_user ?? 0,
+      ),
+    }
   } catch (error: any) {
     const err = error as AxiosErrorShape
 

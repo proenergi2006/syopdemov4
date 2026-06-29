@@ -29,21 +29,49 @@ class UserController extends Controller
             $status = $request->input('is_active', null);
             $roleId = $request->input('role_id', null);
 
+            /*
+        |--------------------------------------------------------------------------
+        | Statistik seluruh user
+        |--------------------------------------------------------------------------
+        | Query ini tidak terpengaruh pagination, search, role, maupun filter
+        | status. Jadi kartu statistik selalu menampilkan jumlah keseluruhan.
+        |--------------------------------------------------------------------------
+        */
+            $statistics = User::query()
+                ->selectRaw('COUNT(*) AS total_user')
+                ->selectRaw(
+                    'COUNT(*) FILTER (WHERE is_active IS TRUE) AS total_active_user'
+                )
+                ->selectRaw(
+                    'COUNT(*) FILTER (WHERE is_active IS NOT TRUE) AS total_inactive_user'
+                )
+                ->first();
+
+            /*
+        |--------------------------------------------------------------------------
+        | Query data tabel
+        |--------------------------------------------------------------------------
+        */
             $query = User::query()
                 ->with([
                     /*
-                    |--------------------------------------------------------------------------
-                    | Jangan pakai cabang:id,nama
-                    |--------------------------------------------------------------------------
-                    | Karena table cabang tidak selalu punya column nama.
-                    | Bisa saja column-nya nama_cabang / inisial_cabang.
-                    |--------------------------------------------------------------------------
-                    */
+                |--------------------------------------------------------------------------
+                | Jangan pakai cabang:id,nama
+                |--------------------------------------------------------------------------
+                | Karena table cabang tidak selalu punya column nama.
+                | Bisa saja column-nya nama_cabang / inisial_cabang.
+                |--------------------------------------------------------------------------
+                */
                     'cabang',
                     'departemen',
                     'roles',
                 ]);
 
+            /*
+        |--------------------------------------------------------------------------
+        | Filter pencarian
+        |--------------------------------------------------------------------------
+        */
             if ($search !== '') {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'ILIKE', "%{$search}%")
@@ -55,16 +83,34 @@ class UserController extends Controller
                 });
             }
 
+            /*
+        |--------------------------------------------------------------------------
+        | Filter status
+        |--------------------------------------------------------------------------
+        */
             if ($status !== null && $status !== '' && $status !== 'all') {
-                $query->where('is_active', filter_var($status, FILTER_VALIDATE_BOOLEAN));
+                $query->where(
+                    'is_active',
+                    filter_var($status, FILTER_VALIDATE_BOOLEAN)
+                );
             }
 
+            /*
+        |--------------------------------------------------------------------------
+        | Filter role
+        |--------------------------------------------------------------------------
+        */
             if ($roleId !== null && $roleId !== '' && $roleId !== 'all') {
                 $query->whereHas('roles', function ($q) use ($roleId) {
                     $q->where('roles.id', (int) $roleId);
                 });
             }
 
+            /*
+        |--------------------------------------------------------------------------
+        | Pagination
+        |--------------------------------------------------------------------------
+        */
             $users = $query
                 ->orderBy('name')
                 ->paginate($perPage);
@@ -76,6 +122,23 @@ class UserController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data user berhasil dimuat.',
+
+                /*
+            |--------------------------------------------------------------------------
+            | Statistik tidak terpengaruh pagination
+            |--------------------------------------------------------------------------
+            */
+                'summary' => [
+                    'total_user' => (int) ($statistics->total_user ?? 0),
+                    'total_active_user' => (int) ($statistics->total_active_user ?? 0),
+                    'total_inactive_user' => (int) ($statistics->total_inactive_user ?? 0),
+                ],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Data tabel tetap menggunakan pagination
+            |--------------------------------------------------------------------------
+            */
                 'data' => $users,
             ], 200);
         } catch (\Throwable $e) {
@@ -89,6 +152,11 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memuat data user.',
+                'summary' => [
+                    'total_user' => 0,
+                    'total_active_user' => 0,
+                    'total_inactive_user' => 0,
+                ],
                 'data' => [],
             ], 500);
         }
