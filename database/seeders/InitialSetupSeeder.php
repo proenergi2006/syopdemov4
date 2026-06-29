@@ -36,13 +36,12 @@ class InitialSetupSeeder extends Seeder
             $cabangId = $this->upsertAndGetId(
                 'cabang',
                 [
-                    'wilayah_id' => $wilayahId,
-                    'nama' => 'JAKARTA',
+                    'nama_cabang' => 'Jakarta',
                 ],
                 [
-                    'alamat' => 'Head Office',
-                    'is_active' => true,
-                    'updated_at' => $now,
+                    'inisial_cabang' => 'JKT',
+                    'inisial_segel' => 'JKT',
+                    'catatan_cabang' => 'Cabang Jakarta',
                 ]
             );
 
