@@ -362,7 +362,6 @@ class ApprovalFlowController extends Controller
 
                 'steps.*.approvers.*.branch_ids.*' => [
                     'integer',
-                    'distinct',
                 ],
 
                 /*
