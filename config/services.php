@@ -36,4 +36,12 @@ return [
         'secret' => env('ACCURATE_API_SECRET'),
         'base_url' => env('ACCURATE_BASE_URL'),
     ],
+
+    'legacy_sso' => [
+        'key' => env('SYOP_SSO_KEY'),
+        'aad' => env(
+            'SYOP_SSO_AAD',
+            'syop-v3-to-v4'
+        ),
+    ],
 ];

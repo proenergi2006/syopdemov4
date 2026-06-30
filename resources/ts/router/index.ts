@@ -19,7 +19,17 @@ import { usePermissionStore } from '@/stores/permission'
 |--------------------------------------------------------------------------
 */
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  /*
+  |--------------------------------------------------------------------------
+  | Router base
+  |--------------------------------------------------------------------------
+  | Gunakan root aplikasi, bukan import.meta.env.BASE_URL.
+  |
+  | Laravel Vite menggunakan /build untuk lokasi asset production.
+  | /build bukan base URL halaman Vue Router.
+  |--------------------------------------------------------------------------
+  */
+  history: createWebHistory('/'),
 
   routes: [
     /*
@@ -105,11 +115,37 @@ const router = createRouter({
 |--------------------------------------------------------------------------
 | Cookie helper
 |--------------------------------------------------------------------------
+| Menghapus cookie dari root dan path /build.
+|
+| Path /build tetap dibersihkan untuk menangani cookie lama yang mungkin
+| dibuat ketika Vue Router masih menggunakan BASE_URL dari Vite.
+|--------------------------------------------------------------------------
 */
 const removeCookie = (name: string): void => {
-  document.cookie = `${name}=; Max-Age=0; path=/`
-  document.cookie
-    = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+  const expiredDate = 'Thu, 01 Jan 1970 00:00:00 GMT'
+
+  const paths = [
+    '/',
+    '/build',
+    '/build/',
+  ]
+
+  const domains = [
+    '',
+    window.location.hostname,
+    '.proenergi.com',
+  ]
+
+  paths.forEach(path => {
+    domains.forEach(domain => {
+      const domainAttribute = domain
+        ? `; domain=${domain}`
+        : ''
+
+      document.cookie
+        = `${name}=; Max-Age=0; expires=${expiredDate}; path=${path}${domainAttribute}; SameSite=Lax`
+    })
+  })
 }
 
 /*
@@ -120,6 +156,7 @@ const removeCookie = (name: string): void => {
 const clearAuthSession = (): void => {
   const authKeys = [
     'accessToken',
+    'access_token',
     'userData',
     'userAbilityRules',
   ]
@@ -145,6 +182,7 @@ router.beforeEach(async to => {
   */
   const publicRoutes = [
     'login',
+    'sso',
     'not-authorized',
     'forbidden',
   ]

@@ -1,42 +1,83 @@
 <script setup lang="ts">
 import axios from '@axios'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
 const ability = useAppAbility()
 
+const loadingStatus = ref('Memverifikasi akses SSO...')
+const errorMessage = ref('')
+
 onMounted(async () => {
   try {
-    const email = route.query.email
+    /*
+    |--------------------------------------------------------------------------
+    | Ambil token SSO terenkripsi dari URL
+    |--------------------------------------------------------------------------
+    */
+    const tokenQuery = route.query.token
 
-    if (!email) {
-      router.replace('/login')
-      return
+    const ssoToken = Array.isArray(tokenQuery)
+      ? tokenQuery[0]
+      : tokenQuery
+
+    if (!ssoToken) {
+      throw new Error('Token SSO tidak ditemukan.')
     }
 
-    // Login SSO
+    /*
+    |--------------------------------------------------------------------------
+    | Proses login SSO
+    |--------------------------------------------------------------------------
+    */
+    loadingStatus.value = 'Memverifikasi akun...'
+
     const { data } = await axios.post('/auth/sso', {
-      email,
+      token: ssoToken,
     })
 
-    // Simpan token
-    localStorage.setItem('accessToken', data.token)
+    if (!data.token)
+      throw new Error('Token login tidak diterima dari server.')
 
-    // Set header bearer dulu
-    axios.defaults.headers.common.Authorization = `Bearer ${data.token}`
+    /*
+    |--------------------------------------------------------------------------
+    | Simpan token Sanctum
+    |--------------------------------------------------------------------------
+    */
+    loadingStatus.value = 'Menyiapkan sesi pengguna...'
 
-    // Ambil user seperti login normal
+    localStorage.setItem(
+      'accessToken',
+      data.token,
+    )
+
+    axios.defaults.headers.common.Authorization
+      = `Bearer ${data.token}`
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ambil user seperti proses login normal
+    |--------------------------------------------------------------------------
+    */
     const me = await axios.get('/auth/me')
+
+    const userData = me.data.data
 
     localStorage.setItem(
       'userData',
-      JSON.stringify(me.data),
+      JSON.stringify(userData),
     )
 
-    // Ability
+    /*
+    |--------------------------------------------------------------------------
+    | Ability existing
+    |--------------------------------------------------------------------------
+    */
+    loadingStatus.value = 'Memuat hak akses...'
+
     const abilities = [
       {
         action: 'manage',
@@ -51,36 +92,269 @@ onMounted(async () => {
 
     ability.update(abilities)
 
-    // Menu
+    /*
+    |--------------------------------------------------------------------------
+    | Memuat menu
+    |--------------------------------------------------------------------------
+    */
+    loadingStatus.value = 'Menyiapkan menu aplikasi...'
+
     try {
-      const menuRes = await axios.get('/auth/my-menus')
+      const menuResponse = await axios.get(
+        '/auth/my-menus',
+      )
 
       localStorage.setItem(
         'navItems',
-        JSON.stringify(menuRes.data),
+        JSON.stringify(menuResponse.data),
       )
     }
-    catch (err) {
-      console.warn('Fetch menu failed:', err)
+    catch (menuError) {
+      console.warn(
+        'Fetch menu failed:',
+        menuError,
+      )
     }
 
-    // Redirect dashboard
-    router.replace('/dashboards/crm')
+    /*
+    |--------------------------------------------------------------------------
+    | Masuk dashboard
+    |--------------------------------------------------------------------------
+    */
+    loadingStatus.value = 'Membuka dashboard...'
+
+    await router.replace('/dashboards/crm')
   }
-  catch (err) {
-    console.error(err)
-    router.replace('/login')
+  catch (error: any) {
+    console.error(
+      'SSO login gagal:',
+      error.response?.data || error,
+    )
+
+    errorMessage.value
+      = error.response?.data?.message
+        || error.message
+        || 'Login SSO gagal.'
+
+    loadingStatus.value = 'SSO gagal diproses.'
+
+    window.setTimeout(() => {
+      router.replace({
+        path: '/login',
+        query: {
+          sso_error: errorMessage.value,
+        },
+      })
+    }, 2000)
   }
 })
 </script>
 
 <template>
-  <div class="d-flex align-center justify-center fill-height">
-    Loading SSO...
+  <div class="sso-loading-screen">
+    <div class="sso-loading-container">
+      <!-- Logo -->
+      <div class="sso-loading-logo">
+        <img
+          src="/logo-proenergi.png"
+          alt="Logo Pro Energi"
+        >
+      </div>
+
+      <!-- Nama aplikasi -->
+      <div class="sso-loading-title">
+        SYOP
+      </div>
+
+      <div class="sso-loading-version">
+        Version 4.0
+      </div>
+
+      <!-- Progress bar -->
+      <div class="sso-loading-progress">
+        <div class="sso-loading-progress-bar" />
+      </div>
+
+      <!-- Status -->
+      <div
+        class="sso-loading-status"
+        :class="{ 'text-error': errorMessage }"
+      >
+        {{ loadingStatus }}
+      </div>
+
+      <div
+        v-if="errorMessage"
+        class="sso-error-message"
+      >
+        {{ errorMessage }}
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.sso-loading-screen {
+  position: fixed;
+  z-index: 99999;
+  display: flex;
+  inline-size: 100%;
+  min-block-size: 100vh;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgb(16 45 122 / 8%),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 80% 80%,
+      rgb(247 148 29 / 8%),
+      transparent 35%
+    ),
+    #fff;
+  inset: 0;
+}
+
+.sso-loading-container {
+  display: flex;
+  min-inline-size: 360px;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 48px;
+  border: 1px solid rgb(16 45 122 / 8%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 86%);
+  box-shadow:
+    0 20px 60px rgb(16 45 122 / 10%),
+    0 8px 24px rgb(0 0 0 / 5%);
+  backdrop-filter: blur(12px);
+}
+
+.sso-loading-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-block-end: 18px;
+  animation: logoPulse 1.8s ease-in-out infinite;
+}
+
+.sso-loading-logo img {
+  display: block;
+  inline-size: 230px;
+  max-inline-size: 100%;
+  block-size: auto;
+  object-fit: contain;
+}
+
+.sso-loading-title {
+  color: #102d7a;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  line-height: 1.2;
+}
+
+.sso-loading-version {
+  margin-block-start: 4px;
+  color: #6e6b7b;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+.sso-loading-progress {
+  position: relative;
+  overflow: hidden;
+  inline-size: 300px;
+  max-inline-size: 100%;
+  block-size: 6px;
+  margin-block-start: 28px;
+  border-radius: 999px;
+  background: rgb(16 45 122 / 10%);
+}
+
+.sso-loading-progress-bar {
+  position: absolute;
+  inline-size: 42%;
+  block-size: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    #102d7a 0%,
+    #ed1b2f 55%,
+    #f7941d 100%
+  );
+  animation: loadingProgress 1.5s ease-in-out infinite;
+}
+
+.sso-loading-status {
+  min-block-size: 22px;
+  margin-block-start: 18px;
+  color: #6e6b7b;
+  font-size: 14px;
+  text-align: center;
+}
+
+.sso-loading-status.text-error {
+  color: rgb(var(--v-theme-error));
+}
+
+.sso-error-message {
+  max-inline-size: 340px;
+  margin-block-start: 8px;
+  color: rgb(var(--v-theme-error));
+  font-size: 13px;
+  text-align: center;
+}
+
+@keyframes loadingProgress {
+  0% {
+    inset-inline-start: -45%;
+  }
+
+  50% {
+    inset-inline-start: 55%;
+  }
+
+  100% {
+    inset-inline-start: 105%;
+  }
+}
+
+@keyframes logoPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.88;
+    transform: scale(1.025);
+  }
+}
+
+@media (max-width: 480px) {
+  .sso-loading-container {
+    min-inline-size: auto;
+    inline-size: calc(100% - 32px);
+    padding: 32px 24px;
+  }
+
+  .sso-loading-logo img {
+    inline-size: 190px;
+  }
+
+  .sso-loading-progress {
+    inline-size: 100%;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:
   layout: blank
+  public: true
 </route>

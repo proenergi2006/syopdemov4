@@ -110,7 +110,7 @@ onMounted(async () => {
 
       <VSpacer />
 
-      <NavSearchBar trigger-btn-class="ms-lg-n3" />
+      <!-- <NavSearchBar trigger-btn-class="ms-lg-n3" /> -->
 
       <NavBarI18n />
       <NavbarThemeSwitcher />

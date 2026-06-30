@@ -91,7 +91,7 @@ onMounted(async () => {
           />
         </VBtn>
 
-        <NavSearchBar class="ms-lg-n3" />
+        <!-- <NavSearchBar class="ms-lg-n3" /> -->
 
         <VSpacer />
 

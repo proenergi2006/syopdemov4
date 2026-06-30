@@ -157,7 +157,7 @@ const headerValues = computed(() => {
           </div>
 
           <!-- 👉 Primary color -->
-          <h6 class="mt-3 text-base font-weight-regular">
+          <!-- <h6 class="mt-3 text-base font-weight-regular">
             Primary Color
           </h6>
           <div class="d-flex gap-x-4 mt-2">
@@ -178,7 +178,7 @@ const headerValues = computed(() => {
                 />
               </VFadeTransition>
             </div>
-          </div>
+          </div> -->
         </CustomizerSection>
         <!-- !SECTION -->
 
@@ -251,7 +251,7 @@ const headerValues = computed(() => {
         <!-- SECTION Menu -->
         <CustomizerSection title="MENU">
           <!-- 👉 Menu Type -->
-          <h6 class="text-base font-weight-regular">
+          <!-- <h6 class="text-base font-weight-regular">
             Menu Type
           </h6>
           <VRadioGroup
@@ -264,7 +264,7 @@ const headerValues = computed(() => {
               :label="key"
               :value="val"
             />
-          </VRadioGroup>
+          </VRadioGroup> -->
 
           <!-- 👉 Collapsed Menu -->
           <div
@@ -309,8 +309,7 @@ const headerValues = computed(() => {
         <!-- !SECTION -->
 
         <!-- SECTION MISC -->
-        <CustomizerSection title="MISC">
-          <!-- 👉 RTL -->
+        <!-- <CustomizerSection title="MISC">
           <div class="d-flex align-center justify-space-between">
             <VLabel
               for="customizer-rtl"
@@ -327,7 +326,6 @@ const headerValues = computed(() => {
             </div>
           </div>
 
-          <!-- 👉 Route Transition -->
           <div class="mt-6">
             <VRow>
               <VCol
@@ -354,7 +352,7 @@ const headerValues = computed(() => {
               </VCol>
             </VRow>
           </div>
-        </CustomizerSection>
+        </CustomizerSection> -->
         <!-- !SECTION -->
       </PerfectScrollbar>
     </VNavigationDrawer>
