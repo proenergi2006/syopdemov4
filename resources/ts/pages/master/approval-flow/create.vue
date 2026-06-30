@@ -52,12 +52,14 @@ interface MasterDepartmentOption {
   label?: string | null
 }
 
+type ApproverScope = 'GLOBAL' | 'SAME_BRANCH' | 'SELECTED_BRANCHES'
+
 interface ApproverForm {
   approver_type: 'ROLE' | 'USER'
   approver_id: number | null
+  approver_scope: ApproverScope
+  branch_ids: number[]
 }
-
-type ApproverScope = 'GLOBAL' | 'SAME_BRANCH'
 
 interface ApprovalStepForm {
   local_key: string
@@ -65,7 +67,6 @@ interface ApprovalStepForm {
   label: string
   approval_mode: 'ANY' | 'ALL'
   approvers: ApproverForm[]
-  approver_scope: ApproverScope
 }
 
 interface ApprovalFlowForm {
@@ -88,6 +89,8 @@ interface ApprovalFlowForm {
   steps: ApprovalStepForm[]
 }
 
+const autocompleteMultiple: any = true
+
 const route = useRoute()
 const router = useRouter()
 
@@ -97,11 +100,13 @@ const submitLoading = ref(false)
 const isLoadingRole = ref(false)
 const isLoadingUser = ref(false)
 const isLoadingDepartment = ref(false)
+const isLoadingBranch = ref(false)
 const isLoadingPermissionModule = ref(false)
 
 const roleOptions = ref<MasterRoleOption[]>([])
 const userOptions = ref<MasterUserOption[]>([])
 const departmentOptions = ref<MasterDepartmentOption[]>([])
+const branchOptions = ref<DropdownOption[]>([])
 
 const APPROVAL_FLOW_INDEX_PATH = '/master/approval-flow'
 const APPROVAL_FLOW_STORE_ENDPOINT = '/master/approval-flows'
@@ -114,6 +119,10 @@ const approverScopeOptions = [
   {
     title: 'Sesuai Cabang Dokumen',
     value: 'SAME_BRANCH',
+  },
+  {
+    title: 'Cabang Tertentu',
+    value: 'SELECTED_BRANCHES',
   },
 ]
 
@@ -245,9 +254,10 @@ const form = reactive<ApprovalFlowForm>({
         {
           approver_type: 'ROLE',
           approver_id: null,
+          approver_scope: 'GLOBAL',
+          branch_ids: [],
         },
       ],
-      approver_scope: 'GLOBAL',
     },
   ],
 })
@@ -438,6 +448,7 @@ onMounted(async () => {
     loadPermissionModule(),
     loadApproverOptions(),
     loadDepartmentOptions(),
+    loadBranchOptions(),
   ])
 })
 
@@ -573,6 +584,35 @@ const loadDepartmentOptions = async (): Promise<void> => {
   }
 }
 
+const loadBranchOptions = async (): Promise<void> => {
+  isLoadingBranch.value = true
+
+  try {
+    const response = await axios.get('/master/cabang/dropdown-select', {
+      headers: { Accept: 'application/json' },
+    })
+
+    branchOptions.value = normalizeDropdownItems(response.data)
+      .map(item => ({
+        ...item,
+        id: Number(item.id),
+        value: Number(item.id),
+      }))
+      .filter(item => Number(item.id) > 0)
+  } catch (error: any) {
+    branchOptions.value = []
+
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(err, 'Gagal memuat data cabang.'),
+    })
+  } finally {
+    isLoadingBranch.value = false
+  }
+}
+
 const getDepartmentTitle = (item: any): string => {
   const kode = item?.kode ? String(item.kode) : ''
   const nama = item?.nama || item?.name || item?.label || ''
@@ -615,9 +655,10 @@ const addStep = (): void => {
       {
         approver_type: 'ROLE',
         approver_id: null,
+        approver_scope: 'GLOBAL',
+        branch_ids: [],
       },
     ],
-    approver_scope: 'GLOBAL',
   })
 }
 
@@ -639,6 +680,8 @@ const addApprover = (stepIndex: number): void => {
   form.steps[stepIndex].approvers.push({
     approver_type: 'ROLE',
     approver_id: null,
+    approver_scope: 'GLOBAL',
+    branch_ids: [],
   })
 }
 
@@ -659,6 +702,13 @@ const removeApprover = (stepIndex: number, approverIndex: number): void => {
 
 const onApproverTypeChange = (stepIndex: number, approverIndex: number): void => {
   form.steps[stepIndex].approvers[approverIndex].approver_id = null
+}
+
+const onApproverScopeChange = (stepIndex: number, approverIndex: number): void => {
+  const approver = form.steps[stepIndex].approvers[approverIndex]
+
+  if (approver.approver_scope !== 'SELECTED_BRANCHES')
+    approver.branch_ids = []
 }
 
 const validateForm = (): boolean => {
@@ -790,6 +840,27 @@ const validateForm = (): boolean => {
         return false
       }
 
+      if (!approver.approver_scope) {
+        showErrorToast({
+          title: 'Validasi Gagal',
+          text: `Scope approver pada step ${stepIndex + 1}, approver ${approverIndex + 1} wajib dipilih.`,
+        })
+
+        return false
+      }
+
+      if (
+        approver.approver_scope === 'SELECTED_BRANCHES'
+        && approver.branch_ids.length === 0
+      ) {
+        showErrorToast({
+          title: 'Validasi Gagal',
+          text: `Cabang yang ditangani pada step ${stepIndex + 1}, approver ${approverIndex + 1} wajib dipilih.`,
+        })
+
+        return false
+      }
+
       const approverKey = `${approver.approver_type}-${approver.approver_id}`
 
       if (usedApproverInStep.has(approverKey)) {
@@ -862,11 +933,16 @@ const buildPayload = () => {
 
             approver_id:
               Number(approver.approver_id),
+
+            approver_scope:
+              approver.approver_scope || 'GLOBAL',
+
+            branch_ids:
+              approver.approver_scope === 'SELECTED_BRANCHES'
+                ? [...new Set(approver.branch_ids.map(branchId => Number(branchId)))].filter(branchId => branchId > 0)
+                : [],
           }),
         ),
-
-        approver_scope:
-          step.approver_scope ?? 'GLOBAL',
       }),
     ),
   }
@@ -1302,7 +1378,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
                   <VRow class="align-start">
                     <VCol
                       cols="12"
-                      md="4"
+                      md="6"
                     >
                       <VTextField
                         v-model="step.label"
@@ -1314,7 +1390,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
 
                     <VCol
                       cols="12"
-                      md="4"
+                      md="6"
                     >
                       <VSelect
                         v-model="step.approval_mode"
@@ -1323,21 +1399,6 @@ const formatAmount = (value: number | string | null | undefined): string => {
                         item-value="value"
                         label="Approval Mode"
                         hint="ANY: salah satu cukup, ALL: semua harus approve"
-                        persistent-hint
-                      />
-                    </VCol>
-
-                    <VCol
-                      cols="12"
-                      md="4"
-                    >
-                      <VSelect
-                        v-model="step.approver_scope"
-                        :items="approverScopeOptions"
-                        item-title="title"
-                        item-value="value"
-                        label="Approver Scope"
-                        hint="Global atau mengikuti cabang dokumen"
                         persistent-hint
                       />
                     </VCol>
@@ -1431,6 +1492,84 @@ const formatAmount = (value: number | string | null | undefined): string => {
                           >
                             <VIcon icon="tabler-x" />
                           </VBtn>
+                        </VCol>
+                      </VRow>
+
+                      <VRow class="mt-1">
+                        <VCol
+                          cols="12"
+                          md="4"
+                        >
+                          <VSelect
+                            v-model="approver.approver_scope"
+                            label="Approver Scope *"
+                            :items="approverScopeOptions"
+                            item-title="title"
+                            item-value="value"
+                            :return-object="false"
+                            density="comfortable"
+                            :disabled="submitLoading"
+                            hint="Tentukan cakupan cabang untuk approver ini"
+                            persistent-hint
+                            @update:model-value="() => onApproverScopeChange(stepIndex, approverIndex)"
+                          />
+                        </VCol>
+
+                        <VCol
+                          v-if="approver.approver_scope === 'SELECTED_BRANCHES'"
+                          cols="12"
+                          md="8"
+                        >
+                          <VAutocomplete
+                            v-model="approver.branch_ids"
+                            label="Cabang yang Ditangani *"
+                            :items="branchOptions"
+                            item-title="title"
+                            item-value="id"
+                            :return-object="false"
+                            :multiple="autocompleteMultiple"
+                            chips
+                            closable-chips
+                            clearable
+                            density="comfortable"
+                            :loading="isLoadingBranch"
+                            :disabled="submitLoading"
+                            :menu-props="{ location: 'bottom', offset: 8, maxHeight: 320 }"
+                            :error="
+                              isSubmitted
+                                && approver.approver_scope === 'SELECTED_BRANCHES'
+                                && approver.branch_ids.length === 0
+                            "
+                            :error-messages="
+                              isSubmitted
+                                && approver.approver_scope === 'SELECTED_BRANCHES'
+                                && approver.branch_ids.length === 0
+                                  ? ['Minimal pilih 1 cabang']
+                                  : []
+                            "
+                            no-data-text="Cabang tidak ditemukan"
+                            placeholder="Pilih satu atau lebih cabang"
+                          />
+                        </VCol>
+
+                        <VCol
+                          v-else
+                          cols="12"
+                          md="8"
+                        >
+                          <VAlert
+                            color="info"
+                            variant="tonal"
+                            density="compact"
+                            class="h-100"
+                          >
+                            <template v-if="approver.approver_scope === 'SAME_BRANCH'">
+                              Approver hanya berlaku saat cabang akun sama dengan cabang dokumen.
+                            </template>
+                            <template v-else>
+                              Approver berlaku tanpa pembatasan cabang.
+                            </template>
+                          </VAlert>
                         </VCol>
                       </VRow>
                     </div>
@@ -1591,7 +1730,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
                       variant="tonal"
                       color="primary"
                     >
-                      {{ approver.approver_type }}
+                      {{ approver.approver_type }} · {{ approver.approver_scope }}
                     </VChip>
                   </div>
                 </div>

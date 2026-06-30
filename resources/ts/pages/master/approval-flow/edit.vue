@@ -43,6 +43,8 @@ interface DropdownOption {
   label?: string | null
 }
 
+type ApproverScope = 'GLOBAL' | 'SAME_BRANCH' | 'SELECTED_BRANCHES'
+
 interface ApprovalStepResponse {
   id?: number
   public_id?: string
@@ -56,7 +58,8 @@ interface ApprovalStepResponse {
   label?: string | null
   approval_mode?: 'ANY' | 'ALL' | string
   is_required?: boolean
-  approver_scope: 'GLOBAL' | 'SAME_BRANCH'
+  approver_scope?: ApproverScope | string
+  branch_ids?: Array<number | string>
 }
 
 interface ApprovalFlowResponse {
@@ -95,6 +98,8 @@ interface ApprovalFlowResponse {
 interface ApproverForm {
   approver_type: 'ROLE' | 'USER'
   approver_id: number | null
+  approver_scope: ApproverScope
+  branch_ids: number[]
 }
 
 interface ApprovalStepForm {
@@ -103,7 +108,6 @@ interface ApprovalStepForm {
   label: string
   approval_mode: 'ANY' | 'ALL'
   approvers: ApproverForm[]
-  approver_scope: 'GLOBAL' | 'SAME_BRANCH'
 }
 
 interface ApprovalFlowForm {
@@ -127,6 +131,7 @@ interface ApprovalFlowForm {
   steps: ApprovalStepForm[]
 }
 
+const autocompleteMultiple: any = true
 const route = useRoute()
 const router = useRouter()
 
@@ -144,10 +149,12 @@ const submitLoading = ref(false)
 const isLoadingRole = ref(false)
 const isLoadingUser = ref(false)
 const isLoadingDepartment = ref(false)
+const isLoadingBranch = ref(false)
 
 const roleOptions = ref<DropdownOption[]>([])
 const userOptions = ref<DropdownOption[]>([])
 const departmentOptions = ref<DropdownOption[]>([])
+const branchOptions = ref<DropdownOption[]>([])
 
 const approverScopeOptions = [
   {
@@ -157,6 +164,10 @@ const approverScopeOptions = [
   {
     title: 'Sesuai Cabang',
     value: 'SAME_BRANCH',
+  },
+  {
+    title: 'Cabang Tertentu',
+    value: 'SELECTED_BRANCHES',
   },
 ]
 
@@ -272,9 +283,10 @@ const form = reactive<ApprovalFlowForm>({
         {
           approver_type: 'ROLE',
           approver_id: null,
+          approver_scope: 'GLOBAL',
+          branch_ids: [],
         },
       ],
-      approver_scope : 'GLOBAL'
     },
   ],
 })
@@ -421,6 +433,7 @@ onMounted(async () => {
   await Promise.all([
     loadApproverOptions(),
     loadDepartmentOptions(),
+    loadBranchOptions(),
   ])
 
   await loadApprovalFlow()
@@ -517,6 +530,35 @@ const loadDepartmentOptions = async (): Promise<void> => {
   }
 }
 
+const loadBranchOptions = async (): Promise<void> => {
+  isLoadingBranch.value = true
+
+  try {
+    const response = await axios.get('/master/cabang/dropdown-select', {
+      headers: { Accept: 'application/json' },
+    })
+
+    branchOptions.value = normalizeDropdownItems(response.data)
+      .map(item => ({
+        ...item,
+        id: Number(item.id),
+        value: Number(item.id),
+      }))
+      .filter(item => Number(item.id) > 0)
+  } catch (error: any) {
+    branchOptions.value = []
+
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(err, 'Gagal memuat data cabang.'),
+    })
+  } finally {
+    isLoadingBranch.value = false
+  }
+}
+
 const normalizeNumberInput = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '')
     return null
@@ -530,6 +572,29 @@ const normalizeApproverType = (value: unknown): 'ROLE' | 'USER' => {
   return String(value || 'ROLE').toUpperCase() === 'USER'
     ? 'USER'
     : 'ROLE'
+}
+
+const normalizeApproverScope = (value: unknown): ApproverScope => {
+  const scope = String(value || 'GLOBAL').toUpperCase()
+
+  if (scope === 'SAME_BRANCH')
+    return 'SAME_BRANCH'
+
+  if (scope === 'SELECTED_BRANCHES')
+    return 'SELECTED_BRANCHES'
+
+  return 'GLOBAL'
+}
+
+const normalizeBranchIds = (value: unknown): number[] => {
+  if (!Array.isArray(value))
+    return []
+
+  return [...new Set(
+    value
+      .map(branchId => Number(branchId))
+      .filter(branchId => Number.isFinite(branchId) && branchId > 0),
+  )]
 }
 
 const normalizeApprovalMode = (value: unknown): 'ANY' | 'ALL' => {
@@ -550,9 +615,10 @@ const buildStepsFromResponse = (steps: ApprovalStepResponse[] = []): ApprovalSte
           {
             approver_type: 'ROLE',
             approver_id: null,
+            approver_scope: 'GLOBAL',
+            branch_ids: [],
           },
         ],
-        approver_scope: 'GLOBAL',
       },
     ]
   }
@@ -581,8 +647,9 @@ const buildStepsFromResponse = (steps: ApprovalStepResponse[] = []): ApprovalSte
         approvers: approvers.map(approver => ({
           approver_type: normalizeApproverType(approver.approver_type),
           approver_id: normalizeNumberInput(approver.approver_id),
+          approver_scope: normalizeApproverScope(approver.approver_scope),
+          branch_ids: normalizeBranchIds(approver.branch_ids),
         })),
-        approver_scope: firstStep?.approver_scope ?? 'GLOBAL',
       }
     })
 }
@@ -695,6 +762,7 @@ const reloadApprovalFlow = async (): Promise<void> => {
     await Promise.all([
       loadApproverOptions(),
       loadDepartmentOptions(),
+      loadBranchOptions(),
     ])
 
     await loadApprovalFlow()
@@ -741,9 +809,10 @@ const addStep = (): void => {
       {
         approver_type: 'ROLE',
         approver_id: null,
+        approver_scope: 'GLOBAL',
+        branch_ids: [],
       },
     ],
-    approver_scope: 'GLOBAL',
   })
 }
 
@@ -765,6 +834,8 @@ const addApprover = (stepIndex: number): void => {
   form.steps[stepIndex].approvers.push({
     approver_type: 'ROLE',
     approver_id: null,
+    approver_scope: 'GLOBAL',
+    branch_ids: [],
   })
 }
 
@@ -785,6 +856,13 @@ const removeApprover = (stepIndex: number, approverIndex: number): void => {
 
 const onApproverTypeChange = (stepIndex: number, approverIndex: number): void => {
   form.steps[stepIndex].approvers[approverIndex].approver_id = null
+}
+
+const onApproverScopeChange = (stepIndex: number, approverIndex: number): void => {
+  const approver = form.steps[stepIndex].approvers[approverIndex]
+
+  if (approver.approver_scope !== 'SELECTED_BRANCHES')
+    approver.branch_ids = []
 }
 
 const validateForm = (): boolean => {
@@ -916,6 +994,27 @@ const validateForm = (): boolean => {
         return false
       }
 
+      if (!approver.approver_scope) {
+        showErrorToast({
+          title: 'Validasi Gagal',
+          text: `Scope approver pada step ${stepIndex + 1}, approver ${approverIndex + 1} wajib dipilih.`,
+        })
+
+        return false
+      }
+
+      if (
+        approver.approver_scope === 'SELECTED_BRANCHES'
+        && approver.branch_ids.length === 0
+      ) {
+        showErrorToast({
+          title: 'Validasi Gagal',
+          text: `Cabang yang ditangani pada step ${stepIndex + 1}, approver ${approverIndex + 1} wajib dipilih.`,
+        })
+
+        return false
+      }
+
       const approverKey = `${approver.approver_type}-${approver.approver_id}`
 
       if (usedApproverInStep.has(approverKey)) {
@@ -959,8 +1058,11 @@ const buildPayload = () => {
       approvers: step.approvers.map(approver => ({
         approver_type: approver.approver_type,
         approver_id: Number(approver.approver_id),
+        approver_scope: approver.approver_scope || 'GLOBAL',
+        branch_ids: approver.approver_scope === 'SELECTED_BRANCHES'
+          ? [...new Set(approver.branch_ids.map(branchId => Number(branchId)))].filter(branchId => branchId > 0)
+          : [],
       })),
-      approver_scope: step.approver_scope ?? 'GLOBAL',
     })),
   }
 }
@@ -1447,7 +1549,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
                   <VRow class="align-start">
                     <VCol
                       cols="12"
-                      md="4"
+                      md="6"
                     >
                       <VTextField
                         v-model="step.label"
@@ -1458,7 +1560,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
 
                     <VCol
                       cols="12"
-                      md="4"
+                      md="6"
                     >
                       <VSelect
                         v-model="step.approval_mode"
@@ -1466,22 +1568,6 @@ const formatAmount = (value: number | string | null | undefined): string => {
                         item-title="title"
                         item-value="value"
                         label="Approval Mode"
-                        hide-details="auto"
-                      />
-                    </VCol>
-
-                    <VCol
-                      cols="12"
-                      md="4"
-                    >
-                      <VSelect
-                        v-model="step.approver_scope"
-                        :items="approverScopeOptions"
-                        item-title="title"
-                        item-value="value"
-                        label="Approver Scope"
-                        hint="Global atau mengikuti cabang dokumen"
-                        persistent-hint
                         hide-details="auto"
                       />
                     </VCol>
@@ -1568,6 +1654,84 @@ const formatAmount = (value: number | string | null | undefined): string => {
                           >
                             <VIcon icon="tabler-x" />
                           </VBtn>
+                        </VCol>
+                      </VRow>
+
+                      <VRow class="mt-1">
+                        <VCol
+                          cols="12"
+                          md="4"
+                        >
+                          <VSelect
+                            v-model="approver.approver_scope"
+                            label="Approver Scope *"
+                            :items="approverScopeOptions"
+                            item-title="title"
+                            item-value="value"
+                            :return-object="false"
+                            density="comfortable"
+                            :disabled="submitLoading"
+                            hint="Tentukan cakupan cabang untuk approver ini"
+                            persistent-hint
+                            @update:model-value="() => onApproverScopeChange(stepIndex, approverIndex)"
+                          />
+                        </VCol>
+
+                        <VCol
+                          v-if="approver.approver_scope === 'SELECTED_BRANCHES'"
+                          cols="12"
+                          md="8"
+                        >
+                          <VAutocomplete
+                            v-model="approver.branch_ids"
+                            label="Cabang yang Ditangani *"
+                            :items="branchOptions"
+                            item-title="title"
+                            item-value="id"
+                            :return-object="false"
+                            :multiple="autocompleteMultiple"
+                            chips
+                            closable-chips
+                            clearable
+                            density="comfortable"
+                            :loading="isLoadingBranch"
+                            :disabled="submitLoading"
+                            :menu-props="{ location: 'bottom', offset: 8, maxHeight: 320 }"
+                            :error="
+                              isSubmitted
+                                && approver.approver_scope === 'SELECTED_BRANCHES'
+                                && approver.branch_ids.length === 0
+                            "
+                            :error-messages="
+                              isSubmitted
+                                && approver.approver_scope === 'SELECTED_BRANCHES'
+                                && approver.branch_ids.length === 0
+                                  ? ['Minimal pilih 1 cabang']
+                                  : []
+                            "
+                            no-data-text="Cabang tidak ditemukan"
+                            placeholder="Pilih satu atau lebih cabang"
+                          />
+                        </VCol>
+
+                        <VCol
+                          v-else
+                          cols="12"
+                          md="8"
+                        >
+                          <VAlert
+                            color="info"
+                            variant="tonal"
+                            density="compact"
+                            class="h-100"
+                          >
+                            <template v-if="approver.approver_scope === 'SAME_BRANCH'">
+                              Approver hanya berlaku saat cabang akun sama dengan cabang dokumen.
+                            </template>
+                            <template v-else>
+                              Approver berlaku tanpa pembatasan cabang.
+                            </template>
+                          </VAlert>
                         </VCol>
                       </VRow>
                     </div>
@@ -1728,7 +1892,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
                       variant="tonal"
                       color="primary"
                     >
-                      {{ approver.approver_type }}
+                      {{ approver.approver_type }} · {{ approver.approver_scope }}
                     </VChip>
                   </div>
                 </div>

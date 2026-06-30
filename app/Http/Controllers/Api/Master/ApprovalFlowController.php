@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use App\Models\PermissionModule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Collection;
 
 class ApprovalFlowController extends Controller
 {
@@ -35,6 +36,7 @@ class ApprovalFlowController extends Controller
                 ->with([
                     'steps.role',
                     'steps.user',
+                    'steps.branchMappings',
                     'creatorDepartment',
                     'permissionModule',
                 ])
@@ -141,6 +143,14 @@ class ApprovalFlowController extends Controller
                         'is_required' => (bool) $step->is_required,
                         'approver_scope' => $step->approver_scope
                             ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL,
+                        'branch_ids' => $step
+                            ->branchMappings
+                            ->pluck('cabang_id')
+                            ->map(
+                                fn($branchId) => (int) $branchId,
+                            )
+                            ->values()
+                            ->all(),
                     ];
                 })->values();
 
@@ -314,14 +324,61 @@ class ApprovalFlowController extends Controller
                 'steps.*.approval_mode' => ['nullable', 'string', 'in:ANY,ALL'],
 
                 'steps.*.approvers' => ['required', 'array', 'min:1'],
-                'steps.*.approvers.*.approver_type' => ['required', 'string', 'in:ROLE,USER'],
-                'steps.*.approvers.*.approver_id' => ['required', 'integer'],
+                'steps.*.approvers.*.approver_type' => [
+                    'required',
+                    'string',
+                    'in:ROLE,USER',
+                ],
+
+                'steps.*.approvers.*.approver_id' => [
+                    'required',
+                    'integer',
+                ],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Scope per approver
+            |--------------------------------------------------------------------------
+            */
+                'steps.*.approvers.*.approver_scope' => [
+                    'nullable',
+                    'string',
+                    Rule::in([
+                        ApprovalFlowStep::APPROVER_SCOPE_GLOBAL,
+                        ApprovalFlowStep::APPROVER_SCOPE_SAME_BRANCH,
+                        ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES,
+                    ]),
+                ],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Daftar cabang khusus per approver
+            |--------------------------------------------------------------------------
+            */
+                'steps.*.approvers.*.branch_ids' => [
+                    'nullable',
+                    'array',
+                ],
+
+                'steps.*.approvers.*.branch_ids.*' => [
+                    'integer',
+                    'distinct',
+                ],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Compatibility payload frontend lama
+            |--------------------------------------------------------------------------
+            | Boleh dipertahankan sementara sampai frontend selesai direvisi.
+            |--------------------------------------------------------------------------
+            */
                 'steps.*.approver_scope' => [
                     'nullable',
                     'string',
                     Rule::in([
                         ApprovalFlowStep::APPROVER_SCOPE_GLOBAL,
                         ApprovalFlowStep::APPROVER_SCOPE_SAME_BRANCH,
+                        ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES,
                     ]),
                 ],
             ]);
@@ -439,8 +496,9 @@ class ApprovalFlowController extends Controller
         */
             $cabang = null;
 
-            $steps = collect($request->input('steps', []))
-                ->values();
+            $steps = $this->normalizeApprovalSteps(
+                $request->input('steps', []),
+            );
 
             if ($steps->isEmpty()) {
                 DB::rollBack();
@@ -458,38 +516,38 @@ class ApprovalFlowController extends Controller
         | ROLE-10 dan USER-10 dianggap berbeda.
         |--------------------------------------------------------------------------
         */
-            foreach ($steps as $stepIndex => $step) {
-                $approvers = collect($step['approvers'] ?? [])->values();
+            // foreach ($steps as $stepIndex => $step) {
+            //     $approvers = collect($step['approvers'] ?? [])->values();
 
-                if ($approvers->isEmpty()) {
-                    DB::rollBack();
+            //     if ($approvers->isEmpty()) {
+            //         DB::rollBack();
 
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Step ' . ($stepIndex + 1) . ' minimal memiliki 1 approver.',
-                    ], 422);
-                }
+            //         return response()->json([
+            //             'success' => false,
+            //             'message' => 'Step ' . ($stepIndex + 1) . ' minimal memiliki 1 approver.',
+            //         ], 422);
+            //     }
 
-                $usedApproversInStep = [];
+            //     $usedApproversInStep = [];
 
-                foreach ($approvers as $approver) {
-                    $approverType = strtoupper((string) ($approver['approver_type'] ?? ''));
-                    $approverId = (int) ($approver['approver_id'] ?? 0);
+            //     foreach ($approvers as $approver) {
+            //         $approverType = strtoupper((string) ($approver['approver_type'] ?? ''));
+            //         $approverId = (int) ($approver['approver_id'] ?? 0);
 
-                    $approverKey = $approverType . '-' . $approverId;
+            //         $approverKey = $approverType . '-' . $approverId;
 
-                    if (in_array($approverKey, $usedApproversInStep, true)) {
-                        DB::rollBack();
+            //         if (in_array($approverKey, $usedApproversInStep, true)) {
+            //             DB::rollBack();
 
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Approver pada step ' . ($stepIndex + 1) . ' duplikat.',
-                        ], 422);
-                    }
+            //             return response()->json([
+            //                 'success' => false,
+            //                 'message' => 'Approver pada step ' . ($stepIndex + 1) . ' duplikat.',
+            //             ], 422);
+            //         }
 
-                    $usedApproversInStep[] = $approverKey;
-                }
-            }
+            //         $usedApproversInStep[] = $approverKey;
+            //     }
+            // }
 
             /*
         |--------------------------------------------------------------------------
@@ -530,50 +588,70 @@ class ApprovalFlowController extends Controller
         | Aman karena ini master flow. Transaksi lama sudah punya snapshot approval sendiri.
         |--------------------------------------------------------------------------
         */
-            DB::table('approval_flow_steps')
-                ->where('approval_flow_id', $flow->id)
-                ->delete();
+            // DB::table('approval_flow_steps')
+            //     ->where('approval_flow_id', $flow->id)
+            //     ->delete();
 
-            foreach ($steps as $stepIndex => $step) {
-                $stepOrder = (int) ($step['step_order'] ?? ($stepIndex + 1));
-                $label = $step['label'] ?? null;
+            // foreach ($steps as $stepIndex => $step) {
+            //     $stepOrder = (int) ($step['step_order'] ?? ($stepIndex + 1));
+            //     $label = $step['label'] ?? null;
 
-                $approvalMode = strtoupper((string) ($step['approval_mode'] ?? 'ANY'));
+            //     $approvalMode = strtoupper((string) ($step['approval_mode'] ?? 'ANY'));
 
-                if (!in_array($approvalMode, ['ANY', 'ALL'], true)) {
-                    $approvalMode = 'ANY';
-                }
+            //     if (!in_array($approvalMode, ['ANY', 'ALL'], true)) {
+            //         $approvalMode = 'ANY';
+            //     }
 
-                $approvers = collect($step['approvers'] ?? [])->values();
+            //     $approvers = collect($step['approvers'] ?? [])->values();
 
-                foreach ($approvers as $approver) {
-                    DB::table('approval_flow_steps')->insert([
-                        'approval_flow_id' => $flow->id,
-                        'step_order' => $stepOrder,
-                        'approver_type' => strtoupper((string) $approver['approver_type']),
-                        'approver_id' => (int) $approver['approver_id'],
-                        'label' => $label,
-                        'approval_mode' => $approvalMode,
-                        'approver_scope' => strtoupper(
-                            trim(
-                                (string) (
-                                    $step['approver_scope']
-                                    ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL
-                                )
-                            )
-                        ),
-                        'is_required' => true,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-            }
+            //     foreach ($approvers as $approver) {
+            //         DB::table('approval_flow_steps')->insert([
+            //             'approval_flow_id' => $flow->id,
+            //             'step_order' => $stepOrder,
+            //             'approver_type' => strtoupper((string) $approver['approver_type']),
+            //             'approver_id' => (int) $approver['approver_id'],
+            //             'label' => $label,
+            //             'approval_mode' => $approvalMode,
+            //             'approver_scope' => strtoupper(
+            //                 trim(
+            //                     (string) (
+            //                         $step['approver_scope']
+            //                         ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL
+            //                     )
+            //                 )
+            //             ),
+            //             'is_required' => true,
+            //             'created_at' => now(),
+            //             'updated_at' => now(),
+            //         ]);
+            //     }
+            // }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Hapus konfigurasi lama
+        |--------------------------------------------------------------------------
+        | Mapping approval_flow_step_branches ikut terhapus karena cascadeOnDelete.
+        |--------------------------------------------------------------------------
+        */
+            $flow->steps()->delete();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Simpan konfigurasi baru
+            |--------------------------------------------------------------------------
+            */
+            $this->createApprovalFlowSteps(
+                $flow,
+                $steps,
+            );
 
             DB::commit();
 
             $flow->load([
                 'steps.role',
                 'steps.user',
+                'steps.branchMappings',
                 'creatorDepartment',
                 'permissionModule',
             ]);
@@ -889,8 +967,9 @@ class ApprovalFlowController extends Controller
         */
             $cabang = null;
 
-            $steps = collect($request->input('steps', []))
-                ->values();
+            $steps = $this->normalizeApprovalSteps(
+                $request->input('steps', []),
+            );
 
             if ($steps->isEmpty()) {
                 DB::rollBack();
@@ -910,38 +989,38 @@ class ApprovalFlowController extends Controller
         | Tapi untuk aman terhadap existing flow, kita validasi per step dulu.
         |--------------------------------------------------------------------------
         */
-            foreach ($steps as $stepIndex => $step) {
-                $approvers = collect($step['approvers'] ?? [])->values();
+            // foreach ($steps as $stepIndex => $step) {
+            //     $approvers = collect($step['approvers'] ?? [])->values();
 
-                if ($approvers->isEmpty()) {
-                    DB::rollBack();
+            //     if ($approvers->isEmpty()) {
+            //         DB::rollBack();
 
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Step ' . ($stepIndex + 1) . ' minimal memiliki 1 approver.',
-                    ], 422);
-                }
+            //         return response()->json([
+            //             'success' => false,
+            //             'message' => 'Step ' . ($stepIndex + 1) . ' minimal memiliki 1 approver.',
+            //         ], 422);
+            //     }
 
-                $usedApproversInStep = [];
+            //     $usedApproversInStep = [];
 
-                foreach ($approvers as $approverIndex => $approver) {
-                    $approverType = strtoupper((string) ($approver['approver_type'] ?? ''));
-                    $approverId = (int) ($approver['approver_id'] ?? 0);
+            //     foreach ($approvers as $approverIndex => $approver) {
+            //         $approverType = strtoupper((string) ($approver['approver_type'] ?? ''));
+            //         $approverId = (int) ($approver['approver_id'] ?? 0);
 
-                    $approverKey = $approverType . '-' . $approverId;
+            //         $approverKey = $approverType . '-' . $approverId;
 
-                    if (in_array($approverKey, $usedApproversInStep, true)) {
-                        DB::rollBack();
+            //         if (in_array($approverKey, $usedApproversInStep, true)) {
+            //             DB::rollBack();
 
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Approver pada step ' . ($stepIndex + 1) . ' duplikat.',
-                        ], 422);
-                    }
+            //             return response()->json([
+            //                 'success' => false,
+            //                 'message' => 'Approver pada step ' . ($stepIndex + 1) . ' duplikat.',
+            //             ], 422);
+            //         }
 
-                    $usedApproversInStep[] = $approverKey;
-                }
-            }
+            //         $usedApproversInStep[] = $approverKey;
+            //     }
+            // }
 
             /*
         |--------------------------------------------------------------------------
@@ -973,6 +1052,11 @@ class ApprovalFlowController extends Controller
                 'updated_by' => $request->user()->id ?? null,
             ]);
 
+            $this->createApprovalFlowSteps(
+                $flow,
+                $steps,
+            );
+
             /*
         |--------------------------------------------------------------------------
         | Create Approval Flow Steps
@@ -981,45 +1065,46 @@ class ApprovalFlowController extends Controller
         | Kalau step 1 punya Adm / ADH, akan insert 2 row dengan step_order = 1.
         |--------------------------------------------------------------------------
         */
-            foreach ($steps as $stepIndex => $step) {
-                $stepOrder = (int) ($step['step_order'] ?? ($stepIndex + 1));
-                $label = $step['label'] ?? null;
-                $approvalMode = strtoupper((string) ($step['approval_mode'] ?? 'ANY'));
+            // foreach ($steps as $stepIndex => $step) {
+            //     $stepOrder = (int) ($step['step_order'] ?? ($stepIndex + 1));
+            //     $label = $step['label'] ?? null;
+            //     $approvalMode = strtoupper((string) ($step['approval_mode'] ?? 'ANY'));
 
-                if (!in_array($approvalMode, ['ANY', 'ALL'], true)) {
-                    $approvalMode = 'ANY';
-                }
+            //     if (!in_array($approvalMode, ['ANY', 'ALL'], true)) {
+            //         $approvalMode = 'ANY';
+            //     }
 
-                $approvers = collect($step['approvers'] ?? [])->values();
+            //     $approvers = collect($step['approvers'] ?? [])->values();
 
-                foreach ($approvers as $approver) {
-                    DB::table('approval_flow_steps')->insert([
-                        'approval_flow_id' => $flow->id,
-                        'step_order' => $stepOrder,
-                        'approver_type' => strtoupper((string) $approver['approver_type']),
-                        'approver_id' => (int) $approver['approver_id'],
-                        'label' => $label,
-                        'approval_mode' => $approvalMode,
-                        'approver_scope' => strtoupper(
-                            trim(
-                                (string) (
-                                    $step['approver_scope']
-                                    ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL
-                                )
-                            )
-                        ),
-                        'is_required' => true,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-            }
+            //     foreach ($approvers as $approver) {
+            //         DB::table('approval_flow_steps')->insert([
+            //             'approval_flow_id' => $flow->id,
+            //             'step_order' => $stepOrder,
+            //             'approver_type' => strtoupper((string) $approver['approver_type']),
+            //             'approver_id' => (int) $approver['approver_id'],
+            //             'label' => $label,
+            //             'approval_mode' => $approvalMode,
+            //             'approver_scope' => strtoupper(
+            //                 trim(
+            //                     (string) (
+            //                         $step['approver_scope']
+            //                         ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL
+            //                     )
+            //                 )
+            //             ),
+            //             'is_required' => true,
+            //             'created_at' => now(),
+            //             'updated_at' => now(),
+            //         ]);
+            //     }
+            // }
 
             DB::commit();
 
             $flow->load([
                 'steps.role',
                 'steps.user',
+                'steps.branchMappings',
                 'creatorDepartment',
                 'permissionModule',
             ]);
@@ -1140,6 +1225,7 @@ class ApprovalFlowController extends Controller
                 ->with([
                     'steps.role',
                     'steps.user',
+                    'steps.branchMappings',
                     'creatorDepartment',
                     'permissionModule',
                 ])
@@ -1186,6 +1272,14 @@ class ApprovalFlowController extends Controller
                         'is_required' => (bool) $step->is_required,
                         'approver_scope' => $step->approver_scope
                             ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL,
+                        'branch_ids' => $step
+                            ->branchMappings
+                            ->pluck('cabang_id')
+                            ->map(
+                                fn($branchId) => (int) $branchId,
+                            )
+                            ->values()
+                            ->all(),
                     ];
                 });
 
@@ -1409,5 +1503,316 @@ class ApprovalFlowController extends Controller
         return $flow->permissionModule?->name
             ?? $flow->module_name
             ?? '-';
+    }
+
+    private function normalizeApprovalSteps(
+        array $rawSteps,
+    ): Collection {
+        $steps = collect($rawSteps)->values();
+
+        if ($steps->isEmpty()) {
+            throw ValidationException::withMessages([
+                'steps' => [
+                    'Minimal harus ada 1 step approval.',
+                ],
+            ]);
+        }
+
+        $validScopes = [
+            ApprovalFlowStep::APPROVER_SCOPE_GLOBAL,
+            ApprovalFlowStep::APPROVER_SCOPE_SAME_BRANCH,
+            ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES,
+        ];
+
+        return $steps->map(
+            function (
+                array $step,
+                int $stepIndex,
+            ) use ($validScopes): array {
+                $stepNumber = $stepIndex + 1;
+
+                $stepOrder = (int) (
+                    $step['step_order']
+                    ?? $stepNumber
+                );
+
+                $label = isset($step['label'])
+                    ? trim((string) $step['label'])
+                    : null;
+
+                $approvalMode = strtoupper(
+                    trim(
+                        (string) (
+                            $step['approval_mode']
+                            ?? ApprovalFlowStep::APPROVAL_MODE_ANY
+                        ),
+                    ),
+                );
+
+                if (
+                    !in_array(
+                        $approvalMode,
+                        [
+                            ApprovalFlowStep::APPROVAL_MODE_ANY,
+                            ApprovalFlowStep::APPROVAL_MODE_ALL,
+                        ],
+                        true,
+                    )
+                ) {
+                    $approvalMode = ApprovalFlowStep::APPROVAL_MODE_ANY;
+                }
+
+                /*
+            |--------------------------------------------------------------------------
+            | Fallback scope dari struktur frontend lama
+            |--------------------------------------------------------------------------
+            */
+                $defaultScope = strtoupper(
+                    trim(
+                        (string) (
+                            $step['approver_scope']
+                            ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL
+                        ),
+                    ),
+                );
+
+                if (!in_array($defaultScope, $validScopes, true)) {
+                    throw ValidationException::withMessages([
+                        "steps.{$stepIndex}.approver_scope" => [
+                            sprintf(
+                                'Approver scope pada Step %d tidak valid.',
+                                $stepNumber,
+                            ),
+                        ],
+                    ]);
+                }
+
+                $approvers = collect(
+                    $step['approvers']
+                        ?? [],
+                )->values();
+
+                if ($approvers->isEmpty()) {
+                    throw ValidationException::withMessages([
+                        "steps.{$stepIndex}.approvers" => [
+                            sprintf(
+                                'Step %d minimal memiliki 1 approver.',
+                                $stepNumber,
+                            ),
+                        ],
+                    ]);
+                }
+
+                $usedApprovers = [];
+
+                $normalizedApprovers = $approvers->map(
+                    function (
+                        array $approver,
+                        int $approverIndex,
+                    ) use (
+                        &$usedApprovers,
+                        $stepIndex,
+                        $stepNumber,
+                        $defaultScope,
+                        $validScopes,
+                    ): array {
+                        $approverType = strtoupper(
+                            trim(
+                                (string) (
+                                    $approver['approver_type']
+                                    ?? ''
+                                ),
+                            ),
+                        );
+
+                        $approverId = (int) (
+                            $approver['approver_id']
+                            ?? 0
+                        );
+
+                        $approverKey = sprintf(
+                            '%s-%d',
+                            $approverType,
+                            $approverId,
+                        );
+
+                        if (isset($usedApprovers[$approverKey])) {
+                            throw ValidationException::withMessages([
+                                "steps.{$stepIndex}.approvers.{$approverIndex}.approver_id" => [
+                                    sprintf(
+                                        'Approver pada Step %d duplikat.',
+                                        $stepNumber,
+                                    ),
+                                ],
+                            ]);
+                        }
+
+                        $usedApprovers[$approverKey] = true;
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Scope milik approver
+                    |--------------------------------------------------------------------------
+                    | Scope per approver diprioritaskan.
+                    | Scope level step hanya menjadi fallback payload lama.
+                    |--------------------------------------------------------------------------
+                    */
+                        $approverScope = strtoupper(
+                            trim(
+                                (string) (
+                                    $approver['approver_scope']
+                                    ?? $defaultScope
+                                ),
+                            ),
+                        );
+
+                        if (
+                            !in_array(
+                                $approverScope,
+                                $validScopes,
+                                true,
+                            )
+                        ) {
+                            throw ValidationException::withMessages([
+                                "steps.{$stepIndex}.approvers.{$approverIndex}.approver_scope" => [
+                                    sprintf(
+                                        'Approver scope pada Step %d tidak valid.',
+                                        $stepNumber,
+                                    ),
+                                ],
+                            ]);
+                        }
+
+                        $branchIds = collect(
+                            $approver['branch_ids']
+                                ?? [],
+                        )
+                            ->map(
+                                fn($branchId) => (int) $branchId,
+                            )
+                            ->filter(
+                                fn(int $branchId) => $branchId > 0,
+                            )
+                            ->unique()
+                            ->values()
+                            ->all();
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | SELECTED_BRANCHES wajib memilih cabang
+                    |--------------------------------------------------------------------------
+                    */
+                        if (
+                            $approverScope
+                            === ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES
+                            && empty($branchIds)
+                        ) {
+                            throw ValidationException::withMessages([
+                                "steps.{$stepIndex}.approvers.{$approverIndex}.branch_ids" => [
+                                    sprintf(
+                                        'Cabang yang ditangani wajib dipilih untuk approver ke-%d pada Step %d.',
+                                        $approverIndex + 1,
+                                        $stepNumber,
+                                    ),
+                                ],
+                            ]);
+                        }
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Mapping hanya digunakan SELECTED_BRANCHES
+                    |--------------------------------------------------------------------------
+                    */
+                        if (
+                            $approverScope
+                            !== ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES
+                        ) {
+                            $branchIds = [];
+                        }
+
+                        return [
+                            'approver_type' => $approverType,
+                            'approver_id' => $approverId,
+                            'approver_scope' => $approverScope,
+                            'branch_ids' => $branchIds,
+                        ];
+                    },
+                );
+
+                return [
+                    'step_order' => $stepOrder,
+                    'label' => $label,
+                    'approval_mode' => $approvalMode,
+                    'approvers' => $normalizedApprovers
+                        ->values()
+                        ->all(),
+                ];
+            },
+        );
+    }
+
+    private function createApprovalFlowSteps(
+        ApprovalFlow $flow,
+        Collection $steps,
+    ): void {
+        foreach ($steps as $step) {
+            foreach ($step['approvers'] as $approver) {
+                /*
+            |--------------------------------------------------------------------------
+            | Satu approver menjadi satu row approval_flow_steps
+            |--------------------------------------------------------------------------
+            */
+                $flowStep = ApprovalFlowStep::create([
+                    'approval_flow_id' => $flow->id,
+
+                    'step_order' => (int) $step['step_order'],
+
+                    'approver_type'
+                    => $approver['approver_type'],
+
+                    'approver_id'
+                    => (int) $approver['approver_id'],
+
+                    'label'
+                    => $step['label'],
+
+                    'approval_mode'
+                    => $step['approval_mode'],
+
+                    'approver_scope'
+                    => $approver['approver_scope'],
+
+                    'is_required'
+                    => true,
+                ]);
+
+                /*
+            |--------------------------------------------------------------------------
+            | Simpan mapping cabang khusus
+            |--------------------------------------------------------------------------
+            */
+                if (
+                    $approver['approver_scope']
+                    !== ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES
+                ) {
+                    continue;
+                }
+
+                $branchMappings = collect(
+                    $approver['branch_ids'],
+                )
+                    ->map(
+                        fn(int $branchId): array => [
+                            'cabang_id' => $branchId,
+                        ],
+                    )
+                    ->values()
+                    ->all();
+
+                $flowStep
+                    ->branchMappings()
+                    ->createMany($branchMappings);
+            }
+        }
     }
 }
