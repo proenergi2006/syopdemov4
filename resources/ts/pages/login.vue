@@ -7,6 +7,8 @@ import { requiredValidator } from '@validators'
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { VForm } from 'vuetify/components'
+import { onMounted } from 'vue'
+import { showErrorToast } from '@/utils/alert'
 
 const isPasswordVisible = ref(false)
 const refVForm = ref<InstanceType<typeof VForm> | null>(null)
@@ -222,6 +224,26 @@ const onSubmit = async () => {
   if (validation?.valid)
     await login()
 }
+
+onMounted(() => {
+  const ssoLoginError
+    = sessionStorage.getItem('ssoLoginError')
+
+  if (!ssoLoginError)
+    return
+
+  /*
+  |--------------------------------------------------------------------------
+  | Hapus terlebih dahulu agar toast tidak muncul berulang kali
+  |--------------------------------------------------------------------------
+  */
+  sessionStorage.removeItem('ssoLoginError')
+
+  showErrorToast({
+    title: 'Login SSO gagal',
+    text: ssoLoginError,
+  })
+})
 </script>
 
 <template>

@@ -3,6 +3,7 @@ import axios from '@axios'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { clearAuthSession } from '@/router'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,21 +132,34 @@ onMounted(async () => {
       error.response?.data || error,
     )
 
-    errorMessage.value
+    const message
       = error.response?.data?.message
         || error.message
-        || 'Login SSO gagal.'
+        || 'Login SSO gagal diproses.'
 
-    loadingStatus.value = 'SSO gagal diproses.'
+    /*
+    |--------------------------------------------------------------------------
+    | Bersihkan kemungkinan session yang sempat terbentuk
+    |--------------------------------------------------------------------------
+    */
+    clearAuthSession()
 
-    window.setTimeout(() => {
-      router.replace({
-        path: '/login',
-        query: {
-          sso_error: errorMessage.value,
-        },
-      })
-    }, 2000)
+    /*
+    |--------------------------------------------------------------------------
+    | Simpan pesan sementara untuk dibaca halaman login
+    |--------------------------------------------------------------------------
+    */
+    sessionStorage.setItem(
+      'ssoLoginError',
+      message,
+    )
+
+    /*
+    |--------------------------------------------------------------------------
+    | Redirect tanpa membawa error pada URL
+    |--------------------------------------------------------------------------
+    */
+    await router.replace('/login')
   }
 })
 </script>
