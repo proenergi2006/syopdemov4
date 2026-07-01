@@ -40,9 +40,17 @@ class ApprovalFlowController extends Controller
                     'creatorDepartment',
                     'permissionModule',
                 ])
-                ->when($documentType !== '' && $documentType !== 'ALL' && $documentType !== 'SEMUA', function ($query) use ($documentType) {
-                    $query->where('document_type', $documentType);
-                })
+                ->when(
+                    $documentType !== ''
+                        && $documentType !== 'ALL'
+                        && $documentType !== 'SEMUA',
+                    function ($query) use ($documentType) {
+                        $query->whereRaw(
+                            'UPPER(TRIM(document_type)) = ?',
+                            [$documentType],
+                        );
+                    },
+                )
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($subQuery) use ($search) {
                         $subQuery
@@ -204,7 +212,10 @@ class ApprovalFlowController extends Controller
                         ?? null,
                     'creator_department_code' => $flow->creatorDepartment?->kode ?? null,
 
-                    'steps_count' => $steps->count(),
+                    'steps_count' => $steps
+                        ->pluck('step_order')
+                        ->unique()
+                        ->count(),
                     'steps' => $steps,
 
                     'description' => $flow->description,
@@ -1353,12 +1364,15 @@ class ApprovalFlowController extends Controller
         }
     }
 
-    private function getDocumentTypeLabel(?string $documentType): string
-    {
-        return match (strtoupper((string) $documentType)) {
+    private function getDocumentTypeLabel(
+        ?string $documentType,
+    ): string {
+        return match (strtoupper(
+            trim((string) $documentType),
+        )) {
             'PO' => 'Purchase Order (PO)',
             'PR' => 'Purchase Requisition (PR)',
-            'Vendor' => 'Master Vendor',
+            'VENDOR' => 'Master Vendor',
             default => $documentType ?: '-',
         };
     }

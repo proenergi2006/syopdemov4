@@ -799,9 +799,12 @@ const getComparableMinAmount = (item: ApprovalFlowItem): number => {
  * - 10 juta - 50 juta = GM -> CFO
  * - > 50 juta = GM -> CFO -> CEO
  */
-const getEffectiveApprovalSteps = (currentFlow: ApprovalFlowItem): ApprovalStep[] => {
+
+ const getEffectiveApprovalSteps = (
+  currentFlow: ApprovalFlowItem,
+): ApprovalStep[] => {
   /**
-   * PR tidak boleh merge antar flow.
+   * PR tidak boleh merge antar-flow.
    * Karena PR dibedakan berdasarkan area + department + nominal.
    */
   if (isPRFlow(currentFlow)) {
@@ -813,13 +816,30 @@ const getEffectiveApprovalSteps = (currentFlow: ApprovalFlowItem): ApprovalStep[
   }
 
   /**
-   * Logic lama PO tetap dipertahankan.
+   * Logic cumulative approval PO tetap dipertahankan.
+   *
+   * Contoh:
+   * - Semua Nilai       = GM
+   * - 10–50 juta        = GM -> CFO
+   * - Lebih dari 50 juta = GM -> CFO -> CEO
+   *
+   * Beberapa approver dengan step_order yang sama harus tetap
+   * berada dalam satu logical step.
    */
-  const currentDocumentType = String(currentFlow.document_type || '').toUpperCase()
-  const currentMinAmount = getComparableMinAmount(currentFlow)
+  const currentDocumentType = String(
+    currentFlow.document_type || '',
+  ).toUpperCase()
+
+  const currentMinAmount = getComparableMinAmount(
+    currentFlow,
+  )
 
   const relatedFlows = approvalFlows.value
-    .filter(flow => String(flow.document_type || '').toUpperCase() === currentDocumentType)
+    .filter(flow => {
+      return String(
+        flow.document_type || '',
+      ).toUpperCase() === currentDocumentType
+    })
     .filter(flow => isFlowActive(flow))
     .filter(flow => {
       if (isBaseAllAmountFlow(flow))
@@ -839,33 +859,90 @@ const getEffectiveApprovalSteps = (currentFlow: ApprovalFlowItem): ApprovalStep[
   const mergedSteps: ApprovalStep[] = []
   const usedApproverKeys = new Set<string>()
 
+  /*
+   * Nomor logical step hasil penggabungan antar-flow.
+   * Nilai bertambah per grup step, bukan per approver.
+   */
+  let effectiveStepOrder = 0
+
   relatedFlows.forEach(flow => {
+    /*
+     * Kelompokkan seluruh approver pada flow berdasarkan
+     * step_order asli dari database.
+     */
+    const flowStepGroups = new Map<
+      number,
+      ApprovalStep[]
+    >()
+
     getSortedSteps(flow).forEach(step => {
-      const approverType = String(step.approver_type || '').toUpperCase()
-      const approverIdentifier = String(
-        step.approver_id
-        || step.approver_public_id
-        || step.approver_name
-        || step.approval_role_name
-        || step.role_name
-        || step.label
-        || '',
-      )
+      const originalStepOrder = getStepOrder(step)
 
-      const approverKey = `${approverType}-${approverIdentifier}`
+      if (!flowStepGroups.has(originalStepOrder))
+        flowStepGroups.set(originalStepOrder, [])
 
-      if (!usedApproverKeys.has(approverKey)) {
-        usedApproverKeys.add(approverKey)
-        mergedSteps.push(step)
-      }
+      flowStepGroups
+        .get(originalStepOrder)
+        ?.push(step)
     })
+
+    Array.from(flowStepGroups.entries())
+      .sort(([orderA], [orderB]) => orderA - orderB)
+      .forEach(([, groupedApprovers]) => {
+        /*
+         * Hindari approver yang sama muncul ulang dari flow nominal
+         * sebelumnya.
+         */
+        const uniqueApprovers = groupedApprovers.filter(step => {
+          const approverType = String(
+            step.approver_type || '',
+          ).toUpperCase()
+
+          const approverIdentifier = String(
+            step.approver_id
+            || step.approver_public_id
+            || step.approver_name
+            || step.approval_role_name
+            || step.role_name
+            || step.label
+            || '',
+          )
+
+          const approverKey
+            = `${approverType}-${approverIdentifier}`
+
+          if (usedApproverKeys.has(approverKey))
+            return false
+
+          usedApproverKeys.add(approverKey)
+
+          return true
+        })
+
+        /*
+         * Apabila seluruh approver pada grup sudah pernah masuk,
+         * tidak perlu membuat logical step kosong.
+         */
+        if (!uniqueApprovers.length)
+          return
+
+        effectiveStepOrder += 1
+
+        /*
+         * Semua approver dari grup yang sama diberi nomor
+         * logical step yang sama.
+         */
+        uniqueApprovers.forEach(step => {
+          mergedSteps.push({
+            ...step,
+            step_order: effectiveStepOrder,
+            sequence: effectiveStepOrder,
+          })
+        })
+      })
   })
 
-  return mergedSteps.map((step, index) => ({
-    ...step,
-    step_order: index + 1,
-    sequence: index + 1,
-  }))
+  return mergedSteps
 }
 
 const getGroupedApprovalSteps = (item: ApprovalFlowItem) => {
