@@ -355,6 +355,7 @@ class ApprovalFlowController extends Controller
             | Daftar cabang khusus per approver
             |--------------------------------------------------------------------------
             */
+
                 'steps.*.approvers.*.branch_ids' => [
                     'nullable',
                     'array',

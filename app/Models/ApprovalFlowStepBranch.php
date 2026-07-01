@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ApprovalFlowStepBranch extends Model
 {
+
     protected $table = 'approval_flow_step_branches';
 
     protected $fillable = [

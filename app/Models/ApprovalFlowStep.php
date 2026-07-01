@@ -224,6 +224,7 @@ class ApprovalFlowStep extends Model
 
     public function isSelectedBranchesScope(): bool
     {
+
         return strtoupper(
             trim((string) $this->approver_scope),
         ) === self::APPROVER_SCOPE_SELECTED_BRANCHES;
