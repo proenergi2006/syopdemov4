@@ -104,20 +104,47 @@ const getStatusIcon = (status?: string | null): string => {
 
 const normalizedApprovals = computed(() => {
   return [...props.approvals]
-    .sort((a, b) => Number(a.step_order) - Number(b.step_order))
+    /*
+     * Record SKIPPED tetap tersimpan di database sebagai audit trail,
+     * tetapi tidak perlu ditampilkan pada history approval.
+     */
+    .filter(item => {
+      return normalizeText(item.status).toUpperCase() !== 'SKIPPED'
+    })
+    .sort((a, b) => {
+      return Number(a.step_order) - Number(b.step_order)
+    })
     .map(item => {
       const statusUpper = normalizeText(item.status).toUpperCase()
 
       const actionAt = statusUpper === 'REJECTED'
-        ? (item.rejected_at || item.signed_at || item.updated_at)
-        : (item.approved_at || item.signed_at || item.updated_at)
+        ? (
+            item.rejected_at
+            || item.signed_at
+            || item.updated_at
+          )
+        : (
+            item.approved_at
+            || item.signed_at
+            || item.updated_at
+          )
 
       return {
         ...item,
         step_order: Number(item.step_order || 0),
-        label_display: normalizeText(item.label) || `Tahap ${item.step_order}`,
-        approver_display: normalizeText(item.approver_name_snapshot) || '-',
-        approver_type_display: normalizeText(item.approver_type).toUpperCase() || '-',
+
+        label_display:
+          normalizeText(item.label)
+          || `Tahap ${item.step_order}`,
+
+        approver_display:
+          normalizeText(item.approver_name_snapshot)
+          || '-',
+
+        approver_type_display:
+          normalizeText(item.approver_type).toUpperCase()
+          || '-',
+
         status_display: getStatusLabel(item.status),
         status_color: getStatusColor(item.status),
         status_icon: getStatusIcon(item.status),
