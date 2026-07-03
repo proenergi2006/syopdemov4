@@ -19,7 +19,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         try {
-            $request->validate([
+            $validated = $request->validate([
                 'username' => ['required', 'string'],
                 'password' => ['required', 'string'],
             ], [
@@ -27,22 +27,26 @@ class AuthController extends Controller
                 'password.required' => 'Password wajib diisi.',
             ]);
 
-            $user = User::where('username', $request->username)->first();
+            $username = trim($validated['username']);
+
+            $user = User::query()
+                ->where('username', $username)
+                ->first();
 
             if (!$user) {
                 return response()->json([
                     'success' => false,
                     'field' => 'username',
                     'message' => 'Username tidak ditemukan.',
-                ], 401);
+                ], 422);
             }
 
-            if (!Hash::check($request->password, $user->password)) {
+            if (!Hash::check($validated['password'], $user->password)) {
                 return response()->json([
                     'success' => false,
                     'field' => 'password',
                     'message' => 'Password salah.',
-                ], 401);
+                ], 422);
             }
 
             if (isset($user->is_active) && !$user->is_active) {
@@ -56,7 +60,9 @@ class AuthController extends Controller
                 'last_login_at' => now(),
             ])->save();
 
-            $token = $user->createToken('syop-v4')->plainTextToken;
+            $token = $user
+                ->createToken('syop-v4')
+                ->plainTextToken;
 
             return response()->json([
                 'success' => true,
@@ -68,7 +74,7 @@ class AuthController extends Controller
                     'username' => $user->username,
                     'email' => $user->email,
                 ],
-            ], 200);
+            ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -77,7 +83,7 @@ class AuthController extends Controller
             ], 422);
         } catch (\Throwable $e) {
             Log::error('[Auth] Login error', [
-                'username' => $request->username,
+                'username' => $request->input('username'),
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -402,34 +408,67 @@ class AuthController extends Controller
     $cabangId = $cabang->id;
     */
 
+        $normalizedEmail = strtolower(trim($email));
+
         /*
-    |--------------------------------------------------------------------------
-    | Cari user berdasarkan email + cabang_id
-    |--------------------------------------------------------------------------
-    */
-        $users = User::query()
+        |--------------------------------------------------------------------------
+        | 1. Cari kecocokan persis email + cabang
+        |--------------------------------------------------------------------------
+        */
+        $exactUsers = User::query()
             ->whereRaw(
-                'LOWER(email) = ?',
-                [$email]
+                'LOWER(TRIM(email)) = ?',
+                [$normalizedEmail]
             )
             ->where('cabang_id', $cabangId)
             ->where('is_active', true)
             ->limit(2)
             ->get();
 
-        if ($users->isEmpty()) {
+        if ($exactUsers->count() > 1) {
             return response()->json([
-                'message' => 'User tidak ditemukan pada cabang tersebut.',
-            ], 404);
-        }
-
-        if ($users->count() > 1) {
-            return response()->json([
-                'message' => 'Terdapat user duplikat pada cabang yang sama.',
+                'message' => 'Terdapat user duplikat pada email dan cabang yang sama.',
             ], 409);
         }
 
-        $user = $users->first();
+        if ($exactUsers->count() === 1) {
+            $user = $exactUsers->first();
+        } else {
+            /*
+            |--------------------------------------------------------------------------
+            | 2. Fallback berdasarkan email
+            |--------------------------------------------------------------------------
+            | Digunakan ketika beberapa akun wilayah SYOP v3 diarahkan
+            | ke satu akun pusat/HO di SYOP v4.
+            |--------------------------------------------------------------------------
+            */
+            $emailUsers = User::query()
+                ->whereRaw(
+                    'LOWER(TRIM(email)) = ?',
+                    [$normalizedEmail]
+                )
+                ->where('is_active', true)
+                ->limit(2)
+                ->get();
+
+            if ($emailUsers->isEmpty()) {
+                return response()->json([
+                    'message' => 'User belum terdaftar di SYOP v4.',
+                ], 404);
+            }
+
+            /*
+            * Jangan memilih sembarang user jika ternyata ada lebih
+            * dari satu akun aktif dengan email yang sama di SYOP v4.
+            */
+            if ($emailUsers->count() > 1) {
+                return response()->json([
+                    'message' => 'Terdapat lebih dari satu akun SYOP v4 dengan email yang sama. Hubungi tim IT.',
+                ], 409);
+            }
+
+            $user = $emailUsers->first();
+        }
 
         /*
     |--------------------------------------------------------------------------

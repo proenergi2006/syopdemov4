@@ -82,7 +82,33 @@ const login = async () => {
       password: password.value,
     })
 
-    const token = loginResponse.data?.token
+    const loginData = loginResponse.data
+
+    /**
+     * Pengaman jika backend mengembalikan HTTP 200,
+     * tetapi payload menyatakan login gagal.
+     */
+    if (loginData?.success === false) {
+      const field = loginData?.field
+      const message
+        = loginData?.message
+          || 'Username atau password salah.'
+
+      if (field === 'username') {
+        errors.value.username = message
+        return
+      }
+
+      if (field === 'password') {
+        errors.value.password = message
+        return
+      }
+
+      errors.value.username = message
+      return
+    }
+
+    const token = loginData?.token
 
     if (!token)
       throw new Error('Token tidak ditemukan pada response login.')
@@ -107,7 +133,7 @@ const login = async () => {
     const authUser
       = meResponse.data?.data
         || meResponse.data?.user
-        || loginResponse.data?.user
+        || loginData?.user
 
     if (!authUser)
       throw new Error('Data user tidak ditemukan.')
@@ -118,14 +144,18 @@ const login = async () => {
      * Untuk sementara seluruh user diberikan ability manage all.
      * Nantinya dapat diganti dengan abilities dari backend.
      */
-    const abilities = [
+   const abilities = [
       {
-        action: 'manage',
-        subject: 'all',
+        action: 'manage' as const,
+        subject: 'all' as const,
       },
     ]
 
-    localStorage.setItem('userAbilities', JSON.stringify(abilities))
+    localStorage.setItem(
+      'userAbilities',
+      JSON.stringify(abilities),
+    )
+
     ability.update(abilities)
 
     /**
@@ -152,6 +182,7 @@ const login = async () => {
      * atau ke dashboard default.
      */
     const queryRedirect = route.query.to
+
     const redirectTo
       = typeof queryRedirect === 'string'
         ? queryRedirect
@@ -161,33 +192,78 @@ const login = async () => {
   }
   catch (error: any) {
     const response = error?.response
+    const status = Number(response?.status || 0)
+    const data = response?.data
 
     console.error(
       'LOGIN ERROR:',
-      response?.status,
-      response?.data || error,
+      status,
+      data || error,
     )
 
     resetErrors()
 
     /**
-     * Validation error Laravel.
+     * Validation error dan kesalahan kredensial
+     * dengan status 422.
      */
-    if (response?.status === 422 && response.data?.errors) {
-      errors.value = {
-        username: response.data.errors.username?.[0],
-        password: response.data.errors.password?.[0],
+    if (status === 422) {
+      /**
+       * Format validation Laravel:
+       *
+       * {
+       *   errors: {
+       *     username: [...],
+       *     password: [...]
+       *   }
+       * }
+       */
+      if (data?.errors) {
+        errors.value = {
+          username: data.errors.username?.[0],
+          password: data.errors.password?.[0],
+        }
+
+        return
       }
 
+      /**
+       * Format username/password salah:
+       *
+       * {
+       *   success: false,
+       *   field: "password",
+       *   message: "Password salah."
+       * }
+       */
+      const field = data?.field
+      const message
+        = data?.message
+          || 'Username atau password salah.'
+
+      if (field === 'username') {
+        errors.value.username = message
+        return
+      }
+
+      if (field === 'password') {
+        errors.value.password = message
+        return
+      }
+
+      errors.value.username = message
       return
     }
 
     /**
-     * Username atau password salah.
+     * Tetap mendukung backend lama yang masih
+     * mengembalikan status 401 untuk kredensial salah.
      */
-    if (response?.status === 401) {
-      const field = response.data?.field
-      const message = response.data?.message || 'Username atau password salah.'
+    if (status === 401) {
+      const field = data?.field
+      const message
+        = data?.message
+          || 'Username atau password salah.'
 
       if (field === 'username') {
         errors.value.username = message
@@ -204,15 +280,32 @@ const login = async () => {
     }
 
     /**
-     * Error server atau koneksi.
+     * Akun nonaktif atau akses ditolak.
      */
-    if (!response) {
-      errors.value.username = 'Tidak dapat terhubung ke server.'
+    if (status === 403) {
+      errors.value.username
+        = data?.message || 'Akun tidak dapat digunakan.'
+
       return
     }
 
+    /**
+     * Benar-benar tidak menerima response dari server.
+     * Contoh: timeout, DNS gagal, server mati, atau koneksi putus.
+     */
+    if (!response) {
+      errors.value.username
+        = 'Tidak dapat terhubung ke server.'
+
+      return
+    }
+
+    /**
+     * Error server lainnya.
+     */
     errors.value.username
-      = response.data?.message || 'Login gagal. Silakan coba kembali.'
+      = data?.message
+        || 'Login gagal. Silakan coba kembali.'
   }
   finally {
     loginLoading.value = false
