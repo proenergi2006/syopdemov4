@@ -4260,16 +4260,26 @@ class PurchaseOrderController extends Controller
             $fileName = str_replace(
                 ['/', '\\'],
                 '-',
-                $po->nomor_po,
+                (string) $po->nomor_po,
             );
 
-            return $pdf->stream(
-                sprintf(
-                    'PO-%s-%s.pdf',
-                    $fileName,
-                    strtoupper($lang),
-                ),
+            $pdfOutput = $pdf->output();
+
+            $downloadFileName = sprintf(
+                'PO-%s-%s.pdf',
+                $fileName,
+                strtoupper($lang),
             );
+
+            return response($pdfOutput, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . $downloadFileName . '"',
+                'Content-Length' => strlen($pdfOutput),
+                'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
         } catch (\Throwable $e) {
             Log::error(
                 '[Purchase Order] Print error',
