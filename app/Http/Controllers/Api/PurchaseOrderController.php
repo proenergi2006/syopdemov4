@@ -25,6 +25,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\URL;
 
 class PurchaseOrderController extends Controller
 {
@@ -3843,6 +3844,50 @@ class PurchaseOrderController extends Controller
                     : null,
             ], 500);
         }
+    }
+
+    public function generatePrintUrl(Request $request, string $publicId)
+    {
+        $lang = strtolower(
+            trim(
+                (string) $request->query('lang', 'id'),
+            ),
+        );
+
+        if (!in_array($lang, ['id', 'en'], true)) {
+            $lang = 'id';
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Validasi PO dan permission user
+    |--------------------------------------------------------------------------
+    */
+        $id = Crypt::decryptString($publicId);
+
+        $po = PurchaseOrder::findOrFail($id);
+
+        // TODO: samakan dengan validasi permission cetak PO yang sudah kamu pakai
+        // abort_unless($userCanPrint, 403);
+
+        $url = URL::temporarySignedRoute(
+            'transaction.purchase-order.print-signed',
+            now()->addMinutes(5),
+            [
+                'publicId' => $publicId,
+                'lang' => $lang,
+            ],
+        );
+
+        return response()->json([
+            'success' => true,
+            'url' => $url,
+        ]);
+    }
+
+    public function printSigned(Request $request, string $publicId)
+    {
+        return $this->print($request, $publicId);
     }
 
     public function print(

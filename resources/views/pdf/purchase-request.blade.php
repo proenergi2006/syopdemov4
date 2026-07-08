@@ -29,6 +29,9 @@
 <head>
     <meta charset="UTF-8">
 
+    <link rel="icon" href="{{ asset('favicon.ico') }}?v=4" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=4" type="image/x-icon">
+
     <title>
         {{ __('purchase_request.document_title') }} {{ $pr->nomor_pr }}
     </title>

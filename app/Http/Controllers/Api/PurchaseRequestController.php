@@ -30,6 +30,7 @@ use App\Services\NonTrade\PurchaseRequest\PurchaseRequestMailService;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\URL;
 
 class PurchaseRequestController extends Controller
 {
@@ -2358,6 +2359,51 @@ class PurchaseRequestController extends Controller
                     : null,
             ], 500);
         }
+    }
+
+    public function generatePrintUrl(Request $request, string $publicId)
+    {
+        $lang = strtolower(
+            trim(
+                (string) $request->query('lang', 'id'),
+            ),
+        );
+
+        if (!in_array($lang, ['id', 'en'], true)) {
+            $lang = 'id';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Optional tapi disarankan:
+        | decrypt PR lalu validasi permission user boleh cetak PR ini.
+        |--------------------------------------------------------------------------
+        */
+        $id = Crypt::decryptString($publicId);
+
+        $pr = PurchaseRequest::findOrFail($id);
+
+        // TODO: validasi permission print PR di sini
+        // abort_unless($userCanPrint, 403);
+
+        $url = URL::temporarySignedRoute(
+            'transaction.purchase-request.print-signed',
+            now()->addMinutes(5),
+            [
+                'publicId' => $publicId,
+                'lang' => $lang,
+            ],
+        );
+
+        return response()->json([
+            'success' => true,
+            'url' => $url,
+        ]);
+    }
+
+    public function printSigned(Request $request, string $publicId)
+    {
+        return $this->print($request, $publicId);
     }
 
     public function print(

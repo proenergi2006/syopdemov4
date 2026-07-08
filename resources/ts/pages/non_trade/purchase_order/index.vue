@@ -676,77 +676,145 @@ const printPurchaseOrder = async (
 ): Promise<void> => {
   const publicId = selectedPrintPublicId.value
 
-  if (
-    !publicId
-    || printLoadingId.value
-  ) {
+  if (!publicId || printLoadingId.value)
     return
-  }
 
   printLoadingId.value = publicId
   printLanguageDialog.value = false
 
+  const loadingTitle = language === 'en'
+    ? 'Opening Purchase Order print...'
+    : 'Membuka cetakan Purchase Order...'
+
+  const loadingText = language === 'en'
+    ? 'Please wait a moment'
+    : 'Mohon tunggu sebentar'
+
+  let printWindow: Window | null = null
+
   try {
     showLoadingAlert(
-      language === 'en'
-        ? 'Opening Purchase Order print...'
-        : 'Membuka cetakan PO...',
-      language === 'en'
-        ? 'Please wait a moment'
-        : 'Mohon tunggu sebentar',
+      loadingTitle,
+      loadingText,
     )
 
-    const response = await axios.get(
-      `/transaction/purchase-order/${publicId}/print`,
+    /*
+    |--------------------------------------------------------------------------
+    | Buka tab langsung supaya tidak kena popup blocker
+    | Tapi isinya loading page, bukan blank putih
+    |--------------------------------------------------------------------------
+    */
+    printWindow = window.open('', '_blank')
+
+    if (!printWindow) {
+      throw new Error(
+        language === 'en'
+          ? 'Popup was blocked. Please allow popups for this site.'
+          : 'Popup diblokir browser. Mohon izinkan popup untuk situs ini.',
+      )
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${loadingTitle}</title>
+          <style>
+            body {
+              margin: 0;
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-family: Arial, sans-serif;
+              background: #f7f7f7;
+              color: #333;
+            }
+
+            .box {
+              text-align: center;
+            }
+
+            .spinner {
+              width: 42px;
+              height: 42px;
+              margin: 0 auto 18px;
+              border: 4px solid #ddd;
+              border-top-color: #2563eb;
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+              to {
+                transform: rotate(360deg);
+              }
+            }
+
+            h3 {
+              margin: 0 0 8px;
+              font-size: 18px;
+            }
+
+            p {
+              margin: 0;
+              font-size: 14px;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <div class="spinner"></div>
+            <h3>${loadingTitle}</h3>
+            <p>${loadingText}</p>
+          </div>
+        </body>
+      </html>
+    `)
+
+    printWindow.document.close()
+
+    const response = await axios.post(
+      `/transaction/purchase-order/${encodeURIComponent(publicId)}/print-url`,
+      null,
       {
         params: {
           lang: language,
         },
-
-        responseType: 'blob',
-
-        headers: {
-          Accept: 'application/pdf',
-        },
       },
     )
 
-    const file = new Blob(
-      [response.data],
-      {
-        type: 'application/pdf',
-      },
-    )
+    const url = response.data?.url
 
-    const fileURL = URL.createObjectURL(file)
+    if (!url) {
+      throw new Error(
+        language === 'en'
+          ? 'Print URL was not found.'
+          : 'URL cetak tidak ditemukan.',
+      )
+    }
 
     closeAlert()
 
-    window.open(
-      fileURL,
-      '_blank',
-      'noopener,noreferrer',
-    )
-
-    /*
-     * Beri waktu browser membuka object URL
-     * sebelum URL dibersihkan.
-     */
-    window.setTimeout(() => {
-      URL.revokeObjectURL(fileURL)
-    }, 60_000)
+    printWindow.location.href = url
   }
   catch (error: unknown) {
     closeAlert()
 
+    if (printWindow)
+      printWindow.close()
+
     showErrorToast({
       title: 'Error',
-      text: getApiErrorMessage(
-        error,
-        language === 'en'
-          ? 'Failed to print Purchase Order.'
-          : 'Gagal mencetak Purchase Order.',
-      ),
+      text: error instanceof Error
+        ? error.message
+        : getApiErrorMessage(
+          error,
+          language === 'en'
+            ? 'Failed to print Purchase Order.'
+            : 'Gagal mencetak Purchase Order.',
+        ),
     })
   }
   finally {

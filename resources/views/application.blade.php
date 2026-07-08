@@ -3,7 +3,11 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" href="{{ asset('logo-proenergi.png') }}" />
+
+  <link rel="icon" href="{{ asset('favicon.ico') }}" type="image/x-icon" />
+  <link rel="shortcut icon" href="{{ asset('favicon.ico') }}" type="image/x-icon" />
+  <link rel="icon" href="{{ asset('logo-proenergi.png') }}?v=2" type="image/png" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SYOP v4 Pro Energi</title>
   <link rel="stylesheet" type="text/css" href="{{ asset('loader.css') }}" />
