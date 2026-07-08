@@ -519,9 +519,9 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get(
     '/transaction/purchase-request/{publicId}/print-signed',
     [PurchaseRequestController::class, 'printSigned']
-)->name('transaction.purchase-request.print-signed')->middleware('signed');
+)->name('transaction.purchase-request.print-signed')->middleware('signed:relative');
 
 Route::get(
     '/transaction/purchase-order/{publicId}/print-signed',
     [PurchaseOrderController::class, 'printSigned']
-)->name('transaction.purchase-order.print-signed')->middleware('signed');
+)->name('transaction.purchase-order.print-signed')->middleware('signed:relative');

@@ -2361,11 +2361,16 @@ class PurchaseRequestController extends Controller
         }
     }
 
-    public function generatePrintUrl(Request $request, string $publicId)
-    {
+    public function generatePrintUrl(
+        Request $request,
+        string $publicId,
+    ): JsonResponse {
         $lang = strtolower(
             trim(
-                (string) $request->query('lang', 'id'),
+                (string) $request->query(
+                    'lang',
+                    'id',
+                ),
             ),
         );
 
@@ -2373,27 +2378,31 @@ class PurchaseRequestController extends Controller
             $lang = 'id';
         }
 
+        $id = (int) Crypt::decryptString(
+            $publicId,
+        );
+
+        $pr = PurchaseRequest::query()
+            ->findOrFail($id);
+
         /*
         |--------------------------------------------------------------------------
-        | Optional tapi disarankan:
-        | decrypt PR lalu validasi permission user boleh cetak PR ini.
+        | Validasi permission print PR jika ada
         |--------------------------------------------------------------------------
         */
-        $id = Crypt::decryptString($publicId);
-
-        $pr = PurchaseRequest::findOrFail($id);
-
-        // TODO: validasi permission print PR di sini
         // abort_unless($userCanPrint, 403);
 
-        $url = URL::temporarySignedRoute(
+        $relativeUrl = URL::temporarySignedRoute(
             'transaction.purchase-request.print-signed',
             now()->addMinutes(5),
             [
                 'publicId' => $publicId,
                 'lang' => $lang,
             ],
+            false,
         );
+
+        $url = rtrim(config('app.url'), '/') . $relativeUrl;
 
         return response()->json([
             'success' => true,
@@ -2401,9 +2410,14 @@ class PurchaseRequestController extends Controller
         ]);
     }
 
-    public function printSigned(Request $request, string $publicId)
-    {
-        return $this->print($request, $publicId);
+    public function printSigned(
+        Request $request,
+        string $publicId,
+    ) {
+        return $this->print(
+            $request,
+            $publicId,
+        );
     }
 
     public function print(

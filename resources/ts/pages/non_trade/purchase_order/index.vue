@@ -823,6 +823,30 @@ const printPurchaseOrder = async (
   }
 }
 
+const getPRAttachmentUrl = (file: any): string => {
+  return String(
+    file?.file_url
+      || file?.filepath
+      || file?.file_path
+      || '',
+  )
+}
+
+const getPRAttachmentName = (file: any): string => {
+  return String(
+    file?.original_filename
+      || file?.filename
+      || file?.file_name
+      || 'Lampiran PR',
+  )
+}
+
+const getPRAttachments = (pr: any): any[] => {
+  return Array.isArray(pr?.attachments)
+    ? pr.attachments
+    : []
+}
+
 const openDetail = async (publicId: string): Promise<void> => {
   detailError.value = ''
   detailPurchaseOrder.value = null
@@ -1878,9 +1902,43 @@ onBeforeUnmount(() => {
                               {{ pr.nomor_pr }}
                             </div>
 
-                            <div class="related-pr-meta">
+                            <div class="related-pr-meta mb-2">
                               <span>{{ formatDate(pr.tanggal_pr) }}</span>
                               <!-- <span>Rp {{ formatNumberWithoutRp(pr.total_amount || 0) }}</span> -->
+                            </div>
+
+                            <div
+                              v-if="getPRAttachments(pr).length"
+                              class="related-pr-attachments"
+                            >
+                              <div class="related-pr-attachment-title">
+                                Lampiran PR
+                              </div>
+
+                              <VBtn
+                                v-for="file in getPRAttachments(pr)"
+                                :key="file.id"
+                                :href="getPRAttachmentUrl(file)"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                size="x-small"
+                                variant="tonal"
+                                color="primary"
+                                prepend-icon="tabler-paperclip"
+                                class="related-pr-attachment-btn text-none"
+                                :disabled="!getPRAttachmentUrl(file)"
+                              >
+                                <span class="related-pr-attachment-text">
+                                  {{ getPRAttachmentName(file) }}
+                                </span>
+                              </VBtn>
+                            </div>
+
+                            <div
+                              v-else
+                              class="text-caption text-disabled mt-2"
+                            >
+                              Tidak ada lampiran
                             </div>
                           </div>
                         </TransitionGroup>
@@ -2931,5 +2989,34 @@ onBeforeUnmount(() => {
   &:hover {
     background: rgba(var(--v-theme-warning), 0.09);
   }
+}
+
+.related-pr-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.related-pr-attachment-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+}
+
+.related-pr-attachment-btn {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 30px;
+  border-radius: 10px;
+}
+
+.related-pr-attachment-text {
+  display: inline-block;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
 }
 </style>
