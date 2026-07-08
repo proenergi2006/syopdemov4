@@ -4155,10 +4155,12 @@ class PurchaseOrderController extends Controller
 
         $url = rtrim(config('app.url'), '/') . $relativeUrl;
 
-        return response()->json([
-            'success' => true,
-            'url' => $url,
-        ]);
+        return response()
+            ->json([
+                'success' => true,
+                'url' => $url,
+            ])
+            ->header('Content-Type', 'application/json; charset=UTF-8');
     }
 
     public function printSigned(
@@ -4177,10 +4179,10 @@ class PurchaseOrderController extends Controller
     ) {
         try {
             /*
-        |--------------------------------------------------------------------------
-        | Bahasa Cetakan
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Bahasa Cetakan
+            |--------------------------------------------------------------------------
+            */
             $lang = strtolower(
                 trim(
                     (string) $request->query(
@@ -4200,10 +4202,10 @@ class PurchaseOrderController extends Controller
             app()->setLocale($lang);
 
             /*
-        |--------------------------------------------------------------------------
-        | Purchase Order
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Purchase Order
+            |--------------------------------------------------------------------------
+            */
             $id = Crypt::decryptString(
                 $publicId,
             );
@@ -4228,10 +4230,10 @@ class PurchaseOrderController extends Controller
             ])->findOrFail($id);
 
             /*
-        |--------------------------------------------------------------------------
-        | Amount in Words
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Amount in Words
+            |--------------------------------------------------------------------------
+            */
             $terbilang = $lang === 'en'
                 ? $this->terbilangRupiahEnglish(
                     (float) $po->total_nilai,
@@ -4241,10 +4243,10 @@ class PurchaseOrderController extends Controller
                 );
 
             /*
-        |--------------------------------------------------------------------------
-        | Generate PDF
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Generate PDF
+            |--------------------------------------------------------------------------
+            */
             $pdf = Pdf::loadView(
                 'pdf.purchase-order',
                 [

@@ -2384,10 +2384,12 @@ class PurchaseRequestController extends Controller
 
         $url = rtrim(config('app.url'), '/') . $relativeUrl;
 
-        return response()->json([
-            'success' => true,
-            'url' => $url,
-        ]);
+        return response()
+            ->json([
+                'success' => true,
+                'url' => $url,
+            ])
+            ->header('Content-Type', 'application/json; charset=UTF-8');
     }
 
     public function printSigned(
