@@ -62,7 +62,7 @@ class BackfillUserAccessAssignments extends Command
                             'department_id' => $departmentId,
                             'is_primary' => !$hasPrimary,
                             'is_active' => true,
-                            'created_by' => "System",
+                            'created_by' => null,
                             'updated_by' => null,
                         ]);
 
