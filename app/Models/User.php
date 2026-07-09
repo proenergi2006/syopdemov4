@@ -689,6 +689,71 @@ class User extends Authenticatable
         return $permissions;
     }
 
+    public function accessAssignments(): HasMany
+    {
+        return $this->hasMany(
+            UserAccessAssignment::class,
+            'user_id',
+        );
+    }
+
+    public function activeAccessAssignments(): HasMany
+    {
+        return $this->accessAssignments()
+            ->where('is_active', true);
+    }
+
+    public function primaryAccessAssignment()
+    {
+        return $this->hasOne(
+            UserAccessAssignment::class,
+            'user_id',
+        )
+            ->where('is_primary', true)
+            ->where('is_active', true);
+    }
+
+    public function canAccessBranchDepartment(
+        int|string|null $branchId,
+        int|string|null $departmentId,
+    ): bool {
+        $branchId = (int) $branchId;
+        $departmentId = (int) $departmentId;
+
+        if ($branchId <= 0 || $departmentId <= 0) {
+            return false;
+        }
+
+        return $this->activeAccessAssignments()
+            ->where('branch_id', $branchId)
+            ->where('department_id', $departmentId)
+            ->exists();
+    }
+
+    public function accessibleBranchIds()
+    {
+        return $this->activeAccessAssignments()
+            ->pluck('branch_id')
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
+    public function accessibleDepartmentIds(?int $branchId = null)
+    {
+        $query = $this->activeAccessAssignments();
+
+        if ($branchId !== null && $branchId > 0) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
+            ->pluck('department_id')
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
     private function normalizePermissionScope(?string $scope): string
     {
         $scope = strtoupper(trim((string) $scope));

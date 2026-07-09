@@ -1092,18 +1092,50 @@ class PurchaseOrderController extends Controller
             ], 403);
         }
 
-        $clean = static function (
-            mixed $value,
-        ): string {
-            return htmlspecialchars(
-                strip_tags(
-                    trim(
-                        (string) $value,
-                    ),
-                ),
-                ENT_QUOTES,
-                'UTF-8',
-            );
+        $clean = static function (mixed $value): string {
+            if ($value === null) {
+                return '';
+            }
+
+            $text = trim((string) $value);
+
+            /*
+                |--------------------------------------------------------------------------
+                | Decode entity lama / double encoded
+                |--------------------------------------------------------------------------
+                | Contoh:
+                | &amp;quot; -> &quot; -> "
+                |--------------------------------------------------------------------------
+                */
+            for ($i = 0; $i < 3; $i++) {
+                $decoded = html_entity_decode(
+                    $text,
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8',
+                );
+
+                if ($decoded === $text) {
+                    break;
+                }
+
+                $text = $decoded;
+            }
+
+            /*
+                |--------------------------------------------------------------------------
+                | Buang tag HTML, tapi jangan encode lagi.
+                |--------------------------------------------------------------------------
+                */
+            $text = strip_tags($text);
+
+            /*
+                |--------------------------------------------------------------------------
+                | Rapihkan spasi berlebih.
+                |--------------------------------------------------------------------------
+                */
+            $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+            return trim($text);
         };
 
         /*
@@ -2165,6 +2197,7 @@ class PurchaseOrderController extends Controller
                 'required',
                 'integer',
                 'min:1',
+                'exists:master_vendor,id',
             ],
 
             'cabang' => [
@@ -2305,18 +2338,50 @@ class PurchaseOrderController extends Controller
         | Sanitizer
         |--------------------------------------------------------------------------
         */
-        $clean = static function (
-            mixed $value,
-        ): string {
-            return htmlspecialchars(
-                strip_tags(
-                    trim(
-                        (string) $value,
-                    ),
-                ),
-                ENT_QUOTES,
-                'UTF-8',
-            );
+        $clean = static function (mixed $value): string {
+            if ($value === null) {
+                return '';
+            }
+
+            $text = trim((string) $value);
+
+            /*
+                |--------------------------------------------------------------------------
+                | Decode entity lama / double encoded
+                |--------------------------------------------------------------------------
+                | Contoh:
+                | &amp;quot; -> &quot; -> "
+                |--------------------------------------------------------------------------
+                */
+            for ($i = 0; $i < 3; $i++) {
+                $decoded = html_entity_decode(
+                    $text,
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8',
+                );
+
+                if ($decoded === $text) {
+                    break;
+                }
+
+                $text = $decoded;
+            }
+
+            /*
+                |--------------------------------------------------------------------------
+                | Buang tag HTML, tapi jangan encode lagi.
+                |--------------------------------------------------------------------------
+                */
+            $text = strip_tags($text);
+
+            /*
+                |--------------------------------------------------------------------------
+                | Rapihkan spasi berlebih.
+                |--------------------------------------------------------------------------
+                */
+            $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+            return trim($text);
         };
 
         /*
@@ -2914,21 +2979,21 @@ class PurchaseOrderController extends Controller
                     */
                     $vendorId = (int) $validated['vendor_id'];
 
-                    $vendorTable = collect([
-                        'vendors',
-                        'master_vendors',
-                        'master_vendor',
-                        'm_vendors',
-                        'm_vendor',
-                    ])->first(
-                        fn(string $table): bool =>
-                        DB::getSchemaBuilder()->hasTable($table),
-                    );
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Master Vendor
+                    |--------------------------------------------------------------------------
+                    | PO menggunakan master_vendor sebagai sumber vendor.
+                    | Jangan auto-pilih table vendors karena bisa mengambil table lain yang
+                    | status_pkp-nya tidak sesuai dengan vendor yang dipilih di PO.
+                    |--------------------------------------------------------------------------
+                    */
+                    $vendorTable = 'master_vendor';
 
-                    if (!$vendorTable) {
+                    if (!DB::getSchemaBuilder()->hasTable($vendorTable)) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Table master vendor tidak ditemukan.',
+                                'Table master_vendor tidak ditemukan.',
                             ],
                         ]);
                     }
@@ -2941,16 +3006,19 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Kolom status PKP vendor tidak ditemukan.',
+                                'Kolom status_pkp vendor tidak ditemukan.',
                             ],
                         ]);
                     }
 
-                    $vendorExists = DB::table($vendorTable)
+                    $vendor = DB::table($vendorTable)
                         ->where('id', $vendorId)
-                        ->exists();
+                        ->first([
+                            'id',
+                            'status_pkp',
+                        ]);
 
-                    if (!$vendorExists) {
+                    if (!$vendor) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
                                 'Vendor tidak ditemukan.',
@@ -2958,13 +3026,9 @@ class PurchaseOrderController extends Controller
                         ]);
                     }
 
-                    $vendorStatusPkp = DB::table($vendorTable)
-                        ->where('id', $vendorId)
-                        ->value('status_pkp');
-
                     $vendorStatusPkpNormalized = strtoupper(
                         trim(
-                            (string) $vendorStatusPkp,
+                            (string) ($vendor->status_pkp ?? ''),
                         ),
                     );
 

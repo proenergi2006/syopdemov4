@@ -60,6 +60,7 @@ use App\Http\Controllers\Api\GoodsReturnController;
 use App\Http\Controllers\Api\Dashboard\DashboardModuleController;
 use App\Http\Controllers\Api\Dashboard\PurchaseOrderDashboardController;
 use App\Http\Controllers\Monitoring\LogViewerController;
+use App\Http\Controllers\Api\Master\UserAccessAssignmentController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 // routes/api.php
@@ -71,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/my-menus', [MenuController::class, 'myMenus']);
     Route::put('/account/change-password', [AccountController::class, 'changePassword']);
+    Route::get('/account/access-assignments', [AccountController::class, 'accessAssignments']);
     Route::get(
         'master/cabang/options',
         [CabangController::class, 'dropdownSelect']
@@ -144,6 +146,12 @@ Route::middleware('auth:sanctum')->group(function () {
                 [LogViewerController::class, 'index'],
             );
         });
+
+    // ===================== USER ACCESS ASSIGNMENT =====================
+
+    Route::get('/master/users/{userId}/access-assignments', [UserAccessAssignmentController::class, 'index']);
+    Route::post('/master/users/{userId}/access-assignments', [UserAccessAssignmentController::class, 'store']);
+    Route::put('/master/users/{userId}/access-assignments/{assignmentId}', [UserAccessAssignmentController::class, 'update']);
 
 
     // ===================== DATA DASHBOARD =====================

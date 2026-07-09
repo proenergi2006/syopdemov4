@@ -39,6 +39,20 @@ class PurchaseRequestController extends Controller
      * Ambil semua data PR (optional: bisa ditambah pagination nanti)
      */
 
+    private const MINIMUM_PR_AMOUNT = 1000000;
+
+    private function validateMinimumPurchaseRequestAmount(
+        float $totalAmount,
+    ): void {
+        if ($totalAmount < self::MINIMUM_PR_AMOUNT) {
+            throw ValidationException::withMessages([
+                'total_amount' => [
+                    'Minimal nilai Purchase Requisition adalah Rp 1.000.000.',
+                ],
+            ]);
+        }
+    }
+
     private function generateDraftPRNumber()
     {
         $year = date('Y');
@@ -214,63 +228,154 @@ class PurchaseRequestController extends Controller
                 ]);
 
             /*
-    |--------------------------------------------------------------------------
-    | Apply Visibility Scope
-    |--------------------------------------------------------------------------
-    */
+            |--------------------------------------------------------------------------
+            | User Access Assignments
+            |--------------------------------------------------------------------------
+            | Digunakan untuk scope OWN_CABANG dan OWN_DEPARTMENT.
+            |--------------------------------------------------------------------------
+            */
+            $userAccessAssignments = $this->getActiveUserAccessAssignments(
+                $user,
+            );
+
+            $userAccessibleBranchIds = $userAccessAssignments
+                ->pluck('branch_id')
+                ->map(fn($id) => (int) $id)
+                ->filter(fn($id) => $id > 0)
+                ->unique()
+                ->values();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Apply Visibility Scope
+            |--------------------------------------------------------------------------
+            */
             if ($scope !== 'ALL') {
                 $query->where(function ($visibilityQuery) use (
                     $scope,
                     $user,
                     $userRoleIds,
+                    $userAccessAssignments,
+                    $userAccessibleBranchIds,
                 ) {
                     /*
-            |--------------------------------------------------------------------------
-            | Scope data normal
-            |--------------------------------------------------------------------------
-            */
-                    if ($scope === 'OWN_DATA') {
-                        if ($user->id) {
-                            $visibilityQuery->where(
-                                'purchase_requests.created_by',
-                                $user->id,
-                            );
-                        } else {
-                            $visibilityQuery->whereRaw('1 = 0');
-                        }
-                    } elseif ($scope === 'OWN_DEPARTMENT') {
-                        if ($user->departemen_id) {
-                            $visibilityQuery->where(
-                                'purchase_requests.id_department',
-                                $user->departemen_id,
-                            );
-                        } else {
-                            $visibilityQuery->whereRaw('1 = 0');
-                        }
-                    } elseif ($scope === 'OWN_CABANG') {
-                        if ($user->cabang_id) {
-                            /*
                     |--------------------------------------------------------------------------
-                    | purchase_requests.cabang di beberapa database bertipe varchar.
-                    | Cast cabang_id ke string agar aman.
+                    | Scope data normal
                     |--------------------------------------------------------------------------
                     */
-                            $visibilityQuery->where(
-                                'purchase_requests.cabang',
-                                (string) $user->cabang_id,
-                            );
-                        } else {
-                            $visibilityQuery->whereRaw('1 = 0');
+                    $visibilityQuery->where(function ($scopeQuery) use (
+                        $scope,
+                        $user,
+                        $userAccessAssignments,
+                        $userAccessibleBranchIds,
+                    ) {
+                        /*
+                        |--------------------------------------------------------------------------
+                        | OWN_DATA
+                        |--------------------------------------------------------------------------
+                        | Tetap berdasarkan creator.
+                        |--------------------------------------------------------------------------
+                        */
+                        if ($scope === 'OWN_DATA') {
+                            if ($user->id) {
+                                $scopeQuery->where(
+                                    'purchase_requests.created_by',
+                                    $user->id,
+                                );
+                            } else {
+                                $scopeQuery->whereRaw('1 = 0');
+                            }
+
+                            return;
                         }
-                    } else {
-                        $visibilityQuery->whereRaw('1 = 0');
-                    }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | OWN_DEPARTMENT
+                        |--------------------------------------------------------------------------
+                        | Sekarang berdasarkan kombinasi branch + department assignment.
+                        |--------------------------------------------------------------------------
+                        | Jangan hanya department_id, karena department yang sama bisa ada
+                        | di cabang berbeda.
+                        |--------------------------------------------------------------------------
+                        */
+                        if ($scope === 'OWN_DEPARTMENT') {
+                            if ($userAccessAssignments->isEmpty()) {
+                                $scopeQuery->whereRaw('1 = 0');
+
+                                return;
+                            }
+
+                            $scopeQuery->where(function ($assignmentQuery) use (
+                                $userAccessAssignments,
+                            ) {
+                                foreach ($userAccessAssignments as $assignment) {
+                                    $branchId = (int) ($assignment['branch_id'] ?? 0);
+                                    $departmentId = (int) ($assignment['department_id'] ?? 0);
+
+                                    if ($branchId <= 0 || $departmentId <= 0) {
+                                        continue;
+                                    }
+
+                                    $assignmentQuery->orWhere(function ($rowQuery) use (
+                                        $branchId,
+                                        $departmentId,
+                                    ) {
+                                        $rowQuery
+                                            ->where(
+                                                'purchase_requests.cabang',
+                                                (string) $branchId,
+                                            )
+                                            ->where(
+                                                'purchase_requests.id_department',
+                                                $departmentId,
+                                            );
+                                    });
+                                }
+                            });
+
+                            return;
+                        }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | OWN_CABANG
+                        |--------------------------------------------------------------------------
+                        | Sekarang berdasarkan semua branch dari assignment user.
+                        |--------------------------------------------------------------------------
+                        */
+                        if ($scope === 'OWN_CABANG') {
+                            if ($userAccessibleBranchIds->isEmpty()) {
+                                $scopeQuery->whereRaw('1 = 0');
+
+                                return;
+                            }
+
+                            $scopeQuery->whereIn(
+                                'purchase_requests.cabang',
+                                $userAccessibleBranchIds
+                                    ->map(fn($id) => (string) $id)
+                                    ->all(),
+                            );
+
+                            return;
+                        }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | NONE / scope tidak valid
+                        |--------------------------------------------------------------------------
+                        */
+                        $scopeQuery->whereRaw('1 = 0');
+                    });
 
                     /*
-            |--------------------------------------------------------------------------
-            | Dokumen yang menunggu approval user
-            |--------------------------------------------------------------------------
-            */
+                    |--------------------------------------------------------------------------
+                    | Dokumen yang menunggu approval user
+                    |--------------------------------------------------------------------------
+                    | Tetap dipertahankan.
+                    |--------------------------------------------------------------------------
+                    */
                     $visibilityQuery->orWhereHas(
                         'approvals',
                         function ($approvalQuery) use (
@@ -294,7 +399,9 @@ class PurchaseRequestController extends Controller
                                 });
 
                                 if ($userRoleIds->isNotEmpty()) {
-                                    $approverQuery->orWhere(function ($roleQuery) use ($userRoleIds) {
+                                    $approverQuery->orWhere(function ($roleQuery) use (
+                                        $userRoleIds,
+                                    ) {
                                         $roleQuery
                                             ->where(
                                                 'purchase_request_approvals.approver_type',
@@ -688,6 +795,149 @@ class PurchaseRequestController extends Controller
         }
     }
 
+    private function validateUserAccessAssignmentForPurchaseRequest(
+        Request $request,
+        int|string|null $branchId,
+        int|string|null $departmentId,
+    ): void {
+        $user = $request->user();
+
+        if (!$user) {
+            throw ValidationException::withMessages([
+                'user' => [
+                    'User tidak terautentikasi.',
+                ],
+            ]);
+        }
+
+        $branchId = (int) $branchId;
+        $departmentId = (int) $departmentId;
+
+        if ($branchId <= 0 || $departmentId <= 0) {
+            throw ValidationException::withMessages([
+                'access_assignment' => [
+                    'Cabang dan department wajib dipilih.',
+                ],
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cek apakah user sudah punya assignment aktif.
+        |--------------------------------------------------------------------------
+        */
+        $hasAnyAssignment = DB::table('user_access_assignments')
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->exists();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fallback untuk user lama jika belum ada assignment sama sekali.
+        | Ini menjaga compatibility, tapi setelah backfill seharusnya semua user
+        | sudah punya assignment.
+        |--------------------------------------------------------------------------
+        */
+        if (!$hasAnyAssignment) {
+            $defaultBranchId = (int) ($user->cabang_id ?? 0);
+            $defaultDepartmentId = (int) ($user->departemen_id ?? 0);
+
+            if (
+                $defaultBranchId === $branchId
+                && $defaultDepartmentId === $departmentId
+            ) {
+                return;
+            }
+
+            throw ValidationException::withMessages([
+                'access_assignment' => [
+                    'Anda tidak memiliki akses untuk cabang dan department tersebut.',
+                ],
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Jika user punya assignment, kombinasi cabang + department harus valid.
+        |--------------------------------------------------------------------------
+        */
+        $hasSelectedAssignment = DB::table('user_access_assignments')
+            ->where('user_id', $user->id)
+            ->where('branch_id', $branchId)
+            ->where('department_id', $departmentId)
+            ->where('is_active', true)
+            ->exists();
+
+        if (!$hasSelectedAssignment) {
+            throw ValidationException::withMessages([
+                'access_assignment' => [
+                    'Anda tidak memiliki akses membuat Purchase Requisition untuk cabang dan department tersebut.',
+                ],
+            ]);
+        }
+    }
+
+    private function getActiveUserAccessAssignments(
+        mixed $user,
+    ) {
+        if (!$user) {
+            return collect();
+        }
+
+        $assignments = DB::table('user_access_assignments')
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->select([
+                'branch_id',
+                'department_id',
+            ])
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'branch_id' => (int) $item->branch_id,
+                    'department_id' => (int) $item->department_id,
+                ];
+            })
+            ->filter(function ($item) {
+                return $item['branch_id'] > 0
+                    && $item['department_id'] > 0;
+            })
+            ->unique(function ($item) {
+                return $item['branch_id'] . '-' . $item['department_id'];
+            })
+            ->values();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fallback user lama
+        |--------------------------------------------------------------------------
+        | Kalau user belum punya assignment sama sekali, pakai master user lama.
+        |--------------------------------------------------------------------------
+        */
+        if ($assignments->isEmpty()) {
+            $branchId = (int) (
+                $user->cabang_id
+                ?? $user->branch_id
+                ?? 0
+            );
+
+            $departmentId = (int) (
+                $user->departemen_id
+                ?? $user->department_id
+                ?? 0
+            );
+
+            if ($branchId > 0 && $departmentId > 0) {
+                $assignments->push([
+                    'branch_id' => $branchId,
+                    'department_id' => $departmentId,
+                ]);
+            }
+        }
+
+        return $assignments->values();
+    }
+
     /**
      * POST /api/purchase-request
      * Simpan data baru dari form (axios.post)
@@ -708,7 +958,51 @@ class PurchaseRequestController extends Controller
 
         DB::beginTransaction();
         try {
-            $clean = fn($v) => htmlspecialchars(strip_tags(trim((string) $v)), ENT_QUOTES, 'UTF-8');
+            $clean = static function (mixed $value): string {
+                if ($value === null) {
+                    return '';
+                }
+
+                $text = trim((string) $value);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Decode entity lama / double encoded
+                |--------------------------------------------------------------------------
+                | Contoh:
+                | &amp;quot; -> &quot; -> "
+                |--------------------------------------------------------------------------
+                */
+                for ($i = 0; $i < 3; $i++) {
+                    $decoded = html_entity_decode(
+                        $text,
+                        ENT_QUOTES | ENT_HTML5,
+                        'UTF-8',
+                    );
+
+                    if ($decoded === $text) {
+                        break;
+                    }
+
+                    $text = $decoded;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Buang tag HTML, tapi jangan encode lagi.
+                |--------------------------------------------------------------------------
+                */
+                $text = strip_tags($text);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Rapihkan spasi berlebih.
+                |--------------------------------------------------------------------------
+                */
+                $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+                return trim($text);
+            };
 
             $request->validate([
                 'tanggal_pr'             => ['required', 'date_format:Y-m-d'],
@@ -720,6 +1014,13 @@ class PurchaseRequestController extends Controller
                 'items'                  => ['required', 'string'],
                 'lampiran_request.*'     => ['sometimes', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:3000'],
             ]);
+
+            $this->validateUserAccessAssignmentForPurchaseRequest(
+                $request,
+                $request->cabang,
+                $request->id_department,
+            );
+
             /*
             |--------------------------------------------------------------------------
             | 1. Generate Nomor PR
@@ -772,20 +1073,29 @@ class PurchaseRequestController extends Controller
 
             /*
             |--------------------------------------------------------------------------
+            | Validasi Minimal Nilai PR
+            |--------------------------------------------------------------------------
+            */
+            $this->validateMinimumPurchaseRequestAmount(
+                (float) $totalAmount,
+            );
+
+            /*
+            |--------------------------------------------------------------------------
             | 4. Simpan Header PR
             |--------------------------------------------------------------------------
             */
             $user = $request->user();
             $pr = PurchaseRequest::create([
                 'nomor_pr'              => $nomorPr,
-                'tanggal_pr'            => $clean($request->tanggal_pr),
-                'cabang'                => $clean($request->cabang),
+                'tanggal_pr'            => $request->tanggal_pr,
+                'cabang'                => $request->cabang,
                 'id_department'         => (int) $request->id_department,
                 'recommended_vendor_id' => $request->filled('recommended_vendor_id')
                     ? (int) $request->recommended_vendor_id
                     : null,
-                'kategori'              => $clean($request->kategori),
-                'pr_type'               => $clean($request->pr_type),
+                'kategori'              => $request->kategori,
+                'pr_type'               => $request->pr_type,
                 'notes'                 => $clean($request->notes),
                 'status'                => PurchaseRequest::STATUS_DRAFT,
                 'total_amount'          => $totalAmount,
@@ -865,7 +1175,7 @@ class PurchaseRequestController extends Controller
                     'nama_item'           => $clean($item['nama_item'] ?? ''),
                     'qty'                 => $qty,
                     'qty_outstanding'     => $qty,
-                    'satuan'              => $clean($item['satuan'] ?? ''),
+                    'satuan'              => $item['satuan'] ?? '',
                     'spesifikasi'         => $clean($item['spesifikasi'] ?? ''),
                     'keterangan'          => $clean($item['keterangan'] ?? ''),
                     'harga_unit'          => $harga,
@@ -885,7 +1195,7 @@ class PurchaseRequestController extends Controller
                     'nomor_pr'  => $pr->nomor_pr ?? $nomorPr,
                 ],
             ], 201);
-        } catch (\Throwable $e) {
+        } catch (ValidationException $e) {
             DB::rollBack();
 
             foreach ($storedPaths as $path) {
@@ -896,7 +1206,31 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? 'Data Purchase Requisition tidak valid.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            foreach ($storedPaths as $path) {
+                if ($path && Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            Log::error('[Purchase Requisition] Store error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request' => $request->all(),
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
                 'message' => 'Gagal menyimpan Purchase Requisition. Silakan periksa data atau hubungi IT.',
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -1290,7 +1624,51 @@ class PurchaseRequestController extends Controller
         DB::beginTransaction();
 
         try {
-            $clean = fn($v) => htmlspecialchars(strip_tags(trim((string) $v)), ENT_QUOTES, 'UTF-8');
+            $clean = static function (mixed $value): string {
+                if ($value === null) {
+                    return '';
+                }
+
+                $text = trim((string) $value);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Decode entity lama / double encoded
+                |--------------------------------------------------------------------------
+                | Contoh:
+                | &amp;quot; -> &quot; -> "
+                |--------------------------------------------------------------------------
+                */
+                for ($i = 0; $i < 3; $i++) {
+                    $decoded = html_entity_decode(
+                        $text,
+                        ENT_QUOTES | ENT_HTML5,
+                        'UTF-8',
+                    );
+
+                    if ($decoded === $text) {
+                        break;
+                    }
+
+                    $text = $decoded;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Buang tag HTML, tapi jangan encode lagi.
+                |--------------------------------------------------------------------------
+                */
+                $text = strip_tags($text);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Rapihkan spasi berlebih.
+                |--------------------------------------------------------------------------
+                */
+                $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+                return trim($text);
+            };
 
             $request->validate([
                 'tanggal_pr'             => ['required', 'date_format:Y-m-d'],
@@ -1306,6 +1684,12 @@ class PurchaseRequestController extends Controller
 
             $id = Crypt::decryptString($publicId);
             $pr = PurchaseRequest::findOrFail($id);
+
+            $this->validateUserAccessAssignmentForPurchaseRequest(
+                $request,
+                $request->cabang,
+                $request->id_department,
+            );
 
             /*
         |--------------------------------------------------------------------------
@@ -1362,6 +1746,10 @@ class PurchaseRequestController extends Controller
                 $totalAmount += $qty * $harga;
             }
 
+            $this->validateMinimumPurchaseRequestAmount(
+                (float) $totalAmount,
+            );
+
             /*
         |--------------------------------------------------------------------------
         | 4. Update Header PR
@@ -1369,14 +1757,14 @@ class PurchaseRequestController extends Controller
         */
             $user = $request->user();
             $pr->update([
-                'tanggal_pr'            => $clean($request->tanggal_pr),
-                'cabang'                => $clean($request->cabang),
+                'tanggal_pr'            => $request->tanggal_pr,
+                'cabang'                => $request->cabang,
                 'id_department'         => (int) $request->id_department,
                 'recommended_vendor_id' => $request->filled('recommended_vendor_id')
                     ? (int) $request->recommended_vendor_id
                     : null,
-                'kategori'              => $clean($request->kategori),
-                'pr_type'               => $clean($request->pr_type),
+                'kategori'              => $request->kategori,
+                'pr_type'               => $request->pr_type,
                 'notes'                 => $clean($request->notes),
                 'total_amount'          => $totalAmount,
                 'updated_by'            => $user?->id,
@@ -1516,7 +1904,7 @@ class PurchaseRequestController extends Controller
                     'nomor_pr' => $pr->nomor_pr,
                 ],
             ], 201);
-        } catch (\Throwable $e) {
+        } catch (ValidationException $e) {
             DB::rollBack();
 
             foreach ($storedPaths as $path) {
@@ -1527,7 +1915,30 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update Purchase Requisition.',
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? 'Data Purchase Requisition tidak valid.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            foreach ($storedPaths as $path) {
+                if ($path && Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            Log::error('[Purchase Requisition] Update error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request' => $request->all(),
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal update Purchase Requisition. Silakan periksa data atau hubungi IT.',
                 'error'   => config('app.debug') ? $e->getMessage() : null,
                 'line'    => config('app.debug') ? $e->getLine() : null,
             ], 500);

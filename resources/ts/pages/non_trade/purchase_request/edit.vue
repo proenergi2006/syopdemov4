@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, toRef } from 'vue'
+import { computed, onMounted, reactive, ref, toRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@axios'
 import {
@@ -74,6 +74,31 @@ interface UnitItem {
   kategori: string
 }
 
+interface UserAccessAssignmentItem {
+  id: number | null
+  branch_id: number
+  branch_name: string
+  branch_code: string
+  department_id: number
+  department_code: string
+  department_name: string
+  is_primary: boolean
+}
+
+interface UserAccessBranchItem {
+  id: number
+  name: string
+  code: string
+  title: string
+}
+
+interface UserAccessDepartmentItem {
+  id: number
+  code: string
+  name: string
+  title: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const { mobile } = useDisplay()
@@ -97,6 +122,9 @@ const isLoadingCabang = ref(false)
 
 const departmentList = ref<any[]>([])
 const isLoadingDepartment = ref(false)
+
+const accessAssignmentList = ref<UserAccessAssignmentItem[]>([])
+const departmentsByBranch = ref<Record<string, UserAccessDepartmentItem[]>>({})
 
 const vendorList = ref<any[]>([])
 const isLoadingVendor = ref(false)
@@ -165,35 +193,137 @@ const onlyNumber = (e: KeyboardEvent): void => {
   onlyNumberKeypress(e)
 }
 
+const formatBranchTitle = (
+  code: string | null | undefined,
+  name: string | null | undefined,
+): string => {
+  const branchCode = String(code || '').trim()
+  const branchName = String(name || '-').trim()
+
+  return branchCode
+    ? `${branchCode} - ${branchName}`
+    : branchName
+}
+
+const formatDepartmentLabel = (
+  code: string | null | undefined,
+  name: string | null | undefined,
+): string => {
+  const departmentCode = String(code || '').trim()
+  const departmentName = String(name || '-').trim()
+
+  return departmentCode
+    ? `${departmentCode} - ${departmentName}`
+    : departmentName
+}
+
+const updateDepartmentListByBranch = (
+  branchId: string | number | null | undefined,
+  preserveSelectedDepartment = false,
+): void => {
+  if (!branchId) {
+    departmentList.value = []
+
+    if (!preserveSelectedDepartment)
+      form.id_department = null
+
+    return
+  }
+
+  const departments = departmentsByBranch.value[String(branchId)] || []
+
+  departmentList.value = departments.map((item: UserAccessDepartmentItem) => ({
+    id: Number(item.id),
+    kode: item.code || '',
+    nama: item.name || item.title || '-',
+    label: item.title || formatDepartmentLabel(item.code, item.name),
+  }))
+
+  const departmentStillAvailable = departmentList.value.some(
+    department => Number(department.id) === Number(form.id_department),
+  )
+
+  if (
+    !preserveSelectedDepartment
+    || (
+      form.id_department
+      && !departmentStillAvailable
+    )
+  ) {
+    form.id_department = null
+  }
+}
+
 const fetchCabangList = async (showAlert = true): Promise<void> => {
   isLoadingCabang.value = true
+  isLoadingDepartment.value = true
 
   try {
-    const response = await axios.get('/master/cabang/dropdown-select', {
+    const response = await axios.get('/account/access-assignments', {
       headers: { Accept: 'application/json' },
     })
 
-    cabangList.value = Array.isArray(response.data?.data)
-      ? response.data.data.map((item: any) => ({
-          id: Number(item.id),
-          value: Number(item.id),
-          title: `${item.inisial_cabang || '-'} - ${item.nama_cabang || item.title || '-'}`,
-          nama_cabang: item.nama_cabang || item.title || '-',
-          inisial_cabang: item.inisial_cabang || '',
+    const payload = response.data?.data || {}
+
+    accessAssignmentList.value = Array.isArray(payload.assignments)
+      ? payload.assignments.map((item: any) => ({
+          id: item.id !== null && item.id !== undefined
+            ? Number(item.id)
+            : null,
+          branch_id: Number(item.branch_id),
+          branch_name: item.branch_name || '-',
+          branch_code: item.branch_code || '',
+          department_id: Number(item.department_id),
+          department_code: item.department_code || '',
+          department_name: item.department_name || '-',
+          is_primary: Boolean(item.is_primary),
         }))
       : []
+
+    cabangList.value = Array.isArray(payload.branches)
+      ? payload.branches.map((item: UserAccessBranchItem) => ({
+          id: Number(item.id),
+          value: Number(item.id),
+          title: item.title || formatBranchTitle(item.code, item.name),
+          nama_cabang: item.name || item.title || '-',
+          inisial_cabang: item.code || '',
+        }))
+      : []
+
+    const rawDepartmentsByBranch = payload.departments_by_branch || {}
+    const normalizedDepartmentsByBranch: Record<string, UserAccessDepartmentItem[]> = {}
+
+    Object.entries(rawDepartmentsByBranch).forEach(([branchId, departments]) => {
+      normalizedDepartmentsByBranch[String(branchId)] = Array.isArray(departments)
+        ? departments.map((item: any) => ({
+            id: Number(item.id),
+            code: item.code || '',
+            name: item.name || item.title || '-',
+            title: item.title || formatDepartmentLabel(item.code, item.name),
+          }))
+        : []
+    })
+
+    departmentsByBranch.value = normalizedDepartmentsByBranch
+
+    updateDepartmentListByBranch(form.cabang, true)
   } catch (error: unknown) {
-    console.error('[Cabang] FETCH ERROR:', error)
+    console.error('[Access Assignment] FETCH ERROR:', error)
+
+    accessAssignmentList.value = []
+    departmentsByBranch.value = {}
     cabangList.value = []
+    departmentList.value = []
 
     if (showAlert) {
       showErrorToast({
         title: 'Error',
-        text: getApiErrorMessage(error, 'Gagal memuat data cabang.'),
+        text: getApiErrorMessage(error, 'Gagal memuat akses cabang dan department.'),
       })
     }
   } finally {
     isLoadingCabang.value = false
+    isLoadingDepartment.value = false
   }
 }
 
@@ -201,20 +331,15 @@ const fetchDepartmentList = async (showAlert = true): Promise<void> => {
   isLoadingDepartment.value = true
 
   try {
-    const response = await axios.get('/master/department/dropdown-select', {
-      headers: { Accept: 'application/json' },
-    })
+    if (!Object.keys(departmentsByBranch.value).length) {
+      await fetchCabangList(showAlert)
 
-    departmentList.value = Array.isArray(response.data?.data)
-      ? response.data.data.map((item: any) => ({
-          id: Number(item.id),
-          kode: item.kode || '',
-          nama: item.nama || item.title || '-',
-          label: `${item.kode || '-'} - ${item.nama || item.title || '-'}`,
-        }))
-      : []
+      return
+    }
+
+    updateDepartmentListByBranch(form.cabang, true)
   } catch (error: unknown) {
-    console.error('[Department] FETCH ERROR:', error)
+    console.error('[Department Access] FETCH ERROR:', error)
     departmentList.value = []
 
     if (showAlert) {
@@ -261,6 +386,23 @@ const loadVendors = async (showAlert = true): Promise<void> => {
   } finally {
     isLoadingVendor.value = false
   }
+}
+
+const handleDepartmentChange = async (): Promise<void> => {
+  form.recommended_vendor_id = null
+  vendorList.value = []
+
+  if (form.id_department) {
+    await loadVendors(false)
+  }
+}
+
+const handleBranchChange = async (): Promise<void> => {
+  form.id_department = null
+  form.recommended_vendor_id = null
+  vendorList.value = []
+
+  updateDepartmentListByBranch(form.cabang, false)
 }
 
 const loadUnits = async (showAlert = true): Promise<void> => {
@@ -352,6 +494,8 @@ const loadPurchaseRequestDetail = async (): Promise<void> => {
       ? Number(detail.cabang_id)
       : null
 
+    updateDepartmentListByBranch(form.cabang, true)
+
     form.id_department = detail.department_id !== null && detail.department_id !== undefined
       ? Number(detail.department_id)
       : null
@@ -379,6 +523,8 @@ const loadPurchaseRequestDetail = async (): Promise<void> => {
           mime_type: file.mime_type || file.filetype || '',
         }))
       : []
+
+    await loadVendors(false)
   } catch (error: unknown) {
     loadError.value = getApiErrorMessage(error, 'Gagal memuat detail Purchase Requisition.')
   } finally {
@@ -920,9 +1066,7 @@ onMounted(async () => {
   try {
     await Promise.all([
       loadUnits(false),
-      loadVendors(false),
       fetchCabangList(false),
-      fetchDepartmentList(false),
     ])
 
     await loadPurchaseRequestDetail()
@@ -1064,7 +1208,6 @@ onMounted(async () => {
                   :items="cabangList"
                   item-title="title"
                   item-value="value"
-                  clearable
                   density="comfortable"
                   :loading="isLoadingCabang"
                   :menu-props="{
@@ -1072,10 +1215,12 @@ onMounted(async () => {
                     offset: 8,
                     maxHeight: 300,
                   }"
+                  :clearable="cabangList.length > 1"
                   :error="isSubmitted && !form.cabang"
                   :error-messages="isSubmitted && !form.cabang ? ['Cabang wajib dipilih'] : []"
                   no-data-text="Cabang tidak ditemukan"
                   placeholder="Pilih cabang"
+                  @update:model-value="handleBranchChange"
                 >
                   <template #append-inner>
                     <VTooltip
@@ -1107,18 +1252,20 @@ onMounted(async () => {
                   :items="departmentList"
                   item-title="label"
                   item-value="id"
-                  clearable
                   density="comfortable"
                   :menu-props="{
                     location: 'bottom',
                     offset: 8,
                     maxHeight: 300,
                   }"
+                  :clearable="departmentList.length > 1"
+                  :disabled="!form.cabang"
                   :loading="isLoadingDepartment"
                   :error="isSubmitted && !form.id_department"
                   :error-messages="isSubmitted && !form.id_department ? ['Department wajib dipilih'] : []"
                   no-data-text="Department tidak ditemukan"
                   placeholder="Pilih department"
+                  @update:model-value="handleDepartmentChange"
                 >
                   <template #append-inner>
                     <VProgressCircular
