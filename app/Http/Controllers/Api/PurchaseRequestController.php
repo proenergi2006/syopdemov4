@@ -74,10 +74,10 @@ class PurchaseRequestController extends Controller
             $perPage = $perPage > 0 ? $perPage : 10;
 
             /*
-    |--------------------------------------------------------------------------
-    | Authentication
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Authentication
+        |--------------------------------------------------------------------------
+        */
             if (!$user) {
                 return response()->json([
                     'success' => false,
@@ -101,10 +101,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Permission Scope: Purchase Requisition View
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Permission Scope: Purchase Requisition View
+        |--------------------------------------------------------------------------
+        */
             $scope = strtoupper(
                 trim(
                     (string) (
@@ -128,10 +128,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Ambil seluruh role ID user
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Ambil seluruh role ID user
+        |--------------------------------------------------------------------------
+        */
             $userRoleIds = collect();
 
             if ($user->getAttribute('role_id')) {
@@ -182,10 +182,10 @@ class PurchaseRequestController extends Controller
             );
 
             /*
-    |--------------------------------------------------------------------------
-    | Abilities
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Abilities
+        |--------------------------------------------------------------------------
+        */
             $abilities = [
                 'can_view' => $user->hasPermission(
                     'purchase_request.view',
@@ -209,10 +209,10 @@ class PurchaseRequestController extends Controller
             ];
 
             /*
-    |--------------------------------------------------------------------------
-    | Base query
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Base query
+        |--------------------------------------------------------------------------
+        */
             $query = PurchaseRequest::query()
                 ->with([
                     'cabangData',
@@ -245,6 +245,18 @@ class PurchaseRequestController extends Controller
                 ->unique()
                 ->values();
 
+            $userAccessibleDepartmentIds = collect([
+                (int) ($user->departemen_id ?? 0),
+            ])
+                ->merge(
+                    $userAccessAssignments
+                        ->pluck('department_id')
+                        ->map(fn($id) => (int) $id),
+                )
+                ->filter(fn($id) => $id > 0)
+                ->unique()
+                ->values();
+
             /*
             |--------------------------------------------------------------------------
             | Apply Visibility Scope
@@ -257,6 +269,7 @@ class PurchaseRequestController extends Controller
                     $userRoleIds,
                     $userAccessAssignments,
                     $userAccessibleBranchIds,
+                    $userAccessibleDepartmentIds,
                 ) {
                     /*
                     |--------------------------------------------------------------------------
@@ -268,6 +281,7 @@ class PurchaseRequestController extends Controller
                         $user,
                         $userAccessAssignments,
                         $userAccessibleBranchIds,
+                        $userAccessibleDepartmentIds,
                     ) {
                         /*
                         |--------------------------------------------------------------------------
@@ -293,46 +307,23 @@ class PurchaseRequestController extends Controller
                         |--------------------------------------------------------------------------
                         | OWN_DEPARTMENT
                         |--------------------------------------------------------------------------
-                        | Sekarang berdasarkan kombinasi branch + department assignment.
-                        |--------------------------------------------------------------------------
-                        | Jangan hanya department_id, karena department yang sama bisa ada
-                        | di cabang berbeda.
+                        | Scope department berarti user bisa melihat seluruh PR dari department
+                        | yang sama, lintas semua cabang.
+                        |
+                        | Department diambil dari master user + access assignment tambahan.
                         |--------------------------------------------------------------------------
                         */
                         if ($scope === 'OWN_DEPARTMENT') {
-                            if ($userAccessAssignments->isEmpty()) {
+                            if ($userAccessibleDepartmentIds->isEmpty()) {
                                 $scopeQuery->whereRaw('1 = 0');
 
                                 return;
                             }
 
-                            $scopeQuery->where(function ($assignmentQuery) use (
-                                $userAccessAssignments,
-                            ) {
-                                foreach ($userAccessAssignments as $assignment) {
-                                    $branchId = (int) ($assignment['branch_id'] ?? 0);
-                                    $departmentId = (int) ($assignment['department_id'] ?? 0);
-
-                                    if ($branchId <= 0 || $departmentId <= 0) {
-                                        continue;
-                                    }
-
-                                    $assignmentQuery->orWhere(function ($rowQuery) use (
-                                        $branchId,
-                                        $departmentId,
-                                    ) {
-                                        $rowQuery
-                                            ->where(
-                                                'purchase_requests.cabang',
-                                                (string) $branchId,
-                                            )
-                                            ->where(
-                                                'purchase_requests.id_department',
-                                                $departmentId,
-                                            );
-                                    });
-                                }
-                            });
+                            $scopeQuery->whereIn(
+                                'purchase_requests.id_department',
+                                $userAccessibleDepartmentIds->all(),
+                            );
 
                             return;
                         }
@@ -420,13 +411,13 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Filter Search
-    |--------------------------------------------------------------------------
-    | Jangan pakai orWhereHas cabangData karena purchase_requests.cabang
-    | bertipe varchar sedangkan cabang.id bigint.
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Filter Search
+        |--------------------------------------------------------------------------
+        | Jangan pakai orWhereHas cabangData karena purchase_requests.cabang
+        | bertipe varchar sedangkan cabang.id bigint.
+        |--------------------------------------------------------------------------
+        */
             if ($request->filled('search')) {
                 $search = trim(
                     (string) $request->input('search'),
@@ -493,10 +484,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Filter Tanggal
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Filter Tanggal
+        |--------------------------------------------------------------------------
+        */
             if ($request->filled('tanggal_mulai')) {
                 $query->whereDate(
                     'purchase_requests.tanggal_pr',
@@ -514,10 +505,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Filter Status Approval
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Filter Status Approval
+        |--------------------------------------------------------------------------
+        */
             if ($request->filled('status')) {
                 $status = strtoupper(
                     trim(
@@ -537,10 +528,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Filter Status PO
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Filter Status PO
+        |--------------------------------------------------------------------------
+        */
             if ($request->filled('status_po')) {
                 $statusPo = strtoupper(
                     trim(
@@ -568,10 +559,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Optional filter department/cabang dari FE
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Optional filter department/cabang dari FE
+        |--------------------------------------------------------------------------
+        */
             if ($request->filled('id_department')) {
                 $query->where(
                     'purchase_requests.id_department',
@@ -592,19 +583,19 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-    |--------------------------------------------------------------------------
-    | Pagination
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Pagination
+        |--------------------------------------------------------------------------
+        */
             $prs = $query
                 ->orderByDesc('purchase_requests.id')
                 ->paginate($perPage);
 
             /*
-    |--------------------------------------------------------------------------
-    | Transform Response
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Transform Response
+        |--------------------------------------------------------------------------
+        */
             $prs->through(
                 function (PurchaseRequest $pr) use (
                     $user,
