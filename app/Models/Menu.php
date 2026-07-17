@@ -9,10 +9,21 @@ class Menu extends Model
     protected $table = 'menus';
 
     protected $fillable = [
-        'parent_id','name','path','route_name','icon','order_no','permission_key','is_active',
+        'parent_id',
+        'name',
+        'path',
+        'route_name',
+        'icon',
+        'order_no',
+        'permission_key',
+        'show_in_sidebar',
+        'is_active',
     ];
 
-    protected $casts = ['is_active' => 'boolean'];
+    protected $casts = [
+        'is_active' => 'boolean',
+        'show_in_sidebar' => 'boolean',
+    ];
 
     public function roles()
     {

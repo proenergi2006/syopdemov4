@@ -16,6 +16,7 @@ import {
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { formatStatusPKP, formatKategoriVendor, toTitleCase, formatAuditDateTime } from '@/utils/textFormatter'
 import { usePolling } from '@core/composable/usePolling'
+import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
 import ApprovalHistoryDialog from '@core/components/ApprovalHistoryVendorDialog.vue'
 import Swal from 'sweetalert2'
@@ -109,6 +110,8 @@ interface VendorAbilities {
   can_submit: boolean
   can_delete: boolean
 }
+
+const navigationStore = useNavigationStore()
 
 const defaultVendorAbilities = (): VendorAbilities => ({
   can_view: false,
@@ -463,6 +466,7 @@ const approveVendor = async (vendor: any): Promise<void> => {
     })
 
     await fetchRows()
+    await navigationStore.refreshBadges()
   } catch (error: unknown) {
     closeAlert()
 
@@ -733,6 +737,7 @@ const submitRejectVendor = async (
     rejectVendorSubmitted.value = false
 
     await fetchRows()
+    await navigationStore.refreshBadges()
   } catch (error: unknown) {
     closeAlert()
 
@@ -1007,6 +1012,7 @@ const submitVendor = async (vendor: any): Promise<void> => {
     })
 
     await fetchRows()
+    await navigationStore.refreshBadges()
   } catch (error: unknown) {
     closeAlert()
 

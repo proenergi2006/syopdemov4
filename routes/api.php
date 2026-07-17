@@ -12,7 +12,6 @@ use App\Http\Controllers\Api\GainLossInventoryController;
 use App\Http\Controllers\Api\GoodsReceiptInventoryController;
 use App\Http\Controllers\Api\GoodsReceiveController;
 use App\Http\Controllers\Api\Master\ApprovalFlowController;
-use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\Master\WilayahController;
 use App\Http\Controllers\Api\Master\CabangController;
 use App\Http\Controllers\Api\Master\DepartmentController;
@@ -61,16 +60,16 @@ use App\Http\Controllers\Api\Dashboard\DashboardModuleController;
 use App\Http\Controllers\Api\Dashboard\PurchaseOrderDashboardController;
 use App\Http\Controllers\Monitoring\LogViewerController;
 use App\Http\Controllers\Api\Master\UserAccessAssignmentController;
+use App\Http\Controllers\Api\Master\MenuController as MasterMenuController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 // routes/api.php
 
 Route::post('/auth/sso', [AuthController::class, 'sso']);
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'auth.token.idle'])->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/auth/me/permissions', [AuthController::class, 'permissions']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/my-menus', [MenuController::class, 'myMenus']);
     Route::put('/account/change-password', [AccountController::class, 'changePassword']);
     Route::get('/account/access-assignments', [AccountController::class, 'accessAssignments']);
     Route::get(
@@ -138,6 +137,26 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/units/dropdown-select', [UnitController::class, 'dropdownSelect']);
     Route::apiResource('/units', UnitController::class);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Menu Navigation / Sidebar
+    |--------------------------------------------------------------------------
+    | Endpoint ini dipakai semua user login.
+    | Jangan diproteksi dengan auth_menu.view.
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/master/menus/navigation', [MasterMenuController::class, 'navigation']);
+
+    // Menu Management
+    Route::prefix('master/menus')->group(function () {
+        Route::get('/', [MasterMenuController::class, 'index']);
+        Route::post('/', [MasterMenuController::class, 'store']);
+        Route::get('/{menu}', [MasterMenuController::class, 'show']);
+        Route::put('/{menu}', [MasterMenuController::class, 'update']);
+        Route::patch('/{menu}/toggle-active', [MasterMenuController::class, 'toggleActive']);
+        Route::delete('/{menu}', [MasterMenuController::class, 'destroy']);
+    });
 
     Route::prefix('monitoring')
         ->group(function () {

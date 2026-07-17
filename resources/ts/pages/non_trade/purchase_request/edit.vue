@@ -74,6 +74,16 @@ interface UnitItem {
   kategori: string
 }
 
+interface VendorOptionItem {
+  id: number
+  id_department: number | null
+  label: string
+  nama_vendor: string
+  status_pkp: string
+  jenis_pembayaran: string | null
+  top: number
+}
+
 interface UserAccessAssignmentItem {
   id: number | null
   branch_id: number
@@ -126,7 +136,7 @@ const isLoadingDepartment = ref(false)
 const accessAssignmentList = ref<UserAccessAssignmentItem[]>([])
 const departmentsByBranch = ref<Record<string, UserAccessDepartmentItem[]>>({})
 
-const vendorList = ref<any[]>([])
+const vendorList = ref<VendorOptionItem[]>([])
 const isLoadingVendor = ref(false)
 
 const units = ref<UnitItem[]>([])
@@ -357,8 +367,11 @@ const loadVendors = async (showAlert = true): Promise<void> => {
   isLoadingVendor.value = true
 
   try {
-    const response = await axios.get('/master/vendor/dropdown-select', {
+    const response = await axios.get('/master/vendor/dropdown-pr', {
       headers: { Accept: 'application/json' },
+      params: {
+        id_department: form.id_department || null,
+      },
     })
 
     const data = Array.isArray(response.data?.data)
@@ -369,9 +382,12 @@ const loadVendors = async (showAlert = true): Promise<void> => {
 
     vendorList.value = data.map((item: any) => ({
       id: Number(item.id),
+      id_department: item.id_department ? Number(item.id_department) : null,
       label: item.nama_vendor || item.title || '-',
       nama_vendor: item.nama_vendor || item.title || '-',
       status_pkp: item.status_pkp || 'NON_PKP',
+      jenis_pembayaran: item.jenis_pembayaran || null,
+      top: Number(item.top || 0),
     }))
   } catch (error: unknown) {
     console.error('[Vendor] FETCH ERROR:', error)
@@ -608,10 +624,73 @@ const handleTempQtyInput = (value: string | number, index: number): void => {
   updateTempItemSubtotal(index)
 }
 
-const calcGrandTotal = (): number => {
+const normalizeVendorStatusPkp = (value: unknown): string => {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+
+  if ([
+    'PKP',
+    '1',
+    'YA',
+    'YES',
+    'TRUE',
+  ].includes(normalized)) {
+    return 'PKP'
+  }
+
+  return 'NON_PKP'
+}
+
+const selectedRecommendedVendor = computed<VendorOptionItem | null>(() => {
+  if (!form.recommended_vendor_id)
+    return null
+
+  return vendorList.value.find(vendor => {
+    return Number(vendor.id) === Number(form.recommended_vendor_id)
+  }) ?? null
+})
+
+const isSelectedVendorPkp = computed(() => {
+  return normalizeVendorStatusPkp(selectedRecommendedVendor.value?.status_pkp) === 'PKP'
+})
+
+const selectedVendorStatusPkpLabel = computed(() => {
+  return isSelectedVendorPkp.value ? 'PKP' : 'NON PKP'
+})
+
+const selectedVendorTaxDescription = computed(() => {
+  if (!selectedRecommendedVendor.value)
+    return 'Pilih vendor rekomendasi untuk melihat status PKP dan simulasi PPN.'
+
+  if (isSelectedVendorPkp.value)
+    return 'Vendor PKP, sehingga PR akan menghitung DPP dan PPN seperti perhitungan PO.'
+
+  return 'Vendor Non PKP, sehingga PR hanya menggunakan grand total tanpa PPN.'
+})
+
+const calcSubtotalBeforeTax = (): number => {
   return form.items.reduce((total, item) => {
     return total + Number(item.subtotal || 0)
   }, 0)
+}
+
+const calcDpp = (): number => {
+  if (!isSelectedVendorPkp.value)
+    return 0
+
+  return Number(((calcSubtotalBeforeTax() * 11) / 12).toFixed(2))
+}
+
+const calcPpn = (): number => {
+  if (!isSelectedVendorPkp.value)
+    return 0
+
+  return Number((calcDpp() * 0.12).toFixed(2))
+}
+
+const calcGrandTotal = (): number => {
+  return Number((calcSubtotalBeforeTax() + calcPpn()).toFixed(2))
 }
 
 const openItemFullscreen = (): void => {
@@ -955,6 +1034,12 @@ const buildFormData = (): FormData => {
   formData.append('kategori', String(form.kategori || ''))
   formData.append('pr_type', String(form.pr_type || ''))
   formData.append('notes', String(form.notes || ''))
+  formData.append('status_pkp', selectedRecommendedVendor.value ? normalizeVendorStatusPkp(selectedRecommendedVendor.value.status_pkp) : 'NON_PKP')
+  formData.append('jenis_pembayaran', String(selectedRecommendedVendor.value?.jenis_pembayaran || ''))
+  formData.append('top', String(selectedRecommendedVendor.value?.top ?? 0))
+  formData.append('dpp', String(calcDpp()))
+  formData.append('ppn', String(calcPpn()))
+  formData.append('subtotal_before_tax', String(calcSubtotalBeforeTax()))
   formData.append('grand_total', String(calcGrandTotal()))
 
   formData.append(
@@ -1181,6 +1266,7 @@ onMounted(async () => {
               variant="text"
               color="secondary"
               @click="goBack"
+              class="text-none"
             >
               Kembali
             </VBtn>
@@ -1370,6 +1456,7 @@ onMounted(async () => {
                       size="small"
                       prepend-icon="tabler-plus"
                       @click="openItemFullscreen"
+                      class="text-none"
                     >
                       Tambah Item
                     </VBtn>
@@ -1380,6 +1467,7 @@ onMounted(async () => {
                       variant="outlined"
                       size="small"
                       @click="resetItems"
+                      class="text-none"
                     >
                       Reset Item
                     </VBtn>
@@ -1458,10 +1546,39 @@ onMounted(async () => {
 
                     <VDivider class="my-4" />
 
-                    <div class="d-flex justify-end">
-                      <div class="item-grand-total">
-                        <span>Grand Total</span>
-                        <strong> Rp {{ formatMoney(calcGrandTotal()) || '0' }}</strong>
+                    <div class="pr-tax-summary-wrapper">
+                      <div class="pr-tax-summary">
+                        <div class="pr-tax-row">
+                          <span>Subtotal Item</span>
+                          <strong>Rp {{ formatMoney(calcSubtotalBeforeTax()) || '0' }}</strong>
+                        </div>
+
+                        <template v-if="isSelectedVendorPkp">
+                          <div class="pr-tax-row">
+                            <span>DPP</span>
+                            <strong>Rp {{ formatMoney(calcDpp()) || '0' }}</strong>
+                          </div>
+
+                          <div class="pr-tax-row">
+                            <span>PPN</span>
+                            <strong>Rp {{ formatMoney(calcPpn()) || '0' }}</strong>
+                          </div>
+                        </template>
+
+                        <div
+                          v-else
+                          class="pr-tax-row pr-tax-row-muted"
+                        >
+                          <span>PPN</span>
+                          <strong>Tidak dihitung</strong>
+                        </div>
+
+                        <VDivider class="my-2" />
+
+                        <div class="pr-tax-row pr-tax-grand-total">
+                          <span>Grand Total</span>
+                          <strong>Rp {{ formatMoney(calcGrandTotal()) || '0' }}</strong>
+                        </div>
                       </div>
                     </div>
                   </VCardText>
@@ -1493,6 +1610,7 @@ onMounted(async () => {
                   item-value="id"
                   clearable
                   density="comfortable"
+                  :disabled="!form.id_department"
                   :loading="isLoadingVendor"
                   :menu-props="{
                     location: 'bottom',
@@ -1502,6 +1620,49 @@ onMounted(async () => {
                   no-data-text="Vendor tidak ditemukan"
                   placeholder="Pilih vendor rekomendasi"
                 >
+                  <template #item="{ props, item }">
+                    <VListItem
+                      v-bind="props"
+                      :title="item.raw?.nama_vendor || item.raw?.label || '-'"
+                    >
+                      <template #subtitle>
+                        <div class="d-flex align-center flex-wrap gap-2 mt-1">
+                          <VChip
+                            size="x-small"
+                            variant="tonal"
+                            :color="normalizeVendorStatusPkp(item.raw?.status_pkp) === 'PKP' ? 'success' : 'secondary'"
+                          >
+                            {{ normalizeVendorStatusPkp(item.raw?.status_pkp) === 'PKP' ? 'PKP' : 'NON PKP' }}
+                          </VChip>
+
+                          <span v-if="item.raw?.jenis_pembayaran">
+                            {{ item.raw.jenis_pembayaran }}
+                          </span>
+
+                          <span v-if="Number(item.raw?.top || 0) > 0">
+                            TOP {{ Number(item.raw?.top || 0) }} Hari
+                          </span>
+                        </div>
+                      </template>
+                    </VListItem>
+                  </template>
+
+                  <template #selection="{ item }">
+                    <div class="d-flex align-center gap-2 text-truncate">
+                      <span class="text-truncate">
+                        {{ item.raw?.nama_vendor || item.raw?.label || '-' }}
+                      </span>
+
+                      <VChip
+                        size="x-small"
+                        variant="tonal"
+                        :color="normalizeVendorStatusPkp(item.raw?.status_pkp) === 'PKP' ? 'success' : 'secondary'"
+                      >
+                        {{ normalizeVendorStatusPkp(item.raw?.status_pkp) === 'PKP' ? 'PKP' : 'NON PKP' }}
+                      </VChip>
+                    </div>
+                  </template>
+
                   <template #append-inner>
                     <VProgressCircular
                       v-if="isLoadingVendor"
@@ -1530,6 +1691,63 @@ onMounted(async () => {
                     </VTooltip>
                   </template>
                 </VAutocomplete>
+              </VCol>
+
+              <VCol cols="12" md="6">
+                <VCard
+                  flat
+                  class="vendor-tax-card"
+                  :class="{ 'vendor-tax-card-pkp': isSelectedVendorPkp }"
+                >
+                  <VCardText class="pa-4">
+                    <div class="d-flex align-start gap-3">
+                      <VAvatar
+                        :color="isSelectedVendorPkp ? 'success' : 'secondary'"
+                        variant="tonal"
+                        size="42"
+                      >
+                        <VIcon icon="tabler-receipt-tax" />
+                      </VAvatar>
+
+                      <div class="flex-grow-1">
+                        <div class="d-flex align-center flex-wrap gap-2 mb-1">
+                          <div class="font-weight-bold">
+                            Status Pajak Vendor
+                          </div>
+
+                          <VChip
+                            size="small"
+                            variant="tonal"
+                            :color="isSelectedVendorPkp ? 'success' : 'secondary'"
+                          >
+                            {{ selectedVendorStatusPkpLabel }}
+                          </VChip>
+                        </div>
+
+                        <div class="text-body-2 text-medium-emphasis">
+                          {{ selectedVendorTaxDescription }}
+                        </div>
+
+                        <div
+                          v-if="selectedRecommendedVendor"
+                          class="vendor-payment-info mt-3"
+                        >
+                          <div>
+                            <span>Jenis Pembayaran</span>
+                            <strong>{{ selectedRecommendedVendor.jenis_pembayaran || '-' }}</strong>
+                          </div>
+
+                          <div>
+                            <span>TOP</span>
+                            <strong>
+                              {{ Number(selectedRecommendedVendor.top || 0) > 0 ? `${Number(selectedRecommendedVendor.top)} Hari` : '-' }}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </VCardText>
+                </VCard>
               </VCol>
 
               <!-- LAMPIRAN -->
@@ -1561,6 +1779,7 @@ onMounted(async () => {
                       variant="outlined"
                       size="small"
                       @click="triggerFileInput"
+                      class="text-none"
                     >
                       + Tambah Lampiran
                     </VBtn>
@@ -2071,4 +2290,102 @@ onMounted(async () => {
   line-height: 1.4;
   resize: vertical;
 }
+
+.pr-tax-summary-wrapper {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pr-tax-summary {
+  width: 100%;
+  max-width: 380px;
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 14px;
+  background: rgba(var(--v-theme-surface), 0.88);
+}
+
+.pr-tax-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 0.875rem;
+  padding-block: 4px;
+}
+
+.pr-tax-row strong {
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  font-weight: 700;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.pr-tax-row-muted strong {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-weight: 600;
+}
+
+.pr-tax-grand-total {
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.pr-tax-grand-total strong {
+  color: rgb(var(--v-theme-primary));
+  font-size: 1.05rem;
+}
+
+.vendor-tax-card {
+  min-height: 100%;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 14px;
+  background: rgba(var(--v-theme-secondary), 0.05);
+}
+
+.vendor-tax-card-pkp {
+  background: rgba(var(--v-theme-success), 0.07);
+  border-color: rgba(var(--v-theme-success), 0.22);
+}
+
+.vendor-payment-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vendor-payment-info > div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(var(--v-theme-surface), 0.76);
+}
+
+.vendor-payment-info span {
+  display: block;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 0.75rem;
+  margin-block-end: 2px;
+}
+
+.vendor-payment-info strong {
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  font-size: 0.875rem;
+}
+
+@media (max-width: 600px) {
+  .pr-tax-summary-wrapper {
+    justify-content: stretch;
+  }
+
+  .pr-tax-summary {
+    max-width: none;
+  }
+
+  .vendor-payment-info {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 </style>

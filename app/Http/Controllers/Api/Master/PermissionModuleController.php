@@ -1065,10 +1065,10 @@ class PermissionModuleController extends Controller
     }
 
     /*
-|--------------------------------------------------------------------------
-| Update Permission pada Module
-|--------------------------------------------------------------------------
-*/
+    |--------------------------------------------------------------------------
+    | Update Permission pada Module
+    |--------------------------------------------------------------------------
+    */
     public function updatePermission(
         Request $request,
         int $moduleId,
@@ -1077,10 +1077,10 @@ class PermissionModuleController extends Controller
         $user = $request->user();
 
         /*
-    |--------------------------------------------------------------------------
-    | Permission
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Permission
+        |--------------------------------------------------------------------------
+        */
         if (
             !$user
             || !$user->hasPermission(
@@ -1095,12 +1095,12 @@ class PermissionModuleController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Validation
-    |--------------------------------------------------------------------------
-    | module, action, dan code sengaja tidak diterima.
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Validation
+        |--------------------------------------------------------------------------
+        | module, action, dan code sengaja tidak diterima.
+        |--------------------------------------------------------------------------
+        */
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -1120,10 +1120,10 @@ class PermissionModuleController extends Controller
         ]);
 
         /*
-    |--------------------------------------------------------------------------
-    | Permission Module
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Permission Module
+        |--------------------------------------------------------------------------
+        */
         $module = PermissionModule::query()
             ->find($moduleId);
 
@@ -1136,12 +1136,12 @@ class PermissionModuleController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Permission Anak
-    |--------------------------------------------------------------------------
-    | Permission harus benar-benar milik module tersebut.
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Permission Anak
+        |--------------------------------------------------------------------------
+        | Permission harus benar-benar milik module tersebut.
+        |--------------------------------------------------------------------------
+        */
         $permission = Permission::query()
             ->where('id', $permissionId)
             ->where('module', $module->code)
@@ -1156,26 +1156,6 @@ class PermissionModuleController extends Controller
         }
 
         $willBeActive = (bool) $validated['is_active'];
-
-        /*
-    |--------------------------------------------------------------------------
-    | Proteksi Permission View
-    |--------------------------------------------------------------------------
-    | Module aktif wajib mempunyai permission *.view yang aktif.
-    | Jangan sampai semua user terkunci karena permission view dimatikan.
-    |--------------------------------------------------------------------------
-    */
-        if (
-            $module->is_active
-            && strtolower((string) $permission->action) === 'view'
-            && !$willBeActive
-        ) {
-            throw ValidationException::withMessages([
-                'is_active' => [
-                    "Permission {$permission->code} tidak dapat dinonaktifkan selama module {$module->code} masih aktif.",
-                ],
-            ]);
-        }
 
         try {
             DB::transaction(
@@ -1258,11 +1238,6 @@ class PermissionModuleController extends Controller
     ): JsonResponse {
         $user = $request->user();
 
-        /*
-    |--------------------------------------------------------------------------
-    | Permission Access
-    |--------------------------------------------------------------------------
-    */
         if (
             !$user
             || !$user->hasPermission(
@@ -1283,11 +1258,6 @@ class PermissionModuleController extends Controller
                     $permissionId,
                     $user,
                 ): JsonResponse {
-                    /*
-                |--------------------------------------------------------------------------
-                | Lock Permission Module
-                |--------------------------------------------------------------------------
-                */
                     $module = PermissionModule::query()
                         ->lockForUpdate()
                         ->find($moduleId);
@@ -1300,11 +1270,6 @@ class PermissionModuleController extends Controller
                         ], 404);
                     }
 
-                    /*
-                |--------------------------------------------------------------------------
-                | Lock Permission Anak
-                |--------------------------------------------------------------------------
-                */
                     $permission = Permission::query()
                         ->where('id', $permissionId)
                         ->where('module', $module->code)
@@ -1321,44 +1286,12 @@ class PermissionModuleController extends Controller
 
                     /*
                 |--------------------------------------------------------------------------
-                | Permission Aktif Tidak Boleh Langsung Dihapus
+                | Dependency Check
                 |--------------------------------------------------------------------------
-                */
-                    if ((bool) $permission->is_active) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Permission masih aktif. Nonaktifkan permission terlebih dahulu sebelum menghapusnya.',
-                            'data' => [
-                                'permission_code' => $permission->code,
-                            ],
-                        ], 422);
-                    }
-
-                    /*
-                |--------------------------------------------------------------------------
-                | Proteksi View Permission
-                |--------------------------------------------------------------------------
-                */
-                    if (
-                        (bool) $module->is_active
-                        && strtolower(
-                            trim(
-                                (string) $permission->action,
-                            ),
-                        ) === 'view'
-                    ) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Permission view tidak dapat dihapus selama Permission Module masih aktif.',
-                            'data' => [
-                                'permission_code' => $permission->code,
-                            ],
-                        ], 422);
-                    }
-
-                    /*
-                |--------------------------------------------------------------------------
-                | Periksa Seluruh Dependency
+                | Permission boleh dihapus walaupun masih aktif.
+                | Permission view juga boleh dihapus walaupun module aktif.
+                | Tapi kalau masih dipakai role/user/route, tetap ditolak agar tidak
+                | meninggalkan data relasi yang rusak.
                 |--------------------------------------------------------------------------
                 */
                     $rolePermissionCount = DB::table(
@@ -1420,17 +1353,13 @@ class PermissionModuleController extends Controller
                         ], 409);
                     }
 
-                    /*
-                |--------------------------------------------------------------------------
-                | Delete Permission
-                |--------------------------------------------------------------------------
-                */
                     $deletedPermission = [
                         'id' => (int) $permission->id,
                         'module' => $permission->module,
                         'action' => $permission->action,
                         'code' => $permission->code,
                         'name' => $permission->name,
+                        'was_active' => (bool) $permission->is_active,
                     ];
 
                     $permission->delete();

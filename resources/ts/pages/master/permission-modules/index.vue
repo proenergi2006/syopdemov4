@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import axiosIns from '@/plugins/axios'
 import {
+  closeAlert,
+  showConfirmAlert,
+  showErrorToast,
+  showLoadingAlert,
+  showSuccessToast,
+} from '@/utils/alert'
+import { getApiErrorMessage } from '@/utils/apiHelper'
+import {
   computed,
   onBeforeUnmount,
   onMounted,
   reactive,
   ref,
   watch,
+  nextTick
 } from 'vue'
 
 interface PermissionModuleItem {
@@ -43,7 +52,7 @@ interface CreateModuleForm {
   sort_order: number
 }
 
-interface CreatePermissionForm {
+interface PermissionForm {
   action: string
   name: string
   description: string
@@ -66,25 +75,42 @@ interface PermissionFieldErrors {
   is_active?: string[]
 }
 
+interface AxiosErrorShape {
+  response?: {
+    status?: number
+    data?: {
+      message?: string
+      debug?: string
+      errors?: Record<string, string[]>
+    }
+  }
+}
+
 const moduleItems = ref<PermissionModuleItem[]>([])
 const permissionItems = ref<PermissionItem[]>([])
 const selectedModule = ref<PermissionModuleItem | null>(null)
+const selectedPermission = ref<PermissionItem | null>(null)
 
 const isLoading = ref(false)
 const isLoadingDetail = ref(false)
 const isSubmitting = ref(false)
 const isSubmittingPermission = ref(false)
+const isSubmittingEditPermission = ref(false)
 const isUpdatingModuleStatus = ref(false)
+const isUpdatingPermissionStatus = ref(false)
+const isDeletingPermission = ref(false)
 
 const isCreateDialogOpen = ref(false)
 const isDetailDialogOpen = ref(false)
 const isCreatePermissionDialogOpen = ref(false)
+const isEditPermissionDialogOpen = ref(false)
 
 const search = ref('')
 const statusFilter = ref<'all' | '1' | '0'>('all')
 
 const createFormRef = ref()
 const createPermissionFormRef = ref()
+const editPermissionFormRef = ref()
 
 const createForm = reactive<CreateModuleForm>({
   code: '',
@@ -94,7 +120,14 @@ const createForm = reactive<CreateModuleForm>({
   sort_order: 0,
 })
 
-const createPermissionForm = reactive<CreatePermissionForm>({
+const createPermissionForm = reactive<PermissionForm>({
+  action: '',
+  name: '',
+  description: '',
+  is_active: true,
+})
+
+const editPermissionForm = reactive<PermissionForm>({
   action: '',
   name: '',
   description: '',
@@ -103,12 +136,7 @@ const createPermissionForm = reactive<CreatePermissionForm>({
 
 const fieldErrors = ref<FieldErrors>({})
 const permissionFieldErrors = ref<PermissionFieldErrors>({})
-
-const snackbar = reactive({
-  show: false,
-  message: '',
-  color: 'success',
-})
+const editPermissionFieldErrors = ref<PermissionFieldErrors>({})
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -155,11 +183,26 @@ const routePrefixPreview = computed(() => {
   return route
 })
 
-const permissionCodePreview = computed(() => {
+const createPermissionCodePreview = computed(() => {
   if (!selectedModule.value)
     return ''
 
   const action = createPermissionForm.action
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+
+  return action
+    ? `${selectedModule.value.code}.${action}`
+    : `${selectedModule.value.code}.action`
+})
+
+const editPermissionCodePreview = computed(() => {
+  if (!selectedModule.value)
+    return ''
+
+  const action = editPermissionForm.action
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
@@ -176,12 +219,6 @@ const hasActiveViewPermission = computed(() => {
       && permission.is_active
   })
 })
-
-function showSnackbar(message: string, color = 'success') {
-  snackbar.message = message
-  snackbar.color = color
-  snackbar.show = true
-}
 
 function resetCreateForm() {
   createForm.code = ''
@@ -224,6 +261,17 @@ function resetCreatePermissionForm() {
   createPermissionFormRef.value?.resetValidation()
 }
 
+function resetEditPermissionForm() {
+  editPermissionForm.action = ''
+  editPermissionForm.name = ''
+  editPermissionForm.description = ''
+  editPermissionForm.is_active = true
+
+  selectedPermission.value = null
+  editPermissionFieldErrors.value = {}
+  editPermissionFormRef.value?.resetValidation()
+}
+
 function openCreatePermissionDialog() {
   if (!selectedModule.value)
     return
@@ -238,6 +286,28 @@ function closeCreatePermissionDialog() {
 
   isCreatePermissionDialogOpen.value = false
   resetCreatePermissionForm()
+}
+
+function openEditPermissionDialog(permission: PermissionItem) {
+  selectedPermission.value = permission
+
+  editPermissionForm.action = permission.action ?? ''
+  editPermissionForm.name = permission.name ?? ''
+  editPermissionForm.description = permission.description ?? ''
+  editPermissionForm.is_active = Boolean(permission.is_active)
+
+  editPermissionFieldErrors.value = {}
+  editPermissionFormRef.value?.resetValidation()
+
+  isEditPermissionDialogOpen.value = true
+}
+
+function closeEditPermissionDialog() {
+  if (isSubmittingEditPermission.value)
+    return
+
+  isEditPermissionDialogOpen.value = false
+  resetEditPermissionForm()
 }
 
 async function fetchModules() {
@@ -279,11 +349,15 @@ async function fetchModules() {
   catch (error: any) {
     moduleItems.value = []
 
-    showSnackbar(
-      error?.response?.data?.message
-      ?? 'Gagal memuat Permission Module.',
-      'error',
-    )
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Gagal Memuat Data',
+      text: getApiErrorMessage(
+        err,
+        'Gagal memuat Permission Module.',
+      ),
+    })
   }
   finally {
     isLoading.value = false
@@ -319,11 +393,15 @@ async function loadModuleDetail(moduleId: number): Promise<boolean> {
     return true
   }
   catch (error: any) {
-    showSnackbar(
-      error?.response?.data?.message
-      ?? 'Gagal memuat detail Permission Module.',
-      'error',
-    )
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Gagal Memuat Detail',
+      text: getApiErrorMessage(
+        err,
+        'Gagal memuat detail Permission Module.',
+      ),
+    })
 
     return false
   }
@@ -351,13 +429,36 @@ function closeDetailDialog() {
     isLoadingDetail.value
     || isUpdatingModuleStatus.value
     || isSubmittingPermission.value
+    || isSubmittingEditPermission.value
+    || isUpdatingPermissionStatus.value
+    || isDeletingPermission.value
   ) {
     return
   }
 
   isDetailDialogOpen.value = false
   selectedModule.value = null
+  selectedPermission.value = null
   permissionItems.value = []
+}
+
+async function hideDetailDialogForAlert() {
+  isDetailDialogOpen.value = false
+  await nextTick()
+}
+
+async function restoreDetailDialogAfterAlert() {
+  if (selectedModule.value) {
+    isDetailDialogOpen.value = true
+    await nextTick()
+  }
+}
+
+async function refreshPermissionModuleData() {
+  await Promise.allSettled([
+    refreshModuleDetail(),
+    fetchModules(),
+  ])
 }
 
 async function refreshModuleDetail() {
@@ -379,6 +480,11 @@ async function submitCreateModule() {
   isSubmitting.value = true
 
   try {
+    showLoadingAlert(
+      'Menyimpan Module',
+      'Mohon tunggu sebentar.',
+    )
+
     const response = await axiosIns.post(
       '/master/permission-modules',
       {
@@ -390,37 +496,55 @@ async function submitCreateModule() {
         sort_order: Number(createForm.sort_order || 0),
         is_active: false,
       },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
     )
+
+    closeAlert()
 
     isCreateDialogOpen.value = false
 
-    showSnackbar(
-      response.data?.message
-      ?? 'Permission Module berhasil dibuat.',
-    )
+    showSuccessToast({
+      title: 'Berhasil',
+      text:
+        response.data?.message
+        ?? 'Permission Module berhasil dibuat.',
+    })
 
     resetCreateForm()
     await fetchModules()
   }
   catch (error: any) {
-    if (error?.response?.status === 422) {
-      fieldErrors.value
-        = error.response.data?.errors ?? {}
+    closeAlert()
 
-      showSnackbar(
-        error.response.data?.message
-        ?? 'Periksa kembali data yang diisi.',
-        'error',
-      )
+    const err = error as AxiosErrorShape
+
+    if (err.response?.status === 422) {
+      fieldErrors.value
+        = err.response.data?.errors ?? {}
+
+      showErrorToast({
+        title: 'Validasi Gagal',
+        text: getApiErrorMessage(
+          err,
+          'Periksa kembali data yang diisi.',
+        ),
+      })
 
       return
     }
 
-    showSnackbar(
-      error?.response?.data?.message
-      ?? 'Gagal membuat Permission Module.',
-      'error',
-    )
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        err,
+        'Gagal membuat Permission Module.',
+      ),
+    })
   }
   finally {
     isSubmitting.value = false
@@ -442,6 +566,11 @@ async function submitCreatePermission() {
   isSubmittingPermission.value = true
 
   try {
+    showLoadingAlert(
+      'Menyimpan Permission',
+      'Mohon tunggu sebentar.',
+    )
+
     const response = await axiosIns.post(
       `/master/permission-modules/${selectedModule.value.id}/permissions`,
       {
@@ -451,14 +580,24 @@ async function submitCreatePermission() {
           createPermissionForm.description.trim() || null,
         is_active: createPermissionForm.is_active,
       },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
     )
+
+    closeAlert()
 
     isCreatePermissionDialogOpen.value = false
 
-    showSnackbar(
-      response.data?.message
-      ?? 'Permission berhasil dibuat.',
-    )
+    showSuccessToast({
+      title: 'Berhasil',
+      text:
+        response.data?.message
+        ?? 'Permission berhasil dibuat.',
+    })
 
     resetCreatePermissionForm()
 
@@ -468,27 +607,127 @@ async function submitCreatePermission() {
     ])
   }
   catch (error: any) {
-    if (error?.response?.status === 422) {
-      permissionFieldErrors.value
-        = error.response.data?.errors ?? {}
+    closeAlert()
 
-      showSnackbar(
-        error.response.data?.message
-        ?? 'Periksa kembali data permission.',
-        'error',
-      )
+    const err = error as AxiosErrorShape
+
+    if (err.response?.status === 422) {
+      permissionFieldErrors.value
+        = err.response.data?.errors ?? {}
+
+      showErrorToast({
+        title: 'Validasi Gagal',
+        text: getApiErrorMessage(
+          err,
+          'Periksa kembali data permission.',
+        ),
+      })
 
       return
     }
 
-    showSnackbar(
-      error?.response?.data?.message
-      ?? 'Gagal membuat permission.',
-      'error',
-    )
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        err,
+        'Gagal membuat permission.',
+      ),
+    })
   }
   finally {
     isSubmittingPermission.value = false
+  }
+}
+
+async function submitUpdatePermission() {
+  if (
+    !selectedModule.value
+    || !selectedPermission.value
+  ) {
+    return
+  }
+
+  editPermissionFieldErrors.value = {}
+
+  const validationResult
+    = await editPermissionFormRef.value?.validate()
+
+  if (!validationResult?.valid)
+    return
+
+  isSubmittingEditPermission.value = true
+
+  try {
+    showLoadingAlert(
+      'Menyimpan Perubahan Permission',
+      'Mohon tunggu sebentar.',
+    )
+
+    const response = await axiosIns.put(
+      `/master/permission-modules/${selectedModule.value.id}/permissions/${selectedPermission.value.id}`,
+      {
+        action: editPermissionForm.action,
+        name: editPermissionForm.name,
+        description:
+          editPermissionForm.description.trim() || null,
+        is_active: editPermissionForm.is_active,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+
+    closeAlert()
+
+    isEditPermissionDialogOpen.value = false
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text:
+        response.data?.message
+        ?? 'Permission berhasil diperbarui.',
+    })
+
+    resetEditPermissionForm()
+
+    await Promise.all([
+      refreshModuleDetail(),
+      fetchModules(),
+    ])
+  }
+  catch (error: any) {
+    closeAlert()
+
+    const err = error as AxiosErrorShape
+
+    if (err.response?.status === 422) {
+      editPermissionFieldErrors.value
+        = err.response.data?.errors ?? {}
+
+      showErrorToast({
+        title: 'Validasi Gagal',
+        text: getApiErrorMessage(
+          err,
+          'Periksa kembali data permission.',
+        ),
+      })
+
+      return
+    }
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        err,
+        'Gagal memperbarui permission.',
+      ),
+    })
+  }
+  finally {
+    isSubmittingEditPermission.value = false
   }
 }
 
@@ -496,11 +735,41 @@ async function updateModuleStatus(nextStatus: boolean) {
   if (!selectedModule.value)
     return
 
+  if (isUpdatingModuleStatus.value)
+    return
+
   const moduleData = selectedModule.value
+
+  await hideDetailDialogForAlert()
+
+  const confirm = await showConfirmAlert({
+    title: nextStatus
+      ? 'Aktifkan Module?'
+      : 'Nonaktifkan Module?',
+    text: nextStatus
+      ? `Module "${moduleData.name}" akan diaktifkan.`
+      : `Module "${moduleData.name}" akan dinonaktifkan.`,
+    confirmButtonText: nextStatus
+      ? 'Ya, Aktifkan'
+      : 'Ya, Nonaktifkan',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) {
+    await restoreDetailDialogAfterAlert()
+    return
+  }
 
   isUpdatingModuleStatus.value = true
 
   try {
+    showLoadingAlert(
+      nextStatus
+        ? 'Mengaktifkan Module'
+        : 'Menonaktifkan Module',
+      'Mohon tunggu sebentar.',
+    )
+
     const response = await axiosIns.put(
       `/master/permission-modules/${moduleData.id}`,
       {
@@ -510,37 +779,218 @@ async function updateModuleStatus(nextStatus: boolean) {
         sort_order: Number(moduleData.sort_order),
         is_active: nextStatus,
       },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
     )
+
+    closeAlert()
 
     selectedModule.value = {
       ...moduleData,
       ...response.data?.data,
     }
 
-    showSnackbar(
-      response.data?.message
-      ?? (
-        nextStatus
-          ? 'Permission Module berhasil diaktifkan.'
-          : 'Permission Module berhasil dinonaktifkan.'
-      ),
-    )
+    showSuccessToast({
+      title: 'Berhasil',
+      text:
+        response.data?.message
+        ?? (
+          nextStatus
+            ? 'Permission Module berhasil diaktifkan.'
+            : 'Permission Module berhasil dinonaktifkan.'
+        ),
+    })
 
-    await Promise.all([
-      fetchModules(),
-      refreshModuleDetail(),
-    ])
+    await refreshPermissionModuleData()
+    await restoreDetailDialogAfterAlert()
   }
   catch (error: any) {
-    showSnackbar(
-      error?.response?.data?.errors?.is_active?.[0]
-      ?? error?.response?.data?.message
-      ?? 'Gagal memperbarui status Permission Module.',
-      'error',
-    )
+    closeAlert()
+
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        err,
+        'Gagal memperbarui status Permission Module.',
+      ),
+    })
+
+    await restoreDetailDialogAfterAlert()
   }
   finally {
     isUpdatingModuleStatus.value = false
+  }
+}
+
+async function updatePermissionStatus(
+  permission: PermissionItem,
+  nextStatus: boolean,
+) {
+  if (!selectedModule.value)
+    return
+
+  if (isUpdatingPermissionStatus.value)
+    return
+
+  await hideDetailDialogForAlert()
+
+  const confirm = await showConfirmAlert({
+    title: nextStatus
+      ? 'Aktifkan Permission?'
+      : 'Nonaktifkan Permission?',
+    text: nextStatus
+      ? `Permission "${permission.name}" akan diaktifkan.`
+      : `Permission "${permission.name}" akan dinonaktifkan.`,
+    confirmButtonText: nextStatus
+      ? 'Ya, Aktifkan'
+      : 'Ya, Nonaktifkan',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) {
+    await restoreDetailDialogAfterAlert()
+    return
+  }
+
+  isUpdatingPermissionStatus.value = true
+
+  try {
+    showLoadingAlert(
+      nextStatus
+        ? 'Mengaktifkan Permission'
+        : 'Menonaktifkan Permission',
+      'Mohon tunggu sebentar.',
+    )
+
+    const moduleId = selectedModule.value.id
+
+    const response = await axiosIns.put(
+      `/master/permission-modules/${moduleId}/permissions/${permission.id}`,
+      {
+        action: permission.action,
+        name: permission.name,
+        description: permission.description,
+        is_active: nextStatus,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+
+    closeAlert()
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text:
+        response.data?.message
+        ?? (
+          nextStatus
+            ? 'Permission berhasil diaktifkan.'
+            : 'Permission berhasil dinonaktifkan.'
+        ),
+    })
+
+    await refreshPermissionModuleData()
+    await restoreDetailDialogAfterAlert()
+  }
+  catch (error: any) {
+    closeAlert()
+
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        err,
+        'Gagal memperbarui status permission.',
+      ),
+    })
+
+    await restoreDetailDialogAfterAlert()
+  }
+  finally {
+    isUpdatingPermissionStatus.value = false
+  }
+}
+
+async function deletePermission(permission: PermissionItem) {
+  if (!selectedModule.value)
+    return
+
+  if (isDeletingPermission.value)
+    return
+
+  await hideDetailDialogForAlert()
+
+  const confirm = await showConfirmAlert({
+    title: 'Hapus Permission?',
+    text: `Permission "${permission.name}" akan dihapus. Permission yang sudah digunakan role/user kemungkinan akan ditolak oleh sistem.`,
+    confirmButtonText: 'Ya, Hapus',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) {
+    await restoreDetailDialogAfterAlert()
+    return
+  }
+
+  isDeletingPermission.value = true
+
+  try {
+    showLoadingAlert(
+      'Menghapus Permission',
+      'Mohon tunggu sebentar.',
+    )
+
+    const moduleId = selectedModule.value.id
+
+    const response = await axiosIns.delete(
+      `/master/permission-modules/${moduleId}/permissions/${permission.id}`,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    closeAlert()
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text:
+        response.data?.message
+        ?? 'Permission berhasil dihapus.',
+    })
+
+    await refreshPermissionModuleData()
+    await restoreDetailDialogAfterAlert()
+  }
+  catch (error: any) {
+    closeAlert()
+
+    const err = error as AxiosErrorShape
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        err,
+        'Gagal menghapus permission.',
+      ),
+    })
+
+    await restoreDetailDialogAfterAlert()
+  }
+  finally {
+    isDeletingPermission.value = false
   }
 }
 
@@ -569,44 +1019,51 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
-    <div
-      class="d-flex flex-wrap align-center justify-space-between gap-4 mb-6"
-    >
-      <div>
-        <h4 class="text-h4">
-          Permission Modules
-        </h4>
+    <VCard class="mb-6">
+      <VCardText>
+        <div class="d-flex flex-wrap align-center justify-space-between gap-4">
+          <div>
+            <h4 class="text-h4 mb-1">
+              Permission Modules
+            </h4>
 
-        <p class="text-body-1 mb-0 text-medium-emphasis">
-          Kelola module, route prefix, dan permission aplikasi.
-        </p>
-      </div>
+            <p class="text-body-1 mb-0 text-medium-emphasis">
+              Kelola module, route prefix, dan permission aplikasi.
+            </p>
+          </div>
 
-      <div class="d-flex align-center gap-3">
-        <VBtn
-          variant="outlined"
-          prepend-icon="tabler-refresh"
-          :loading="isLoading"
-          @click="fetchModules"
-        >
-          Refresh
-        </VBtn>
+          <div class="d-flex align-center gap-3">
+            <VBtn
+              variant="outlined"
+              prepend-icon="tabler-refresh"
+              :loading="isLoading"
+              @click="fetchModules"
+              class="text-none"
+            >
+              Refresh
+            </VBtn>
 
-        <VBtn
-          v-permission="'auth_permission_module.create'"
-          color="primary"
-          prepend-icon="tabler-plus"
-          @click="openCreateDialog"
-        >
-          Tambah Module
-        </VBtn>
-      </div>
-    </div>
+            <VBtn
+              v-permission="'auth_permission_module.create'"
+              color="primary"
+              prepend-icon="tabler-plus"
+              @click="openCreateDialog"
+              class="text-none"
+            >
+              Tambah Module
+            </VBtn>
+          </div>
+        </div>
+      </VCardText>
+    </VCard>
 
     <VCard>
       <VCardText>
         <VRow>
-          <VCol cols="12" md="8">
+          <VCol
+            cols="12"
+            md="8"
+          >
             <VTextField
               v-model="search"
               label="Cari Permission Module"
@@ -617,7 +1074,10 @@ onBeforeUnmount(() => {
             />
           </VCol>
 
-          <VCol cols="12" md="4">
+          <VCol
+            cols="12"
+            md="4"
+          >
             <VSelect
               v-model="statusFilter"
               :items="statusOptions"
@@ -655,10 +1115,18 @@ onBeforeUnmount(() => {
               <th>Module</th>
               <th>Code</th>
               <th>Route Prefix</th>
-              <th class="text-center">Permissions</th>
-              <th class="text-center">Urutan</th>
-              <th class="text-center">Status</th>
-              <th class="text-center">Aksi</th>
+              <th class="text-center">
+                Permissions
+              </th>
+              <th class="text-center">
+                Urutan
+              </th>
+              <th class="text-center">
+                Status
+              </th>
+              <th class="text-center">
+                Aksi
+              </th>
             </tr>
           </thead>
 
@@ -693,7 +1161,10 @@ onBeforeUnmount(() => {
                 </td>
 
                 <td>
-                  <VChip size="small" variant="tonal">
+                  <VChip
+                    size="small"
+                    variant="tonal"
+                  >
                     {{ item.code }}
                   </VChip>
                 </td>
@@ -735,6 +1206,7 @@ onBeforeUnmount(() => {
                     variant="tonal"
                     prepend-icon="tabler-settings"
                     @click="openDetailDialog(item)"
+                    class="text-none"
                   >
                     Kelola
                   </VBtn>
@@ -761,9 +1233,7 @@ onBeforeUnmount(() => {
       persistent
     >
       <VCard>
-        <VCardTitle
-          class="d-flex align-center justify-space-between px-6 py-5"
-        >
+        <VCardTitle class="d-flex align-center justify-space-between px-6 py-5">
           <div>
             <div class="text-h5 font-weight-medium">
               Tambah Permission Module
@@ -805,7 +1275,10 @@ onBeforeUnmount(() => {
             </VAlert>
 
             <VRow>
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VTextField
                   v-model="createForm.name"
                   label="Nama Module"
@@ -817,7 +1290,10 @@ onBeforeUnmount(() => {
                 />
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VTextField
                   v-model="createForm.code"
                   label="Code Module"
@@ -846,7 +1322,10 @@ onBeforeUnmount(() => {
                 />
               </VCol>
 
-              <VCol cols="12" md="8">
+              <VCol
+                cols="12"
+                md="8"
+              >
                 <VTextField
                   v-model="createForm.route_prefix"
                   label="Route Prefix"
@@ -864,7 +1343,10 @@ onBeforeUnmount(() => {
                 />
               </VCol>
 
-              <VCol cols="12" md="4">
+              <VCol
+                cols="12"
+                md="4"
+              >
                 <VTextField
                   v-model.number="createForm.sort_order"
                   label="Urutan"
@@ -911,9 +1393,7 @@ onBeforeUnmount(() => {
       persistent
     >
       <VCard>
-        <VCardTitle
-          class="d-flex align-center justify-space-between px-6 py-5"
-        >
+        <VCardTitle class="d-flex align-center justify-space-between px-6 py-5">
           <div>
             <div class="text-h5 font-weight-medium">
               Kelola Permission Module
@@ -935,6 +1415,9 @@ onBeforeUnmount(() => {
               isLoadingDetail
                 || isUpdatingModuleStatus
                 || isSubmittingPermission
+                || isSubmittingEditPermission
+                || isUpdatingPermissionStatus
+                || isDeletingPermission
             "
             @click="closeDetailDialog"
           >
@@ -955,7 +1438,10 @@ onBeforeUnmount(() => {
           class="pa-6"
         >
           <VRow class="mb-2">
-            <VCol cols="12" md="4">
+            <VCol
+              cols="12"
+              md="4"
+            >
               <VCard
                 variant="tonal"
                 color="primary"
@@ -973,8 +1459,14 @@ onBeforeUnmount(() => {
               </VCard>
             </VCol>
 
-            <VCol cols="12" md="5">
-              <VCard variant="tonal" class="h-100">
+            <VCol
+              cols="12"
+              md="5"
+            >
+              <VCard
+                variant="tonal"
+                class="h-100"
+              >
                 <VCardText>
                   <div class="text-caption mb-2">
                     Route Prefix
@@ -987,8 +1479,14 @@ onBeforeUnmount(() => {
               </VCard>
             </VCol>
 
-            <VCol cols="12" md="3">
-              <VCard variant="tonal" class="h-100">
+            <VCol
+              cols="12"
+              md="3"
+            >
+              <VCard
+                variant="tonal"
+                class="h-100"
+              >
                 <VCardText>
                   <div class="text-caption mb-2">
                     Status Module
@@ -1038,9 +1536,7 @@ onBeforeUnmount(() => {
             tersedia dan berstatus aktif.
           </VAlert>
 
-          <div
-            class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4"
-          >
+          <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
             <div>
               <h5 class="text-h5">
                 Daftar Permission
@@ -1054,6 +1550,7 @@ onBeforeUnmount(() => {
 
             <div class="d-flex flex-wrap align-center gap-3">
               <VBtn
+                class="text-none"
                 v-permission="'auth_permission_module.update'"
                 :color="
                   selectedModule.is_active
@@ -1070,6 +1567,9 @@ onBeforeUnmount(() => {
                 :disabled="
                   isLoadingDetail
                     || isSubmittingPermission
+                    || isSubmittingEditPermission
+                    || isUpdatingPermissionStatus
+                    || isDeletingPermission
                 "
                 @click="
                   updateModuleStatus(
@@ -1091,8 +1591,12 @@ onBeforeUnmount(() => {
                 :disabled="
                   isLoadingDetail
                     || isUpdatingModuleStatus
+                    || isSubmittingEditPermission
+                    || isUpdatingPermissionStatus
+                    || isDeletingPermission
                 "
                 @click="openCreatePermissionDialog"
+                class="text-none"
               >
                 Tambah Permission
               </VBtn>
@@ -1101,8 +1605,15 @@ onBeforeUnmount(() => {
                 variant="outlined"
                 prepend-icon="tabler-refresh"
                 :loading="isLoadingDetail"
-                :disabled="isUpdatingModuleStatus"
+                :disabled="
+                  isUpdatingModuleStatus
+                    || isSubmittingPermission
+                    || isSubmittingEditPermission
+                    || isUpdatingPermissionStatus
+                    || isDeletingPermission
+                "
                 @click="refreshModuleDetail"
+                class="text-none"
               >
                 Refresh
               </VBtn>
@@ -1124,14 +1635,19 @@ onBeforeUnmount(() => {
                   <th>Permission</th>
                   <th>Action</th>
                   <th>Code</th>
-                  <th class="text-center">Status</th>
+                  <th class="text-center">
+                    Status
+                  </th>
+                  <th class="text-center">
+                    Aksi
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 <tr v-if="isLoadingDetail">
                   <td
-                    colspan="4"
+                    colspan="5"
                     class="text-center py-8 text-medium-emphasis"
                   >
                     Memuat permission...
@@ -1159,7 +1675,10 @@ onBeforeUnmount(() => {
                     </td>
 
                     <td>
-                      <VChip size="small" variant="tonal">
+                      <VChip
+                        size="small"
+                        variant="tonal"
+                      >
                         {{ permission.action }}
                       </VChip>
                     </td>
@@ -1185,11 +1704,109 @@ onBeforeUnmount(() => {
                         }}
                       </VChip>
                     </td>
+
+                    <td class="text-center">
+                      <div class="d-flex justify-center gap-2">
+                        <VBtn
+                          v-permission="'auth_permission_module.update'"
+                          icon
+                          size="small"
+                          color="primary"
+                          variant="tonal"
+                          :disabled="
+                            isLoadingDetail
+                              || isUpdatingModuleStatus
+                              || isSubmittingPermission
+                              || isSubmittingEditPermission
+                              || isUpdatingPermissionStatus
+                              || isDeletingPermission
+                          "
+                          @click="openEditPermissionDialog(permission)"
+                        >
+                          <VIcon icon="tabler-edit" />
+                          <VTooltip
+                            activator="parent"
+                            location="top"
+                          >
+                            Edit Permission
+                          </VTooltip>
+                        </VBtn>
+
+                        <VBtn
+                          v-permission="'auth_permission_module.update'"
+                          icon
+                          size="small"
+                          :color="
+                            permission.is_active
+                              ? 'warning'
+                              : 'success'
+                          "
+                          variant="tonal"
+                          :loading="isUpdatingPermissionStatus"
+                          :disabled="
+                            isLoadingDetail
+                              || isUpdatingModuleStatus
+                              || isSubmittingPermission
+                              || isSubmittingEditPermission
+                              || isDeletingPermission
+                          "
+                          @click="
+                            updatePermissionStatus(
+                              permission,
+                              !permission.is_active,
+                            )
+                          "
+                        >
+                          <VIcon
+                            :icon="
+                              permission.is_active
+                                ? 'tabler-eye-off'
+                                : 'tabler-eye'
+                            "
+                          />
+                          <VTooltip
+                            activator="parent"
+                            location="top"
+                          >
+                            {{
+                              permission.is_active
+                                ? 'Nonaktifkan Permission'
+                                : 'Aktifkan Permission'
+                            }}
+                          </VTooltip>
+                        </VBtn>
+
+                        <VBtn
+                          v-permission="'auth_permission_module.delete'"
+                          icon
+                          size="small"
+                          color="error"
+                          variant="tonal"
+                          :loading="isDeletingPermission"
+                          :disabled="
+                            isLoadingDetail
+                              || isUpdatingModuleStatus
+                              || isSubmittingPermission
+                              || isSubmittingEditPermission
+                              || isUpdatingPermissionStatus
+                          "
+                          @click="deletePermission(permission)"
+                        >
+                          <VIcon icon="tabler-trash" />
+                          <VTooltip
+                            activator="parent"
+                            location="top"
+                          >
+                            Hapus Permission
+                          </VTooltip>
+                        </VBtn>
+                      </div>
+                    </td>
                   </tr>
 
                   <tr v-if="permissionItems.length === 0">
                     <td
-                      colspan="4"
+                      colspan="5"
                       class="text-center py-8 text-medium-emphasis"
                     >
                       Module ini belum mempunyai permission.
@@ -1210,6 +1827,9 @@ onBeforeUnmount(() => {
               isLoadingDetail
                 || isUpdatingModuleStatus
                 || isSubmittingPermission
+                || isSubmittingEditPermission
+                || isUpdatingPermissionStatus
+                || isDeletingPermission
             "
             @click="closeDetailDialog"
           >
@@ -1225,9 +1845,7 @@ onBeforeUnmount(() => {
       persistent
     >
       <VCard>
-        <VCardTitle
-          class="d-flex align-center justify-space-between px-6 py-5"
-        >
+        <VCardTitle class="d-flex align-center justify-space-between px-6 py-5">
           <div>
             <div class="text-h5 font-weight-medium">
               Tambah Permission
@@ -1278,20 +1896,26 @@ onBeforeUnmount(() => {
             </VAlert>
 
             <VRow>
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VTextField
                   v-model="createPermissionForm.action"
                   label="Action"
                   placeholder="Contoh: view"
                   :rules="[requiredRule]"
                   :error-messages="permissionFieldErrors.action"
-                  :hint="`Code permission: ${permissionCodePreview}`"
+                  :hint="`Code permission: ${createPermissionCodePreview}`"
                   persistent-hint
                   maxlength="50"
                 />
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VTextField
                   v-model="createPermissionForm.name"
                   label="Nama Permission"
@@ -1354,13 +1978,126 @@ onBeforeUnmount(() => {
       </VCard>
     </VDialog>
 
-    <VSnackbar
-      v-model="snackbar.show"
-      :color="snackbar.color"
-      location="top end"
-      timeout="4000"
+    <VDialog
+      v-model="isEditPermissionDialogOpen"
+      max-width="700"
+      persistent
     >
-      {{ snackbar.message }}
-    </VSnackbar>
+      <VCard>
+        <VCardTitle class="d-flex align-center justify-space-between px-6 py-5">
+          <div>
+            <div class="text-h5 font-weight-medium">
+              Edit Permission
+            </div>
+
+            <div
+              v-if="selectedModule"
+              class="text-body-2 text-medium-emphasis mt-1"
+            >
+              Module:
+              <code>{{ selectedModule.code }}</code>
+            </div>
+          </div>
+
+          <VBtn
+            icon
+            variant="text"
+            color="secondary"
+            :disabled="isSubmittingEditPermission"
+            @click="closeEditPermissionDialog"
+          >
+            <VIcon icon="tabler-x" />
+          </VBtn>
+        </VCardTitle>
+
+        <VDivider />
+
+        <VForm
+          ref="editPermissionFormRef"
+          @submit.prevent="submitUpdatePermission"
+        >
+          <VCardText class="pa-6">
+            <VRow>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VTextField
+                  v-model="editPermissionForm.action"
+                  label="Action"
+                  placeholder="Contoh: view"
+                  :rules="[requiredRule]"
+                  :error-messages="editPermissionFieldErrors.action"
+                  :hint="`Code permission: ${editPermissionCodePreview}`"
+                  persistent-hint
+                  maxlength="50"
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VTextField
+                  v-model="editPermissionForm.name"
+                  label="Nama Permission"
+                  placeholder="Contoh: Lihat Master Customer"
+                  :rules="[requiredRule]"
+                  :error-messages="editPermissionFieldErrors.name"
+                  maxlength="150"
+                  hide-details="auto"
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <VTextarea
+                  v-model="editPermissionForm.description"
+                  label="Deskripsi"
+                  placeholder="Jelaskan akses yang diberikan permission ini"
+                  :error-messages="editPermissionFieldErrors.description"
+                  rows="3"
+                  auto-grow
+                  hide-details="auto"
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <VSwitch
+                  v-model="editPermissionForm.is_active"
+                  label="Permission aktif"
+                  color="success"
+                  inset
+                  :error-messages="editPermissionFieldErrors.is_active"
+                  hide-details="auto"
+                />
+              </VCol>
+            </VRow>
+          </VCardText>
+
+          <VDivider />
+
+          <VCardActions class="justify-end gap-3 px-6 py-4">
+            <VBtn
+              variant="outlined"
+              color="secondary"
+              :disabled="isSubmittingEditPermission"
+              @click="closeEditPermissionDialog"
+            >
+              Batal
+            </VBtn>
+
+            <VBtn
+              v-permission="'auth_permission_module.update'"
+              type="submit"
+              color="primary"
+              prepend-icon="tabler-device-floppy"
+              :loading="isSubmittingEditPermission"
+            >
+              Simpan Perubahan
+            </VBtn>
+          </VCardActions>
+        </VForm>
+      </VCard>
+    </VDialog>
   </div>
 </template>

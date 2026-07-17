@@ -12,7 +12,7 @@ import {
   closeAlert,
   showConfirmAlert,
 } from '@/utils/alert'
-
+import { useNavigationStore } from '@/stores/navigation'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { useNativeDatePicker } from '@core/composable/useNativeDatePicker'
 import { useDeleteConfirm } from '@core/composable/useDeleteConfirm'
@@ -86,6 +86,8 @@ interface AxiosErrorShape {
 
 const permissionStore = usePermissionStore()
 
+const navigationStore = useNavigationStore()
+
 const canView = computed(() => {
   return permissionStore.can('purchase_order.view')
 })
@@ -138,6 +140,7 @@ const printLoadingId = ref<string | null>(null)
 
 const searchQuery = ref('')
 const selectedStatus = ref('')
+const onlyWaitingMyApproval = ref(false)
 
 const tanggalMulai = ref<string | null>(null)
 const tanggalSelesai = ref<string | null>(null)
@@ -251,6 +254,161 @@ const detailItemTotalPage = computed(() => {
 
 const detailItems = computed(() => detailPurchaseOrder.value?.items || [])
 
+
+type SimpleApprovalHistory = {
+  id: number | string
+  step_order: number
+  label: string
+  status: string
+  processed_by: string
+  processed_at: string | null
+  notes: string | null
+}
+
+const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
+  const detail = detailPurchaseOrder.value as any
+
+  const rawHistories =
+    detail?.approvals
+    ?? detail?.approval_histories
+    ?? detail?.approvalHistories
+    ?? detail?.approval_history
+    ?? detail?.approvalHistory
+    ?? []
+
+  if (!Array.isArray(rawHistories))
+    return []
+
+  return rawHistories
+    .filter((item: any) => {
+      const status = String(
+        item.status
+        ?? item.result
+        ?? item.action
+        ?? item.approval_status
+        ?? '',
+      ).toUpperCase()
+
+      return ['APPROVED', 'APPROVE', 'REJECTED', 'REJECT'].includes(status)
+    })
+    .map((item: any, index: number): SimpleApprovalHistory => {
+      const stepOrder = Number(
+        item.step_order
+        ?? item.approval_step_order
+        ?? item.step
+        ?? index + 1,
+      )
+
+      return {
+        id: item.id ?? `${stepOrder}-${index}`,
+        step_order: stepOrder,
+        label:
+          item.label
+          ?? item.approval_label
+          ?? item.position
+          ?? item.role_name
+          ?? item.role
+          ?? item.title
+          ?? `Tahap ${stepOrder}`,
+        status: String(
+          item.status
+          ?? item.result
+          ?? item.action
+          ?? item.approval_status
+          ?? '',
+        ).toUpperCase(),
+        processed_by:
+          item.processed_by_name
+          ?? item.approved_by_name
+          ?? item.rejected_by_name
+          ?? item.user_name
+          ?? item.approver_name
+          ?? item.approver_name_snapshot
+          ?? item.processor_name
+          ?? '-',
+        processed_at:
+          item.processed_at
+          ?? item.approved_at
+          ?? item.rejected_at
+          ?? item.signed_at
+          ?? item.updated_at
+          ?? item.created_at
+          ?? null,
+        notes:
+          item.notes
+          ?? item.remark
+          ?? item.keterangan
+          ?? null,
+      }
+    })
+    .sort((a, b) => {
+      if (a.step_order !== b.step_order)
+        return a.step_order - b.step_order
+
+      return String(a.id).localeCompare(String(b.id))
+    })
+})
+
+const getSimpleApprovalStatusLabel = (status: string): string => {
+  const normalized = String(status || '').toUpperCase()
+
+  if (['APPROVED', 'APPROVE'].includes(normalized))
+    return 'Approved'
+
+  if (['REJECTED', 'REJECT'].includes(normalized))
+    return 'Rejected'
+
+  if (['PENDING', 'WAITING', 'WAITING_APPROVAL'].includes(normalized))
+    return 'Pending'
+
+  if (['SKIPPED', 'SKIP'].includes(normalized))
+    return 'Skipped'
+
+  if (!normalized)
+    return '-'
+
+  return normalized
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, char => char.toUpperCase())
+}
+
+const getSimpleApprovalStatusColor = (status: string): string => {
+  const normalized = String(status || '').toUpperCase()
+
+  if (['APPROVED', 'APPROVE'].includes(normalized))
+    return 'success'
+
+  if (['REJECTED', 'REJECT'].includes(normalized))
+    return 'error'
+
+  if (['PENDING', 'WAITING', 'WAITING_APPROVAL'].includes(normalized))
+    return 'warning'
+
+  if (['SKIPPED', 'SKIP'].includes(normalized))
+    return 'secondary'
+
+  return 'primary'
+}
+
+const getSimpleApprovalStatusIcon = (status: string): string => {
+  const normalized = String(status || '').toUpperCase()
+
+  if (['APPROVED', 'APPROVE'].includes(normalized))
+    return 'tabler-circle-check'
+
+  if (['REJECTED', 'REJECT'].includes(normalized))
+    return 'tabler-circle-x'
+
+  if (['PENDING', 'WAITING', 'WAITING_APPROVAL'].includes(normalized))
+    return 'tabler-clock'
+
+  if (['SKIPPED', 'SKIP'].includes(normalized))
+    return 'tabler-player-skip-forward'
+
+  return 'tabler-circle-dot'
+}
+
 const statusItems = [
   { title: 'Semua', value: '' },
   { title: 'Draft', value: 'Draft' },
@@ -330,9 +488,9 @@ const loadCurrentUser = async (): Promise<void> => {
 
     currentUser.value = res.data?.data || null
 
-    console.log('CURRENT USER', currentUser.value)
+    // console.log('CURRENT USER', currentUser.value)
   } catch (error) {
-    console.error('[AUTH] Failed load current user', error)
+    // console.error('[AUTH] Failed load current user', error)
     currentUser.value = null
   }
 }
@@ -357,6 +515,7 @@ const fetchPurchaseOrders = async (): Promise<void> => {
           status: selectedStatus.value || undefined,
           tanggal_mulai: tanggalMulai.value || undefined,
           tanggal_selesai: tanggalSelesai.value || undefined,
+          waiting_my_approval: onlyWaitingMyApproval.value ? 1 : undefined,
           page: currentPage.value,
           per_page: rowPerPage.value,
         },
@@ -490,6 +649,7 @@ const rejectPurchaseOrder = async (): Promise<void> => {
     })
 
     await fetchPurchaseOrders()
+    await navigationStore.refreshBadges()
   } catch (error: unknown) {
     closeAlert()
 
@@ -948,6 +1108,7 @@ const resetFilters = async (): Promise<void> => {
   selectedStatus.value = ''
   tanggalMulai.value = null
   tanggalSelesai.value = null
+  onlyWaitingMyApproval.value = false
   currentPage.value = 1
 
   await fetchPurchaseOrders()
@@ -1054,6 +1215,7 @@ const submitPurchaseOrder = async (): Promise<void> => {
     })
 
     await fetchPurchaseOrders()
+    await navigationStore.refreshBadges()
   } catch (error: unknown) {
     closeAlert()
 
@@ -1197,6 +1359,7 @@ const approvePurchaseOrder = async (): Promise<void> => {
     pendingAction.value = null
 
     await fetchPurchaseOrders()
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1233,7 +1396,7 @@ watch(rowPerPage, async () => {
   await fetchPurchaseOrders()
 })
 
-watch([searchQuery, selectedStatus, tanggalMulai, tanggalSelesai], async () => {
+watch([searchQuery, selectedStatus, tanggalMulai, tanggalSelesai, onlyWaitingMyApproval], async () => {
   currentPage.value = 1
   await fetchPurchaseOrders()
 })
@@ -1323,20 +1486,64 @@ onBeforeUnmount(() => {
 <template>
   <section>
     <!-- Filters -->
-    <VCard title="Filters" class="mb-6">
-      <VCardText>
-        <VRow>
-          <VCol cols="12" sm="3">
+    <VCard class="mb-6 po-filter-card">
+      <VCardText class="pa-5">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-5">
+          <div class="d-flex align-center gap-3">
+            <VAvatar
+              size="44"
+              color="primary"
+              variant="tonal"
+            >
+              <VIcon
+                icon="tabler-filter"
+                size="24"
+              />
+            </VAvatar>
+
+            <div>
+              <div class="text-h5 font-weight-bold">
+                Filters
+              </div>
+
+              <div class="text-body-2 text-medium-emphasis mt-1">
+                Filter data Purchase Order berdasarkan keyword, tanggal, status, dan approval.
+              </div>
+            </div>
+          </div>
+
+          <VBtn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="tabler-refresh"
+            class="text-none"
+            :disabled="loading"
+            @click="resetFilters"
+          >
+            Reset Filter
+          </VBtn>
+        </div>
+
+        <VRow class="po-filter-grid">
+          <VCol
+            cols="12"
+            md="4"
+          >
             <VTextField
               v-model="searchQuery"
-              label="Cari kode PO"
-              placeholder="Cari purchase order..."
+              label="Cari data"
+              placeholder="Cari nomor PO, vendor, cabang, department..."
               density="compact"
+              prepend-inner-icon="tabler-search"
               clearable
+              hide-details
             />
           </VCol>
 
-          <VCol cols="12" sm="3">
+          <VCol
+            cols="12"
+            md="4"
+          >
             <AppDateTimePicker
               v-model="tanggalMulai"
               label="Tanggal Awal"
@@ -1346,7 +1553,10 @@ onBeforeUnmount(() => {
             />
           </VCol>
 
-          <VCol cols="12" sm="3">
+          <VCol
+            cols="12"
+            md="4"
+          >
             <AppDateTimePicker
               v-model="tanggalSelesai"
               label="Tanggal Akhir"
@@ -1356,29 +1566,56 @@ onBeforeUnmount(() => {
             />
           </VCol>
 
-          <VCol cols="12" sm="3">
+          <VCol
+            cols="12"
+            md="3"
+          >
             <VSelect
               v-model="selectedStatus"
-              label="Status"
+              label="Status Approval"
               :items="statusItems"
               item-title="title"
               item-value="value"
               density="compact"
+              prepend-inner-icon="tabler-progress-check"
+              hide-details
             />
           </VCol>
-        </VRow>
 
-        <VRow class="mt-1">
-          <VCol cols="12" class="d-flex justify-end">
-            <VBtn
-              color="secondary"
-              prepend-icon="tabler-refresh"
-              @click="resetFilters"
-              class="text-none"
-              block
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <div
+              class="approval-filter-box"
+              :class="{ 'is-active': onlyWaitingMyApproval }"
             >
-              Reset Filter
-            </VBtn>
+              <div class="d-flex align-center gap-3 min-w-0">
+                <VAvatar
+                  size="34"
+                  :color="onlyWaitingMyApproval ? 'warning' : 'secondary'"
+                  variant="tonal"
+                >
+                  <VIcon
+                    icon="tabler-user-check"
+                    size="19"
+                  />
+                </VAvatar>
+
+                <div class="min-w-0">
+                  <div class="text-caption text-medium-emphasis approval-filter-subtitle">
+                    Tampilkan hanya PO yang perlu saya approve.
+                  </div>
+                </div>
+              </div>
+
+              <VSwitch
+                v-model="onlyWaitingMyApproval"
+                color="warning"
+                inset
+                hide-details
+              />
+            </div>
           </VCol>
         </VRow>
       </VCardText>
@@ -1425,7 +1662,7 @@ onBeforeUnmount(() => {
             <th scope="col" class="text-center">Cabang</th>
             <th scope="col" class="text-center">Department</th>
             <th scope="col" class="text-right">Total</th>
-            <th scope="col" class="text-center">Status Pengajuan</th>
+            <th scope="col" class="text-center">Status Approval</th>
             <th scope="col" class="text-center">Status GR</th>
             <th scope="col" class="text-center" style="width: 5rem;">Actions</th>
           </tr>
@@ -1440,26 +1677,165 @@ onBeforeUnmount(() => {
             </td>
 
             <td>
-              <div class="d-flex flex-column gap-1 text-center">
-                <div class="font-weight-medium">
-                  {{ v.nomor_po || '-' }}
-                </div>
+              <VMenu location="bottom start">
+                <template #activator="{ props }">
+                  <div
+                    v-bind="props"
+                    class="po-number-action d-inline-flex flex-column gap-1"
+                  >
+                    <div class="d-flex align-center justify-center gap-1 font-weight-medium text-primary">
+                      <span>{{ v.nomor_po || '-' }}</span>
 
-                <VChip
-                  v-if="canApprovePO(v)"
-                  size="x-small"
-                  color="warning"
-                  variant="tonal"
-                  class="po-approval-chip"
-                >
-                  <VIcon
-                    icon="tabler-alert-circle"
-                    size="14"
-                    start
-                  />
-                  Menunggu Approval Anda
-                </VChip>
-              </div>
+                      <VIcon
+                        icon="tabler-chevron-down"
+                        size="16"
+                      />
+                    </div>
+
+                    <VChip
+                      v-if="canApprovePO(v)"
+                      size="x-small"
+                      color="warning"
+                      variant="tonal"
+                      class="po-approval-chip"
+                    >
+                      <VIcon
+                        icon="tabler-alert-circle"
+                        size="14"
+                        start
+                      />
+                      Menunggu Approval Anda
+                    </VChip>
+                  </div>
+                </template>
+
+                  <VList>
+                    <VListItem
+                      href="javascript:void(0)"
+                      @click="openDetail(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon icon="tabler-eye" :size="20" class="me-3" />
+                      </template>
+
+                      <VListItemTitle>
+                        Lihat Detail
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem @click="openApprovalHistory(v)">
+                      <template #prepend>
+                        <VIcon icon="tabler-history" :size="20" class="me-3" />
+                      </template>
+
+                      <VListItemTitle>History Approval</VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(v.status).toLowerCase() === 'approved'
+                        && String(v.status).toLowerCase() !== 'rejected'
+                      "
+                      href="javascript:void(0)"
+                      :disabled="printLoadingId === v.public_id"
+                      @click="openPrintLanguageDialog(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VProgressCircular
+                          v-if="printLoadingId === v.public_id"
+                          indeterminate
+                          size="18"
+                          width="2"
+                          class="me-3"
+                        />
+
+                        <VIcon
+                          v-else
+                          icon="tabler-printer"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        {{
+                          printLoadingId === v.public_id
+                            ? 'Membuka...'
+                            : 'Cetak'
+                        }}
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="canApprovePO(v)"
+                      @click="openApprovePO(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-circle-check"
+                          :size="20"
+                          class="me-3 text-success"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-success">
+                        Approve
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="canApprovePO(v)"
+                      @click="openRejectPO(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-close-circle-outline"
+                          :size="20"
+                          color="error"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-error">
+                        Reject
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="v.can_submit"
+                      href="javascript:void(0)"
+                      @click="openSubmitPO(v)"
+                    >
+                      <template #prepend>
+                        <VIcon icon="mdi-send-outline" :size="20" class="me-3" />
+                      </template>
+
+                      <VListItemTitle>Submit</VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="String(v.status).toLowerCase() === 'draft' && canUpdate"
+                      href="javascript:void(0)"
+                      @click="goToEdit(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon icon="mdi-pencil-outline" :size="20" class="me-3" />
+                      </template>
+                      <VListItemTitle>Edit</VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="String(v.status).toLowerCase() === 'draft' && canDelete"
+                      href="javascript:void(0)"
+                      @click="openDelete(v)"
+                    >
+                      <template #prepend>
+                        <VIcon icon="tabler-trash" :size="20" class="me-3 text-error" />
+                      </template>
+                      <VListItemTitle class="text-error">Delete</VListItemTitle>
+                    </VListItem>
+                  </VList>
+              </VMenu>
             </td>
 
             <td class="text-medium-emphasis text-center">
@@ -1505,7 +1881,7 @@ onBeforeUnmount(() => {
               <VBtn size="x-small" color="default" variant="plain" icon>
                 <VIcon size="24" icon="mdi-dots-vertical" />
 
-                <VMenu activator="parent">
+                <VMenu activator="parent" location="bottom end">
                   <VList>
                     <VListItem
                       href="javascript:void(0)"
@@ -1640,7 +2016,7 @@ onBeforeUnmount(() => {
 
         <tfoot v-show="!rows.length && !loading">
           <tr>
-            <td colspan="10" class="text-center">
+            <td colspan="9" class="text-center">
               No data available
             </td>
           </tr>
@@ -1835,14 +2211,54 @@ onBeforeUnmount(() => {
                       <VCol cols="12" md="6">
                         <div class="info-box">
                           <div class="info-label">Vendor</div>
-                          <div class="info-value">{{ detailPurchaseOrder.vendor_data?.nama_vendor || '-' }}</div>
+                          <div class="info-value">
+                            {{ detailPurchaseOrder.vendor_data?.nama_vendor || detailPurchaseOrder.vendor || '-' }}
+                          </div>
                         </div>
                       </VCol>
 
                       <VCol cols="12" md="6">
                         <div class="info-box">
                           <div class="info-label">Status PKP</div>
-                          <div class="info-value">{{ formatStatusPKP(detailPurchaseOrder.vendor_data?.status_pkp) }}</div>
+                          <div class="info-value">
+                            {{
+                              formatStatusPKP(
+                                detailPurchaseOrder.status_pkp
+                                  || detailPurchaseOrder.vendor_data?.status_pkp
+                                  || 'NON_PKP',
+                              )
+                            }}
+                          </div>
+                        </div>
+                      </VCol>
+
+                      <VCol cols="12" md="6">
+                        <div class="info-box">
+                          <div class="info-label">Jenis Pembayaran</div>
+                          <div class="info-value">
+                            {{
+                              detailPurchaseOrder.jenis_pembayaran
+                                || detailPurchaseOrder.vendor_data?.jenis_pembayaran
+                                || '-'
+                            }}
+                          </div>
+                        </div>
+                      </VCol>
+
+                      <VCol cols="12" md="6">
+                        <div class="info-box">
+                          <div class="info-label">TOP</div>
+                          <div class="info-value">
+                            {{
+                              Number(
+                                detailPurchaseOrder.top
+                                  ?? detailPurchaseOrder.vendor_data?.top
+                                  ?? 0,
+                              ) > 0
+                                ? `${Number(detailPurchaseOrder.top ?? detailPurchaseOrder.vendor_data?.top ?? 0)} Hari`
+                                : '-'
+                            }}
+                          </div>
                         </div>
                       </VCol>
 
@@ -1867,6 +2283,7 @@ onBeforeUnmount(() => {
                         </div>
                       </VCol>
                     </VRow>
+
                     <VRow class="mt-4">
                       <VCol
                         cols="12"
@@ -2190,38 +2607,160 @@ onBeforeUnmount(() => {
                     />
                   </div>
                 </div>
-                <div class="d-flex justify-end mt-4">
-                  <VCard
-                    variant="tonal"
-                    class="summary-total-box"
+                <VRow class="mt-4 align-stretch">
+                  <VCol
+                    cols="12"
+                    md="7"
+                    lg="8"
+                    class="order-2 order-md-1"
                   >
-                    <VCardText class="py-3 px-4">
-                      <template v-if="String(detailPurchaseOrder.vendor_data?.status_pkp).toUpperCase() === 'PKP'">
-                        <div class="summary-row">
-                          <span>Subtotal</span>
-                          <strong>Rp {{ formatNumberWithoutRp(calcPOTotal(detailPurchaseOrder.items)) }}</strong>
+                    <VCard
+                      variant="tonal"
+                      class="approval-simple-box h-100"
+                    >
+                      <VCardText class="py-3 px-4">
+                        <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-3">
+                          <div class="d-flex align-center gap-2">
+                            <VAvatar
+                              size="30"
+                              color="primary"
+                              variant="tonal"
+                            >
+                              <VIcon
+                                icon="tabler-route"
+                                size="17"
+                              />
+                            </VAvatar>
+
+                            <div>
+                              <div class="text-subtitle-2 font-weight-bold">
+                                History Approval
+                              </div>
+
+                              <div class="text-caption text-medium-emphasis">
+                                Ringkasan proses approval PO
+                              </div>
+                            </div>
+                          </div>
+
+                          <VChip
+                            size="x-small"
+                            color="primary"
+                            variant="tonal"
+                          >
+                            {{ detailApprovalHistories.length }} Tahap
+                          </VChip>
                         </div>
 
-                        <div class="summary-row">
-                          <span>DPP</span>
-                          <strong>Rp {{ formatNumberWithoutRp(detailPurchaseOrder.dpp || 0) }}</strong>
+                        <div
+                          v-if="detailApprovalHistories.length"
+                          class="approval-simple-list"
+                        >
+                          <div
+                            v-for="history in detailApprovalHistories"
+                            :key="history.id"
+                            class="approval-simple-item"
+                          >
+                            <div class="approval-step-circle">
+                              {{ history.step_order }}
+                            </div>
+
+                            <div class="approval-simple-content">
+                              <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                                <div class="font-weight-bold approval-simple-title">
+                                  {{ history.label }}
+                                </div>
+
+                                <VChip
+                                  size="x-small"
+                                  variant="tonal"
+                                  :color="getSimpleApprovalStatusColor(history.status)"
+                                  :prepend-icon="getSimpleApprovalStatusIcon(history.status)"
+                                >
+                                  {{ getSimpleApprovalStatusLabel(history.status) }}
+                                </VChip>
+                              </div>
+
+                              <div class="approval-simple-meta">
+                                <span>
+                                  <VIcon
+                                    icon="tabler-user"
+                                    size="14"
+                                    class="me-1"
+                                  />
+                                  {{ history.processed_by }}
+                                </span>
+
+                                <span>
+                                  <VIcon
+                                    icon="tabler-clock"
+                                    size="14"
+                                    class="me-1"
+                                  />
+                                  {{ history.processed_at ? formatDate(history.processed_at) : '-' }}
+                                </span>
+                              </div>
+
+                              <div
+                                v-if="history.notes"
+                                class="approval-simple-notes"
+                              >
+                                {{ history.notes }}
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
-                        <div class="summary-row">
-                          <span>PPN</span>
-                          <strong>Rp {{ formatNumberWithoutRp(detailPurchaseOrder.ppn || 0) }}</strong>
+                        <VAlert
+                          v-else
+                          type="info"
+                          variant="tonal"
+                          density="compact"
+                        >
+                          Belum ada history approval.
+                        </VAlert>
+                      </VCardText>
+                    </VCard>
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="5"
+                    lg="4"
+                    class="order-1 order-md-2"
+                  >
+                    <VCard
+                      variant="tonal"
+                      class="summary-total-box h-100"
+                    >
+                      <VCardText class="py-3 px-4">
+                        <template v-if="String(detailPurchaseOrder.vendor_data?.status_pkp).toUpperCase() === 'PKP'">
+                          <div class="summary-row">
+                            <span>Subtotal</span>
+                            <strong>Rp {{ formatNumberWithoutRp(calcPOTotal(detailPurchaseOrder.items)) }}</strong>
+                          </div>
+
+                          <div class="summary-row">
+                            <span>DPP</span>
+                            <strong>Rp {{ formatNumberWithoutRp(detailPurchaseOrder.dpp || 0) }}</strong>
+                          </div>
+
+                          <div class="summary-row">
+                            <span>PPN</span>
+                            <strong>Rp {{ formatNumberWithoutRp(detailPurchaseOrder.ppn || 0) }}</strong>
+                          </div>
+
+                          <VDivider class="my-2" />
+                        </template>
+
+                        <div class="summary-row grand-total">
+                          <span>Grand Total PO</span>
+                          <strong>Rp {{ formatNumberWithoutRp(detailPurchaseOrder.total_nilai || calcPOTotal(detailPurchaseOrder.items)) }}</strong>
                         </div>
-
-                        <VDivider class="my-2" />
-                      </template>
-
-                      <div class="summary-row grand-total">
-                        <span>Grand Total PO</span>
-                        <strong>Rp {{ formatNumberWithoutRp(detailPurchaseOrder.total_nilai || calcPOTotal(detailPurchaseOrder.items)) }}</strong>
-                      </div>
-                    </VCardText>
-                  </VCard>
-                </div>
+                      </VCardText>
+                    </VCard>
+                  </VCol>
+                </VRow>
               </VCardText>
             </VCard>
           </div>
@@ -3045,6 +3584,59 @@ onBeforeUnmount(() => {
   }
 }
 
+
+.po-filter-card {
+  border: 1px solid rgba(var(--v-theme-primary), 0.08);
+}
+
+.po-filter-grid {
+  row-gap: 16px;
+}
+
+.approval-filter-box {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgba(var(--v-theme-surface), 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: all 0.2s ease;
+}
+
+.approval-filter-box.is-active {
+  border-color: rgba(var(--v-theme-warning), 0.42);
+  background: rgba(var(--v-theme-warning), 0.09);
+}
+
+.approval-filter-title {
+  line-height: 1.25;
+}
+
+.approval-filter-subtitle {
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.po-number-action {
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 10px;
+  transition: background-color 0.18s ease;
+}
+
+.po-number-action:hover {
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+@media (max-width: 960px) {
+  .approval-filter-box {
+    align-items: flex-start;
+  }
+}
+
 .po-row-need-approval {
   background: rgba(var(--v-theme-warning), 0.055);
 
@@ -3080,5 +3672,86 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
+}
+
+
+.approval-simple-box {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: linear-gradient(
+    135deg,
+    rgba(var(--v-theme-primary), 0.08),
+    rgba(var(--v-theme-surface), 0.96)
+  );
+}
+
+.approval-simple-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.approval-simple-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(var(--v-theme-surface), 0.78);
+  border: 1px solid rgba(var(--v-border-color), 0.55);
+}
+
+.approval-step-circle {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--v-theme-primary), 0.14);
+  color: rgb(var(--v-theme-primary));
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.approval-simple-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.approval-simple-title {
+  font-size: 13px;
+  color: rgba(var(--v-theme-on-surface), 0.86);
+}
+
+.approval-simple-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+  font-size: 12px;
+}
+
+.approval-simple-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.approval-simple-notes {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.68);
+  white-space: pre-line;
+}
+
+@media (max-width: 960px) {
+  .approval-simple-list {
+    max-height: none;
+  }
 }
 </style>

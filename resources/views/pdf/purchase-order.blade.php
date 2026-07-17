@@ -8,6 +8,52 @@
     }
 
     app()->setLocale($printLanguage);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Snapshot Vendor Payment Data
+    |--------------------------------------------------------------------------
+    | Gunakan data snapshot dari purchase_orders terlebih dahulu.
+    | Fallback ke master vendor hanya untuk data lama yang belum punya snapshot.
+    |--------------------------------------------------------------------------
+    */
+    $poStatusPkpSnapshot = strtoupper(
+        trim(
+            (string) (
+                $po->status_pkp
+                ?? $po->vendor->status_pkp
+                ?? 'NON_PKP'
+            )
+        )
+    );
+
+    if ($poStatusPkpSnapshot === '') {
+        $poStatusPkpSnapshot = 'NON_PKP';
+    }
+
+    $poJenisPembayaranSnapshot = strtoupper(
+        trim(
+            (string) (
+                $po->jenis_pembayaran
+                ?? $po->vendor->jenis_pembayaran
+                ?? ''
+            )
+        )
+    );
+
+    $poTopSnapshot = (int) (
+        $po->top
+        ?? $po->vendor->top
+        ?? 0
+    );
+
+    $poPaymentTermText = $poTopSnapshot > 0
+        ? $poTopSnapshot . ' ' . __('purchase_order.days')
+        : (
+            $poJenisPembayaranSnapshot !== ''
+                ? $poJenisPembayaranSnapshot
+                : '-'
+        );
 @endphp
 
 <!DOCTYPE html>
@@ -168,7 +214,7 @@
                         <tr>
                             <td class="po-meta-label">{{ __('purchase_order.top') }}</td>
                             <td class="po-meta-separator">:</td>
-                            <td class="po-meta-value">{{ $po->vendor->top ? $po->vendor->top . ' ' . __('purchase_order.days') : $po->vendor->jenis_pembayaran }}</td>
+                            <td class="po-meta-value">{{ $poPaymentTermText }}</td>
                         </tr>
                     </table>
                 </div>
@@ -216,7 +262,7 @@
             @endforeach
         </tbody>
         <tfoot>
-            @if (($po->vendor->status_pkp ?? '') === 'PKP')
+            @if ($poStatusPkpSnapshot === 'PKP')
                 <tr>
                     <td colspan="5" class="right summary-label">{{ __('purchase_order.subtotal') }}</td>
                     <td class="right summary-value nowrap">Rp {{ number_format($po->items->sum('subtotal'), 0, ',', '.') }}</td>
@@ -246,7 +292,7 @@
         <div class="terms-title">{{ __('purchase_order.terms_conditions') }}</div>
         <div class="term-line">1. {{ __('purchase_order.term_po_number') }}</div>
         <div class="term-line">2. {{ __('purchase_order.term_attach_po') }}</div>
-        <div class="term-line">3. {{ __('purchase_order.payment_terms') }}: {{ $po->vendor->top ? $po->vendor->top . ' ' . __('purchase_order.days') : $po->vendor->jenis_pembayaran }}</div>
+        <div class="term-line">3. {{ __('purchase_order.payment_terms') }}: {{ $poPaymentTermText }}</div>
         <div class="term-line">4. {{ __('purchase_order.reference_pr') }}: {{ $po->purchaseRequests->pluck('nomor_pr')->implode(', ') }}</div>
     </div>
 

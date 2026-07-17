@@ -1066,6 +1066,7 @@ const submitCancel = async (): Promise<void> => {
 */
 watch(
   [
+    searchQuery,
     selectedStatus,
     tanggalMulai,
     tanggalSelesai,
@@ -1140,15 +1141,47 @@ onMounted(async () => {
     | Filters
     |--------------------------------------------------------------------------
     -->
-    <VCard
-      title="Filters"
-      class="mb-6"
-    >
-      <VCardText>
-        <VRow>
+    <VCard class="mb-6 filter-card">
+      <VCardText class="pa-5">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
+          <div class="d-flex align-center gap-3">
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              size="38"
+            >
+              <VIcon
+                icon="tabler-filter"
+                size="20"
+              />
+            </VAvatar>
+
+            <div>
+              <div class="text-subtitle-1 font-weight-bold">
+                Filter Goods Return
+              </div>
+
+              <div class="text-caption text-medium-emphasis">
+                Cari berdasarkan nomor Return / GR / PO, tanggal, dan status
+              </div>
+            </div>
+          </div>
+
+          <VBtn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="tabler-refresh"
+            class="text-none"
+            @click="resetFilters"
+          >
+            Reset Filter
+          </VBtn>
+        </div>
+
+        <VRow class="align-center">
           <VCol
             cols="12"
-            sm="3"
+            md="3"
           >
             <VTextField
               v-model="searchQuery"
@@ -1156,14 +1189,15 @@ onMounted(async () => {
               placeholder="Cari goods return..."
               density="compact"
               clearable
-              @keyup.enter="fetchGoodsReturns"
-              @click:clear="fetchGoodsReturns"
+              hide-details="auto"
+              prepend-inner-icon="tabler-search"
             />
           </VCol>
 
           <VCol
             cols="12"
-            sm="3"
+            sm="6"
+            md="3"
           >
             <AppDateTimePicker
               :key="`tanggal-mulai-${datePickerKey}`"
@@ -1171,6 +1205,7 @@ onMounted(async () => {
               label="Tanggal Awal"
               density="compact"
               clearable
+              hide-details="auto"
               :config="{
                 dateFormat: 'Y-m-d',
               }"
@@ -1182,7 +1217,8 @@ onMounted(async () => {
 
           <VCol
             cols="12"
-            sm="3"
+            sm="6"
+            md="3"
           >
             <AppDateTimePicker
               :key="`tanggal-selesai-${datePickerKey}`"
@@ -1190,6 +1226,7 @@ onMounted(async () => {
               label="Tanggal Akhir"
               density="compact"
               clearable
+              hide-details="auto"
               :config="{
                 dateFormat: 'Y-m-d',
               }"
@@ -1201,7 +1238,7 @@ onMounted(async () => {
 
           <VCol
             cols="12"
-            sm="3"
+            md="3"
           >
             <VSelect
               v-model="selectedStatus"
@@ -1210,24 +1247,9 @@ onMounted(async () => {
               item-title="title"
               item-value="value"
               density="compact"
+              hide-details="auto"
+              clearable
             />
-          </VCol>
-        </VRow>
-
-        <VRow class="mt-1">
-          <VCol
-            cols="12"
-            class="d-flex justify-end"
-          >
-            <VBtn
-              block
-              color="secondary"
-              prepend-icon="tabler-refresh"
-              class="text-none"
-              @click="resetFilters"
-            >
-              Reset Filter
-            </VBtn>
           </VCol>
         </VRow>
       </VCardText>
@@ -1288,7 +1310,7 @@ onMounted(async () => {
 
             <th
               scope="col"
-              class="text-center"
+              class="text-start return-number-header"
             >
               Nomor Return
             </th>
@@ -1345,24 +1367,156 @@ onMounted(async () => {
               }}
             </td>
 
-            <td class="text-medium-emphasis text-center">
-              <div>
-                {{ row.nomor_return || '-' }}
-              </div>
+            <td class="return-number-cell">
+              <div class="d-flex flex-column align-start">
+                <VMenu>
+                  <template #activator="{ props }">
+                    <div
+                      v-bind="props"
+                      class="return-number-action"
+                      role="button"
+                      tabindex="0"
+                    >
+                      <span class="font-weight-medium return-number-text">
+                        {{ row.nomor_return || '-' }}
+                      </span>
 
-              <VChip
-                v-if="row.has_replacement_gr"
-                size="x-small"
-                color="info"
-                variant="tonal"
-                class="mt-1"
-              >
-                {{
-                  row.active_replacement_gr_count
-                  || 0
-                }}
-                Replacement
-              </VChip>
+                      <VIcon
+                        icon="tabler-chevron-down"
+                        size="16"
+                        class="ms-1"
+                      />
+                    </div>
+                  </template>
+
+                  <VList>
+                    <VListItem
+                      href="javascript:void(0)"
+                      @click="openDetail(row.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-eye"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        Lihat Detail
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(row.status || '')
+                          .toUpperCase() === 'DRAFT'
+                        && canUpdate
+                        && row.can_update
+                      "
+                      href="javascript:void(0)"
+                      @click="goToEdit(row.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-pencil-outline"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        Edit
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(row.status || '')
+                          .toUpperCase() === 'DRAFT'
+                        && canDelete
+                        && row.can_delete
+                      "
+                      href="javascript:void(0)"
+                      @click="openDelete(row)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-trash"
+                          :size="20"
+                          class="me-3 text-error"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-error">
+                        Hapus
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(row.status || '')
+                          .toUpperCase() === 'DRAFT'
+                        && canPost
+                        && row.can_post
+                      "
+                      href="javascript:void(0)"
+                      @click="postGoodsReturn(row)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-circle-check"
+                          :size="20"
+                          color="success"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-success">
+                        Post Return
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(row.status || '')
+                          .toUpperCase() === 'POSTED'
+                        && canCancel
+                        && row.can_cancel
+                      "
+                      href="javascript:void(0)"
+                      @click="openCancelDialog(row)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-circle-x"
+                          :size="20"
+                          color="error"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-error">
+                        Batalkan Return
+                      </VListItemTitle>
+                    </VListItem>
+                  </VList>
+                </VMenu>
+
+                <VChip
+                  v-if="row.has_replacement_gr"
+                  size="x-small"
+                  color="info"
+                  variant="tonal"
+                  class="mt-1 ms-1"
+                >
+                  {{
+                    row.active_replacement_gr_count
+                    || 0
+                  }}
+                  Replacement
+                </VChip>
+              </div>
             </td>
 
             <td class="text-medium-emphasis text-center">
@@ -1524,7 +1678,7 @@ onMounted(async () => {
         <tfoot v-show="!rows.length && !loading">
           <tr>
             <td
-              colspan="8"
+              colspan="7"
               class="text-center"
             >
               No data available
@@ -2209,3 +2363,64 @@ onMounted(async () => {
     </VDialog>
   </section>
 </template>
+
+<style lang="scss" scoped>
+.filter-card {
+  border-radius: 18px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.return-number-header,
+.return-number-cell {
+  min-width: 360px;
+  width: 360px;
+}
+
+.return-number-action {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 330px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  color: rgb(var(--v-theme-primary));
+  cursor: pointer;
+  user-select: text;
+}
+
+.return-number-action:hover {
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+.return-number-text {
+  display: inline-block;
+  max-width: 310px;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.user-pagination-select {
+  .v-field__input,
+  .v-field__append-inner {
+    padding-block-start: 0.3rem;
+  }
+}
+
+@media (max-width: 960px) {
+  .return-number-header,
+  .return-number-cell {
+    min-width: 300px;
+    width: 300px;
+  }
+
+  .return-number-action {
+    min-width: 280px;
+  }
+
+  .return-number-text {
+    max-width: 260px;
+  }
+}
+</style>

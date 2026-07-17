@@ -165,6 +165,18 @@ class PurchaseRequestController extends Controller
                 ->unique()
                 ->values();
 
+            /*
+        |--------------------------------------------------------------------------
+        | Filter khusus: hanya PR yang menunggu approval user login
+        |--------------------------------------------------------------------------
+        | Param dari FE:
+        | waiting_my_approval=1
+        |--------------------------------------------------------------------------
+        */
+            $waitingMyApproval = $request->boolean(
+                'waiting_my_approval',
+            );
+
             Log::info('[PR INDEX PERMISSION DEBUG]', [
                 'user_id' => $user->id,
                 'raw_role_id' => $user->getAttribute('role_id'),
@@ -175,6 +187,7 @@ class PurchaseRequestController extends Controller
                     'purchase_request.view',
                 ),
                 'scope' => $scope,
+                'waiting_my_approval' => $waitingMyApproval,
             ]);
 
             $canSubmit = $user->hasPermission(
@@ -228,12 +241,12 @@ class PurchaseRequestController extends Controller
                 ]);
 
             /*
-            |--------------------------------------------------------------------------
-            | User Access Assignments
-            |--------------------------------------------------------------------------
-            | Digunakan untuk scope OWN_CABANG dan OWN_DEPARTMENT.
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | User Access Assignments
+        |--------------------------------------------------------------------------
+        | Digunakan untuk scope OWN_CABANG dan OWN_DEPARTMENT.
+        |--------------------------------------------------------------------------
+        */
             $userAccessAssignments = $this->getActiveUserAccessAssignments(
                 $user,
             );
@@ -258,10 +271,10 @@ class PurchaseRequestController extends Controller
                 ->values();
 
             /*
-            |--------------------------------------------------------------------------
-            | Apply Visibility Scope
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | Apply Visibility Scope
+        |--------------------------------------------------------------------------
+        */
             if ($scope !== 'ALL') {
                 $query->where(function ($visibilityQuery) use (
                     $scope,
@@ -272,10 +285,10 @@ class PurchaseRequestController extends Controller
                     $userAccessibleDepartmentIds,
                 ) {
                     /*
-                    |--------------------------------------------------------------------------
-                    | Scope data normal
-                    |--------------------------------------------------------------------------
-                    */
+                |--------------------------------------------------------------------------
+                | Scope data normal
+                |--------------------------------------------------------------------------
+                */
                     $visibilityQuery->where(function ($scopeQuery) use (
                         $scope,
                         $user,
@@ -284,12 +297,12 @@ class PurchaseRequestController extends Controller
                         $userAccessibleDepartmentIds,
                     ) {
                         /*
-                        |--------------------------------------------------------------------------
-                        | OWN_DATA
-                        |--------------------------------------------------------------------------
-                        | Tetap berdasarkan creator.
-                        |--------------------------------------------------------------------------
-                        */
+                    |--------------------------------------------------------------------------
+                    | OWN_DATA
+                    |--------------------------------------------------------------------------
+                    | Tetap berdasarkan creator.
+                    |--------------------------------------------------------------------------
+                    */
                         if ($scope === 'OWN_DATA') {
                             if ($user->id) {
                                 $scopeQuery->where(
@@ -304,15 +317,15 @@ class PurchaseRequestController extends Controller
                         }
 
                         /*
-                        |--------------------------------------------------------------------------
-                        | OWN_DEPARTMENT
-                        |--------------------------------------------------------------------------
-                        | Scope department berarti user bisa melihat seluruh PR dari department
-                        | yang sama, lintas semua cabang.
-                        |
-                        | Department diambil dari master user + access assignment tambahan.
-                        |--------------------------------------------------------------------------
-                        */
+                    |--------------------------------------------------------------------------
+                    | OWN_DEPARTMENT
+                    |--------------------------------------------------------------------------
+                    | Scope department berarti user bisa melihat seluruh PR dari department
+                    | yang sama, lintas semua cabang.
+                    |
+                    | Department diambil dari master user + access assignment tambahan.
+                    |--------------------------------------------------------------------------
+                    */
                         if ($scope === 'OWN_DEPARTMENT') {
                             if ($userAccessibleDepartmentIds->isEmpty()) {
                                 $scopeQuery->whereRaw('1 = 0');
@@ -329,12 +342,12 @@ class PurchaseRequestController extends Controller
                         }
 
                         /*
-                        |--------------------------------------------------------------------------
-                        | OWN_CABANG
-                        |--------------------------------------------------------------------------
-                        | Sekarang berdasarkan semua branch dari assignment user.
-                        |--------------------------------------------------------------------------
-                        */
+                    |--------------------------------------------------------------------------
+                    | OWN_CABANG
+                    |--------------------------------------------------------------------------
+                    | Sekarang berdasarkan semua branch dari assignment user.
+                    |--------------------------------------------------------------------------
+                    */
                         if ($scope === 'OWN_CABANG') {
                             if ($userAccessibleBranchIds->isEmpty()) {
                                 $scopeQuery->whereRaw('1 = 0');
@@ -353,20 +366,21 @@ class PurchaseRequestController extends Controller
                         }
 
                         /*
-                        |--------------------------------------------------------------------------
-                        | NONE / scope tidak valid
-                        |--------------------------------------------------------------------------
-                        */
+                    |--------------------------------------------------------------------------
+                    | NONE / scope tidak valid
+                    |--------------------------------------------------------------------------
+                    */
                         $scopeQuery->whereRaw('1 = 0');
                     });
 
                     /*
-                    |--------------------------------------------------------------------------
-                    | Dokumen yang menunggu approval user
-                    |--------------------------------------------------------------------------
-                    | Tetap dipertahankan.
-                    |--------------------------------------------------------------------------
-                    */
+                |--------------------------------------------------------------------------
+                | Dokumen yang terkait dengan approval user
+                |--------------------------------------------------------------------------
+                | Tetap dipertahankan agar approver masih bisa melihat dokumen yang
+                | ada dalam flow approval dirinya.
+                |--------------------------------------------------------------------------
+                */
                     $visibilityQuery->orWhereHas(
                         'approvals',
                         function ($approvalQuery) use (
@@ -408,6 +422,71 @@ class PurchaseRequestController extends Controller
                         },
                     );
                 });
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Filter: Menunggu Approval Saya
+        |--------------------------------------------------------------------------
+        | Harus dilakukan di query sebelum paginate.
+        |
+        | Syarat:
+        | - PR status IN PROGRESS
+        | - Ada approval dengan status WAITING
+        | - Approval tersebut assigned ke user login atau role user login
+        |--------------------------------------------------------------------------
+        */
+            if ($waitingMyApproval) {
+                $query->where(
+                    'purchase_requests.status',
+                    PurchaseRequest::STATUS_IN_PROGRESS,
+                );
+
+                $query->whereHas(
+                    'approvals',
+                    function ($approvalQuery) use (
+                        $user,
+                        $userRoleIds,
+                    ) {
+                        $approvalQuery
+                            ->where(
+                                'purchase_request_approvals.status',
+                                PurchaseRequestApproval::STATUS_WAITING,
+                            )
+                            ->where(function ($approverQuery) use (
+                                $user,
+                                $userRoleIds,
+                            ) {
+                                $approverQuery->where(function ($userQuery) use ($user) {
+                                    $userQuery
+                                        ->where(
+                                            'purchase_request_approvals.approver_type',
+                                            PurchaseRequestApproval::APPROVER_TYPE_USER,
+                                        )
+                                        ->where(
+                                            'purchase_request_approvals.approver_id',
+                                            $user->id,
+                                        );
+                                });
+
+                                if ($userRoleIds->isNotEmpty()) {
+                                    $approverQuery->orWhere(function ($roleQuery) use (
+                                        $userRoleIds,
+                                    ) {
+                                        $roleQuery
+                                            ->where(
+                                                'purchase_request_approvals.approver_type',
+                                                PurchaseRequestApproval::APPROVER_TYPE_ROLE,
+                                            )
+                                            ->whereIn(
+                                                'purchase_request_approvals.approver_id',
+                                                $userRoleIds->all(),
+                                            );
+                                    });
+                                }
+                            });
+                    },
+                );
             }
 
             /*
@@ -572,10 +651,10 @@ class PurchaseRequestController extends Controller
 
             if ($request->filled('cabang')) {
                 /*
-        |--------------------------------------------------------------------------
-        | purchase_requests.cabang bertipe varchar di database tertentu.
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | purchase_requests.cabang bertipe varchar di database tertentu.
+            |--------------------------------------------------------------------------
+            */
                 $query->where(
                     'purchase_requests.cabang',
                     (string) $request->input('cabang'),
@@ -957,13 +1036,13 @@ class PurchaseRequestController extends Controller
                 $text = trim((string) $value);
 
                 /*
-                |--------------------------------------------------------------------------
-                | Decode entity lama / double encoded
-                |--------------------------------------------------------------------------
-                | Contoh:
-                | &amp;quot; -> &quot; -> "
-                |--------------------------------------------------------------------------
-                */
+            |--------------------------------------------------------------------------
+            | Decode entity lama / double encoded
+            |--------------------------------------------------------------------------
+            | Contoh:
+            | &amp;quot; -> &quot; -> "
+            |--------------------------------------------------------------------------
+            */
                 for ($i = 0; $i < 3; $i++) {
                     $decoded = html_entity_decode(
                         $text,
@@ -979,17 +1058,17 @@ class PurchaseRequestController extends Controller
                 }
 
                 /*
-                |--------------------------------------------------------------------------
-                | Buang tag HTML, tapi jangan encode lagi.
-                |--------------------------------------------------------------------------
-                */
+            |--------------------------------------------------------------------------
+            | Buang tag HTML, tapi jangan encode lagi.
+            |--------------------------------------------------------------------------
+            */
                 $text = strip_tags($text);
 
                 /*
-                |--------------------------------------------------------------------------
-                | Rapihkan spasi berlebih.
-                |--------------------------------------------------------------------------
-                */
+            |--------------------------------------------------------------------------
+            | Rapihkan spasi berlebih.
+            |--------------------------------------------------------------------------
+            */
                 $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
 
                 return trim($text);
@@ -1013,17 +1092,17 @@ class PurchaseRequestController extends Controller
             );
 
             /*
-            |--------------------------------------------------------------------------
-            | 1. Generate Nomor PR
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | 1. Generate Nomor PR
+        |--------------------------------------------------------------------------
+        */
             $nomorPr = $this->generateDraftPRNumber();
 
             /*
-            |--------------------------------------------------------------------------
-            | 2. Decode & Validasi Items
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | 2. Decode & Validasi Items
+        |--------------------------------------------------------------------------
+        */
             $items = json_decode($request->items, true);
 
             if (!is_array($items) || count($items) === 0) {
@@ -1049,56 +1128,129 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-            |--------------------------------------------------------------------------
-            | 3. Hitung Total Amount
-            |--------------------------------------------------------------------------
-            */
-            $totalAmount = 0;
+        |--------------------------------------------------------------------------
+        | 3. Hitung Subtotal Item
+        |--------------------------------------------------------------------------
+        | subtotal item = nilai sebelum PPN
+        |--------------------------------------------------------------------------
+        */
+            $subTotalItems = 0;
 
             foreach ($items as $item) {
                 $qty = (float) ($item['qty'] ?? 0);
                 $harga = (float) ($item['harga_unit'] ?? 0);
 
-                $totalAmount += $qty * $harga;
+                $subTotalItems += $qty * $harga;
+            }
+
+            $subTotalItems = round((float) $subTotalItems, 2);
+
+            /*
+        |--------------------------------------------------------------------------
+        | 3A. Snapshot Vendor dan Hitung Pajak PR
+        |--------------------------------------------------------------------------
+        | Mengikuti konsep PO:
+        | - PKP     : dpp = subtotal * 11 / 12, ppn = dpp * 12%, total = subtotal + ppn
+        | - NON PKP : dpp = 0, ppn = 0, total = subtotal
+        |--------------------------------------------------------------------------
+        */
+            $recommendedVendorId = $request->filled('recommended_vendor_id')
+                ? (int) $request->recommended_vendor_id
+                : null;
+
+            $vendor = $recommendedVendorId
+                ? DB::table('master_vendor')
+                ->where('id', $recommendedVendorId)
+                ->first([
+                    'id',
+                    'status_pkp',
+                    'jenis_pembayaran',
+                    'top',
+                ])
+                : null;
+
+            $vendorStatusPkpNormalized = strtoupper(
+                trim((string) ($vendor->status_pkp ?? 'NON_PKP')),
+            );
+
+            $isPkpVendor = in_array(
+                $vendorStatusPkpNormalized,
+                [
+                    'PKP',
+                    '1',
+                    'YA',
+                    'YES',
+                    'TRUE',
+                ],
+                true,
+            );
+
+            $statusPkpSnapshot = $isPkpVendor
+                ? 'PKP'
+                : 'NON_PKP';
+
+            $jenisPembayaranSnapshot = $vendor
+                ? trim((string) ($vendor->jenis_pembayaran ?? ''))
+                : '';
+
+            $jenisPembayaranSnapshot = $jenisPembayaranSnapshot !== ''
+                ? strtoupper($jenisPembayaranSnapshot)
+                : null;
+
+            $topSnapshot = $vendor
+                ? (int) ($vendor->top ?? 0)
+                : 0;
+
+            if ($isPkpVendor) {
+                $dppAmount = round($subTotalItems * 11 / 12, 2);
+                $ppnAmount = round($dppAmount * 0.12, 2);
+                $totalAmount = round($subTotalItems + $ppnAmount, 2);
+            } else {
+                $dppAmount = 0.0;
+                $ppnAmount = 0.0;
+                $totalAmount = round($subTotalItems, 2);
             }
 
             /*
-            |--------------------------------------------------------------------------
-            | Validasi Minimal Nilai PR
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | Validasi Minimal Nilai PR
+        |--------------------------------------------------------------------------
+        */
             $this->validateMinimumPurchaseRequestAmount(
                 (float) $totalAmount,
             );
 
             /*
-            |--------------------------------------------------------------------------
-            | 4. Simpan Header PR
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | 4. Simpan Header PR
+        |--------------------------------------------------------------------------
+        */
             $user = $request->user();
             $pr = PurchaseRequest::create([
                 'nomor_pr'              => $nomorPr,
                 'tanggal_pr'            => $request->tanggal_pr,
                 'cabang'                => $request->cabang,
                 'id_department'         => (int) $request->id_department,
-                'recommended_vendor_id' => $request->filled('recommended_vendor_id')
-                    ? (int) $request->recommended_vendor_id
-                    : null,
+                'recommended_vendor_id' => $recommendedVendorId,
                 'kategori'              => $request->kategori,
                 'pr_type'               => $request->pr_type,
                 'notes'                 => $clean($request->notes),
                 'status'                => PurchaseRequest::STATUS_DRAFT,
                 'total_amount'          => $totalAmount,
+                'status_pkp'            => $statusPkpSnapshot,
+                'jenis_pembayaran'      => $jenisPembayaranSnapshot,
+                'top'                   => $topSnapshot,
+                'dpp'                   => $dppAmount,
+                'ppn'                   => $ppnAmount,
                 'created_by'            => $user?->id,
                 'updated_by'            => $user?->id,
             ]);
 
             /*
-            |--------------------------------------------------------------------------
-            | 5. Simpan Lampiran Request
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | 5. Simpan Lampiran Request
+        |--------------------------------------------------------------------------
+        */
             if ($request->hasFile('lampiran_request')) {
                 $folder = "syopv4/uploads/purchase_requests/lampiran/{$pr->id}";
 
@@ -1152,14 +1304,14 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-            |--------------------------------------------------------------------------
-            | 6. Simpan Item PR
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | 6. Simpan Item PR
+        |--------------------------------------------------------------------------
+        */
             foreach ($items as $item) {
                 $qty = (float) ($item['qty'] ?? 0);
                 $harga = (float) ($item['harga_unit'] ?? 0);
-                $subtotal = $qty * $harga;
+                $subtotal = round($qty * $harga, 2);
 
                 PurchaseRequestItem::create([
                     'purchase_request_id' => $pr->id,
@@ -1226,12 +1378,6 @@ class PurchaseRequestController extends Controller
         }
     }
 
-
-
-    /**
-     * GET /api/purchase-request/{id}
-     * Ambil detail PR berdasarkan ID
-     */
     public function show($publicId)
     {
         try {
@@ -1263,17 +1409,205 @@ class PurchaseRequestController extends Controller
                 },
             ])->findOrFail($id);
 
-            $items = $pr->getRelation('items');
+            /*
+        |--------------------------------------------------------------------------
+        | Item aktif PR
+        |--------------------------------------------------------------------------
+        | Item yang sudah soft delete tidak boleh ikut menghitung summary detail,
+        | outstanding PO, maupun status nilai.
+        |--------------------------------------------------------------------------
+        */
+            $items = $pr->getRelation('items')
+                ->filter(function ($item) {
+                    return empty($item->deleted_at);
+                })
+                ->values();
 
-            $totalPo = $items->sum(function ($item) {
-                return (float) ($item->qty_po ?? 0)
-                    * (float) ($item->harga_unit ?? 0);
-            });
+            /*
+        |--------------------------------------------------------------------------
+        | Vendor PKP Snapshot
+        |--------------------------------------------------------------------------
+        | Gunakan snapshot di purchase_requests, bukan membaca ulang status vendor
+        | terbaru, supaya nilai detail mengikuti kondisi saat PR dibuat/diubah.
+        |--------------------------------------------------------------------------
+        */
+            $statusPkp = strtoupper(
+                trim((string) ($pr->status_pkp ?? 'NON_PKP')),
+            );
 
-            $totalOutstanding = $items->sum(function ($item) {
-                return (float) ($item->qty_outstanding ?? 0)
-                    * (float) ($item->harga_unit ?? 0);
-            });
+            $isPkp = $statusPkp === 'PKP';
+
+            /*
+        |--------------------------------------------------------------------------
+        | Subtotal Item PR
+        |--------------------------------------------------------------------------
+        | Subtotal item adalah nilai sebelum PPN.
+        |--------------------------------------------------------------------------
+        */
+            $subtotalItem = round(
+                (float) $items->sum(function ($item) {
+                    $subtotal = (float) ($item->subtotal ?? 0);
+
+                    if ($subtotal > 0) {
+                        return $subtotal;
+                    }
+
+                    return (float) ($item->qty ?? 0)
+                        * (float) ($item->harga_unit ?? 0);
+                }),
+                2,
+            );
+
+            /*
+        |--------------------------------------------------------------------------
+        | DPP, PPN, dan Grand Total PR
+        |--------------------------------------------------------------------------
+        | Jika snapshot dpp/ppn sudah ada, gunakan snapshot.
+        | Jika belum ada untuk data lama, fallback dihitung dari subtotal item.
+        |--------------------------------------------------------------------------
+        */
+            $dppAmount = round(
+                (float) ($pr->dpp ?? 0),
+                2,
+            );
+
+            $ppnAmount = round(
+                (float) ($pr->ppn ?? 0),
+                2,
+            );
+
+            if ($isPkp && $dppAmount <= 0 && $subtotalItem > 0) {
+                $dppAmount = round(
+                    ($subtotalItem * 11) / 12,
+                    2,
+                );
+            }
+
+            if ($isPkp && $ppnAmount <= 0 && $dppAmount > 0) {
+                $ppnAmount = round(
+                    $dppAmount * 0.12,
+                    2,
+                );
+            }
+
+            if (!$isPkp) {
+                $dppAmount = 0.0;
+                $ppnAmount = 0.0;
+            }
+
+            $grandTotalPr = round(
+                (float) ($pr->total_amount ?? 0),
+                2,
+            );
+
+            if ($grandTotalPr <= 0) {
+                $grandTotalPr = round(
+                    $subtotalItem + $ppnAmount,
+                    2,
+                );
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Purchase Order valid
+        |--------------------------------------------------------------------------
+        | DRAFT tetap dihitung karena sesuai rule sistem:
+        | ketika PO draft dibuat, qty PR sudah dianggap digunakan.
+        |
+        | REJECTED / CANCELLED tidak dihitung.
+        |--------------------------------------------------------------------------
+        */
+            $validPurchaseOrders = $pr->purchaseOrders
+                ->filter(function ($po) {
+                    return !in_array(
+                        strtoupper(trim((string) $po->status)),
+                        [
+                            'REJECTED',
+                            'CANCELLED',
+                            'CANCELED',
+                        ],
+                        true,
+                    );
+                })
+                ->values();
+
+            $totalPo = round(
+                (float) $validPurchaseOrders->sum(function ($po) {
+                    return (float) ($po->total_nilai ?? 0);
+                }),
+                2,
+            );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Outstanding PO berbasis quantity
+        |--------------------------------------------------------------------------
+        | Ini adalah sisa nilai proses PO, bukan selisih nilai PR vs PO.
+        | Jadi kalau qty_outstanding item sudah 0, outstanding PO harus 0,
+        | walaupun nilai PO lebih murah/mahal dari PR.
+        |--------------------------------------------------------------------------
+        */
+            $outstandingSubtotal = round(
+                (float) $items->sum(function ($item) {
+                    return (float) ($item->qty_outstanding ?? 0)
+                        * (float) ($item->harga_unit ?? 0);
+                }),
+                2,
+            );
+
+            $outstandingDpp = 0.0;
+            $outstandingPpn = 0.0;
+            $outstandingPoAmount = $outstandingSubtotal;
+
+            if ($isPkp && $outstandingSubtotal > 0) {
+                $outstandingDpp = round(
+                    ($outstandingSubtotal * 11) / 12,
+                    2,
+                );
+
+                $outstandingPpn = round(
+                    $outstandingDpp * 0.12,
+                    2,
+                );
+
+                $outstandingPoAmount = round(
+                    $outstandingSubtotal + $outstandingPpn,
+                    2,
+                );
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Selisih nilai PR vs PO
+        |--------------------------------------------------------------------------
+        | Ini bukan outstanding proses PO.
+        |
+        | - EFFICIENCY: nilai PO lebih rendah dari Grand Total PR.
+        | - INCREASE  : nilai PO lebih tinggi dari Grand Total PR.
+        | - NONE      : tidak ada selisih.
+        |--------------------------------------------------------------------------
+        */
+            $rawValueDifference = round(
+                $grandTotalPr - $totalPo,
+                2,
+            );
+
+            $valueDifferenceAmount = round(
+                abs($rawValueDifference),
+                2,
+            );
+
+            if ($valueDifferenceAmount <= 0.009) {
+                $valueDifferenceType = 'NONE';
+                $valueDifferenceLabel = 'Tidak Ada Selisih';
+                $valueDifferenceAmount = 0.0;
+            } elseif ($rawValueDifference > 0) {
+                $valueDifferenceType = 'EFFICIENCY';
+                $valueDifferenceLabel = 'Efisiensi Nilai';
+            } else {
+                $valueDifferenceType = 'INCREASE';
+                $valueDifferenceLabel = 'Kenaikan Nilai';
+            }
 
             return response()->json([
                 'success' => true,
@@ -1315,19 +1649,24 @@ class PurchaseRequestController extends Controller
                                 ->nama_vendor
                                 ?? '-',
 
-                            'status_pkp' => $pr->recommendedVendor
-                                ->status_pkp
+                            'status_pkp' => $pr->status_pkp
                                 ?? 'NON_PKP',
 
-                            'jenis_pembayaran' => $pr->recommendedVendor
-                                ->jenis_pembayaran
+                            'jenis_pembayaran' => $pr->jenis_pembayaran
                                 ?? null,
 
-                            'top' => $pr->recommendedVendor
-                                ->top
+                            'top' => $pr->top
                                 ?? null,
                         ]
                         : null,
+
+                    'status_pkp' => $pr->status_pkp ?? 'NON_PKP',
+                    'jenis_pembayaran' => $pr->jenis_pembayaran ?? null,
+                    'top' => $pr->top ?? null,
+
+                    'subtotal_item' => $subtotalItem,
+                    'dpp' => $dppAmount,
+                    'ppn' => $ppnAmount,
 
                     'kategori' => $pr->kategori,
                     'pr_type' => $pr->pr_type,
@@ -1340,18 +1679,7 @@ class PurchaseRequestController extends Controller
                 | Purchase Order terkait
                 |--------------------------------------------------------------------------
                 */
-                    'purchase_orders' => $pr->purchaseOrders
-                        ->filter(function ($po) {
-                            return !in_array(
-                                strtoupper((string) $po->status),
-                                [
-                                    'REJECTED',
-                                    'CANCELLED',
-                                ],
-                                true,
-                            );
-                        })
-                        ->values()
+                    'purchase_orders' => $validPurchaseOrders
                         ->map(function ($po) {
                             return [
                                 'id' => $po->id,
@@ -1390,12 +1718,29 @@ class PurchaseRequestController extends Controller
                 | Nilai
                 |--------------------------------------------------------------------------
                 */
-                    'total_amount' => (float) (
-                        $pr->total_amount ?? 0
-                    ),
+                    'total_amount' => $grandTotalPr,
 
                     'total_po' => $totalPo,
-                    'total_outstanding' => $totalOutstanding,
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Backward compatibility
+                |--------------------------------------------------------------------------
+                | total_outstanding sekarang berarti outstanding PO berbasis qty,
+                | bukan lagi Grand Total PR - Total PO.
+                |--------------------------------------------------------------------------
+                */
+                    'total_outstanding' => $outstandingPoAmount,
+
+                    'outstanding_po_subtotal' => $outstandingSubtotal,
+                    'outstanding_po_dpp' => $outstandingDpp,
+                    'outstanding_po_ppn' => $outstandingPpn,
+                    'outstanding_po_amount' => $outstandingPoAmount,
+
+                    'value_difference_amount' => $valueDifferenceAmount,
+                    'value_difference_raw' => $rawValueDifference,
+                    'value_difference_type' => $valueDifferenceType,
+                    'value_difference_label' => $valueDifferenceLabel,
 
                     /*
                 |--------------------------------------------------------------------------
@@ -1593,11 +1938,6 @@ class PurchaseRequestController extends Controller
         }
     }
 
-
-    /**
-     * PUT /api/purchase-request/{id}
-     * Update PR
-     */
     public function update(string $publicId, Request $request)
     {
 
@@ -1623,13 +1963,13 @@ class PurchaseRequestController extends Controller
                 $text = trim((string) $value);
 
                 /*
-                |--------------------------------------------------------------------------
-                | Decode entity lama / double encoded
-                |--------------------------------------------------------------------------
-                | Contoh:
-                | &amp;quot; -> &quot; -> "
-                |--------------------------------------------------------------------------
-                */
+            |--------------------------------------------------------------------------
+            | Decode entity lama / double encoded
+            |--------------------------------------------------------------------------
+            | Contoh:
+            | &amp;quot; -> &quot; -> "
+            |--------------------------------------------------------------------------
+            */
                 for ($i = 0; $i < 3; $i++) {
                     $decoded = html_entity_decode(
                         $text,
@@ -1645,17 +1985,17 @@ class PurchaseRequestController extends Controller
                 }
 
                 /*
-                |--------------------------------------------------------------------------
-                | Buang tag HTML, tapi jangan encode lagi.
-                |--------------------------------------------------------------------------
-                */
+            |--------------------------------------------------------------------------
+            | Buang tag HTML, tapi jangan encode lagi.
+            |--------------------------------------------------------------------------
+            */
                 $text = strip_tags($text);
 
                 /*
-                |--------------------------------------------------------------------------
-                | Rapihkan spasi berlebih.
-                |--------------------------------------------------------------------------
-                */
+            |--------------------------------------------------------------------------
+            | Rapihkan spasi berlebih.
+            |--------------------------------------------------------------------------
+            */
                 $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
 
                 return trim($text);
@@ -1725,16 +2065,86 @@ class PurchaseRequestController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | 3. Hitung Total Amount
+        | 3. Hitung Subtotal Item
+        |--------------------------------------------------------------------------
+        | subtotal item = nilai sebelum PPN
         |--------------------------------------------------------------------------
         */
-            $totalAmount = 0;
+            $subTotalItems = 0;
 
             foreach ($items as $item) {
                 $qty = (float) ($item['qty'] ?? 0);
                 $harga = (float) ($item['harga_unit'] ?? 0);
 
-                $totalAmount += $qty * $harga;
+                $subTotalItems += $qty * $harga;
+            }
+
+            $subTotalItems = round((float) $subTotalItems, 2);
+
+            /*
+        |--------------------------------------------------------------------------
+        | 3A. Snapshot Vendor dan Hitung Pajak PR
+        |--------------------------------------------------------------------------
+        | Mengikuti konsep PO:
+        | - PKP     : dpp = subtotal * 11 / 12, ppn = dpp * 12%, total = subtotal + ppn
+        | - NON PKP : dpp = 0, ppn = 0, total = subtotal
+        |--------------------------------------------------------------------------
+        */
+            $recommendedVendorId = $request->filled('recommended_vendor_id')
+                ? (int) $request->recommended_vendor_id
+                : null;
+
+            $vendor = $recommendedVendorId
+                ? DB::table('master_vendor')
+                ->where('id', $recommendedVendorId)
+                ->first([
+                    'id',
+                    'status_pkp',
+                    'jenis_pembayaran',
+                    'top',
+                ])
+                : null;
+
+            $vendorStatusPkpNormalized = strtoupper(
+                trim((string) ($vendor->status_pkp ?? 'NON_PKP')),
+            );
+
+            $isPkpVendor = in_array(
+                $vendorStatusPkpNormalized,
+                [
+                    'PKP',
+                    '1',
+                    'YA',
+                    'YES',
+                    'TRUE',
+                ],
+                true,
+            );
+
+            $statusPkpSnapshot = $isPkpVendor
+                ? 'PKP'
+                : 'NON_PKP';
+
+            $jenisPembayaranSnapshot = $vendor
+                ? trim((string) ($vendor->jenis_pembayaran ?? ''))
+                : '';
+
+            $jenisPembayaranSnapshot = $jenisPembayaranSnapshot !== ''
+                ? strtoupper($jenisPembayaranSnapshot)
+                : null;
+
+            $topSnapshot = $vendor
+                ? (int) ($vendor->top ?? 0)
+                : 0;
+
+            if ($isPkpVendor) {
+                $dppAmount = round($subTotalItems * 11 / 12, 2);
+                $ppnAmount = round($dppAmount * 0.12, 2);
+                $totalAmount = round($subTotalItems + $ppnAmount, 2);
+            } else {
+                $dppAmount = 0.0;
+                $ppnAmount = 0.0;
+                $totalAmount = round($subTotalItems, 2);
             }
 
             $this->validateMinimumPurchaseRequestAmount(
@@ -1751,13 +2161,16 @@ class PurchaseRequestController extends Controller
                 'tanggal_pr'            => $request->tanggal_pr,
                 'cabang'                => $request->cabang,
                 'id_department'         => (int) $request->id_department,
-                'recommended_vendor_id' => $request->filled('recommended_vendor_id')
-                    ? (int) $request->recommended_vendor_id
-                    : null,
+                'recommended_vendor_id' => $recommendedVendorId,
                 'kategori'              => $request->kategori,
                 'pr_type'               => $request->pr_type,
                 'notes'                 => $clean($request->notes),
                 'total_amount'          => $totalAmount,
+                'status_pkp'            => $statusPkpSnapshot,
+                'jenis_pembayaran'      => $jenisPembayaranSnapshot,
+                'top'                   => $topSnapshot,
+                'dpp'                   => $dppAmount,
+                'ppn'                   => $ppnAmount,
                 'updated_by'            => $user?->id,
             ]);
 
@@ -1772,7 +2185,7 @@ class PurchaseRequestController extends Controller
             foreach ($items as $item) {
                 $qty = (float) ($item['qty'] ?? 0);
                 $harga = (float) ($item['harga_unit'] ?? 0);
-                $subtotal = $qty * $harga;
+                $subtotal = round($qty * $harga, 2);
 
                 PurchaseRequestItem::create([
                     'purchase_request_id' => $pr->id,

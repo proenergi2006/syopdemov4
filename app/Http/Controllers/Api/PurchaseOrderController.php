@@ -188,6 +188,18 @@ class PurchaseOrderController extends Controller
 
             /*
         |--------------------------------------------------------------------------
+        | Filter khusus: Menunggu Approval Saya
+        |--------------------------------------------------------------------------
+        | Param dari FE:
+        | waiting_my_approval=1
+        |--------------------------------------------------------------------------
+        */
+            $waitingMyApproval = $request->boolean(
+                'waiting_my_approval',
+            );
+
+            /*
+        |--------------------------------------------------------------------------
         | Query Purchase Order
         |--------------------------------------------------------------------------
         */
@@ -404,6 +416,84 @@ class PurchaseOrderController extends Controller
 
             /*
         |--------------------------------------------------------------------------
+        | Filter: Menunggu Approval Saya
+        |--------------------------------------------------------------------------
+        | Harus dilakukan sebelum paginate.
+        |
+        | Syarat:
+        | 1. PO status IN PROGRESS.
+        | 2. Ada approval WAITING pada step aktif terkecil.
+        | 3. Approval tersebut assigned ke user login atau role user login.
+        |
+        | Kenapa pakai step aktif terkecil?
+        | Agar user yang ada di tahap berikutnya tidak muncul sebelum tahap
+        | sebelumnya selesai.
+        |--------------------------------------------------------------------------
+        */
+            if ($waitingMyApproval) {
+                $query->whereRaw(
+                    'UPPER(TRIM(purchase_orders.status)) = ?',
+                    ['IN PROGRESS'],
+                );
+
+                $query->whereHas(
+                    'approvals',
+                    function ($approvalQuery) use (
+                        $user,
+                        $userRoleIds,
+                    ) {
+                        $approvalQuery
+                            ->whereRaw(
+                                'UPPER(TRIM(purchase_order_approvals.status)) = ?',
+                                [PurchaseOrderApproval::STATUS_WAITING],
+                            )
+                            ->whereRaw(
+                                'purchase_order_approvals.step_order = (
+                                SELECT MIN(poa_min.step_order)
+                                FROM purchase_order_approvals AS poa_min
+                                WHERE poa_min.purchase_order_id = purchase_order_approvals.purchase_order_id
+                                  AND UPPER(TRIM(poa_min.status)) = ?
+                            )',
+                                [PurchaseOrderApproval::STATUS_WAITING],
+                            )
+                            ->where(function ($approverQuery) use (
+                                $user,
+                                $userRoleIds,
+                            ) {
+                                $approverQuery->where(function ($userQuery) use ($user) {
+                                    $userQuery
+                                        ->whereRaw(
+                                            'UPPER(TRIM(purchase_order_approvals.approver_type)) = ?',
+                                            [PurchaseOrderApproval::APPROVER_TYPE_USER],
+                                        )
+                                        ->where(
+                                            'purchase_order_approvals.approver_id',
+                                            $user->id,
+                                        );
+                                });
+
+                                if ($userRoleIds->isNotEmpty()) {
+                                    $approverQuery->orWhere(function ($roleQuery) use (
+                                        $userRoleIds,
+                                    ) {
+                                        $roleQuery
+                                            ->whereRaw(
+                                                'UPPER(TRIM(purchase_order_approvals.approver_type)) = ?',
+                                                [PurchaseOrderApproval::APPROVER_TYPE_ROLE],
+                                            )
+                                            ->whereIn(
+                                                'purchase_order_approvals.approver_id',
+                                                $userRoleIds->all(),
+                                            );
+                                    });
+                                }
+                            });
+                    },
+                );
+            }
+
+            /*
+        |--------------------------------------------------------------------------
         | Search nomor PO
         |--------------------------------------------------------------------------
         */
@@ -606,10 +696,10 @@ class PurchaseOrderController extends Controller
                     );
 
                     /*
-                    |--------------------------------------------------------------------------
-                    | Ownership PO
-                    |--------------------------------------------------------------------------
-                    */
+                |--------------------------------------------------------------------------
+                | Ownership PO
+                |--------------------------------------------------------------------------
+                */
                     $isCreator = (int) $po->created_by
                         === (int) $user->id;
 
@@ -620,15 +710,15 @@ class PurchaseOrderController extends Controller
                     );
 
                     /*
-                    |--------------------------------------------------------------------------
-                    | Hak submit per row
-                    |--------------------------------------------------------------------------
-                    | Syarat:
-                    | 1. Memiliki permission purchase_order.submit
-                    | 2. Status PO masih DRAFT
-                    | 3. Creator PO atau satu department
-                    |--------------------------------------------------------------------------
-                    */
+                |--------------------------------------------------------------------------
+                | Hak submit per row
+                |--------------------------------------------------------------------------
+                | Syarat:
+                | 1. Memiliki permission purchase_order.submit
+                | 2. Status PO masih DRAFT
+                | 3. Creator PO atau satu department
+                |--------------------------------------------------------------------------
+                */
                     $canSubmitRow = (
                         $canSubmit
                         && $poStatus === 'DRAFT'
@@ -702,7 +792,7 @@ class PurchaseOrderController extends Controller
                             ?? '-',
 
                         'status_pkp'
-                        => $po->vendor?->status_pkp
+                        => $po->status_pkp
                             ?? 'NON_PKP',
 
                         'jenis_pembayaran'
@@ -1054,10 +1144,17 @@ class PurchaseOrderController extends Controller
                 'gt:0',
             ],
 
+            /*
+        |--------------------------------------------------------------------------
+        | Harga Unit
+        |--------------------------------------------------------------------------
+        | Dibuat tidak memakai rule numeric langsung agar tetap aman jika suatu saat
+        | frontend mengirim harga dalam format uang seperti "2.000.000".
+        | Nilainya tetap dinormalisasi dan divalidasi di bawah sebelum disimpan.
+        |--------------------------------------------------------------------------
+        */
             'items.*.harga_unit' => [
                 'required',
-                'numeric',
-                'gte:0',
             ],
 
             'items.*.spesifikasi' => [
@@ -1100,13 +1197,13 @@ class PurchaseOrderController extends Controller
             $text = trim((string) $value);
 
             /*
-                |--------------------------------------------------------------------------
-                | Decode entity lama / double encoded
-                |--------------------------------------------------------------------------
-                | Contoh:
-                | &amp;quot; -> &quot; -> "
-                |--------------------------------------------------------------------------
-                */
+        |--------------------------------------------------------------------------
+        | Decode entity lama / double encoded
+        |--------------------------------------------------------------------------
+        | Contoh:
+        | &amp;quot; -> &quot; -> "
+        |--------------------------------------------------------------------------
+        */
             for ($i = 0; $i < 3; $i++) {
                 $decoded = html_entity_decode(
                     $text,
@@ -1122,20 +1219,130 @@ class PurchaseOrderController extends Controller
             }
 
             /*
-                |--------------------------------------------------------------------------
-                | Buang tag HTML, tapi jangan encode lagi.
-                |--------------------------------------------------------------------------
-                */
+        |--------------------------------------------------------------------------
+        | Buang tag HTML, tapi jangan encode lagi.
+        |--------------------------------------------------------------------------
+        */
             $text = strip_tags($text);
 
             /*
-                |--------------------------------------------------------------------------
-                | Rapihkan spasi berlebih.
-                |--------------------------------------------------------------------------
-                */
+        |--------------------------------------------------------------------------
+        | Rapihkan spasi berlebih.
+        |--------------------------------------------------------------------------
+        */
             $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
 
             return trim($text);
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Normalize Money Input
+        |--------------------------------------------------------------------------
+        | Mendukung:
+        | - 2000000
+        | - "2000000"
+        | - "2.000.000"
+        | - "Rp 2.000.000"
+        |--------------------------------------------------------------------------
+        */
+        $normalizeMoney = static function (
+            mixed $value,
+            string $field,
+        ): float {
+            if (
+                is_int($value)
+                || is_float($value)
+            ) {
+                $amount = (float) $value;
+
+                if ($amount < 0) {
+                    throw ValidationException::withMessages([
+                        $field => [
+                            'Harga unit tidak boleh kurang dari 0.',
+                        ],
+                    ]);
+                }
+
+                return $amount;
+            }
+
+            $text = trim((string) $value);
+
+            if ($text === '') {
+                throw ValidationException::withMessages([
+                    $field => [
+                        'Harga unit wajib diisi.',
+                    ],
+                ]);
+            }
+
+            $normalizedText = str_replace(
+                [
+                    'Rp',
+                    'rp',
+                    'IDR',
+                    'idr',
+                    ' ',
+                ],
+                '',
+                $text,
+            );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Format Indonesia:
+        | 2.000.000,50 -> 2000000.50
+        |--------------------------------------------------------------------------
+        */
+            if (
+                str_contains($normalizedText, '.')
+                && str_contains($normalizedText, ',')
+            ) {
+                $normalizedText = str_replace('.', '', $normalizedText);
+                $normalizedText = str_replace(',', '.', $normalizedText);
+            }
+            /*
+        |--------------------------------------------------------------------------
+        | Format ribuan Indonesia:
+        | 2.000.000 -> 2000000
+        |--------------------------------------------------------------------------
+        */ elseif (
+                preg_match(
+                    '/^\d{1,3}(\.\d{3})+$/',
+                    $normalizedText,
+                )
+            ) {
+                $normalizedText = str_replace('.', '', $normalizedText);
+            }
+            /*
+        |--------------------------------------------------------------------------
+        | Format decimal pakai koma:
+        | 2000000,50 -> 2000000.50
+        |--------------------------------------------------------------------------
+        */ else {
+                $normalizedText = str_replace(',', '.', $normalizedText);
+            }
+
+            if (!is_numeric($normalizedText)) {
+                throw ValidationException::withMessages([
+                    $field => [
+                        'Harga unit hanya boleh berupa angka.',
+                    ],
+                ]);
+            }
+
+            $amount = (float) $normalizedText;
+
+            if ($amount < 0) {
+                throw ValidationException::withMessages([
+                    $field => [
+                        'Harga unit tidak boleh kurang dari 0.',
+                    ],
+                ]);
+            }
+
+            return $amount;
         };
 
         /*
@@ -1204,15 +1411,16 @@ class PurchaseOrderController extends Controller
                     $validated,
                     $user,
                     $clean,
+                    $normalizeMoney,
                     $purchaseRequestIds,
                     $itemPayloads,
                     $requestedDepartmentId,
                 ) {
                     /*
-            |--------------------------------------------------------------------------
-            | Lock Purchase Requests
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Lock Purchase Requests
+                |--------------------------------------------------------------------------
+                */
                     $purchaseRequests = PurchaseRequest::query()
                         ->whereIn(
                             'id',
@@ -1244,10 +1452,10 @@ class PurchaseOrderController extends Controller
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Validate PR Status
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Validate PR Status
+                |--------------------------------------------------------------------------
+                */
                     foreach ($purchaseRequests as $purchaseRequest) {
                         $status = strtoupper(
                             trim(
@@ -1289,10 +1497,10 @@ class PurchaseOrderController extends Controller
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Seluruh PR wajib satu department
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Seluruh PR wajib satu department
+                |--------------------------------------------------------------------------
+                */
                     $sourceDepartmentIds = $purchaseRequests
                         ->pluck('id_department')
                         ->map(
@@ -1317,10 +1525,10 @@ class PurchaseOrderController extends Controller
                     );
 
                     /*
-            |--------------------------------------------------------------------------
-            | Department payload wajib sama dengan department PR di database
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Department payload wajib sama dengan department PR di database
+                |--------------------------------------------------------------------------
+                */
                     if (
                         $sourceDepartmentId
                         !== $requestedDepartmentId
@@ -1333,10 +1541,10 @@ class PurchaseOrderController extends Controller
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Authoritative Department Authorization
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Authoritative Department Authorization
+                |--------------------------------------------------------------------------
+                */
                     if (
                         !$user->canAccessDepartmentForPermission(
                             'purchase_order.create',
@@ -1349,10 +1557,10 @@ class PurchaseOrderController extends Controller
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Seluruh PR wajib satu cabang
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Seluruh PR wajib satu cabang
+                |--------------------------------------------------------------------------
+                */
                     $sourceCabangIds = $purchaseRequests
                         ->pluck('cabang')
                         ->map(
@@ -1388,10 +1596,10 @@ class PurchaseOrderController extends Controller
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Lock Purchase Request Items
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Lock Purchase Request Items
+                |--------------------------------------------------------------------------
+                */
                     $purchaseRequestItemIds = $itemPayloads
                         ->pluck(
                             'purchase_request_item_id',
@@ -1428,10 +1636,10 @@ class PurchaseOrderController extends Controller
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Prepare dan validate item
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Prepare dan validate item
+                |--------------------------------------------------------------------------
+                */
                     $preparedItems = [];
 
                     foreach (
@@ -1459,10 +1667,10 @@ class PurchaseOrderController extends Controller
                         }
 
                         /*
-                |--------------------------------------------------------------------------
-                | Item wajib benar-benar milik PR yang dikirim
-                |--------------------------------------------------------------------------
-                */
+                    |--------------------------------------------------------------------------
+                    | Item wajib benar-benar milik PR yang dikirim
+                    |--------------------------------------------------------------------------
+                    */
                         if (
                             (int) $purchaseRequestItem
                                 ->purchase_request_id
@@ -1538,17 +1746,31 @@ class PurchaseOrderController extends Controller
                             ]);
                         }
 
-                        $hargaUnit = (float) (
-                            $itemPayload['harga_unit']
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Harga Unit PO
+                    |--------------------------------------------------------------------------
+                    | Harga unit sengaja diambil dari payload frontend, bukan dari
+                    | purchase_request_items, karena pada Create PO harga boleh diedit.
+                    |--------------------------------------------------------------------------
+                    */
+                        $hargaUnit = $normalizeMoney(
+                            $itemPayload['harga_unit'] ?? null,
+                            "items.$index.harga_unit",
+                        );
+
+                        $itemSubtotal = round(
+                            $qtyPoInput * $hargaUnit,
+                            2,
                         );
 
                         $preparedItems[] = [
                             'model' => $purchaseRequestItem,
 
                             /*
-                     * Nama dan satuan diambil dari database,
-                     * bukan dipercaya dari payload frontend.
-                     */
+                         * Nama dan satuan diambil dari database,
+                         * bukan dipercaya dari payload frontend.
+                         */
                             'nama_item'
                             => $purchaseRequestItem
                                 ->nama_item,
@@ -1569,23 +1791,25 @@ class PurchaseOrderController extends Controller
                                 $itemPayload['keterangan'] ?? '',
                             ),
 
+                            /*
+                         * Harga unit berasal dari input PO yang sudah diedit.
+                         */
                             'harga_unit'
                             => $hargaUnit,
 
                             'subtotal'
-                            => $qtyPoInput
-                                * $hargaUnit,
+                            => $itemSubtotal,
                         ];
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Hitung DPP, PPN, dan Total PO dari Backend
-            |--------------------------------------------------------------------------
-            | Jangan bergantung ke payload frontend, karena di live bisa saja
-            | dpp / ppn / total_nilai tidak terkirim atau build FE belum terbaru.
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Hitung DPP, PPN, dan Total PO dari Backend
+                |--------------------------------------------------------------------------
+                | Jangan bergantung ke payload frontend, karena di live bisa saja
+                | dpp / ppn / total_nilai tidak terkirim atau build FE belum terbaru.
+                |--------------------------------------------------------------------------
+                */
                     $vendorId = (int) $validated['vendor_id'];
 
                     $vendorTable = collect([
@@ -1632,9 +1856,33 @@ class PurchaseOrderController extends Controller
                         ]);
                     }
 
-                    $vendorStatusPkp = DB::table($vendorTable)
+                    $vendor = DB::table($vendorTable)
                         ->where('id', $vendorId)
-                        ->value('status_pkp');
+                        ->first([
+                            'id',
+                            'status_pkp',
+                            'jenis_pembayaran',
+                            'top',
+                        ]);
+
+                    if (!$vendor) {
+                        throw ValidationException::withMessages([
+                            'vendor_id' => [
+                                'Vendor tidak ditemukan.',
+                            ],
+                        ]);
+                    }
+
+                    $vendorStatusPkp = $vendor->status_pkp ?? null;
+
+                    $vendorJenisPembayaranSnapshot = strtoupper(
+                        trim((string) ($vendor->jenis_pembayaran ?? '')),
+                    );
+
+                    $vendorTopSnapshot = (int) (
+                        $vendor->top
+                        ?? 0
+                    );
 
                     $vendorStatusPkpNormalized = strtoupper(
                         trim(
@@ -1646,13 +1894,13 @@ class PurchaseOrderController extends Controller
                         $vendorStatusPkpNormalized,
                         [
                             'PKP',
-                            '1',
-                            'YA',
-                            'YES',
-                            'TRUE',
                         ],
                         true,
                     );
+
+                    $poStatusPkpSnapshot = $isPkpVendor
+                        ? 'PKP'
+                        : 'NON_PKP';
 
                     $subTotalItems = collect($preparedItems)
                         ->sum(function (array $preparedItem): float {
@@ -1693,12 +1941,12 @@ class PurchaseOrderController extends Controller
                     }
 
                     /*
-            |--------------------------------------------------------------------------
-            | Create PO
-            |--------------------------------------------------------------------------
-            | Cabang dan department berasal dari PR di database.
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Create PO
+                |--------------------------------------------------------------------------
+                | Cabang dan department berasal dari PR di database.
+                |--------------------------------------------------------------------------
+                */
                     $nomorPo = $this
                         ->generateDraftPONumber();
 
@@ -1732,6 +1980,11 @@ class PurchaseOrderController extends Controller
                         'ppn'
                         => $ppnAmount,
 
+                        'status_pkp' => $poStatusPkpSnapshot,
+
+                        'jenis_pembayaran' => $vendorJenisPembayaranSnapshot,
+                        'top' => $vendorTopSnapshot,
+
                         'status' => 'DRAFT',
 
                         'created_by'
@@ -1743,10 +1996,10 @@ class PurchaseOrderController extends Controller
                     );
 
                     /*
-            |--------------------------------------------------------------------------
-            | Create PO Items dan update outstanding
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | Create PO Items dan update outstanding
+                |--------------------------------------------------------------------------
+                */
                     foreach ($preparedItems as $preparedItem) {
                         /** @var PurchaseRequestItem $prItem */
                         $prItem = $preparedItem['model'];
@@ -1773,6 +2026,10 @@ class PurchaseOrderController extends Controller
                             'keterangan'
                             => $preparedItem['keterangan'],
 
+                            /*
+                         * Harga unit yang tersimpan adalah harga unit dari PO,
+                         * bukan harga unit asli dari PR.
+                         */
                             'harga_unit'
                             => $preparedItem['harga_unit'],
 
@@ -1854,14 +2111,6 @@ class PurchaseOrderController extends Controller
 
     public function show($publicId, Request $request)
     {
-        $user = $request->user();
-        // if (!$user || !$user->hasPermission('purchase_order.update')) {
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => 'Anda tidak memiliki akses untuk mengubah Purchase Order.',
-        //     ], 403);
-        // }
-
         try {
             $id = Crypt::decryptString($publicId);
 
@@ -1898,9 +2147,9 @@ class PurchaseOrderController extends Controller
                         'vendor_id' => $po->vendor->id,
                         'id' => $po->vendor->id,
                         'nama_vendor' => $po->vendor->nama_vendor ?? '-',
-                        'status_pkp' => $po->vendor->status_pkp ?? 'NON_PKP',
-                        'jenis_pembayaran' => $po->vendor->jenis_pembayaran ?? null,
-                        'top' => $po->vendor->top ?? null,
+                        'status_pkp' => $po->status_pkp ?? 'NON_PKP',
+                        'jenis_pembayaran' => $po->jenis_pembayaran ?? null,
+                        'top' => $po->top ?? null,
                     ] : null,
 
                     'cabang_id' => $po->cabang,
@@ -2284,10 +2533,17 @@ class PurchaseOrderController extends Controller
                 'exists:units,id',
             ],
 
+            /*
+        |--------------------------------------------------------------------------
+        | Harga Unit
+        |--------------------------------------------------------------------------
+        | Sengaja tidak langsung pakai rule numeric agar tetap aman jika FE
+        | mengirim format uang seperti "2.000.000" atau "Rp 2.000.000".
+        | Nilai tetap dinormalisasi dan divalidasi manual di bawah.
+        |--------------------------------------------------------------------------
+        */
             'items.*.harga_unit' => [
                 'required',
-                'numeric',
-                'gte:0',
             ],
 
             'items.*.spesifikasi' => [
@@ -2357,6 +2613,117 @@ class PurchaseOrderController extends Controller
         };
 
         /*
+        |--------------------------------------------------------------------------
+        | Normalize Money Input
+        |--------------------------------------------------------------------------
+        | Mendukung:
+        | - 2000000
+        | - "2000000"
+        | - "2.000.000"
+        | - "Rp 2.000.000"
+        | - "2.000.000,50"
+        |--------------------------------------------------------------------------
+        */
+        $normalizeMoney = static function (
+            mixed $value,
+            string $field,
+        ): float {
+            if (
+                is_int($value)
+                || is_float($value)
+            ) {
+                $amount = (float) $value;
+
+                if ($amount < 0) {
+                    throw ValidationException::withMessages([
+                        $field => [
+                            'Harga unit tidak boleh kurang dari 0.',
+                        ],
+                    ]);
+                }
+
+                return $amount;
+            }
+
+            $text = trim((string) $value);
+
+            if ($text === '') {
+                throw ValidationException::withMessages([
+                    $field => [
+                        'Harga unit wajib diisi.',
+                    ],
+                ]);
+            }
+
+            $normalizedText = str_replace(
+                [
+                    'Rp',
+                    'rp',
+                    'IDR',
+                    'idr',
+                    ' ',
+                ],
+                '',
+                $text,
+            );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Format Indonesia:
+        | 2.000.000,50 -> 2000000.50
+        |--------------------------------------------------------------------------
+        */
+            if (
+                str_contains($normalizedText, '.')
+                && str_contains($normalizedText, ',')
+            ) {
+                $normalizedText = str_replace('.', '', $normalizedText);
+                $normalizedText = str_replace(',', '.', $normalizedText);
+            }
+            /*
+        |--------------------------------------------------------------------------
+        | Format ribuan Indonesia:
+        | 2.000.000 -> 2000000
+        |--------------------------------------------------------------------------
+        */ elseif (
+                preg_match(
+                    '/^\d{1,3}(\.\d{3})+$/',
+                    $normalizedText,
+                )
+            ) {
+                $normalizedText = str_replace('.', '', $normalizedText);
+            }
+            /*
+        |--------------------------------------------------------------------------
+        | Format decimal pakai koma:
+        | 2000000,50 -> 2000000.50
+        |--------------------------------------------------------------------------
+        */ else {
+                $normalizedText = str_replace(',', '.', $normalizedText);
+            }
+
+            if (!is_numeric($normalizedText)) {
+                throw ValidationException::withMessages([
+                    $field => [
+                        'Harga unit hanya boleh berupa angka.',
+                    ],
+                ]);
+            }
+
+            $amount = (float) $normalizedText;
+
+            if ($amount < 0) {
+                throw ValidationException::withMessages([
+                    $field => [
+                        'Harga unit tidak boleh kurang dari 0.',
+                    ],
+                ]);
+            }
+
+            return $amount;
+        };
+
+        /*
     |--------------------------------------------------------------------------
     | Normalize PR IDs
     |--------------------------------------------------------------------------
@@ -2410,6 +2777,7 @@ class PurchaseOrderController extends Controller
                     $validated,
                     $user,
                     $clean,
+                    $normalizeMoney,
                     $purchaseRequestIds,
                     $itemPayloads,
                     $requestedDepartmentId,
@@ -2790,8 +3158,22 @@ class PurchaseOrderController extends Controller
                             ]);
                         }
 
-                        $hargaUnit = (float) (
-                            $itemPayload['harga_unit']
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Harga Unit PO
+                    |--------------------------------------------------------------------------
+                    | Harga unit sengaja diambil dari payload frontend, bukan dari
+                    | purchase_request_items, karena pada Edit PO harga boleh diedit.
+                    |--------------------------------------------------------------------------
+                    */
+                        $hargaUnit = $normalizeMoney(
+                            $itemPayload['harga_unit'] ?? null,
+                            "items.$index.harga_unit",
+                        );
+
+                        $itemSubtotal = round(
+                            $qtyPoInput * $hargaUnit,
+                            2,
                         );
 
                         $preparedItems[] = [
@@ -2806,7 +3188,7 @@ class PurchaseOrderController extends Controller
                                 $itemPayload['keterangan'] ?? '',
                             ),
                             'harga_unit' => $hargaUnit,
-                            'subtotal' => $qtyPoInput * $hargaUnit,
+                            'subtotal' => $itemSubtotal,
                         ];
                     }
 
@@ -2845,6 +3227,8 @@ class PurchaseOrderController extends Controller
                         ->first([
                             'id',
                             'status_pkp',
+                            'jenis_pembayaran',
+                            'top',
                         ]);
 
                     if (!$vendor) {
@@ -2854,6 +3238,15 @@ class PurchaseOrderController extends Controller
                             ],
                         ]);
                     }
+
+                    $vendorJenisPembayaranSnapshot = strtoupper(
+                        trim((string) ($vendor->jenis_pembayaran ?? '')),
+                    );
+
+                    $vendorTopSnapshot = (int) (
+                        $vendor->top
+                        ?? 0
+                    );
 
                     $vendorStatusPkpNormalized = strtoupper(
                         trim(
@@ -2865,13 +3258,13 @@ class PurchaseOrderController extends Controller
                         $vendorStatusPkpNormalized,
                         [
                             'PKP',
-                            '1',
-                            'YA',
-                            'YES',
-                            'TRUE',
                         ],
                         true,
                     );
+
+                    $poStatusPkpSnapshot = $isPkpVendor
+                        ? 'PKP'
+                        : 'NON_PKP';
 
                     $subtotalAmount = round(
                         collect($preparedItems)
@@ -2930,6 +3323,9 @@ class PurchaseOrderController extends Controller
                         'total_nilai' => $totalPoAmount,
                         'dpp' => $dppAmount,
                         'ppn' => $ppnAmount,
+                        'status_pkp' => $poStatusPkpSnapshot,
+                        'jenis_pembayaran' => $vendorJenisPembayaranSnapshot,
+                        'top' => $vendorTopSnapshot,
                         'updated_at' => now(),
                     ];
 
@@ -3049,7 +3445,15 @@ class PurchaseOrderController extends Controller
                             'satuan' => $preparedItem['satuan'],
                             'spesifikasi' => $preparedItem['spesifikasi'],
                             'keterangan' => $preparedItem['keterangan'],
+
+                            /*
+                        |--------------------------------------------------------------------------
+                        | Harga unit yang tersimpan adalah harga unit dari Edit PO,
+                        | bukan harga unit asli dari PR.
+                        |--------------------------------------------------------------------------
+                        */
                             'harga_unit' => $preparedItem['harga_unit'],
+
                             'subtotal' => $preparedItem['subtotal'],
                         ]);
                     }
@@ -5139,34 +5543,62 @@ class PurchaseOrderController extends Controller
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil hanya item PR yang masih aktif
+        |--------------------------------------------------------------------------
+        | Item yang sudah soft delete tidak boleh mempengaruhi status_po PR.
+        |--------------------------------------------------------------------------
+        */
         $summary = PurchaseRequestItem::query()
             ->where('purchase_request_id', $purchaseRequestId)
             ->whereNull('deleted_at')
             ->selectRaw('
-            COALESCE(SUM(qty), 0) as total_qty_request,
-            COALESCE(SUM(qty_po), 0) as total_qty_po,
-            COALESCE(SUM(qty_outstanding), 0) as total_qty_outstanding
+            COALESCE(SUM(qty), 0) AS total_qty_request,
+            COALESCE(SUM(qty_po), 0) AS total_qty_po,
+            COALESCE(SUM(qty_outstanding), 0) AS total_qty_outstanding
         ')
             ->first();
 
         $totalQtyRequest = (float) ($summary->total_qty_request ?? 0);
         $totalQtyPo = (float) ($summary->total_qty_po ?? 0);
-        $totalOutstanding = (float) ($summary->total_qty_outstanding ?? 0);
 
-        if ($totalQtyPo <= 0) {
+        /*
+        |--------------------------------------------------------------------------
+        | Hitung outstanding dari total qty request - total qty PO
+        |--------------------------------------------------------------------------
+        | Jangan hanya bergantung ke qty_outstanding tersimpan, supaya lebih aman
+        | jika ada data lama / hasil edit / pembulatan decimal.
+        |--------------------------------------------------------------------------
+        */
+        $totalOutstanding = max(
+            $totalQtyRequest - $totalQtyPo,
+            0,
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Toleransi angka decimal
+        |--------------------------------------------------------------------------
+        | Untuk menghindari kasus 5.0000001 atau 4.9999999 pada decimal.
+        |--------------------------------------------------------------------------
+        */
+        $epsilon = 0.00001;
+
+        if ($totalQtyRequest <= $epsilon || $totalQtyPo <= $epsilon) {
             $statusPo = 'OPEN';
-        } elseif ($totalOutstanding > 0 && $totalQtyPo < $totalQtyRequest) {
+        } elseif ($totalQtyPo + $epsilon < $totalQtyRequest) {
             $statusPo = 'PARTIAL';
         } else {
             /*
         |--------------------------------------------------------------------------
-        | PO dibuat penuh bukan berarti PR selesai/closed.
+        | Qty PR sudah habis digunakan oleh PO
         |--------------------------------------------------------------------------
-        | Status PO pada PR tetap OPEN supaya PR masih dianggap berada dalam
-        | proses PO, bukan selesai total.
+        | Draft PO tetap dihitung sebagai penggunaan qty PR sesuai rule yang
+        | sudah disepakati. Jadi jika qty sudah full, status_po PR harus COMPLETED.
         |--------------------------------------------------------------------------
         */
-            $statusPo = 'OPEN';
+            $statusPo = 'COMPLETED';
         }
 
         $pr->update([

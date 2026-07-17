@@ -103,7 +103,7 @@ onMounted(async () => {
 
     try {
       const menuResponse = await axios.get(
-        '/auth/my-menus',
+        '/master/menus/navigation',
       )
 
       localStorage.setItem(

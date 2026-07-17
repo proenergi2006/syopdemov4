@@ -19,7 +19,8 @@ class PurchaseOrderDashboardController extends Controller
         $user = $request->user();
 
         if (
-            !$user->hasPermission(
+            !$user
+            || !$user->hasPermission(
                 'dashboard.po.view',
             )
         ) {
@@ -94,20 +95,20 @@ class PurchaseOrderDashboardController extends Controller
         ]);
 
         /*
-         * Menentukan filter efektif berdasarkan scope.
-         *
-         * OWN_CABANG dan OWN_DEPARTMENT akan menimpa
-         * filter tertentu dengan data user login.
-         */
-        $resolvedAccess
-            = $this->dashboardService
+        |--------------------------------------------------------------------------
+        | Resolve Access dan Effective Filters
+        |--------------------------------------------------------------------------
+        | OWN_CABANG dan OWN_DEPARTMENT akan menimpa filter tertentu dengan
+        | data user login. Controller hanya meneruskan hasil resolve ke service.
+        |--------------------------------------------------------------------------
+        */
+        $resolvedAccess = $this->dashboardService
             ->resolveAccessAndFilters(
                 user: $user,
                 filters: $validated,
             );
 
-        $dashboard
-            = $this->dashboardService
+        $dashboard = $this->dashboardService
             ->getDashboard(
                 $resolvedAccess['filters'],
             );
@@ -121,10 +122,10 @@ class PurchaseOrderDashboardController extends Controller
                 => $resolvedAccess['access'],
 
                 'filters'
-                => $dashboard['filters'],
+                => $dashboard['filters'] ?? [],
 
                 'summary'
-                => $dashboard['summary'],
+                => $dashboard['summary'] ?? [],
 
                 'trend'
                 => $dashboard['trend'] ?? [],
@@ -135,12 +136,60 @@ class PurchaseOrderDashboardController extends Controller
                 'attention_items'
                 => $dashboard['attention_items'] ?? [],
 
-                /*
-                 * Akan diisi pada tahap chart berikutnya.
-                 */
                 'breakdown' => $dashboard['breakdown'] ?? [
                     'by_cabang' => [],
                     'by_department' => [],
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Perbandingan Harga Item PR dan PO
+                |--------------------------------------------------------------------------
+                | Data ini dipakai frontend untuk section:
+                | "Perbandingan Harga Item PR dan PO".
+                |--------------------------------------------------------------------------
+                */
+                'item_price_comparison'
+                => $dashboard['item_price_comparison'] ?? [
+                    'summary' => [
+                        'total_items' => 0,
+                        'increased_items' => 0,
+                        'decreased_items' => 0,
+                        'unchanged_items' => 0,
+                        'average_difference_percent' => 0,
+                        'total_difference_amount' => 0,
+                    ],
+                    'items' => [],
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Efisiensi dan Kenaikan Nilai PR vs PO
+                |--------------------------------------------------------------------------
+                | Data ini dipakai frontend untuk section:
+                | "Efisiensi dan Kenaikan Nilai PR vs PO".
+                |
+                | Rule:
+                | - Hanya PR status_po COMPLETED yang dihitung di service.
+                | - PO DRAFT tetap dihitung sebagai PO valid sesuai rule yang
+                |   sudah disepakati.
+                |--------------------------------------------------------------------------
+                */
+                'value_comparison'
+                => $dashboard['value_comparison'] ?? [
+                    'summary' => [
+                        'completed_pr_count' => 0,
+                        'efficiency_pr_count' => 0,
+                        'increase_pr_count' => 0,
+                        'same_pr_count' => 0,
+                        'total_pr_amount' => 0,
+                        'total_po_amount' => 0,
+                        'efficiency_amount' => 0,
+                        'increase_amount' => 0,
+                        'net_difference_amount' => 0,
+                        'average_difference_percent' => 0,
+                    ],
+                    'items' => [],
                 ],
             ],
         ]);

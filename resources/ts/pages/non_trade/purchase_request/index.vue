@@ -18,6 +18,7 @@ import {
   showWarningToast,
   showInfoToast,
 } from '@/utils/alert'
+import { useNavigationStore } from '@/stores/navigation'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { useDeleteConfirm } from '@core/composable/useDeleteConfirm'
 import { formatStatusPKP, formatNumberWithoutRp, toTitleCase, formatDecimalQty } from '@/utils/textFormatter'
@@ -44,6 +45,8 @@ interface ApprovalHistoryItem {
   approved_at?: string | null
   rejected_at?: string | null
   signed_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
   notes?: string | null
 }
 
@@ -58,6 +61,10 @@ interface PurchaseRequestItem {
   pr_type: string | null
   status: string | null
   status_po: string | null
+
+  total_amount?: number | string | null
+  total_po?: number | string | null
+  total_outstanding?: number | string | null
 
   can_approve?: boolean | number | string | null
   can_submit?: boolean | number | string | null
@@ -105,17 +112,7 @@ const canView = computed(() => {
   return permissionStore.can('purchase_request.view')
 })
 
-const canCreate = computed(() => {
-  return permissionStore.can('purchase_request.create')
-})
-
-const canUpdate = computed(() => {
-  return permissionStore.can('purchase_request.update')
-})
-
-const canDelete = computed(() => {
-  return permissionStore.can('purchase_request.delete')
-})
+const navigationStore = useNavigationStore()
 
 const isCheckingPermission = ref(true)
 
@@ -194,6 +191,7 @@ const selectedPRNomor = ref('-')
 const openedVendorPanels = ref<number[]>([])
 
 const selectedStatusPO = ref('')
+const onlyWaitingMyApproval = ref(false)
 
 const abilities = ref<ModuleAbilities>(
   defaultModuleAbilities(),
@@ -754,6 +752,7 @@ const approvePurchaseRequest = async (): Promise<void> => {
     pendingAction.value = null
 
     await fetchPurchaseRequests()
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -873,6 +872,7 @@ const rejectPurchaseRequisition = async (): Promise<void> => {
     })
 
     await fetchPurchaseRequests()
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1041,6 +1041,7 @@ watch(
     tanggalSelesai,
     selectedStatus,
     selectedStatusPO,
+    onlyWaitingMyApproval,
   ],
   () => {
     if (filterTimer)
@@ -1073,6 +1074,7 @@ const fetchPurchaseRequests = async (): Promise<void> => {
           tanggal_selesai: tanggalSelesai.value || undefined,
           status: selectedStatus.value || undefined,
           status_po: selectedStatusPO.value || undefined,
+          waiting_my_approval: onlyWaitingMyApproval.value ? 1 : undefined,
         },
       },
     )
@@ -1146,6 +1148,7 @@ const resetFilters = async (): Promise<void> => {
   tanggalSelesai.value = null
   selectedStatus.value = ''
   selectedStatusPO.value = ''
+  onlyWaitingMyApproval.value = false
 
   currentPage.value = 1
 
@@ -1216,6 +1219,7 @@ const submitPurchaseRequest = async (row: any): Promise<void> => {
     })
 
     await fetchPurchaseRequests()
+    await navigationStore.refreshBadges()
   } catch (error: unknown) {
     closeAlert()
 
@@ -1320,6 +1324,13 @@ const openDetail = async (publicId: string): Promise<void> => {
       throw new Error('Data purchase requisition tidak ditemukan')
     }
 
+    if (
+      !Array.isArray(detail.approvals)
+      && Array.isArray(response.data?.approvals)
+    ) {
+      detail.approvals = response.data.approvals
+    }
+
     detailPurchaseRequest.value = detail
 
     await nextTick()
@@ -1341,10 +1352,549 @@ const openDetail = async (publicId: string): Promise<void> => {
   }
 }
 
+
+type SimpleApprovalHistory = {
+  id: number | string
+  step_order: number
+  label: string
+  status: string
+  processed_by: string
+  processed_at: string | null
+  notes: string | null
+}
+
+const normalizeApprovalText = (value: unknown): string => {
+  return String(value ?? '').trim()
+}
+
+const formatSimpleApprovalDateTime = (value?: string | null): string => {
+  if (!value)
+    return '-'
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime()))
+    return String(value)
+
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const yyyy = date.getFullYear()
+  const hh = String(date.getHours()).padStart(2, '0')
+  const ii = String(date.getMinutes()).padStart(2, '0')
+
+  return `${dd}/${mm}/${yyyy} ${hh}:${ii}`
+}
+
+const getRawDetailApprovals = (): any[] => {
+  const detail = detailPurchaseRequest.value as any
+
+  const rawApprovals =
+    detail?.approvals
+    ?? detail?.approval_histories
+    ?? detail?.approvalHistories
+    ?? detail?.approval_history
+    ?? detail?.approvalHistory
+    ?? []
+
+  return Array.isArray(rawApprovals)
+    ? rawApprovals
+    : []
+}
+
+const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
+  return getRawDetailApprovals()
+    .map((item: any, index: number): SimpleApprovalHistory => {
+      const stepOrder = Number(
+        item.step_order
+        ?? item.approval_step_order
+        ?? item.step
+        ?? index + 1,
+      )
+
+      const status = normalizeApprovalText(
+        item.status
+        ?? item.result
+        ?? item.action
+        ?? item.approval_status,
+      ).toUpperCase()
+
+      const actionAt = status === 'REJECTED'
+        ? (
+          item.rejected_at
+          ?? item.processed_at
+          ?? item.updated_at
+          ?? item.created_at
+          ?? null
+        )
+        : status === 'APPROVED'
+          ? (
+            item.approved_at
+            ?? item.signed_at
+            ?? item.processed_at
+            ?? item.updated_at
+            ?? item.created_at
+            ?? null
+          )
+          : (
+            item.processed_at
+            ?? item.updated_at
+            ?? item.created_at
+            ?? null
+          )
+
+      return {
+        id: item.id ?? `${stepOrder}-${index}`,
+        step_order: Number.isFinite(stepOrder) && stepOrder > 0
+          ? stepOrder
+          : index + 1,
+        label:
+          normalizeApprovalText(item.label)
+          || normalizeApprovalText(item.approval_label)
+          || normalizeApprovalText(item.position)
+          || normalizeApprovalText(item.role_name)
+          || normalizeApprovalText(item.role)
+          || `Tahap ${index + 1}`,
+        status,
+        processed_by:
+          normalizeApprovalText(item.approver_name_snapshot)
+          || normalizeApprovalText(item.processed_by_name)
+          || normalizeApprovalText(item.approved_by_name)
+          || normalizeApprovalText(item.rejected_by_name)
+          || normalizeApprovalText(item.user_name)
+          || normalizeApprovalText(item.approver_name)
+          || '-',
+        processed_at: actionAt,
+        notes:
+          normalizeApprovalText(item.notes)
+          || normalizeApprovalText(item.remark)
+          || normalizeApprovalText(item.keterangan)
+          || null,
+      }
+    })
+    .sort((a, b) => a.step_order - b.step_order)
+})
+
+const getSimpleApprovalStatusLabel = (status: string): string => {
+  const normalized = normalizeApprovalText(status).toUpperCase()
+
+  if (normalized === 'APPROVED')
+    return 'Approved'
+
+  if (normalized === 'WAITING')
+    return 'Menunggu'
+
+  if (normalized === 'PENDING')
+    return 'Pending'
+
+  if (normalized === 'REJECTED')
+    return 'Rejected'
+
+  if (normalized === 'CANCELLED')
+    return 'Dibatalkan'
+
+  if (!normalized)
+    return '-'
+
+  return normalized
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, char => char.toUpperCase())
+}
+
+const getSimpleApprovalStatusColor = (status: string): string => {
+  const normalized = normalizeApprovalText(status).toUpperCase()
+
+  if (normalized === 'APPROVED')
+    return 'success'
+
+  if (normalized === 'WAITING')
+    return 'warning'
+
+  if (normalized === 'PENDING')
+    return 'secondary'
+
+  if (normalized === 'REJECTED')
+    return 'error'
+
+  if (normalized === 'CANCELLED')
+    return 'default'
+
+  return 'primary'
+}
+
+const getSimpleApprovalStatusIcon = (status: string): string => {
+  const normalized = normalizeApprovalText(status).toUpperCase()
+
+  if (normalized === 'APPROVED')
+    return 'tabler-circle-check'
+
+  if (normalized === 'WAITING')
+    return 'tabler-loader-2'
+
+  if (normalized === 'PENDING')
+    return 'tabler-clock'
+
+  if (normalized === 'REJECTED')
+    return 'tabler-circle-x'
+
+  if (normalized === 'CANCELLED')
+    return 'tabler-ban'
+
+  return 'tabler-help-circle'
+}
+
+const parseDetailNumber = (value: unknown): number => {
+  if (typeof value === 'number')
+    return Number.isFinite(value) ? value : 0
+
+  if (value === null || value === undefined)
+    return 0
+
+  let normalized = String(value)
+    .trim()
+    .replace(/Rp/gi, '')
+    .replace(/IDR/gi, '')
+    .replace(/\s+/g, '')
+
+  if (!normalized)
+    return 0
+
+  if (normalized.includes('.') && normalized.includes(',')) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.')
+  }
+  else if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(normalized)) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.')
+  }
+  else {
+    normalized = normalized.replace(',', '.')
+  }
+
+  normalized = normalized.replace(/[^\d.-]/g, '')
+
+  const numeric = Number(normalized)
+
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
 const calcDetailGrandTotal = (items: any[] = []): number => {
   return items.reduce((total, item) => {
-    return total + Number(item.subtotal || 0)
+    return total + parseDetailNumber(item.subtotal || 0)
   }, 0)
+}
+
+const roundDetailCurrency = (value: number): number => {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
+}
+
+const normalizePKPValue = (value: unknown): string => {
+  return String(value ?? 'NON_PKP')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_')
+}
+
+const isPKPStatus = (value: unknown): boolean => {
+  return normalizePKPValue(value) === 'PKP'
+}
+
+const getDetailStatusPKP = (detail: any | null | undefined): string => {
+  return String(
+    detail?.recommended_vendor?.status_pkp
+    ?? detail?.status_pkp
+    ?? 'NON_PKP',
+  )
+}
+
+const isDetailPurchaseRequestPKP = (detail: any | null | undefined): boolean => {
+  return isPKPStatus(getDetailStatusPKP(detail))
+}
+
+const getDetailSubtotalItem = (detail: any | null | undefined): number => {
+  const storedSubtotal = parseDetailNumber(
+    detail?.subtotal_item
+    ?? detail?.subtotal_before_tax
+    ?? 0,
+  )
+
+  if (storedSubtotal > 0)
+    return roundDetailCurrency(storedSubtotal)
+
+  const items = Array.isArray(detail?.items)
+    ? detail.items
+    : []
+
+  return roundDetailCurrency(calcDetailGrandTotal(items))
+}
+
+const getDetailDpp = (detail: any | null | undefined): number => {
+  const storedDpp = parseDetailNumber(detail?.dpp ?? 0)
+
+  if (storedDpp > 0)
+    return roundDetailCurrency(storedDpp)
+
+  if (!isDetailPurchaseRequestPKP(detail))
+    return 0
+
+  return roundDetailCurrency(getDetailSubtotalItem(detail) * 11 / 12)
+}
+
+const getDetailPpn = (detail: any | null | undefined): number => {
+  const storedPpn = parseDetailNumber(detail?.ppn ?? 0)
+
+  if (storedPpn > 0)
+    return roundDetailCurrency(storedPpn)
+
+  if (!isDetailPurchaseRequestPKP(detail))
+    return 0
+
+  return roundDetailCurrency(getDetailDpp(detail) * 0.12)
+}
+
+const getDetailGrandTotal = (detail: any | null | undefined): number => {
+  const storedTotal = parseDetailNumber(
+    detail?.total_amount
+    ?? detail?.grand_total
+    ?? detail?.total_nilai
+    ?? detail?.total
+    ?? 0,
+  )
+
+  if (storedTotal > 0)
+    return roundDetailCurrency(storedTotal)
+
+  const subtotal = getDetailSubtotalItem(detail)
+
+  if (!isDetailPurchaseRequestPKP(detail))
+    return roundDetailCurrency(subtotal)
+
+  return roundDetailCurrency(subtotal + getDetailPpn(detail))
+}
+
+const getDetailTotalPo = (detail: any | null | undefined): number => {
+  const purchaseOrders = Array.isArray(detail?.purchase_orders)
+    ? detail.purchase_orders
+    : []
+
+  if (purchaseOrders.length > 0) {
+    return roundDetailCurrency(
+      purchaseOrders.reduce((total: number, po: any) => {
+        const status = String(po?.status ?? '')
+          .trim()
+          .toUpperCase()
+
+        if (['REJECTED', 'CANCELLED', 'CANCELED'].includes(status))
+          return total
+
+        return total + parseDetailNumber(
+          po?.total_nilai
+          ?? po?.total_amount
+          ?? po?.grand_total
+          ?? po?.total
+          ?? 0,
+        )
+      }, 0),
+    )
+  }
+
+  return roundDetailCurrency(
+    parseDetailNumber(
+      detail?.total_po
+      ?? detail?.total_po_amount
+      ?? detail?.total_ordered
+      ?? 0,
+    ),
+  )
+}
+
+const getDetailOutstandingSubtotal = (detail: any | null | undefined): number => {
+  const items = Array.isArray(detail?.items)
+    ? detail.items
+    : []
+
+  return roundDetailCurrency(
+    items.reduce((total: number, item: any) => {
+      const qtyOutstanding = parseDetailNumber(
+        item?.qty_outstanding
+        ?? item?.outstanding_qty
+        ?? 0,
+      )
+
+      const price = parseDetailNumber(
+        item?.harga_unit
+        ?? item?.price
+        ?? item?.unit_price
+        ?? 0,
+      )
+
+      return total + (qtyOutstanding * price)
+    }, 0),
+  )
+}
+
+const getDetailTotalOutstanding = (detail: any | null | undefined): number => {
+  const outstandingSubtotal = getDetailOutstandingSubtotal(detail)
+
+  if (outstandingSubtotal <= 0)
+    return 0
+
+  const backendOutstanding = parseDetailNumber(
+    detail?.outstanding_po_amount
+    ?? detail?.total_outstanding
+    ?? 0,
+  )
+
+  if (backendOutstanding > 0)
+    return roundDetailCurrency(backendOutstanding)
+
+  if (!isDetailPurchaseRequestPKP(detail))
+    return roundDetailCurrency(outstandingSubtotal)
+
+  const outstandingDpp = roundDetailCurrency(outstandingSubtotal * 11 / 12)
+  const outstandingPpn = roundDetailCurrency(outstandingDpp * 0.12)
+
+  return roundDetailCurrency(outstandingSubtotal + outstandingPpn)
+}
+
+const getDetailValueDifferenceRaw = (detail: any | null | undefined): number => {
+  const backendRawDifference = detail?.value_difference_raw
+
+  if (backendRawDifference !== null && backendRawDifference !== undefined)
+    return roundDetailCurrency(parseDetailNumber(backendRawDifference))
+
+  const totalPo = getDetailTotalPo(detail)
+
+  if (totalPo <= 0)
+    return 0
+
+  return roundDetailCurrency(
+    getDetailGrandTotal(detail) - totalPo,
+  )
+}
+
+const getDetailValueDifferenceAmount = (detail: any | null | undefined): number => {
+  const backendDifference = parseDetailNumber(
+    detail?.value_difference_amount
+    ?? 0,
+  )
+
+  if (backendDifference > 0)
+    return roundDetailCurrency(backendDifference)
+
+  return roundDetailCurrency(
+    Math.abs(getDetailValueDifferenceRaw(detail)),
+  )
+}
+
+const getDetailValueDifferenceType = (detail: any | null | undefined): string => {
+  const backendType = String(detail?.value_difference_type ?? '')
+    .trim()
+    .toUpperCase()
+
+  if (['EFFICIENCY', 'INCREASE', 'NONE'].includes(backendType))
+    return backendType
+
+  const amount = getDetailValueDifferenceAmount(detail)
+
+  if (amount <= 0)
+    return 'NONE'
+
+  return getDetailValueDifferenceRaw(detail) >= 0
+    ? 'EFFICIENCY'
+    : 'INCREASE'
+}
+
+const getDetailValueDifferenceLabel = (detail: any | null | undefined): string => {
+  const backendLabel = String(detail?.value_difference_label ?? '').trim()
+
+  if (backendLabel)
+    return backendLabel
+
+  const type = getDetailValueDifferenceType(detail)
+
+  if (type === 'EFFICIENCY')
+    return 'Efisiensi Nilai'
+
+  if (type === 'INCREASE')
+    return 'Kenaikan Nilai'
+
+  return 'Selisih Nilai'
+}
+
+const getDetailValueDifferenceColor = (detail: any | null | undefined): string => {
+  const type = getDetailValueDifferenceType(detail)
+
+  if (type === 'EFFICIENCY')
+    return 'success'
+
+  if (type === 'INCREASE')
+    return 'error'
+
+  return 'secondary'
+}
+
+const shouldShowDetailValueDifference = (detail: any | null | undefined): boolean => {
+  const statusPo = String(detail?.status_po ?? '')
+    .trim()
+    .toUpperCase()
+
+  /*
+  |--------------------------------------------------------------------------
+  | Selisih nilai baru final jika seluruh qty PR sudah menjadi PO
+  |--------------------------------------------------------------------------
+  | Jika status_po masih OPEN / PARTIAL, selisih antara Grand Total PR dan
+  | Total Sudah PO belum boleh dianggap efisiensi atau kenaikan, karena proses
+  | PO belum selesai.
+  |--------------------------------------------------------------------------
+  */
+  if (statusPo !== 'COMPLETED')
+    return false
+
+  return getDetailTotalPo(detail) > 0
+    && getDetailValueDifferenceAmount(detail) > 0
+}
+
+const getDetailItemSubtotal = (item: any): number => {
+  const storedSubtotal = parseDetailNumber(item?.subtotal ?? 0)
+
+  if (storedSubtotal > 0)
+    return roundDetailCurrency(storedSubtotal)
+
+  return roundDetailCurrency(
+    parseDetailNumber(item?.qty ?? 0)
+    * parseDetailNumber(item?.harga_unit ?? 0),
+  )
+}
+
+const getDetailItemDpp = (item: any): number => {
+  return roundDetailCurrency(getDetailItemSubtotal(item) * 11 / 12)
+}
+
+const getDetailItemPpn = (item: any): number => {
+  return roundDetailCurrency(getDetailItemDpp(item) * 0.12)
+}
+
+const getDetailVendorPaymentMethod = (detail: any | null | undefined): string => {
+  return String(
+    detail?.recommended_vendor?.jenis_pembayaran
+    ?? detail?.jenis_pembayaran
+    ?? '-',
+  ) || '-'
+}
+
+const getDetailVendorTop = (detail: any | null | undefined): string => {
+  const top = detail?.recommended_vendor?.top
+    ?? detail?.top
+    ?? null
+
+  if (top === null || top === undefined || top === '')
+    return '-'
+
+  const numericTop = parseDetailNumber(top)
+
+  if (!Number.isFinite(numericTop) || numericTop <= 0)
+    return '-'
+
+  return `${formatNumberWithoutRp(numericTop)} Hari`
 }
 
 watch(currentPage, async () => {
@@ -1356,7 +1906,7 @@ watch(rowPerPage, async () => {
   await fetchPurchaseRequests()
 })
 
-watch([searchQuery, selectedStatus, selectedStatusPO, tanggalMulai, tanggalSelesai], async () => {
+watch([searchQuery, selectedStatus, selectedStatusPO, tanggalMulai, tanggalSelesai, onlyWaitingMyApproval], async () => {
   currentPage.value = 1
   await fetchPurchaseRequests()
 })
@@ -1447,20 +1997,64 @@ onBeforeUnmount(() => {
 <template>
   <section>
     <!-- Filters -->
-    <VCard title="Filters" class="mb-6">
-      <VCardText>
-        <VRow>
-          <VCol cols="12" md="4">
+    <VCard class="mb-6 pr-filter-card">
+      <VCardText class="pa-5">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-5">
+          <div class="d-flex align-center gap-3">
+            <VAvatar
+              size="44"
+              color="primary"
+              variant="tonal"
+            >
+              <VIcon
+                icon="tabler-filter"
+                size="24"
+              />
+            </VAvatar>
+
+            <div>
+              <div class="text-h5 font-weight-bold">
+                Filters
+              </div>
+
+              <div class="text-body-2 text-medium-emphasis mt-1">
+                Filter data Purchase Requisition berdasarkan keyword, tanggal, status, dan approval.
+              </div>
+            </div>
+          </div>
+
+          <VBtn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="tabler-refresh"
+            class="text-none"
+            :disabled="loading"
+            @click="resetFilters"
+          >
+            Reset Filter
+          </VBtn>
+        </div>
+
+        <VRow class="pr-filter-grid">
+          <VCol
+            cols="12"
+            md="4"
+          >
             <VTextField
               v-model="searchQuery"
               label="Cari data"
-              placeholder="Cari purchase requisition..."
+              placeholder="Cari nomor PR, cabang, department..."
               density="compact"
+              prepend-inner-icon="tabler-search"
               clearable
+              hide-details
             />
           </VCol>
 
-          <VCol cols="12" md="4">
+          <VCol
+            cols="12"
+            md="4"
+          >
             <AppDateTimePicker
               v-model="tanggalMulai"
               label="Tanggal Awal"
@@ -1470,7 +2064,10 @@ onBeforeUnmount(() => {
             />
           </VCol>
 
-          <VCol cols="12" md="4">
+          <VCol
+            cols="12"
+            md="4"
+          >
             <AppDateTimePicker
               v-model="tanggalSelesai"
               label="Tanggal Akhir"
@@ -1480,67 +2077,10 @@ onBeforeUnmount(() => {
             />
           </VCol>
 
-          <!-- <VCol cols="12" md="4">
-            <div class="position-relative">
-              <VTextField
-                :model-value="tanggalMulaiPicker.displayValue.value"
-                label="Tanggal Awal"
-                placeholder="DD/MM/YYYY"
-                readonly
-                clearable
-                density="compact"
-                append-inner-icon="tabler-calendar"
-                @click="tanggalMulaiPicker.openPicker"
-                @click:append-inner="tanggalMulaiPicker.openPicker"
-                @click:clear="tanggalMulai = null"
-              />
-
-              <input
-                :ref="(el) => {
-                  tanggalMulaiPicker.nativeDateRef.value = el as HTMLInputElement | null
-                }"
-                type="date"
-                :value="tanggalMulai || ''"
-                class="native-date-hidden"
-                tabindex="-1"
-                aria-hidden="true"
-                @change="tanggalMulaiPicker.onDateChange"
-              >
-            </div>
-          </VCol>
-
-          <VCol cols="12" md="4">
-            <div class="position-relative">
-              <VTextField
-                :model-value="tanggalSelesaiPicker.displayValue.value"
-                label="Tanggal Akhir"
-                placeholder="DD/MM/YYYY"
-                readonly
-                clearable
-                density="compact"
-                append-inner-icon="tabler-calendar"
-                @click="tanggalSelesaiPicker.openPicker"
-                @click:append-inner="tanggalSelesaiPicker.openPicker"
-                @click:clear="tanggalSelesai = null"
-              />
-
-              <input
-                :ref="(el) => {
-                  tanggalSelesaiPicker.nativeDateRef.value = el as HTMLInputElement | null
-                }"
-                type="date"
-                :value="tanggalSelesai || ''"
-                class="native-date-hidden"
-                tabindex="-1"
-                aria-hidden="true"
-                @change="tanggalSelesaiPicker.onDateChange"
-              >
-            </div>
-          </VCol> -->
-        </VRow>
-
-        <VRow class="mt-1 align-center">
-          <VCol cols="12" md="4">
+          <VCol
+            cols="12"
+            md="3"
+          >
             <VSelect
               v-model="selectedStatus"
               label="Status Approval"
@@ -1548,10 +2088,15 @@ onBeforeUnmount(() => {
               item-title="title"
               item-value="value"
               density="compact"
+              prepend-inner-icon="tabler-progress-check"
+              hide-details
             />
           </VCol>
 
-          <VCol cols="12" md="4">
+          <VCol
+            cols="12"
+            md="3"
+          >
             <VSelect
               v-model="selectedStatusPO"
               label="Status PO"
@@ -1559,19 +2104,45 @@ onBeforeUnmount(() => {
               item-title="title"
               item-value="value"
               density="compact"
+              prepend-inner-icon="tabler-file-invoice"
+              hide-details
             />
           </VCol>
 
-          <VCol cols="12" md="4" class="d-flex justify-end">
-            <VBtn
-              color="secondary"
-              prepend-icon="tabler-refresh"
-              @click="resetFilters"
-              block
-              class="text-none"
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <div
+              class="approval-filter-box"
+              :class="{ 'is-active': onlyWaitingMyApproval }"
             >
-              Reset Filter
-            </VBtn>
+              <div class="d-flex align-center gap-3 min-w-0">
+                <VAvatar
+                  size="34"
+                  :color="onlyWaitingMyApproval ? 'warning' : 'secondary'"
+                  variant="tonal"
+                >
+                  <VIcon
+                    icon="tabler-user-check"
+                    size="19"
+                  />
+                </VAvatar>
+
+                <div class="min-w-0">
+                  <div class="text-caption text-medium-emphasis approval-filter-subtitle">
+                    Tampilkan hanya PR yang perlu saya approve.
+                  </div>
+                </div>
+              </div>
+
+              <VSwitch
+                v-model="onlyWaitingMyApproval"
+                color="warning"
+                inset
+                hide-details
+              />
+            </div>
           </VCol>
         </VRow>
       </VCardText>
@@ -1626,7 +2197,8 @@ onBeforeUnmount(() => {
             <th scope="col">Tanggal</th>
             <th scope="col">Cabang</th>
             <th scope="col">Department</th>
-            <th scope="col">Status Pengajuan</th>
+            <th scope="col" class="text-end">Total</th>
+            <th scope="col">Status Approval</th>
             <th scope="col">Status PO</th>
             <th scope="col" class="text-center" style="width: 5rem;">Actions</th>
           </tr>
@@ -1645,31 +2217,209 @@ onBeforeUnmount(() => {
               {{ ((currentPage - 1) * rowPerPage) + Number(index) + 1 }}
             </td>
             <td>
-              <div class="d-flex flex-column gap-1">
-                <div class="font-weight-medium">
-                  {{ v.nomor_pr || '-' }}
-                </div>
+              <VMenu location="bottom start">
+                <template #activator="{ props }">
+                  <div
+                    v-bind="props"
+                    class="pr-number-action d-inline-flex flex-column gap-1"
+                  >
+                    <div class="d-flex align-center gap-1 font-weight-medium text-primary">
+                      <span>{{ v.nomor_pr || '-' }}</span>
+                      <VIcon
+                        icon="tabler-chevron-down"
+                        size="16"
+                      />
+                    </div>
 
-                <VChip
-                  v-if="canApprovePurchaseRequest(v)"
-                  size="x-small"
-                  color="warning"
-                  variant="tonal"
-                  class="pr-approval-chip"
-                >
-                  <VIcon
-                    icon="tabler-alert-circle"
-                    size="14"
-                    start
-                  />
+                    <VChip
+                      v-if="canApprovePurchaseRequest(v)"
+                      size="x-small"
+                      color="warning"
+                      variant="tonal"
+                      class="pr-approval-chip"
+                    >
+                      <VIcon
+                        icon="tabler-alert-circle"
+                        size="14"
+                        start
+                      />
 
-                  Menunggu Approval Anda
-                </VChip>
-              </div>
+                      Menunggu Approval Anda
+                    </VChip>
+                  </div>
+                </template>
+
+                  <VList>
+                    <VListItem
+                      href="javascript:void(0)"
+                      @click="openDetail(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-eye"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        Lihat Detail
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      href="javascript:void(0)"
+                      @click="openApprovalHistory(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-history"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        History Approval
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(v.status).toLowerCase() === 'approved'
+                        && String(v.status).toLowerCase() !== 'rejected'
+                      "
+                      href="javascript:void(0)"
+                      :disabled="printLoadingId === v.public_id"
+                      @click="openPrintLanguageDialog(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VProgressCircular
+                          v-if="printLoadingId === v.public_id"
+                          indeterminate
+                          size="18"
+                          width="2"
+                          class="me-3"
+                        />
+
+                        <VIcon
+                          v-else
+                          icon="tabler-printer"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        {{
+                          printLoadingId === v.public_id
+                            ? 'Membuka...'
+                            : 'Cetak'
+                        }}
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="canApprovePurchaseRequest(v)"
+                      href="javascript:void(0)"
+                      :disabled="approveLoading"
+                      @click="openApprovePurchaseRequest(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-circle-check"
+                          :size="20"
+                          class="me-3 text-success"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-success">
+                        Approve
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="canApprovePurchaseRequest(v)"
+                      href="javascript:void(0)"
+                      :disabled="rejectLoading"
+                      @click="openRejectPurchaseRequest(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-close-circle-outline"
+                          :size="20"
+                          color="error"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-error">
+                        Reject
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="v.can_submit"
+                      href="javascript:void(0)"
+                      @click="openSubmitPurchaseRequest(v)"
+                    >
+                      <template #prepend>
+                        <VIcon icon="mdi-send-outline" :size="20" class="me-3" />
+                      </template>
+
+                      <VListItemTitle>Submit</VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(v.status).toLowerCase() === 'draft'
+                          && canUpdatePurchaseRequest
+                      "
+                      href="javascript:void(0)"
+                      @click="goToEdit(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-pencil-outline"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        Edit
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        String(v.status).toLowerCase() === 'draft'
+                          && canDeletePurchaseRequest
+                      "
+                      href="javascript:void(0)"
+                      @click="openDelete(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-trash"
+                          :size="20"
+                          class="me-3 text-error"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-error">
+                        Hapus
+                      </VListItemTitle>
+                    </VListItem>
+                  </VList>
+              </VMenu>
             </td>
             <td class="text-medium-emphasis">{{ formatDate(v.tanggal_pr) }}</td>
             <td class="text-medium-emphasis">{{ v.cabang || '-' }}</td>
             <td class="text-medium-emphasis">{{ v.department || '-' }}</td>
+            <td class="text-end font-weight-medium">
+              Rp {{ formatNumberWithoutRp(v.total_amount || 0) }}
+            </td>
             <td>
               <VChip
                 :color="getStatusColor(v.status)"
@@ -1698,10 +2448,18 @@ onBeforeUnmount(() => {
               </span>
             </td>
             <td class="text-center" style="width: 5rem;">
-              <VBtn size="x-small" color="default" variant="plain" icon>
-                <VIcon size="24" icon="mdi-dots-vertical" />
+              <VBtn
+                size="x-small"
+                color="default"
+                variant="plain"
+                icon
+              >
+                <VIcon
+                  size="24"
+                  icon="mdi-dots-vertical"
+                />
 
-                <VMenu activator="parent">
+                <VMenu activator="parent" location="bottom end">
                   <VList>
                     <VListItem
                       href="javascript:void(0)"
@@ -1873,7 +2631,7 @@ onBeforeUnmount(() => {
 
         <tfoot v-show="!rows.length && !loading">
           <tr>
-            <td colspan="8" class="text-center">
+            <td colspan="9" class="text-center">
               No data available
             </td>
           </tr>
@@ -2087,7 +2845,7 @@ onBeforeUnmount(() => {
             <VRow class="mb-5">
               <VCol cols="12" md="8">
                 <VCard
-                  class="h-100 rounded-xl pr-info-card"
+                  class="h-100 rounded-md pr-info-card"
                 >
                   <VCardText>
                     <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
@@ -2189,13 +2947,13 @@ onBeforeUnmount(() => {
               </VCol>
 
               <VCol cols="12" md="4">
-                <VCard class="h-100 rounded-xl total-card">
+                <VCard class="h-100 rounded-md total-card">
                   <VCardText>
                     <div class="text-caption text-medium-emphasis mb-1">
                       Grand Total Estimasi
                     </div>
                     <div class="text-h5 font-weight-bold mb-4">
-                      Rp {{ formatNumberWithoutRp(detailPurchaseRequest.total_amount || calcDetailGrandTotal(detailPurchaseRequest.items)) }}
+                      Rp {{ formatNumberWithoutRp(getDetailGrandTotal(detailPurchaseRequest)) }}
                     </div>
 
                     <div class="text-caption text-medium-emphasis mb-2">
@@ -2301,33 +3059,65 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div v-if="detailPurchaseRequest.recommended_vendor">
-                      <div class="d-flex align-center gap-2 mb-2">
-                        <VAvatar
-                          size="32"
-                          color="success"
-                          variant="tonal"
-                        >
-                          <VIcon icon="tabler-building-store" />
-                        </VAvatar>
+                      <div class="vendor-recommendation-box">
+                        <div class="d-flex align-start gap-3">
+                          <VAvatar
+                            size="36"
+                            color="success"
+                            variant="tonal"
+                            rounded="lg"
+                          >
+                            <VIcon icon="tabler-building-store" />
+                          </VAvatar>
 
-                        <div>
-                          <div class="font-weight-bold">
-                            {{ detailPurchaseRequest.recommended_vendor.nama_vendor || '-' }}
+                          <div class="flex-grow-1 min-w-0">
+                            <div class="font-weight-bold vendor-name">
+                              {{ detailPurchaseRequest.recommended_vendor.nama_vendor || '-' }}
+                            </div>
+
+                            <div class="d-flex align-center flex-wrap gap-2 mt-2">
+                              <VChip
+                                :color="isDetailPurchaseRequestPKP(detailPurchaseRequest) ? 'primary' : 'secondary'"
+                                size="small"
+                                variant="tonal"
+                              >
+                                {{ formatStatusPKP(getDetailStatusPKP(detailPurchaseRequest)) }}
+                              </VChip>
+
+                              <VChip
+                                color="success"
+                                size="small"
+                                variant="tonal"
+                                prepend-icon="tabler-check"
+                              >
+                                Direkomendasikan
+                              </VChip>
+                            </div>
                           </div>
-                          <div class="text-caption text-medium-emphasis">
-                            {{ formatStatusPKP(detailPurchaseRequest.recommended_vendor.status_pkp) }}
+                        </div>
+
+                        <VDivider class="my-3" />
+
+                        <div class="vendor-payment-grid">
+                          <div class="vendor-payment-item">
+                            <div class="vendor-payment-label">
+                              Jenis Pembayaran
+                            </div>
+                            <div class="vendor-payment-value">
+                              {{ getDetailVendorPaymentMethod(detailPurchaseRequest) }}
+                            </div>
+                          </div>
+
+                          <div class="vendor-payment-item">
+                            <div class="vendor-payment-label">
+                              TOP
+                            </div>
+                            <div class="vendor-payment-value">
+                              {{ getDetailVendorTop(detailPurchaseRequest) }}
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                      <VChip
-                        color="success"
-                        size="small"
-                        variant="tonal"
-                        prepend-icon="tabler-check"
-                      >
-                        Direkomendasikan
-                      </VChip>
                     </div>
 
                     <VAlert
@@ -2346,7 +3136,7 @@ onBeforeUnmount(() => {
             <!-- ATTACHMENTS -->
             <VCard
               flat
-              class="rounded-xl"
+              class="rounded-md"
             >
               <VCardText>
                 <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-3">
@@ -2401,7 +3191,7 @@ onBeforeUnmount(() => {
             <!-- ITEMS -->
             <VCard
               flat
-              class="rounded-xl"
+              class="rounded-md"
             >
               <VCardText>
                 <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
@@ -2434,8 +3224,6 @@ onBeforeUnmount(() => {
                         <th class="text-center col-outstanding">Outstanding</th>
                         <th class="text-end col-money">Harga Unit</th>
                         <th class="text-end col-money">Subtotal PR</th>
-                        <th class="text-end col-money">Subtotal PO</th>
-                        <th class="text-end col-money">Outstanding Amount</th>
                       </tr>
                     </thead>
 
@@ -2485,12 +3273,13 @@ onBeforeUnmount(() => {
 
                         <td class="text-end col-money">{{ formatNumberWithoutRp(item.harga_unit) }}</td>
                         <td class="text-end col-money font-weight-bold">{{ formatNumberWithoutRp(item.subtotal) }}</td>
-                        <td class="text-end col-money">{{ formatNumberWithoutRp(item.subtotal_po) }}</td>
-                        <td class="text-end col-money font-weight-bold">{{ formatNumberWithoutRp(item.subtotal_outstanding) }}</td>
                       </tr>
 
                       <tr v-if="!detailPurchaseRequest.items?.length">
-                        <td colspan="11" class="text-center text-medium-emphasis py-6">
+                        <td
+                          colspan="11"
+                          class="text-center text-medium-emphasis py-6"
+                        >
                           Item belum tersedia.
                         </td>
                       </tr>
@@ -2498,31 +3287,182 @@ onBeforeUnmount(() => {
                   </VTable>
                 </div>
 
-                <div class="d-flex justify-end mt-4">
-                  <VCard
-                    variant="tonal"
-                    class="summary-total-box"
+                <VRow class="mt-4 align-stretch">
+                  <VCol
+                    cols="12"
+                    md="5"
+                    lg="4"
+                    class="order-1 order-md-2"
                   >
-                    <VCardText class="py-3 px-4">
-                      <div class="summary-row">
-                        <span>Grand Total PR</span>
-                        <strong>Rp {{ formatNumberWithoutRp(detailPurchaseRequest.total_amount || 0) }}</strong>
-                      </div>
+                    <VCard
+                      variant="tonal"
+                      class="summary-total-box h-100"
+                    >
+                      <VCardText class="py-3 px-4">
+                        <div class="summary-row">
+                          <span>Subtotal Item</span>
+                          <strong>Rp {{ formatNumberWithoutRp(getDetailSubtotalItem(detailPurchaseRequest)) }}</strong>
+                        </div>
 
-                      <div class="summary-row">
-                        <span>Total Sudah PO</span>
-                        <strong>Rp {{ formatNumberWithoutRp(detailPurchaseRequest.total_po || 0) }}</strong>
-                      </div>
+                        <template v-if="isDetailPurchaseRequestPKP(detailPurchaseRequest)">
+                          <div class="summary-row">
+                            <span>DPP</span>
+                            <strong>Rp {{ formatNumberWithoutRp(getDetailDpp(detailPurchaseRequest)) }}</strong>
+                          </div>
 
-                      <VDivider class="my-2" />
+                          <div class="summary-row">
+                            <span>PPN</span>
+                            <strong>Rp {{ formatNumberWithoutRp(getDetailPpn(detailPurchaseRequest)) }}</strong>
+                          </div>
+                        </template>
 
-                      <div class="summary-row outstanding">
-                        <span>Total Outstanding</span>
-                        <strong>Rp {{ formatNumberWithoutRp(detailPurchaseRequest.total_outstanding || 0) }}</strong>
-                      </div>
-                    </VCardText>
-                  </VCard>
-                </div>
+                        <VDivider class="my-2" />
+
+                        <div class="summary-row grand-total">
+                          <span>Grand Total PR</span>
+                          <strong>Rp {{ formatNumberWithoutRp(getDetailGrandTotal(detailPurchaseRequest)) }}</strong>
+                        </div>
+
+                        <div class="summary-row">
+                          <span>Total Sudah PO</span>
+                          <strong>Rp {{ formatNumberWithoutRp(getDetailTotalPo(detailPurchaseRequest)) }}</strong>
+                        </div>
+
+                        <VDivider class="my-2" />
+
+                        <div class="summary-row outstanding">
+                          <span>Outstanding PO</span>
+                          <strong>Rp {{ formatNumberWithoutRp(getDetailTotalOutstanding(detailPurchaseRequest)) }}</strong>
+                        </div>
+
+                        <template v-if="shouldShowDetailValueDifference(detailPurchaseRequest)">
+                          <div class="summary-row value-difference">
+                            <span>{{ getDetailValueDifferenceLabel(detailPurchaseRequest) }}</span>
+                            <strong
+                              :class="`text-${getDetailValueDifferenceColor(detailPurchaseRequest)}`"
+                            >
+                              Rp {{ formatNumberWithoutRp(getDetailValueDifferenceAmount(detailPurchaseRequest)) }}
+                            </strong>
+                          </div>
+                        </template>
+                      </VCardText>
+                    </VCard>
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="7"
+                    lg="8"
+                    class="order-2 order-md-1"
+                  >
+                    <VCard
+                      variant="tonal"
+                      class="approval-simple-box h-100"
+                    >
+                      <VCardText class="py-3 px-4">
+                        <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-3">
+                          <div class="d-flex align-center gap-2">
+                            <VAvatar
+                              size="30"
+                              color="primary"
+                              variant="tonal"
+                            >
+                              <VIcon
+                                icon="tabler-route"
+                                size="17"
+                              />
+                            </VAvatar>
+
+                            <div>
+                              <div class="text-subtitle-2 font-weight-bold">
+                                History Approval
+                              </div>
+                              <div class="text-caption text-medium-emphasis">
+                                Ringkasan proses approval PR
+                              </div>
+                            </div>
+                          </div>
+
+                          <VChip
+                            size="x-small"
+                            color="primary"
+                            variant="tonal"
+                          >
+                            {{ detailApprovalHistories.length }} Tahap
+                          </VChip>
+                        </div>
+
+                        <div
+                          v-if="detailApprovalHistories.length"
+                          class="approval-simple-list"
+                        >
+                          <div
+                            v-for="history in detailApprovalHistories"
+                            :key="history.id"
+                            class="approval-simple-item"
+                          >
+                            <div class="approval-step-circle">
+                              {{ history.step_order }}
+                            </div>
+
+                            <div class="approval-simple-content">
+                              <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                                <div class="font-weight-bold approval-simple-title">
+                                  {{ history.label }}
+                                </div>
+
+                                <VChip
+                                  size="x-small"
+                                  variant="tonal"
+                                  :color="getSimpleApprovalStatusColor(history.status)"
+                                  :prepend-icon="getSimpleApprovalStatusIcon(history.status)"
+                                >
+                                  {{ getSimpleApprovalStatusLabel(history.status) }}
+                                </VChip>
+                              </div>
+
+                              <div class="approval-simple-meta">
+                                <span>
+                                  <VIcon
+                                    icon="tabler-user"
+                                    size="14"
+                                    class="me-1"
+                                  />
+                                  {{ history.processed_by }}
+                                </span>
+
+                                <span>
+                                  <VIcon
+                                    icon="tabler-clock"
+                                    size="14"
+                                    class="me-1"
+                                  />
+                                  {{ formatSimpleApprovalDateTime(history.processed_at) }}
+                                </span>
+                              </div>
+
+                              <div
+                                v-if="history.notes"
+                                class="approval-simple-notes"
+                              >
+                                {{ history.notes }}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <VAlert
+                          v-else
+                          type="info"
+                          variant="tonal"
+                          density="compact"
+                        >
+                          Belum ada history approval.
+                        </VAlert>
+                      </VCardText>
+                    </VCard>
+                  </VCol>
+                </VRow>
               </VCardText>
             </VCard>
           </div>
@@ -2809,9 +3749,71 @@ onBeforeUnmount(() => {
 
 <style lang="scss">
 .text-capitalize { text-transform: capitalize; }
+.pr-filter-card {
+  border-radius: 16px;
+}
+
+.pr-filter-grid {
+  align-items: center;
+}
+
+.approval-filter-box {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 12px;
+  background: rgba(var(--v-theme-surface), 0.96);
+  transition: all 0.18s ease;
+}
+
+.approval-filter-box.is-active {
+  border-color: rgba(var(--v-theme-warning), 0.55);
+  background: rgba(var(--v-theme-warning), 0.08);
+}
+
+.approval-filter-title {
+  line-height: 1.2;
+}
+
+.approval-filter-subtitle {
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.pr-number-action {
+  cursor: pointer;
+  max-width: 260px;
+}
+
+.pr-number-action:hover span {
+  text-decoration: underline;
+}
+
+@media (max-width: 959px) {
+  .approval-filter-box {
+    align-items: flex-start;
+  }
+}
+
 </style>
 
 <style lang="scss" scoped>
+
+.pr-number-action {
+  cursor: pointer;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: 10px;
+  transition: background-color 0.18s ease;
+}
+
+.pr-number-action:hover {
+  background-color: rgba(var(--v-theme-primary), 0.06);
+}
 
 .po-slide-enter-active {
   transition: all 0.28s ease;
@@ -2998,6 +4000,14 @@ onBeforeUnmount(() => {
   color: rgb(var(--v-theme-warning));
 }
 
+.summary-row.value-difference {
+  font-weight: 700;
+}
+
+.summary-row.value-difference strong {
+  font-weight: 800;
+}
+
 .pr-detail-header {
   display: flex;
   align-items: center;
@@ -3128,6 +4138,63 @@ onBeforeUnmount(() => {
   }
 }
 
+
+.vendor-recommendation-box {
+  padding: 12px;
+  border: 1px solid rgba(var(--v-theme-success), 0.18);
+  border-radius: 16px;
+  background: rgba(var(--v-theme-success), 0.06);
+}
+
+.vendor-name {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.vendor-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vendor-payment-item {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(var(--v-theme-surface), 0.82);
+  border: 1px solid rgba(var(--v-border-color), 0.45);
+}
+
+.vendor-payment-label {
+  margin-bottom: 3px;
+  color: rgba(var(--v-theme-on-surface), 0.58);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.vendor-payment-value {
+  color: rgba(var(--v-theme-on-surface), 0.86);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.summary-row.grand-total {
+  font-weight: 800;
+}
+
+.summary-row.grand-total strong {
+  color: rgb(var(--v-theme-primary));
+}
+
+@media (max-width: 600px) {
+  .vendor-payment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .vendor-detail-content {
   display: flex;
   flex-direction: column;
@@ -3239,4 +4306,135 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 16px 24px;
 }
+
+.approval-simple-box {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: linear-gradient(
+    135deg,
+    rgba(var(--v-theme-primary), 0.08),
+    rgba(var(--v-theme-surface), 0.96)
+  );
+}
+
+.approval-simple-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.approval-simple-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(var(--v-theme-surface), 0.78);
+  border: 1px solid rgba(var(--v-border-color), 0.55);
+}
+
+.approval-step-circle {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--v-theme-primary), 0.14);
+  color: rgb(var(--v-theme-primary));
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.approval-simple-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.approval-simple-title {
+  font-size: 13px;
+  color: rgba(var(--v-theme-on-surface), 0.86);
+}
+
+.approval-simple-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+  font-size: 12px;
+}
+
+.approval-simple-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.approval-simple-notes {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.68);
+  white-space: pre-line;
+}
+
+@media (max-width: 960px) {
+  .approval-simple-list {
+    max-height: none;
+  }
+}
+
+.pr-filter-card {
+  border-radius: 5px;
+}
+
+.pr-filter-grid {
+  align-items: center;
+}
+
+.approval-filter-box {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 12px;
+  background: rgba(var(--v-theme-surface), 0.96);
+  transition: all 0.18s ease;
+}
+
+.approval-filter-box.is-active {
+  border-color: rgba(var(--v-theme-warning), 0.55);
+  background: rgba(var(--v-theme-warning), 0.08);
+}
+
+.approval-filter-title {
+  line-height: 1.2;
+}
+
+.approval-filter-subtitle {
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.pr-number-action {
+  cursor: pointer;
+  max-width: 260px;
+}
+
+.pr-number-action:hover span {
+  text-decoration: underline;
+}
+
+@media (max-width: 959px) {
+  .approval-filter-box {
+    align-items: flex-start;
+  }
+}
+
 </style>

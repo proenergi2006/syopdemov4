@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { computed, provide, ref, watch } from 'vue'
 import type { Component } from 'vue'
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { VNodeRenderer } from './VNodeRenderer'
@@ -26,14 +27,39 @@ const isHovered = useElementHover(refNav)
 
 provide(injectionKeyIsVerticalNavHovered, isHovered)
 
-const { isVerticalNavCollapsed: isCollapsed, isLessThanOverlayNavBreakpoint, isVerticalNavMini, isAppRtl } = useLayouts()
+const {
+  isVerticalNavCollapsed: isCollapsed,
+  isLessThanOverlayNavBreakpoint,
+  isVerticalNavMini,
+  isAppRtl,
+} = useLayouts()
 
 const hideTitleAndIcon = isVerticalNavMini(windowWidth, isHovered)
 
-const resolveNavItemComponent = (item: NavLink | NavSectionTitle | NavGroup) => {
+const safeNavItems = computed(() => {
+  return Array.isArray(props.navItems)
+    ? props.navItems.filter(item => item && typeof item === 'object')
+    : []
+})
+
+const hasValidChildren = (item: unknown): boolean => {
+  return !!item
+    && typeof item === 'object'
+    && 'children' in item
+    && Array.isArray((item as NavGroup).children)
+    && (item as NavGroup).children.length > 0
+}
+
+const resolveNavItemComponent = (
+  item: NavLink | NavSectionTitle | NavGroup | null | undefined,
+) => {
+  if (!item || typeof item !== 'object')
+    return VerticalNavLink
+
   if ('heading' in item)
     return VerticalNavSectionTitle
-  if ('children' in item)
+
+  if (hasValidChildren(item))
     return VerticalNavGroup
 
   return VerticalNavLink
@@ -50,7 +76,10 @@ watch(() => route.name, () => {
 })
 
 const isVerticalNavScrolled = ref(false)
-const updateIsVerticalNavScrolled = (val: boolean) => isVerticalNavScrolled.value = val
+
+const updateIsVerticalNavScrolled = (val: boolean) => {
+  isVerticalNavScrolled.value = val
+}
 
 const handleNavScroll = (evt: Event) => {
   isVerticalNavScrolled.value = (evt.target as HTMLElement).scrollTop > 0
@@ -65,9 +94,9 @@ const handleNavScroll = (evt: Event) => {
     :class="[
       {
         'overlay-nav': isLessThanOverlayNavBreakpoint(windowWidth),
-        'hovered': isHovered,
-        'visible': isOverlayNavActive,
-        'scrolled': isVerticalNavScrolled,
+        hovered: isHovered,
+        visible: isOverlayNavActive,
+        scrolled: isVerticalNavScrolled,
       },
     ]"
   >
@@ -89,8 +118,8 @@ const handleNavScroll = (evt: Event) => {
             </h1>
           </Transition>
         </RouterLink>
+
         <!-- 👉 Vertical nav actions -->
-        <!-- Show toggle collapsible in >md and close button in <md -->
         <template v-if="!isLessThanOverlayNavBreakpoint(windowWidth)">
           <Component
             :is="config.app.iconRenderer || 'div'"
@@ -99,6 +128,7 @@ const handleNavScroll = (evt: Event) => {
             v-bind="config.icons.verticalNavUnPinned"
             @click="isCollapsed = !isCollapsed"
           />
+
           <Component
             :is="config.app.iconRenderer || 'div'"
             v-show="!isCollapsed && !hideTitleAndIcon"
@@ -107,6 +137,7 @@ const handleNavScroll = (evt: Event) => {
             @click="isCollapsed = !isCollapsed"
           />
         </template>
+
         <template v-else>
           <Component
             :is="config.app.iconRenderer || 'div'"
@@ -117,9 +148,11 @@ const handleNavScroll = (evt: Event) => {
         </template>
       </slot>
     </div>
+
     <slot name="before-nav-items">
       <div class="vertical-nav-items-shadow" />
     </slot>
+
     <slot
       name="nav-items"
       :update-is-vertical-nav-scrolled="updateIsVerticalNavScrolled"
@@ -133,7 +166,7 @@ const handleNavScroll = (evt: Event) => {
       >
         <Component
           :is="resolveNavItemComponent(item)"
-          v-for="(item, index) in navItems"
+          v-for="(item, index) in safeNavItems"
           :key="index"
           :item="item"
         />
@@ -174,19 +207,40 @@ const handleNavScroll = (evt: Event) => {
 
   .nav-items {
     block-size: 100%;
-
-    // ℹ️ We no loner needs this overflow styles as perfect scrollbar applies it
-    // overflow-x: hidden;
-
-    // // ℹ️ We used `overflow-y` instead of `overflow` to mitigate overflow x. Revert back if any issue found.
-    // overflow-y: auto;
   }
 
   .nav-item-title {
     overflow: hidden;
+    min-inline-size: 0;
     margin-inline-end: auto;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .nav-item-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 20px;
+    block-size: 20px;
+    flex-shrink: 0;
+    padding-block: 0;
+    padding-inline: 6px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 20px;
+    margin-inline-start: 8px;
+  }
+
+  .nav-item-badge.bg-error {
+    background-color: rgb(var(--v-theme-error));
+  }
+
+  .nav-link a,
+  .nav-group-label {
+    min-inline-size: 0;
   }
 
   // 👉 Collapsed

@@ -163,7 +163,7 @@ const login = async () => {
      * Kegagalan mengambil menu tidak membatalkan login.
      */
     try {
-      const menuResponse = await axios.get('/auth/my-menus')
+      const menuResponse = await axios.get('/master/menus/navigation')
 
       localStorage.setItem(
         'navItems',

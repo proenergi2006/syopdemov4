@@ -14,772 +14,88 @@ class InitialSetupSeeder extends Seeder
         DB::transaction(function () {
             $now = now();
 
-            /*
-            |--------------------------------------------------------------------------
-            | 1) Wilayah
-            |--------------------------------------------------------------------------
-            */
-            $wilayahId = $this->upsertAndGetId(
-                'wilayah',
-                ['kode' => 'WIL-01'],
-                [
-                    'nama' => 'JABODETABEK',
-                    'is_active' => true,
-                    'updated_at' => $now,
-                ]
-            );
+            $superAdminRole = DB::table('roles')
+                ->where('kode', 'SA')
+                ->where('is_active', true)
+                ->first();
 
-            /*
-            |--------------------------------------------------------------------------
-            | 2) Cabang
-            |--------------------------------------------------------------------------
-            */
-            $groupCabangId = DB::table('group_cabang')
+            if (!$superAdminRole) {
+                throw new RuntimeException(
+                    'Role SA / Super Administrator belum tersedia. Jalankan RoleSeeder terlebih dahulu.'
+                );
+            }
+
+            $cabangId = DB::table('cabang')
                 ->orderBy('id')
                 ->value('id');
 
-            if (!$groupCabangId) {
+            if (!$cabangId) {
                 throw new RuntimeException(
-                    'Data group cabang belum tersedia. Jalankan atau tambahkan seeder group_cabang terlebih dahulu.'
+                    'Data cabang belum tersedia. Jalankan seeder cabang terlebih dahulu.'
                 );
             }
 
-            $cabangId = $this->upsertAndGetId(
-                'cabang',
-                [
-                    'group_cabang_id' => $groupCabangId,
-                    'nama_cabang' => 'Jakarta',
-                ],
-                [
-                    'inisial_cabang' => 'JKT',
-                    'inisial_segel' => 'JKT',
-                    'catatan_cabang' => 'Cabang Jakarta',
-                ]
-            );
+            $departmentId = DB::table('departments')
+                ->where('kode', 'IT')
+                ->value('id');
 
-            /*
-            |--------------------------------------------------------------------------
-            | 3) Departemen
-            |--------------------------------------------------------------------------
-            */
-            $deptIT = $this->upsertAndGetId(
-                'departments',
-                ['kode' => 'DEP-IT'],
-                [
-                    'nama' => 'IT',
-                    'is_active' => true,
-                    'updated_at' => $now,
-                ]
-            );
+            if (!$departmentId) {
+                $departmentId = DB::table('departments')
+                    ->orderBy('id')
+                    ->value('id');
+            }
 
-            /*
-            |--------------------------------------------------------------------------
-            | 4) Roles
-            |--------------------------------------------------------------------------
-            */
-            $roles = [
-                ['kode' => 'ADMIN', 'nama' => 'Administrator'],
-                ['kode' => 'BM', 'nama' => 'Branch Manager'],
-                ['kode' => 'OM', 'nama' => 'Operation Manager'],
-                ['kode' => 'PROC', 'nama' => 'Procurement'],
-                ['kode' => 'CFO', 'nama' => 'CFO'],
-                ['kode' => 'CEO', 'nama' => 'Chief Executive Officer'],
-            ];
+            if (!$departmentId) {
+                throw new RuntimeException(
+                    'Data department belum tersedia. Jalankan DepartmentSeeder terlebih dahulu.'
+                );
+            }
 
-            $roleIds = [];
-            foreach ($roles as $role) {
-                $roleIds[$role['kode']] = $this->upsertAndGetId(
-                    'roles',
-                    ['kode' => $role['kode']],
-                    [
-                        'nama' => $role['nama'],
+            $existingUser = DB::table('users')
+                ->where('username', 'admin.syop')
+                ->first();
+
+            if ($existingUser) {
+                DB::table('users')
+                    ->where('id', $existingUser->id)
+                    ->update([
+                        'name' => 'Super Admin SYOP',
+                        'email' => $existingUser->email ?: 'admin.syop@syop.local',
+                        'username' => 'admin.syop',
+                        'cabang_id' => $cabangId,
+                        'departemen_id' => $departmentId,
                         'is_active' => true,
                         'updated_at' => $now,
-                    ]
-                );
-            }
+                    ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | 5) Menus
-            |--------------------------------------------------------------------------
-            */
-
-            // Top level
-            $dashboardMenuId = $this->upsertMenu(
-                ['name' => 'Dashboard', 'parent_id' => null],
-                [
-                    'path' => '/dashboards/crm',
-                    'route_name' => 'dashboard',
-                    'icon' => 'tabler-smart-home',
-                    'order_no' => 1,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $masterMenuId = $this->upsertMenu(
-                ['name' => 'Master', 'parent_id' => null],
-                [
-                    'path' => null,
-                    'route_name' => null,
-                    'icon' => 'tabler-settings',
-                    'order_no' => 2,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $purchaseMenuId = $this->upsertMenu(
-                ['name' => 'Non Trade', 'parent_id' => null],
-                [
-                    'path' => null,
-                    'route_name' => null,
-                    'icon' => 'tabler-shopping-cart',
-                    'order_no' => 3,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $authMenuId = $this->upsertMenu(
-                ['name' => 'Auth', 'parent_id' => null],
-                [
-                    'path' => null,
-                    'route_name' => null,
-                    'icon' => 'tabler-lock',
-                    'order_no' => 4,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-            /*
-            |--------------------------------------------------------------------------
-            | 7) Procurement Menu
-            |--------------------------------------------------------------------------
-            */
-            $purchSupplierMenuId = $this->upsertMenu(
-                ['name' => 'Purchase Trading', 'parent_id' => null],
-                [
-                    'path' => null,
-                    'route_name' => null,
-                    'icon' => 'tabler-truck',
-                    'order_no' => 5,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            // Purchase children
-            $purchaseRequestMenuId = $this->upsertMenu(
-                ['name' => 'Purchase Requisition', 'parent_id' => $purchaseMenuId],
-                [
-                    'path' => '/non_trade/purchase_request',
-                    'route_name' => 'purchase-request',
-                    'icon' => 'tabler-file-invoice',
-                    'order_no' => 1,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $purchaseOrderMenuId = $this->upsertMenu(
-                ['name' => 'Purchase Order', 'parent_id' => $purchaseMenuId],
-                [
-                    'path' => '/non_trade/purchase_order',
-                    'route_name' => 'purchase-order',
-                    'icon' => 'tabler-file-invoice',
-                    'order_no' => 2,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $goodsReceiveMenuId = $this->upsertMenu(
-                ['name' => 'Goods Receipt', 'parent_id' => $purchaseMenuId],
-                [
-                    'path' => '/non_trade/goods_receive',
-                    'route_name' => 'goods-receive',
-                    'icon' => 'tabler-archive',
-                    'order_no' => 3,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $goodsReturnMenuId = $this->upsertMenu(
-                ['name' => 'Goods Return', 'parent_id' => $purchaseMenuId],
-                [
-                    'path' => '/non_trade/goods_return',
-                    'route_name' => 'goods-return',
-                    'icon' => 'tabler-archive',
-                    'order_no' => 4,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            // Master children
-            $regionalMenuId = $this->upsertMenu(
-                ['name' => 'Regional', 'parent_id' => $masterMenuId],
-                [
-                    'path' => null,
-                    'route_name' => null,
-                    'icon' => 'tabler-map-2',
-                    'order_no' => 1,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $produkId = $this->upsertMenu(
-                ['name' => 'Produk', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/produk',
-                    'route_name' => 'master-produk',
-                    'icon' => 'tabler-archive',
-                    'order_no' => 4,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $pbbkbId = $this->upsertMenu(
-                ['name' => 'PBBKB', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/pbbkb',
-                    'route_name' => 'master-pbbkb',
-                    'icon' => 'tabler-article',
-                    'order_no' => 5,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $fleetMenuId = $this->upsertMenu(
-                ['name' => 'Fleet Management', 'parent_id' => $masterMenuId],
-                [
-                    'path' => null,
-                    'route_name' => null,
-                    'icon' => 'tabler-truck',
-                    'order_no' => 6,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $cabangMenuId = $this->upsertMenu(
-                ['name' => 'Cabang', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/cabang',
-                    'route_name' => 'master-cabang',
-                    'icon' => 'tabler-building',
-                    'order_no' => 8,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $deptMenuId = $this->upsertMenu(
-                ['name' => 'Departemen', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/departemen',
-                    'route_name' => 'master-departemen',
-                    'icon' => 'tabler-users',
-                    'order_no' => 9,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $vendorMenuId = $this->upsertMenu(
-                ['name' => 'Vendor', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/vendor',
-                    'route_name' => 'master-vendor',
-                    'icon' => 'tabler-building-store',
-                    'order_no' => 10,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $terminalMenuId = $this->upsertMenu(
-                ['name' => 'Terminal', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/terminal',
-                    'route_name' => 'master-terminal',
-                    'icon' => 'tabler-gas-station',
-                    'order_no' => 11,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $customerMenuId = $this->upsertMenu(
-                ['name' => 'Customer', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/customer',
-                    'route_name' => 'master-customer',
-                    'icon' => 'tabler-users',
-                    'order_no' => 12,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $volumeId = $this->upsertMenu(
-                ['name' => 'Volume', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/volume',
-                    'route_name' => 'master-volume',
-                    'icon' => 'tabler-cylinder',
-                    'order_no' => 16,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $wilAngkutId = $this->upsertMenu(
-                ['name' => 'Wilayah Angkut', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/wilayah-angkut',
-                    'route_name' => 'master-wilayah-angkut',
-                    'icon' => 'tabler-location-pin',
-                    'order_no' => 17,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $hargaJualId = $this->upsertMenu(
-                ['name' => 'Harga Jual', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/harga-jual',
-                    'route_name' => 'master-harga-jual',
-                    'icon' => 'tabler-receipt-dollar',
-                    'order_no' => 18,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $hargaPertaminaId = $this->upsertMenu(
-                ['name' => 'Harga Dasar Pertamina', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/harga-pertamina',
-                    'route_name' => 'master-harga-pertamina',
-                    'icon' => 'tabler-file-dollar',
-                    'order_no' => 19,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $approvalFlowMenuId = $this->upsertMenu(
-                ['name' => 'Approval Flow', 'parent_id' => $masterMenuId],
-                [
-                    'path' => '/master/approval-flow',
-                    'route_name' => 'master-approval-flow',
-                    'icon' => 'tabler-user-check',
-                    'order_no' => 20,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            // Fleet children
-            $transportirMenuId = $this->upsertMenu(
-                ['name' => 'Transportir', 'parent_id' => $fleetMenuId],
-                [
-                    'path' => '/master/transportir',
-                    'route_name' => 'master-transportir',
-                    'icon' => 'tabler-building-store',
-                    'order_no' => 1,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $sopirMenuId = $this->upsertMenu(
-                ['name' => 'Sopir', 'parent_id' => $fleetMenuId],
-                [
-                    'path' => '/master/sopir',
-                    'route_name' => 'master-sopir',
-                    'icon' => 'tabler-user-circle',
-                    'order_no' => 2,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $mobilMenuId = $this->upsertMenu(
-                ['name' => 'Mobil', 'parent_id' => $fleetMenuId],
-                [
-                    'path' => '/master/mobil',
-                    'route_name' => 'master-mobil',
-                    'icon' => 'tabler-car',
-                    'order_no' => 3,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $ongkosAngkutMenuId = $this->upsertMenu(
-                ['name' => 'Ongkos Angkut', 'parent_id' => $fleetMenuId],
-                [
-                    'path' => '/master/ongkos-angkut',
-                    'route_name' => 'master-ongkos-angkut',
-                    'icon' => 'tabler-currency-rupiah',
-                    'order_no' => 4,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $kapalMenuId = $this->upsertMenu(
-                ['name' => 'Kapal', 'parent_id' => $fleetMenuId],
-                [
-                    'path' => '/master/kapal',
-                    'route_name' => 'master-kapal',
-                    'icon' => 'tabler-ship',
-                    'order_no' => 5,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            // Regional children
-            $provinsiMenuId = $this->upsertMenu(
-                ['name' => 'Provinsi', 'parent_id' => $regionalMenuId],
-                [
-                    'path' => '/master/provinsi',
-                    'route_name' => 'master-provinsi',
-                    'icon' => 'tabler-map-pin',
-                    'order_no' => 2,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $kabMenuId = $this->upsertMenu(
-                ['name' => 'Kabupaten', 'parent_id' => $regionalMenuId],
-                [
-                    'path' => '/master/kabupaten',
-                    'route_name' => 'master-kabupaten',
-                    'icon' => 'tabler-map-pin',
-                    'order_no' => 3,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $wilayahMenuId = $this->upsertMenu(
-                ['name' => 'Wilayah', 'parent_id' => $regionalMenuId],
-                [
-                    'path' => '/master/wilayah',
-                    'route_name' => 'master-wilayah',
-                    'icon' => 'tabler-map',
-                    'order_no' => 4,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $areaMenuId = $this->upsertMenu(
-                ['name' => 'Area', 'parent_id' => $regionalMenuId],
-                [
-                    'path' => '/master/area',
-                    'route_name' => 'master-area',
-                    'icon' => 'tabler-map-pin',
-                    'order_no' => 5,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            // Auth children
-            $userMenuId = $this->upsertMenu(
-                ['name' => 'Users', 'parent_id' => $authMenuId],
-                [
-                    'path' => '/master/users',
-                    'route_name' => 'master-users',
-                    'icon' => 'tabler-user',
-                    'order_no' => 1,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $roleMenuId = $this->upsertMenu(
-                ['name' => 'Roles', 'parent_id' => $authMenuId],
-                [
-                    'path' => '/master/roles',
-                    'route_name' => 'master-roles',
-                    'icon' => 'tabler-shield',
-                    'order_no' => 2,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $roleMenuSettingId = $this->upsertMenu(
-                ['name' => 'Role Menu', 'parent_id' => $authMenuId],
-                [
-                    'path' => '/master/role-menus',
-                    'route_name' => 'master-role-menus',
-                    'icon' => 'tabler-lock',
-                    'order_no' => 3,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $permissionSettingId = $this->upsertMenu(
-                ['name' => 'Role Permissions', 'parent_id' => $authMenuId],
-                [
-                    'path' => '/master/permissions',
-                    'route_name' => 'master-role-permissions',
-                    'icon' => 'tabler-license',
-                    'order_no' => 4,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $userPermissionSettingId = $this->upsertMenu(
-                ['name' => 'User Permissions', 'parent_id' => $authMenuId],
-                [
-                    'path' => '/master/user-permission',
-                    'route_name' => 'master-user-permission',
-                    'icon' => 'tabler-license',
-                    'order_no' => 5,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $permissionModuleSettingId = $this->upsertMenu(
-                ['name' => 'Permission Modules', 'parent_id' => $authMenuId],
-                [
-                    'path' => '/master/permission-modules',
-                    'route_name' => 'master-permission-modules',
-                    'icon' => 'tabler-license',
-                    'order_no' => 6,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | 6) Admin User
-            |--------------------------------------------------------------------------
-            */
-            $adminUserId = $this->upsertAndGetId(
-                'users',
-                ['email' => 'admin@syop.local'],
-                [
-                    'name' => 'Admin SYOP',
-                    'password' => Hash::make('admin123'),
-                    'cabang_id' => 2,
-                    'departemen_id' => 1,
-                    'is_active' => true,
-                    'updated_at' => $now,
-                ]
-            );
-            $cfoUserId = $this->upsertAndGetId(
-                'users',
-                ['email' => 'cfo@syop.local'],
-                [
-                    'name' => 'CFO',
+                $adminUserId = (int) $existingUser->id;
+            } else {
+                $adminUserId = (int) DB::table('users')->insertGetId([
+                    'name' => 'Super Admin SYOP',
+                    'email' => 'admin.syop@syop.local',
+                    'username' => 'admin.syop',
                     'password' => Hash::make('admin123'),
                     'cabang_id' => $cabangId,
-                    'departemen_id' => $deptIT,
+                    'departemen_id' => $departmentId,
                     'is_active' => true,
+                    'created_at' => $now,
                     'updated_at' => $now,
-                ]
-            );
-            $ceoUserId = $this->upsertAndGetId(
-                'users',
-                ['email' => 'ceo@syop.local'],
-                [
-                    'name' => 'CEO',
-                    'password' => Hash::make('admin123'),
-                    'cabang_id' => $cabangId,
-                    'departemen_id' => $deptIT,
-                    'is_active' => true,
-                    'updated_at' => $now,
-                ]
-            );
-
-            // Purchases Supplier children
-            $poSupplierMenuId = $this->upsertMenu(
-                ['name' => 'PO Supplier', 'parent_id' => $purchSupplierMenuId],
-                [
-                    'path' => '/purchaseSupplier/po-supplier',
-                    'route_name' => 'po-supplier',
-                    'icon' => 'tabler-cube-plus',
-                    'order_no' => 1,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $receiveItemMenuId = $this->upsertMenu(
-                ['name' => 'Goods Receipt', 'parent_id' => $purchSupplierMenuId],
-                [
-                    'path' => '/purchaseSupplier/goods-receipt',
-                    'route_name' => 'goods-receipt',
-                    'icon' => 'tabler-truck-return',
-                    'order_no' => 2,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $approvalMenuId = $this->upsertMenu(
-                ['name' => 'Approval PO', 'parent_id' => $purchSupplierMenuId],
-                [
-                    'path' => '/purchaseSupplier/po-supplier/approval',
-                    'route_name' => 'po-supplier/approval',
-                    'icon' => 'tabler-user-check',
-                    'order_no' => 3,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            $shippingMenuId = $this->upsertMenu(
-                ['name' => 'Shipping Request', 'parent_id' => $purchSupplierMenuId],
-                [
-                    'path' => '/purchaseSupplier/shipping-instruction',
-                    'route_name' => 'shipping-instruction',
-                    'icon' => 'tabler-ship',
-                    'order_no' => 4,
-                    'permission_key' => null,
-                    'is_active' => true,
-                ]
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | 7) Attach Admin Role
-            |--------------------------------------------------------------------------
-            */
-            $this->upsertPivot('user_roles', [
-                'user_id' => $adminUserId,
-                'role_id' => $roleIds['ADMIN'],
-            ]);
-            $this->upsertPivot('user_roles', [
-                'user_id' => $cfoUserId,
-                'role_id' => $roleIds['CFO'],
-            ]);
-            $this->upsertPivot('user_roles', [
-                'user_id' => $ceoUserId,
-                'role_id' => $roleIds['CEO'],
-            ]);
-            /*
-            |--------------------------------------------------------------------------
-            | 8) Attach menus to ADMIN role
-            |--------------------------------------------------------------------------
-            */
-            $menuIds = [
-                $dashboardMenuId,
-                $masterMenuId,
-                $purchaseMenuId,
-                $purchaseRequestMenuId,
-                $purchaseOrderMenuId,
-                $goodsReceiveMenuId,
-                $goodsReturnMenuId,
-                $regionalMenuId,
-                $provinsiMenuId,
-                $kabMenuId,
-                $wilayahMenuId,
-                $areaMenuId,
-                $fleetMenuId,
-                $transportirMenuId,
-                $sopirMenuId,
-                $mobilMenuId,
-                $ongkosAngkutMenuId,
-                $kapalMenuId,
-                $approvalFlowMenuId,
-                $cabangMenuId,
-                $deptMenuId,
-                $vendorMenuId,
-                $terminalMenuId,
-                $customerMenuId,
-                $authMenuId,
-                $userMenuId,
-                $roleMenuId,
-                $roleMenuSettingId,
-                $permissionSettingId,
-                $userPermissionSettingId,
-                $produkId,
-                $pbbkbId,
-                $volumeId,
-                $wilAngkutId,
-                $hargaJualId,
-                $hargaPertaminaId,
-                $purchSupplierMenuId,
-                $poSupplierMenuId,
-                $receiveItemMenuId,
-                $approvalMenuId,
-                $shippingMenuId,
-            ];
-
-            foreach ($menuIds as $menuId) {
-                $this->upsertPivot('role_menus', [
-                    'role_id' => $roleIds['ADMIN'],
-                    'menu_id' => $menuId,
                 ]);
             }
 
             /*
             |--------------------------------------------------------------------------
-            | 9) Multi-cabang user
+            | Pastikan admin.syop hanya punya role SA
             |--------------------------------------------------------------------------
             */
-            $this->upsertPivot('user_cabang', [
+            DB::table('user_roles')
+                ->where('user_id', $adminUserId)
+                ->delete();
+
+            DB::table('user_roles')->insert([
                 'user_id' => $adminUserId,
-                'cabang_id' => 2,
+                'role_id' => $superAdminRole->id,
             ]);
         });
-    }
-
-    private function upsertAndGetId(string $table, array $uniqueBy, array $values): int
-    {
-        $existing = DB::table($table)->where($uniqueBy)->first();
-
-        if ($existing) {
-            DB::table($table)
-                ->where($uniqueBy)
-                ->update(array_merge($values, [
-                    'updated_at' => now(),
-                ]));
-
-            return (int) $existing->id;
-        }
-
-        return (int) DB::table($table)->insertGetId(array_merge(
-            $uniqueBy,
-            $values,
-            [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
-        ));
-    }
-
-    private function upsertMenu(array $uniqueBy, array $values): int
-    {
-        return $this->upsertAndGetId('menus', $uniqueBy, $values);
-    }
-
-    private function upsertPivot(string $table, array $uniqueBy): void
-    {
-        if (!DB::table($table)->where($uniqueBy)->exists()) {
-            DB::table($table)->insert($uniqueBy);
-        }
     }
 }

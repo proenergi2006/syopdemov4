@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, toRef } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@axios'
 import {
@@ -18,6 +18,8 @@ import {
   parseDecimalInput,
   formatDecimalQty,
   toTitleCase,
+  onlyNumberKeypress,
+  formatSanitizedNumberInput,
 } from '@/utils/textFormatter'
 import { usePermissionStore } from '@/stores/permission'
 
@@ -89,6 +91,7 @@ interface PurchaseOrderItem {
 interface POItemState {
   is_selected: boolean
   qty: number
+  harga_unit: number
 }
 
 const permissionStore = usePermissionStore()
@@ -308,6 +311,14 @@ const required = (value: unknown): boolean => {
   return value !== '' && value !== null && value !== undefined
 }
 
+const formatMoney = (value: number | string | null | undefined): string => {
+  return formatNumberWithoutRp(Number(value || 0))
+}
+
+const onlyNumber = (event: KeyboardEvent): void => {
+  onlyNumberKeypress(event)
+}
+
 const normalizeText = (value: unknown): string => {
   return String(value || '')
     .trim()
@@ -512,6 +523,7 @@ const captureCurrentPOItemState = (): void => {
     poItemStateMap.value[key] = {
       is_selected: item.is_selected !== false,
       qty: Number(item.qty || 0),
+      harga_unit: Number(item.harga_unit || 0),
     }
   })
 }
@@ -543,6 +555,178 @@ const showMoreAttachments = (pr: PurchaseRequestOption): void => {
 
 const showLessAttachments = (pr: PurchaseRequestOption): void => {
   visibleAttachmentMap.value[pr.id] = 1
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Detail Purchase Request
+|--------------------------------------------------------------------------
+*/
+const purchaseRequestDetailDialog = ref(false)
+const selectedPurchaseRequestDetail = ref<any>(null)
+
+const purchaseRequestDetailItemPage = ref(1)
+const purchaseRequestDetailItemPerPage = ref<number | 'ALL'>(5)
+
+const purchaseRequestDetailItemPerPageItems = [
+  { title: '5', value: 5 },
+  { title: '10', value: 10 },
+  { title: '20', value: 20 },
+  { title: '50', value: 50 },
+  { title: 'All', value: 'ALL' },
+]
+
+const purchaseRequestDetailItems = computed<any[]>(() => {
+  const detail = selectedPurchaseRequestDetail.value as any
+
+  const items =
+    detail?.items
+    ?? detail?.purchase_request_items
+    ?? detail?.purchaseRequestItems
+    ?? detail?.details
+    ?? []
+
+  return Array.isArray(items)
+    ? items
+    : []
+})
+
+const purchaseRequestDetailAttachments = computed<any[]>(() => {
+  const detail = selectedPurchaseRequestDetail.value as any
+
+  const attachments =
+    detail?.attachments
+    ?? detail?.files
+    ?? detail?.lampiran
+    ?? []
+
+  return Array.isArray(attachments)
+    ? attachments
+    : []
+})
+
+const purchaseRequestDetailItemTotalPage = computed(() => {
+  if (purchaseRequestDetailItemPerPage.value === 'ALL')
+    return 1
+
+  return Math.ceil(
+    purchaseRequestDetailItems.value.length / Number(purchaseRequestDetailItemPerPage.value),
+  ) || 1
+})
+
+const paginatedPurchaseRequestDetailItems = computed(() => {
+  if (purchaseRequestDetailItemPerPage.value === 'ALL')
+    return purchaseRequestDetailItems.value
+
+  const start = (Number(purchaseRequestDetailItemPage.value) - 1) * Number(purchaseRequestDetailItemPerPage.value)
+  const end = start + Number(purchaseRequestDetailItemPerPage.value)
+
+  return purchaseRequestDetailItems.value.slice(start, end)
+})
+
+const purchaseRequestDetailTotalAmount = computed(() => {
+  const detail = selectedPurchaseRequestDetail.value as any
+
+  const value =
+    detail?.total_amount
+    ?? detail?.grand_total
+    ?? detail?.total_nilai
+    ?? detail?.total
+
+  if (value !== null && value !== undefined)
+    return Number(value || 0)
+
+  return purchaseRequestDetailItems.value.reduce((total: number, item: any) => {
+    const qty = Number(item.qty ?? item.quantity ?? 0)
+    const hargaUnit = Number(item.harga_unit ?? item.price ?? item.unit_price ?? 0)
+    const subtotalItem = Number(item.subtotal ?? item.total ?? 0)
+
+    return total + (subtotalItem || (qty * hargaUnit))
+  }, 0)
+})
+
+const getPurchaseRequestDetailStatusColor = (status?: string | null): string => {
+  const normalized = String(status || '').trim().toUpperCase()
+
+  if (normalized === 'APPROVED')
+    return 'success'
+
+  if (normalized === 'IN PROGRESS')
+    return 'info'
+
+  if (normalized === 'DRAFT')
+    return 'warning'
+
+  if (normalized === 'REJECTED')
+    return 'error'
+
+  return 'secondary'
+}
+
+const formatPurchaseRequestDetailFileSize = (size: number | string | null | undefined): string => {
+  const bytes = Number(size || 0)
+
+  if (!bytes)
+    return '-'
+
+  const kb = bytes / 1024
+
+  if (kb < 1024)
+    return `${kb.toFixed(2)} KB`
+
+  return `${(kb / 1024).toFixed(2)} MB`
+}
+
+const openPurchaseRequestDetail = async (publicId: string): Promise<void> => {
+  if (!publicId) {
+    showErrorToast({
+      title: 'Error',
+      text: 'Public ID Purchase Request tidak ditemukan.',
+    })
+
+    return
+  }
+
+  try {
+    purchaseRequestDetailItemPage.value = 1
+    purchaseRequestDetailItemPerPage.value = 5
+
+    showLoadingAlert(
+      'Memuat detail Purchase Request',
+      'Mohon tunggu sebentar',
+    )
+
+    const response = await axios.get(
+      `/transaction/purchase-request/${encodeURIComponent(publicId)}`,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    selectedPurchaseRequestDetail.value = response.data?.data ?? null
+
+    closeAlert()
+
+    await nextTick()
+
+    purchaseRequestDetailDialog.value = true
+  }
+  catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: 'Error',
+      text: getApiErrorMessage(error, 'Gagal memuat detail Purchase Request.'),
+    })
+  }
+}
+
+const closePurchaseRequestDetail = (): void => {
+  purchaseRequestDetailDialog.value = false
+  selectedPurchaseRequestDetail.value = null
 }
 
 const loadVendors = async (showAlert = true): Promise<void> => {
@@ -811,18 +995,31 @@ const findExistingPOItem = (
   return existingPOItemCompositeMap.value[compositeKey] || null
 }
 
-const togglePOItemSelection = (item: PurchaseOrderItem): void => {
-  const isSelected = item.is_selected !== false
+const updatePOItemSubtotal = (index: number): void => {
+  const item = poItems.value[index]
 
-  if (!isSelected) {
+  if (!item)
+    return
+
+  if (item.is_selected === false) {
     item.subtotal = 0
-  } else {
-    item.subtotal = Number(item.qty || 0) * Number(item.harga_unit || 0)
+    return
   }
 
+  item.subtotal = Number(item.qty || 0) * Number(item.harga_unit || 0)
+}
+
+const togglePOItemSelection = (item: PurchaseOrderItem): void => {
+  const index = poItems.value.findIndex(row => {
+    return Number(row.purchase_request_item_id) === Number(item.purchase_request_item_id)
+  })
+
+  updatePOItemSubtotal(index)
+
   poItemStateMap.value[Number(item.purchase_request_item_id)] = {
-    is_selected: isSelected,
+    is_selected: item.is_selected !== false,
     qty: Number(item.qty || 0),
+    harga_unit: Number(item.harga_unit || 0),
   }
 }
 
@@ -877,12 +1074,16 @@ const handleSelectPurchaseRequest = (): void => {
       const savedState = getSavedPOItemState(effectivePrItemId)
 
       const qtyOutstandingRaw = Number(item.qty_outstanding ?? item.qty ?? 0)
-      const hargaUnit = Number(item.harga_unit || existingItem?.harga_unit || 0)
+      const defaultHargaUnit = Number(item.harga_unit || existingItem?.harga_unit || 0)
 
       if (existingItem) {
         const qty = savedState
           ? Number(savedState.qty || 0)
           : Number(existingItem.qty || 0)
+
+        const hargaUnit = savedState
+          ? Number(savedState.harga_unit || 0)
+          : Number(existingItem.harga_unit || defaultHargaUnit || 0)
 
         const isSelected = shouldAutoSelectAllItems
         ? true
@@ -898,10 +1099,11 @@ const handleSelectPurchaseRequest = (): void => {
           nama_item: existingItem.nama_item || namaItem,
           is_selected: isSelected,
           qty,
+          harga_unit: hargaUnit,
           satuan_id: Number(existingItem.satuan_id || item.satuan_id || item.satuan?.id || item.unit?.id || 0),
           satuan: existingItem.satuan || item.satuan?.nama || item.satuan?.kode || item.unit?.nama || item.unit?.kode || item.satuan || '-',
           subtotal: isSelected
-            ? Number(qty || 0) * Number(existingItem.harga_unit || hargaUnit || 0)
+            ? Number(qty || 0) * hargaUnit
             : 0,
         })
 
@@ -913,6 +1115,10 @@ const handleSelectPurchaseRequest = (): void => {
       const savedQty = savedState
         ? Number(savedState.qty || 0)
         : qtyOutstandingRaw
+
+      const hargaUnit = savedState
+        ? Number(savedState.harga_unit || 0)
+        : defaultHargaUnit
 
       const defaultSelected = shouldAutoSelectAllItems
         ? true
@@ -954,6 +1160,10 @@ const handleSelectPurchaseRequest = (): void => {
             ? Number(savedState.qty || 0)
             : Number(existingItem.qty || 0)
 
+          const hargaUnit = savedState
+            ? Number(savedState.harga_unit || 0)
+            : Number(existingItem.harga_unit || 0)
+
           const isSelected = shouldAutoSelectAllItems
           ? true
           : savedState
@@ -964,10 +1174,11 @@ const handleSelectPurchaseRequest = (): void => {
             ...existingItem,
             is_selected: isSelected,
             qty,
+            harga_unit: hargaUnit,
             satuan_id: Number(existingItem.satuan_id || 0),
             satuan: existingItem.satuan || '-',
             subtotal: isSelected
-              ? Number(qty || 0) * Number(existingItem.harga_unit || 0)
+              ? Number(qty || 0) * hargaUnit
               : 0,
           })
         })
@@ -1014,14 +1225,78 @@ const handlePOQtyInput = (value: string | number, index: number): void => {
     item.qty = qty
   }
 
-  item.subtotal = item.is_selected !== false
-    ? Number(item.qty || 0) * Number(item.harga_unit || 0)
-    : 0
+  updatePOItemSubtotal(index)
 
   poItemStateMap.value[Number(item.purchase_request_item_id)] = {
     is_selected: item.is_selected !== false,
     qty: Number(item.qty || 0),
+    harga_unit: Number(item.harga_unit || 0),
   }
+}
+
+const handlePOItemPriceInput = (event: Event, index: number): void => {
+  const item = poItems.value[index]
+
+  if (!item)
+    return
+
+  const target = event.target as HTMLInputElement
+
+  const result = formatSanitizedNumberInput(
+    target.value,
+    formatMoney,
+    {
+      maxLength: 12,
+      emptyAsZero: true,
+    },
+  )
+
+  item.harga_unit = result.numeric ?? 0
+
+  updatePOItemSubtotal(index)
+
+  poItemStateMap.value[Number(item.purchase_request_item_id)] = {
+    is_selected: item.is_selected !== false,
+    qty: Number(item.qty || 0),
+    harga_unit: Number(item.harga_unit || 0),
+  }
+
+  target.value = result.formatted
+}
+
+const handlePOItemPricePaste = (event: ClipboardEvent, index: number): void => {
+  const item = poItems.value[index]
+
+  if (!item)
+    return
+
+  const pastedText = event.clipboardData?.getData('text') || ''
+
+  if (!/^\d+$/.test(pastedText.trim())) {
+    event.preventDefault()
+
+    showErrorToast({
+      title: 'Input tidak valid',
+      text: 'Harga hanya boleh berupa angka (0-9).',
+    })
+
+    return
+  }
+
+  const target = event.target as HTMLInputElement
+  const harga = Number(pastedText)
+
+  item.harga_unit = harga
+
+  updatePOItemSubtotal(index)
+
+  poItemStateMap.value[Number(item.purchase_request_item_id)] = {
+    is_selected: item.is_selected !== false,
+    qty: Number(item.qty || 0),
+    harga_unit: Number(item.harga_unit || 0),
+  }
+
+  target.value = formatMoney(harga)
 }
 
 const mapEditDetailToForm = async (detail: any): Promise<void> => {
@@ -1134,6 +1409,7 @@ const mapEditDetailToForm = async (detail: any): Promise<void> => {
       poItemStateMap.value[prItemId] = {
         is_selected: true,
         qty: Number(item.qty || 0),
+        harga_unit: Number(item.harga_unit || 0),
       }
     }
 
@@ -1316,7 +1592,7 @@ const validateForm = async (): Promise<boolean> => {
     || Number(item.qty) > Number(item.qty_outstanding)
     || !item.nama_item
     || !item.satuan
-    || Number(item.harga_unit) < 0,
+    || Number(item.harga_unit) <= 0,
   )
 
   if (invalidItemIndex !== -1) {
@@ -1324,7 +1600,7 @@ const validateForm = async (): Promise<boolean> => {
 
     showWarningToast({
       title: 'Warning',
-      text: `Qty PO item "${item.nama_item || '-'}" wajib lebih dari 0 dan tidak boleh melebihi outstanding.`,
+      text: `Qty dan harga PO item "${item.nama_item || '-'}" wajib lebih dari 0, dan qty tidak boleh melebihi outstanding.`,
     })
 
     return false
@@ -1794,8 +2070,24 @@ onMounted(async () => {
                         />
                       </td>
 
-                      <td class="col-pr font-weight-medium">
-                        {{ pr.nomor_pr || '-' }}
+                      <td class="col-pr font-weight-medium pr-number-cell">
+                        <VBtn
+                          variant="text"
+                          color="primary"
+                          class="pr-number-action text-none px-0"
+                          :disabled="!pr.public_id"
+                          @click.stop="openPurchaseRequestDetail(pr.public_id)"
+                        >
+                          <span class="pr-number-text">
+                            {{ pr.nomor_pr || '-' }}
+                          </span>
+
+                          <VIcon
+                            icon="tabler-eye"
+                            size="16"
+                            class="ms-1"
+                          />
+                        </VBtn>
                       </td>
 
                       <td class="col-attachment pr-attachment-cell">
@@ -1957,7 +2249,7 @@ onMounted(async () => {
                           <th class="text-center col-qty">Outstanding</th>
                           <th class="text-center col-input">Qty PO</th>
                           <th class="text-center col-unit">Satuan</th>
-                          <th class="text-end col-money">Harga</th>
+                          <th class="text-end col-price">Harga</th>
                           <th class="text-end col-money">Total</th>
                         </tr>
                       </thead>
@@ -2025,7 +2317,22 @@ onMounted(async () => {
                           </td>
 
                           <td class="text-end">
-                            Rp {{ formatNumberWithoutRp(item.harga_unit) }}
+                            <VTextField
+                              :model-value="formatMoney(item.harga_unit)"
+                              placeholder="Harga satuan"
+                              prefix="Rp"
+                              density="compact"
+                              hide-details="auto"
+                              variant="outlined"
+                              inputmode="numeric"
+                              class="po-price-field"
+                              :disabled="item.is_selected === false"
+                              :error="item.is_selected !== false && isSubmitted && Number(item.harga_unit || 0) <= 0"
+                              :error-messages="item.is_selected !== false && isSubmitted && Number(item.harga_unit || 0) <= 0 ? ['Harga wajib diisi'] : []"
+                              @keypress="onlyNumber"
+                              @input="handlePOItemPriceInput($event, poItems.findIndex(row => row.purchase_request_item_id === item.purchase_request_item_id))"
+                              @paste.prevent="handlePOItemPricePaste($event, poItems.findIndex(row => row.purchase_request_item_id === item.purchase_request_item_id))"
+                            />
                           </td>
 
                           <td class="text-end font-weight-bold">
@@ -2216,6 +2523,444 @@ onMounted(async () => {
         </div>
       </VCardText>
     </VCard>
+    <!--
+    |--------------------------------------------------------------------------
+    | Detail Purchase Request
+    |--------------------------------------------------------------------------
+    -->
+    <VDialog
+      v-model="purchaseRequestDetailDialog"
+      max-width="1100"
+      persistent
+      scrollable
+    >
+      <VCard
+        v-if="selectedPurchaseRequestDetail"
+        class="rounded-lg overflow-hidden"
+      >
+        <VCardText class="pa-0">
+          <div class="pa-6 bg-primary text-white">
+            <div class="d-flex flex-wrap align-start justify-space-between gap-4">
+              <div>
+                <div class="text-caption text-uppercase mb-1 opacity-80">
+                  Purchase Request Detail
+                </div>
+
+                <h2 class="text-h5 font-weight-bold mb-2">
+                  {{ selectedPurchaseRequestDetail.nomor_pr || '-' }}
+                </h2>
+
+                <div class="d-flex flex-wrap gap-2">
+                  <VChip
+                    :color="getPurchaseRequestDetailStatusColor(selectedPurchaseRequestDetail.status)"
+                    variant="flat"
+                    size="small"
+                  >
+                    {{ toTitleCase(selectedPurchaseRequestDetail.status || '') || '-' }}
+                  </VChip>
+
+                  <VChip
+                    v-if="selectedPurchaseRequestDetail.status_po"
+                    color="white"
+                    variant="tonal"
+                    size="small"
+                  >
+                    PO: {{ toTitleCase(selectedPurchaseRequestDetail.status_po || '') }}
+                  </VChip>
+                </div>
+              </div>
+
+              <VBtn
+                icon
+                variant="text"
+                color="white"
+                @click="closePurchaseRequestDetail"
+              >
+                <VIcon icon="tabler-x" />
+              </VBtn>
+            </div>
+          </div>
+
+          <div class="pa-6">
+            <VRow>
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <VCard
+                  variant="tonal"
+                  color="primary"
+                  class="h-100"
+                >
+                  <VCardText>
+                    <div class="text-caption text-medium-emphasis mb-1">
+                      Nomor PR
+                    </div>
+
+                    <div class="text-h6 font-weight-bold">
+                      {{ selectedPurchaseRequestDetail.nomor_pr || '-' }}
+                    </div>
+
+                    <div class="text-body-2 mt-1">
+                      {{ formatDate(selectedPurchaseRequestDetail.tanggal_pr) || '-' }}
+                    </div>
+                  </VCardText>
+                </VCard>
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <VCard
+                  variant="tonal"
+                  color="success"
+                  class="h-100"
+                >
+                  <VCardText>
+                    <div class="text-caption text-medium-emphasis mb-1">
+                      Cabang / Department
+                    </div>
+
+                    <div class="text-h6 font-weight-bold">
+                      {{ selectedPurchaseRequestDetail.cabang || selectedPurchaseRequestDetail.cabang_name || '-' }}
+                    </div>
+
+                    <div class="text-body-2 mt-1">
+                      {{ selectedPurchaseRequestDetail.department || selectedPurchaseRequestDetail.department_name || '-' }}
+                    </div>
+                  </VCardText>
+                </VCard>
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <VCard
+                  variant="tonal"
+                  color="info"
+                  class="h-100"
+                >
+                  <VCardText>
+                    <div class="text-caption text-medium-emphasis mb-1">
+                      Total PR
+                    </div>
+
+                    <div class="text-h6 font-weight-bold">
+                      Rp {{ formatNumberWithoutRp(purchaseRequestDetailTotalAmount) }}
+                    </div>
+
+                    <div class="text-body-2 mt-1">
+                      {{ purchaseRequestDetailItems.length }} Item
+                    </div>
+                  </VCardText>
+                </VCard>
+              </VCol>
+            </VRow>
+
+            <VRow class="mt-2">
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <div class="text-caption text-medium-emphasis">
+                  Tanggal PR
+                </div>
+
+                <div class="font-weight-medium">
+                  {{ formatDate(selectedPurchaseRequestDetail.tanggal_pr) || '-' }}
+                </div>
+
+                <div class="text-caption text-medium-emphasis mt-4">
+                  Requester
+                </div>
+
+                <div class="font-weight-medium">
+                  {{ selectedPurchaseRequestDetail.requester_name || selectedPurchaseRequestDetail.created_by_name || selectedPurchaseRequestDetail.created_by || '-' }}
+                </div>
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <div class="text-caption text-medium-emphasis">
+                  Cabang
+                </div>
+
+                <div class="font-weight-medium">
+                  {{ selectedPurchaseRequestDetail.cabang || selectedPurchaseRequestDetail.cabang_name || '-' }}
+                </div>
+
+                <div class="text-caption text-medium-emphasis mt-4">
+                  Department
+                </div>
+
+                <div class="font-weight-medium">
+                  {{ selectedPurchaseRequestDetail.department || selectedPurchaseRequestDetail.department_name || '-' }}
+                </div>
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <div class="text-caption text-medium-emphasis">
+                  Catatan
+                </div>
+
+                <div class="font-weight-medium white-space-pre-line">
+                  {{ selectedPurchaseRequestDetail.notes || selectedPurchaseRequestDetail.keterangan || '-' }}
+                </div>
+              </VCol>
+            </VRow>
+
+            <VDivider class="my-6" />
+
+            <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
+              <div>
+                <h3 class="text-h6 font-weight-bold mb-1">
+                  Lampiran
+                </h3>
+
+                <div class="text-body-2 text-medium-emphasis">
+                  Dokumen pendukung Purchase Request.
+                </div>
+              </div>
+
+              <VChip
+                color="primary"
+                variant="tonal"
+                prepend-icon="tabler-paperclip"
+              >
+                {{ purchaseRequestDetailAttachments.length }} File
+              </VChip>
+            </div>
+
+            <VAlert
+              v-if="!purchaseRequestDetailAttachments.length"
+              type="info"
+              variant="tonal"
+              density="compact"
+            >
+              Tidak ada lampiran.
+            </VAlert>
+
+            <div
+              v-else
+              class="pr-detail-table-wrapper"
+            >
+              <VTable class="text-no-wrap rounded border">
+                <thead>
+                  <tr>
+                    <th width="60">
+                      No
+                    </th>
+                    <th>Nama File</th>
+                    <th width="160">Ukuran</th>
+                    <th width="180">Tipe</th>
+                    <th width="120" class="text-center">Aksi</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr
+                    v-for="(attachment, index) in purchaseRequestDetailAttachments"
+                    :key="attachment.id || attachment.public_id || index"
+                  >
+                    <td>
+                      {{ Number(index) + 1 }}
+                    </td>
+
+                    <td>
+                      <div class="d-flex align-center">
+                        <VIcon
+                          icon="tabler-file"
+                          size="18"
+                          class="me-2"
+                        />
+
+                        <div>
+                          <div class="font-weight-medium">
+                            {{ attachment.file_original_name || attachment.original_filename || attachment.filename || attachment.file_name || '-' }}
+                          </div>
+
+                          <div class="text-caption text-medium-emphasis">
+                            {{ attachment.file_name || attachment.filename || '-' }}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td>
+                      {{ formatPurchaseRequestDetailFileSize(attachment.file_size || attachment.size) }}
+                    </td>
+
+                    <td>
+                      {{ attachment.file_mime_type || attachment.mime_type || '-' }}
+                    </td>
+
+                    <td class="text-center">
+                      <VBtn
+                        v-if="attachment.file_url || attachment.filepath || attachment.path"
+                        icon
+                        size="small"
+                        variant="text"
+                        color="primary"
+                        :href="attachment.file_url || attachment.filepath || attachment.path"
+                        target="_blank"
+                      >
+                        <VIcon icon="tabler-eye" />
+
+                        <VTooltip
+                          activator="parent"
+                          location="top"
+                        >
+                          Lihat File
+                        </VTooltip>
+                      </VBtn>
+                    </td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </div>
+
+            <VDivider class="my-6" />
+
+            <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
+              <div>
+                <h3 class="text-h6 font-weight-bold mb-1">
+                  Item Purchase Request
+                </h3>
+
+                <div class="text-body-2 text-medium-emphasis">
+                  Detail item yang diajukan pada Purchase Request.
+                </div>
+              </div>
+
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="tabler-list-details"
+              >
+                {{ purchaseRequestDetailItems.length }} Item
+              </VChip>
+            </div>
+
+            <div class="pr-detail-table-wrapper">
+              <VTable class="text-no-wrap rounded border">
+                <thead>
+                  <tr>
+                    <th width="50">No</th>
+                    <th>Item</th>
+                    <th class="text-end">Qty</th>
+                    <th class="text-center">Satuan</th>
+                    <th class="text-end">Harga</th>
+                    <th class="text-end">Subtotal</th>
+                    <th>Keterangan</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr
+                    v-for="(item, index) in paginatedPurchaseRequestDetailItems"
+                    :key="item.id || item.public_id || index"
+                  >
+                    <td>
+                      {{ purchaseRequestDetailItemPerPage === 'ALL'
+                        ? Number(index) + 1
+                        : ((Number(purchaseRequestDetailItemPage) - 1) * Number(purchaseRequestDetailItemPerPage)) + Number(index) + 1
+                      }}
+                    </td>
+
+                    <td>
+                      <div class="font-weight-medium">
+                        {{ toTitleCase(item.nama_item || item.item_name || '-') }}
+                      </div>
+
+                      <div
+                        v-if="item.spesifikasi"
+                        class="text-caption text-medium-emphasis"
+                      >
+                        {{ item.spesifikasi }}
+                      </div>
+                    </td>
+
+                    <td class="text-end">
+                      {{ formatDecimalQty(item.qty ?? item.quantity ?? 0) }}
+                    </td>
+
+                    <td class="text-center">
+                      {{ item.satuan?.nama || item.satuan_name || item.satuan || item.unit || '-' }}
+                    </td>
+
+                    <td class="text-end">
+                      Rp {{ formatNumberWithoutRp(item.harga_unit ?? item.price ?? item.unit_price ?? 0) }}
+                    </td>
+
+                    <td class="text-end font-weight-bold">
+                      Rp {{ formatNumberWithoutRp(item.subtotal ?? item.total ?? (Number(item.qty || 0) * Number(item.harga_unit || 0))) }}
+                    </td>
+
+                    <td>
+                      {{ item.keterangan || item.notes || '-' }}
+                    </td>
+                  </tr>
+
+                  <tr v-if="!purchaseRequestDetailItems.length">
+                    <td
+                      colspan="7"
+                      class="text-center py-8 text-medium-emphasis"
+                    >
+                      Item Purchase Request belum tersedia.
+                    </td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </div>
+
+            <div class="d-flex align-center justify-space-between flex-wrap gap-3 mt-3">
+              <div class="text-caption text-medium-emphasis">
+                Total Item PR: {{ purchaseRequestDetailItems.length }}
+              </div>
+
+              <div class="d-flex align-center gap-3">
+                <VSelect
+                  v-model="purchaseRequestDetailItemPerPage"
+                  :items="purchaseRequestDetailItemPerPageItems"
+                  item-title="title"
+                  item-value="value"
+                  density="compact"
+                  hide-details
+                  style="width: 110px;"
+                  @update:model-value="purchaseRequestDetailItemPage = 1"
+                />
+
+                <VPagination
+                  v-if="purchaseRequestDetailItemPerPage !== 'ALL' && purchaseRequestDetailItems.length > Number(purchaseRequestDetailItemPerPage)"
+                  v-model="purchaseRequestDetailItemPage"
+                  :length="purchaseRequestDetailItemTotalPage"
+                  size="small"
+                  :total-visible="3"
+                />
+              </div>
+            </div>
+          </div>
+        </VCardText>
+
+        <VCardActions class="justify-end pa-6 pt-0">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            @click="closePurchaseRequestDetail"
+          >
+            Tutup
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </section>
 </template>
 
@@ -2271,7 +3016,7 @@ onMounted(async () => {
 
 .po-item-table {
   width: 100%;
-  min-width: 950px;
+  min-width: 1080px;
   table-layout: fixed;
 }
 
@@ -2303,8 +3048,12 @@ onMounted(async () => {
   width: 90px;
 }
 
+.po-item-table .col-price {
+  width: 260px;
+}
+
 .po-item-table .col-money {
-  width: 200px;
+  width: 210px;
 }
 
 .item-name {
@@ -2321,17 +3070,34 @@ onMounted(async () => {
   text-align: center;
 }
 
+.po-price-field :deep(.v-field__input) {
+  min-height: 36px !important;
+  padding-block: 4px !important;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.po-price-field :deep(.v-field__prefix) {
+  padding-inline-start: 8px;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+  font-weight: 600;
+}
+
 @media (max-width: 1280px) {
   .po-item-table {
-    min-width: 900px;
+    min-width: 1040px;
   }
 
   .po-item-table .col-item {
     width: 220px;
   }
 
+  .po-item-table .col-price {
+    width: 260px;
+  }
+
   .po-item-table .col-money {
-    width: 200px;
+    width: 210px;
   }
 }
 
@@ -2347,5 +3113,39 @@ onMounted(async () => {
 
 .po-item-row-disabled .item-name {
   text-decoration: line-through;
+}
+
+.pr-number-cell {
+  min-width: 230px;
+  white-space: nowrap;
+}
+
+.pr-number-action {
+  justify-content: flex-start;
+  letter-spacing: normal;
+  min-inline-size: auto;
+  text-align: start;
+}
+
+.pr-number-action :deep(.v-btn__content) {
+  max-width: 100%;
+}
+
+.pr-number-text {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-detail-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+}
+
+.white-space-pre-line {
+  white-space: pre-line;
 }
 </style>

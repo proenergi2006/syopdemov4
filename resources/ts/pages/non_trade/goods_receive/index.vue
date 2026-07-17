@@ -760,7 +760,7 @@ const cancelGR = (item: any): void => {
   console.log('CANCEL GR:', item)
 }
 
-watch([selectedStatus, tanggalMulai, tanggalSelesai], async () => {
+watch([searchQuery, selectedStatus, tanggalMulai, tanggalSelesai], async () => {
   currentPage.value = 1
   await fetchGoodsReceives()
 })
@@ -816,30 +816,62 @@ onMounted(async () => {
 <template>
   <section>
     <!-- Filters -->
-    <VCard
-      title="Filters"
-      class="mb-6"
-    >
-      <VCardText>
-        <VRow>
+    <VCard class="mb-6 filter-card">
+      <VCardText class="pa-5">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
+          <div class="d-flex align-center gap-3">
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              size="38"
+            >
+              <VIcon
+                icon="tabler-filter"
+                size="20"
+              />
+            </VAvatar>
+
+            <div>
+              <div class="text-subtitle-1 font-weight-bold">
+                Filter Goods Receipt
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                Cari berdasarkan nomor GR / PO, tanggal, dan status
+              </div>
+            </div>
+          </div>
+
+          <VBtn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="tabler-refresh"
+            @click="resetFilters"
+            class="text-none"
+          >
+            Reset Filter
+          </VBtn>
+        </div>
+
+        <VRow class="align-center">
           <VCol
             cols="12"
-            sm="3"
+            md="3"
           >
             <VTextField
               v-model="searchQuery"
               label="Cari kode GR / PO"
-              placeholder="Cari goods receive..."
+              placeholder="Cari goods receipt..."
               density="compact"
               clearable
-              @keyup.enter="fetchGoodsReceives"
-              @click:clear="fetchGoodsReceives"
+              hide-details="auto"
+              prepend-inner-icon="tabler-search"
             />
           </VCol>
 
           <VCol
             cols="12"
-            sm="3"
+            sm="6"
+            md="3"
           >
             <AppDateTimePicker
               :key="`tanggal-mulai-${datePickerKey}`"
@@ -847,6 +879,7 @@ onMounted(async () => {
               label="Tanggal Awal"
               density="compact"
               clearable
+              hide-details="auto"
               :config="{ dateFormat: 'Y-m-d' }"
               @update:model-value="validateTanggalFilter('mulai')"
             />
@@ -854,7 +887,8 @@ onMounted(async () => {
 
           <VCol
             cols="12"
-            sm="3"
+            sm="6"
+            md="3"
           >
             <AppDateTimePicker
               :key="`tanggal-selesai-${datePickerKey}`"
@@ -862,6 +896,7 @@ onMounted(async () => {
               label="Tanggal Akhir"
               density="compact"
               clearable
+              hide-details="auto"
               :config="{ dateFormat: 'Y-m-d' }"
               @update:model-value="validateTanggalFilter('selesai')"
             />
@@ -869,7 +904,7 @@ onMounted(async () => {
 
           <VCol
             cols="12"
-            sm="3"
+            md="3"
           >
             <VSelect
               v-model="selectedStatus"
@@ -878,24 +913,9 @@ onMounted(async () => {
               item-title="title"
               item-value="value"
               density="compact"
+              hide-details="auto"
+              clearable
             />
-          </VCol>
-        </VRow>
-
-        <VRow class="mt-1">
-          <VCol
-            cols="12"
-            class="d-flex justify-end"
-          >
-            <VBtn
-              color="secondary"
-              prepend-icon="tabler-refresh"
-              @click="resetFilters"
-              class="text-none"
-              block
-            >
-              Reset Filter
-            </VBtn>
           </VCol>
         </VRow>
       </VCardText>
@@ -951,7 +971,7 @@ onMounted(async () => {
             </th>
             <th
               scope="col"
-              class="text-center"
+              class="text-start gr-number-header"
             >
               Nomor GR
             </th>
@@ -1004,8 +1024,128 @@ onMounted(async () => {
               {{ ((currentPage - 1) * rowPerPage) + Number(index) + 1 }}
             </td>
 
-            <td class="text-medium-emphasis text-center">
-              {{ v.nomor_gr || '-' }}
+            <td class="gr-number-cell">
+              <VMenu>
+                <template #activator="{ props }">
+                  <VBtn
+                    v-bind="props"
+                    color="primary"
+                    variant="text"
+                    density="comfortable"
+                    class="gr-number-btn text-none px-1"
+                  >
+                    <span class="font-weight-medium">
+                      {{ v.nomor_gr || '-' }}
+                    </span>
+
+                    <VIcon
+                      icon="tabler-chevron-down"
+                      size="16"
+                      class="ms-1"
+                    />
+                  </VBtn>
+                </template>
+
+                  <VList>
+                    <VListItem
+                      href="javascript:void(0)"
+                      @click="openDetail(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-eye"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        Lihat Detail
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="
+                        canViewReturnHistory
+                        && Number(v.goods_return_count || 0) > 0
+                      "
+                      href="javascript:void(0)"
+                      @click="openReturnHistory(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-history"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        History Return
+                      </VListItemTitle>
+
+                      <VListItemSubtitle>
+                        {{ Number(v.goods_return_count || 0) }}
+                        dokumen return
+                      </VListItemSubtitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="String(v.status).toUpperCase() === 'DRAFT' && canUpdate"
+                      href="javascript:void(0)"
+                      @click="goToEdit(v.public_id)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-pencil-outline"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle>
+                        Edit
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="String(v.status || '').toUpperCase() === 'DRAFT' && canDelete"
+                      href="javascript:void(0)"
+                      @click="openDelete(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-trash"
+                          :size="20"
+                          class="me-3 text-error"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-error">
+                        Hapus
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="String(v.status).toUpperCase() === 'DRAFT'"
+                      href="javascript:void(0)"
+                      @click="postGoodsReceive(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-circle-check"
+                          :size="20"
+                          color="success"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-success">
+                        Post GR
+                      </VListItemTitle>
+                    </VListItem>
+                  </VList>
+              </VMenu>
             </td>
 
             <td class="text-medium-emphasis text-center">
@@ -2512,3 +2652,62 @@ onMounted(async () => {
     </VDialog>
   </section>
 </template>
+
+<style lang="scss" scoped>
+.filter-card {
+  border-radius: 5px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.gr-number-header,
+.gr-number-cell {
+  min-width: 320px;
+  width: 320px;
+}
+
+.gr-number-btn {
+  min-width: 300px;
+  max-width: 100%;
+  justify-content: flex-start;
+  user-select: text;
+}
+
+.gr-number-btn :deep(.v-btn__content) {
+  justify-content: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  user-select: text;
+}
+
+.gr-number-btn span {
+  display: inline-block;
+  max-width: 270px;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.user-pagination-select {
+  .v-field__input,
+  .v-field__append-inner {
+    padding-block-start: 0.3rem;
+  }
+}
+
+@media (max-width: 960px) {
+  .gr-number-header,
+  .gr-number-cell {
+    min-width: 280px;
+    width: 280px;
+  }
+
+  .gr-number-btn {
+    min-width: 260px;
+  }
+
+  .gr-number-btn span {
+    max-width: 230px;
+  }
+}
+</style>

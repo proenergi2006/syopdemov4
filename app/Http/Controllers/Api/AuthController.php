@@ -60,9 +60,25 @@ class AuthController extends Controller
                 'last_login_at' => now(),
             ])->save();
 
-            $token = $user
-                ->createToken('syop-v4')
-                ->plainTextToken;
+            $expiresAt = now()->addMinutes(
+                (int) config('auth_session.absolute_timeout_minutes', 720),
+            );
+
+            $newToken = $user->createToken(
+                'syop-v4',
+                ['*'],
+                $expiresAt,
+            );
+
+            Cache::put(
+                'auth:last_activity:' . $newToken->accessToken->id,
+                now()->toIso8601String(),
+                now()->addMinutes(
+                    (int) config('auth_session.absolute_timeout_minutes', 720) + 60,
+                ),
+            );
+
+            $token = $newToken->plainTextToken;
 
             return response()->json([
                 'success' => true,
@@ -475,9 +491,25 @@ class AuthController extends Controller
     | Generate token Sanctum SYOP V4
     |--------------------------------------------------------------------------
     */
-        $token = $user
-            ->createToken('syop-v4-sso')
-            ->plainTextToken;
+        $user->forceFill([
+            'last_login_at' => now(),
+        ])->save();
+
+        $expiresAt = now()->addMinutes(
+            (int) config('auth_session.absolute_timeout_minutes', 720),
+        );
+
+        $newToken = $user->createToken(
+            'syop-v4-sso',
+            ['*'],
+            $expiresAt,
+        );
+
+        $newToken->accessToken->forceFill([
+            'last_used_at' => now(),
+        ])->save();
+
+        $token = $newToken->plainTextToken;
 
         return response()->json([
             'token' => $token,

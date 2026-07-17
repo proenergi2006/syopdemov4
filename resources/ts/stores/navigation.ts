@@ -29,6 +29,41 @@ export const useNavigationStore = defineStore('navigation', {
       }
     },
 
+    normalizeNavigationItems(items: any[]): any[] {
+      return items.map(item => {
+        const badgeCount = Number(
+          item.badge_count
+          ?? item.badgeCount
+          ?? item.badgeContent
+          ?? 0,
+        )
+
+        const normalizedItem = {
+          ...item,
+        }
+
+        if (badgeCount > 0) {
+          normalizedItem.badge_count = badgeCount
+          normalizedItem.badgeContent = badgeCount > 99
+            ? '99+'
+            : String(badgeCount)
+
+          normalizedItem.badgeClass = item.badgeClass || 'bg-error'
+        }
+        else {
+          delete normalizedItem.badge_count
+          delete normalizedItem.badgeContent
+          delete normalizedItem.badgeClass
+        }
+
+        if (Array.isArray(item.children)) {
+          normalizedItem.children = this.normalizeNavigationItems(item.children)
+        }
+
+        return normalizedItem
+      })
+    },
+
     loadFromLocal(): void {
       try {
         const raw = localStorage.getItem('navItems')
@@ -38,11 +73,11 @@ export const useNavigationStore = defineStore('navigation', {
           : []
 
         this.items = Array.isArray(parsedItems)
-          ? parsedItems
+          ? this.normalizeNavigationItems(parsedItems) as VerticalNavItems
           : []
 
         this.loadedUserId = this.getCurrentUserId()
-        this.loaded = true
+        this.loaded = false
       }
       catch {
         this.items = []
@@ -65,24 +100,35 @@ export const useNavigationStore = defineStore('navigation', {
 
       /*
       |--------------------------------------------------------------------------
-      | Gunakan cache hanya jika menu memang milik user yang sama
+      | Gunakan cache hanya jika:
+      | - bukan force refresh
+      | - menu sudah loaded
+      | - user masih sama
+      | - items sudah ada
+      |--------------------------------------------------------------------------
+      |
+      | Untuk update badge approval PR/PO, panggil:
+      | fetchFromApi(true)
       |--------------------------------------------------------------------------
       */
-      if (
-        !force
-        && this.loaded
-        && sameUser
-        && this.items.length > 0
-      ) {
-        return
-      }
+      // if (
+      //   !force
+      //   && this.loaded
+      //   && sameUser
+      //   && this.items.length > 0
+      // ) {
+      //   return
+      // }
 
       this.loading = true
 
       try {
-        const response = await axios.get('/auth/my-menus', {
+        const response = await axios.get('/master/menus/navigation', {
           headers: {
             Accept: 'application/json',
+          },
+          params: {
+            _t: Date.now(),
           },
         })
 
@@ -102,13 +148,17 @@ export const useNavigationStore = defineStore('navigation', {
             ? response.data.data
             : []
 
-        this.items = responseItems
+        const normalizedItems = this.normalizeNavigationItems(responseItems)
+
+        this.items = normalizedItems as VerticalNavItems
         this.loadedUserId = currentUserId
         this.loaded = true
 
+        console.log('[NAVIGATION] fetched items:', normalizedItems)
+
         localStorage.setItem(
           'navItems',
-          JSON.stringify(responseItems),
+          JSON.stringify(normalizedItems),
         )
       }
       catch (error) {
@@ -126,13 +176,25 @@ export const useNavigationStore = defineStore('navigation', {
       }
     },
 
-    setItems(items: VerticalNavItems): void {
-      this.items = Array.isArray(items)
-        ? items
-        : []
+    async refreshBadges(): Promise<void> {
+      localStorage.removeItem('navItems')
+      sessionStorage.removeItem('navItems')
 
+      this.loaded = false
+
+      await this.fetchFromApi(true)
+    },
+
+    setItems(items: VerticalNavItems): void {
+      const normalizedItems = this.normalizeNavigationItems(
+        Array.isArray(items)
+          ? items
+          : [],
+      )
+
+      this.items = normalizedItems as VerticalNavItems
       this.loadedUserId = this.getCurrentUserId()
-      this.loaded = true
+      this.loaded = false
 
       localStorage.setItem(
         'navItems',

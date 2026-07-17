@@ -20,6 +20,12 @@ class PurchaseOrderDashboardService
     private const PO_STATUS_IN_PROGRESS = 'IN PROGRESS';
     private const PO_STATUS_APPROVED = 'APPROVED';
     private const PO_STATUS_REJECTED = 'REJECTED';
+    private const PO_STATUS_CANCELLED = 'CANCELLED';
+
+    private const EXCLUDED_DASHBOARD_STATUSES = [
+        self::PO_STATUS_REJECTED,
+        self::PO_STATUS_CANCELLED,
+    ];
 
     /**
      * Dashboard tahap kedua:
@@ -64,6 +70,18 @@ class PurchaseOrderDashboardService
         );
 
         $breakdownByDepartment = $this->getBreakdownByDepartment(
+            filters: $filters,
+            startDate: $startDate,
+            endDate: $endDate,
+        );
+
+        $itemPriceComparison = $this->getItemPriceComparison(
+            filters: $filters,
+            startDate: $startDate,
+            endDate: $endDate,
+        );
+
+        $valueComparison = $this->getValueComparison(
             filters: $filters,
             startDate: $startDate,
             endDate: $endDate,
@@ -153,13 +171,7 @@ class PurchaseOrderDashboardService
             ],
 
             'trend' => $trend,
-
             'statuses' => [
-                [
-                    'status' => self::PO_STATUS_DRAFT,
-                    'label' => 'Draft',
-                    'total' => $draftPo,
-                ],
                 [
                     'status' => self::PO_STATUS_IN_PROGRESS,
                     'label' => 'In Progress',
@@ -170,11 +182,6 @@ class PurchaseOrderDashboardService
                     'label' => 'Approved',
                     'total' => $approvedPo,
                 ],
-                [
-                    'status' => self::PO_STATUS_REJECTED,
-                    'label' => 'Rejected',
-                    'total' => $rejectedPo,
-                ],
             ],
 
             'attention_items' => [],
@@ -183,6 +190,9 @@ class PurchaseOrderDashboardService
                 'by_cabang' => $breakdownByCabang,
                 'by_department' => $breakdownByDepartment,
             ],
+
+            'item_price_comparison' => $itemPriceComparison,
+            'value_comparison' => $valueComparison,
         ];
     }
 
@@ -365,7 +375,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_requests.status = ?
+                        WHEN UPPER(TRIM(purchase_requests.status)) = ?
                         THEN 1
                         ELSE 0
                     END
@@ -373,7 +383,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_requests.status = ?
+                        WHEN UPPER(TRIM(purchase_requests.status)) = ?
                         AND (
                             purchase_requests.status_po = ?
                             OR purchase_requests.status_po IS NULL
@@ -385,7 +395,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_requests.status = ?
+                        WHEN UPPER(TRIM(purchase_requests.status)) = ?
                         AND purchase_requests.status_po IN (?, ?)
                         THEN 1
                         ELSE 0
@@ -455,7 +465,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_orders.status = ?
+                        WHEN UPPER(TRIM(purchase_orders.status)) = ?
                         THEN 1
                         ELSE 0
                     END
@@ -463,7 +473,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_orders.status = ?
+                        WHEN UPPER(TRIM(purchase_orders.status)) = ?
                         THEN 1
                         ELSE 0
                     END
@@ -471,7 +481,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_orders.status = ?
+                        WHEN UPPER(TRIM(purchase_orders.status)) = ?
                         THEN 1
                         ELSE 0
                     END
@@ -479,7 +489,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_orders.status = ?
+                        WHEN UPPER(TRIM(purchase_orders.status)) = ?
                         THEN 1
                         ELSE 0
                     END
@@ -487,7 +497,7 @@ class PurchaseOrderDashboardService
 
                 SUM(
                     CASE
-                        WHEN purchase_orders.status = ?
+                        WHEN UPPER(TRIM(purchase_orders.status)) = ?
                         AND COALESCE(
                             receipt_state.has_outstanding,
                             0
@@ -591,6 +601,65 @@ class PurchaseOrderDashboardService
                 ',
             );
     }
+    /**
+     * Membatasi dokumen yang dihitung dashboard hanya dokumen resmi.
+     *
+     * DRAFT belum dianggap kebutuhan/realisasi resmi, sedangkan REJECTED dan
+     * CANCELLED tidak valid untuk pengambilan keputusan management.
+     */
+    private function applyAllowedStatusFilter(
+        Builder $query,
+        string $qualifiedStatusColumn,
+        array $allowedStatuses,
+    ): void {
+        $statuses = collect($allowedStatuses)
+            ->map(fn($status): string => strtoupper(trim((string) $status)))
+            ->filter(fn(string $status): bool => $status !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($statuses)) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $placeholders = implode(
+            ', ',
+            array_fill(0, count($statuses), '?'),
+        );
+
+        $query->whereRaw(
+            "UPPER(TRIM({$qualifiedStatusColumn})) IN ({$placeholders})",
+            $statuses,
+        );
+    }
+
+    private function applyOfficialPurchaseRequestDashboardStatusFilter(
+        Builder $query,
+    ): void {
+        $this->applyAllowedStatusFilter(
+            query: $query,
+            qualifiedStatusColumn: 'purchase_requests.status',
+            allowedStatuses: [
+                'IN PROGRESS',
+                PurchaseRequest::STATUS_APPROVED,
+            ],
+        );
+    }
+
+    private function applyOfficialPurchaseOrderDashboardStatusFilter(
+        Builder $query,
+    ): void {
+        $this->applyAllowedStatusFilter(
+            query: $query,
+            qualifiedStatusColumn: 'purchase_orders.status',
+            allowedStatuses: [
+                self::PO_STATUS_IN_PROGRESS,
+                self::PO_STATUS_APPROVED,
+            ],
+        );
+    }
 
     /**
      * Filter tanggal, cabang, dan departemen PR.
@@ -607,6 +676,9 @@ class PurchaseOrderDashboardService
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ],
+        );
+        $this->applyOfficialPurchaseRequestDashboardStatusFilter(
+            query: $query,
         );
 
         if (isset($filters['cabang_id'])) {
@@ -639,6 +711,9 @@ class PurchaseOrderDashboardService
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ],
+        );
+        $this->applyOfficialPurchaseOrderDashboardStatusFilter(
+            query: $query,
         );
 
         if (isset($filters['cabang_id'])) {
@@ -1304,6 +1379,544 @@ class PurchaseOrderDashboardService
     }
 
     /**
+     * Membandingkan harga satuan item PR dengan harga satuan rata-rata PO.
+     *
+     * Data ini membantu management melihat item mana yang mengalami kenaikan,
+     * penurunan, atau tetap sama saat kebutuhan PR direalisasikan menjadi PO.
+     */
+    private function getItemPriceComparison(
+        array $filters,
+        CarbonImmutable $startDate,
+        CarbonImmutable $endDate,
+    ): array {
+        $driver = DB::connection()->getDriverName();
+
+        $poNumbersExpression = $driver === 'mysql'
+            ? "GROUP_CONCAT(DISTINCT po.nomor_po ORDER BY po.nomor_po SEPARATOR ', ')"
+            : "STRING_AGG(DISTINCT po.nomor_po, ', ' ORDER BY po.nomor_po)";
+
+        /*
+        |--------------------------------------------------------------------------
+        | PR Unit Price Expression
+        |--------------------------------------------------------------------------
+        | Data PR lama kadang harga_unit bernilai 0/null, tetapi subtotal dan qty
+        | tetap terisi. Agar dashboard tetap muncul, harga PR dihitung dengan
+        | fallback:
+        | 1. purchase_request_items.harga_unit
+        | 2. purchase_request_items.subtotal / purchase_request_items.qty
+        | 3. 0 jika keduanya tidak valid
+        |--------------------------------------------------------------------------
+        */
+        $prUnitPriceExpression = "
+            CASE
+                WHEN COALESCE(pri.harga_unit, 0) > 0
+                    THEN COALESCE(pri.harga_unit, 0)
+                WHEN COALESCE(pri.qty, 0) > 0
+                    AND COALESCE(pri.subtotal, 0) > 0
+                    THEN COALESCE(pri.subtotal, 0) / NULLIF(COALESCE(pri.qty, 0), 0)
+                ELSE 0
+            END
+        ";
+
+        /*
+        |--------------------------------------------------------------------------
+        | PO Unit Price Expression
+        |--------------------------------------------------------------------------
+        | Harga PO menggunakan weighted average berdasarkan qty agar lebih akurat
+        | ketika satu item PR dibuat menjadi beberapa PO dengan harga berbeda.
+        |--------------------------------------------------------------------------
+        */
+        $poUnitPriceExpression = "
+            CASE
+                WHEN SUM(COALESCE(poi.qty, 0)) > 0
+                    THEN SUM(COALESCE(poi.harga_unit, 0) * COALESCE(poi.qty, 0))
+                        / NULLIF(SUM(COALESCE(poi.qty, 0)), 0)
+                ELSE AVG(COALESCE(poi.harga_unit, 0))
+            END
+        ";
+
+        $query = DB::table('purchase_order_items as poi')
+            ->join(
+                'purchase_orders as po',
+                'po.id',
+                '=',
+                'poi.purchase_order_id',
+            )
+            ->join(
+                'purchase_request_items as pri',
+                'pri.id',
+                '=',
+                'poi.purchase_request_item_id',
+            )
+            ->leftJoin(
+                'purchase_requests as pr',
+                'pr.id',
+                '=',
+                'pri.purchase_request_id',
+            )
+            ->whereNull('poi.deleted_at')
+            ->whereBetween(
+                'po.tanggal_po',
+                [
+                    $startDate->toDateString(),
+                    $endDate->toDateString(),
+                ],
+            )
+            ->whereRaw(
+                'UPPER(TRIM(po.status)) IN (?, ?)',
+                [
+                    self::PO_STATUS_IN_PROGRESS,
+                    self::PO_STATUS_APPROVED,
+                ],
+            )
+            ->whereRaw('COALESCE(poi.harga_unit, 0) > 0')
+            ->whereRaw("({$prUnitPriceExpression}) > 0");
+
+        if (isset($filters['cabang_id'])) {
+            $query->where(
+                'po.cabang',
+                (int) $filters['cabang_id'],
+            );
+        }
+
+        if (isset($filters['department_id'])) {
+            $query->where(
+                'po.id_department',
+                (int) $filters['department_id'],
+            );
+        }
+
+        $rows = $query
+            ->selectRaw(
+                "
+                pri.id AS purchase_request_item_id,
+                COALESCE(MAX(pr.nomor_pr), '-') AS pr_number,
+                {$poNumbersExpression} AS po_numbers,
+                COALESCE(MAX(NULLIF(TRIM(poi.nama_item), '')), MAX(NULLIF(TRIM(pri.nama_item), '')), 'Item tanpa nama') AS item_name,
+                MAX({$prUnitPriceExpression}) AS pr_unit_price,
+                {$poUnitPriceExpression} AS po_unit_price,
+                MIN(COALESCE(poi.harga_unit, 0)) AS min_po_unit_price,
+                MAX(COALESCE(poi.harga_unit, 0)) AS max_po_unit_price,
+                COUNT(DISTINCT po.id) AS po_count,
+                COALESCE(SUM(COALESCE(poi.qty, 0)), 0) AS po_qty,
+                COALESCE(SUM(COALESCE(poi.subtotal, 0)), 0) AS po_amount
+                ",
+            )
+            ->groupBy('pri.id')
+            ->havingRaw('COALESCE(SUM(COALESCE(poi.qty, 0)), 0) > 0')
+            ->get();
+
+        $items = $rows
+            ->map(function ($row): array {
+                $prUnitPrice = (float) (
+                    $row->pr_unit_price ?? 0
+                );
+
+                $poUnitPrice = (float) (
+                    $row->po_unit_price ?? 0
+                );
+
+                $priceDifference = $poUnitPrice - $prUnitPrice;
+
+                $priceDifferencePercent = $prUnitPrice > 0
+                    ? round(
+                        ($priceDifference / $prUnitPrice) * 100,
+                        1,
+                    )
+                    : 0.0;
+
+                $varianceType = 'same';
+
+                if ($priceDifference > 0) {
+                    $varianceType = 'increase';
+                } elseif ($priceDifference < 0) {
+                    $varianceType = 'decrease';
+                }
+
+                return [
+                    'purchase_request_item_id' => $row->purchase_request_item_id !== null
+                        ? (int) $row->purchase_request_item_id
+                        : null,
+
+                    'pr_number' => (string) (
+                        $row->pr_number ?? '-'
+                    ),
+
+                    'po_numbers' => (string) (
+                        $row->po_numbers ?? '-'
+                    ),
+
+                    'item_name' => (string) (
+                        $row->item_name ?? 'Item tanpa nama'
+                    ),
+
+                    'pr_unit_price' => round($prUnitPrice, 2),
+                    'po_unit_price' => round($poUnitPrice, 2),
+                    'min_po_unit_price' => (float) (
+                        $row->min_po_unit_price ?? 0
+                    ),
+                    'max_po_unit_price' => (float) (
+                        $row->max_po_unit_price ?? 0
+                    ),
+                    'price_difference' => round($priceDifference, 2),
+                    'price_difference_percent' => $priceDifferencePercent,
+                    'variance_type' => $varianceType,
+                    'po_count' => (int) (
+                        $row->po_count ?? 0
+                    ),
+                    'po_qty' => (float) (
+                        $row->po_qty ?? 0
+                    ),
+                    'po_amount' => (float) (
+                        $row->po_amount ?? 0
+                    ),
+                ];
+            })
+            ->sortByDesc(function (array $item): float {
+                return abs(
+                    (float) $item['price_difference_percent'],
+                );
+            })
+            ->values();
+
+        $allItems = $items->all();
+        $totalItems = count($allItems);
+
+        $increasedItems = collect($allItems)
+            ->where('variance_type', 'increase')
+            ->count();
+
+        $decreasedItems = collect($allItems)
+            ->where('variance_type', 'decrease')
+            ->count();
+
+        $unchangedItems = collect($allItems)
+            ->where('variance_type', 'same')
+            ->count();
+
+        $averageDifferencePercent = $totalItems > 0
+            ? round(
+                collect($allItems)->avg('price_difference_percent'),
+                1,
+            )
+            : 0.0;
+
+        $totalDifferenceAmount = collect($allItems)
+            ->sum('price_difference');
+
+        return [
+            'summary' => [
+                'total_items' => $totalItems,
+                'increased_items' => $increasedItems,
+                'decreased_items' => $decreasedItems,
+                'unchanged_items' => $unchangedItems,
+                'average_difference_percent' => $averageDifferencePercent,
+                'total_difference_amount' => round(
+                    (float) $totalDifferenceAmount,
+                    2,
+                ),
+            ],
+
+            'items' => $items
+                ->take(10)
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * Membandingkan nilai final PR dengan nilai PO terkait.
+     *
+     * Perbandingan ini hanya memakai PR yang sudah COMPLETED secara status PO,
+     * karena efisiensi / kenaikan nilai baru final ketika seluruh qty PR sudah
+     * terealisasi menjadi PO. Outstanding qty tidak dihitung sebagai efisiensi.
+     */
+    private function getValueComparison(
+        array $filters,
+        CarbonImmutable $startDate,
+        CarbonImmutable $endDate,
+    ): array {
+        $driver = DB::connection()->getDriverName();
+
+        $poNumbersExpression = $driver === 'mysql'
+            ? "GROUP_CONCAT(DISTINCT po.nomor_po ORDER BY po.nomor_po SEPARATOR ', ')"
+            : "STRING_AGG(DISTINCT po.nomor_po, ', ' ORDER BY po.nomor_po)";
+
+        $poSubtotalByPurchaseOrder = DB::table(
+            'purchase_order_items as poi_all',
+        )
+            ->whereNull('poi_all.deleted_at')
+            ->groupBy('poi_all.purchase_order_id')
+            ->selectRaw(
+                '
+                poi_all.purchase_order_id,
+                COALESCE(
+                    SUM(COALESCE(poi_all.subtotal, 0)),
+                    0
+                ) AS po_item_subtotal
+                ',
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Alokasi nilai PO ke masing-masing PR
+        |--------------------------------------------------------------------------
+        | Satu PO dapat berisi beberapa PR. Karena itu total_nilai header PO tidak
+        | langsung dijumlah per PR agar tidak double count. Nilai PO dialokasikan
+        | proporsional berdasarkan subtotal item PO yang berasal dari item PR.
+        |--------------------------------------------------------------------------
+        */
+        $allocatedPoAmountExpression = '
+            CASE
+                WHEN COALESCE(po_subtotals.po_item_subtotal, 0) > 0
+                    THEN COALESCE(poi.subtotal, 0)
+                        * COALESCE(po.total_nilai, 0)
+                        / NULLIF(COALESCE(po_subtotals.po_item_subtotal, 0), 0)
+                ELSE COALESCE(poi.subtotal, 0)
+            END
+        ';
+
+        $query = DB::table('purchase_requests as pr')
+            ->join(
+                'purchase_request_items as pri',
+                'pri.purchase_request_id',
+                '=',
+                'pr.id',
+            )
+            ->join(
+                'purchase_order_items as poi',
+                'poi.purchase_request_item_id',
+                '=',
+                'pri.id',
+            )
+            ->join(
+                'purchase_orders as po',
+                'po.id',
+                '=',
+                'poi.purchase_order_id',
+            )
+            ->leftJoinSub(
+                $poSubtotalByPurchaseOrder,
+                'po_subtotals',
+                function ($join): void {
+                    $join->on(
+                        'po_subtotals.purchase_order_id',
+                        '=',
+                        'po.id',
+                    );
+                },
+            )
+            ->whereNull('pri.deleted_at')
+            ->whereNull('poi.deleted_at')
+            ->whereNull('po.deleted_at')
+            ->whereBetween(
+                'pr.tanggal_pr',
+                [
+                    $startDate->toDateString(),
+                    $endDate->toDateString(),
+                ],
+            )
+            ->whereRaw(
+                'UPPER(TRIM(pr.status)) = ?',
+                [PurchaseRequest::STATUS_APPROVED],
+            )
+            ->whereRaw(
+                'UPPER(TRIM(COALESCE(pr.status_po, \'\'))) = ?',
+                [PurchaseRequest::STATUS_PO_COMPLETED],
+            )
+            /*
+            |--------------------------------------------------------------------------
+            | Status PO yang dihitung untuk perbandingan nilai
+            |--------------------------------------------------------------------------
+            | Sesuai rule proses PO yang sudah disepakati:
+            | PO DRAFT sudah mengunci / mengurangi qty outstanding PR.
+            | Karena itu untuk perbandingan nilai PR vs PO, DRAFT juga harus
+            | dihitung selama PR sudah COMPLETED secara status_po.
+            |
+            | REJECTED dan CANCELLED tetap tidak dihitung karena tidak valid.
+            |--------------------------------------------------------------------------
+            */
+            ->whereRaw(
+                'UPPER(TRIM(po.status)) IN (?, ?, ?)',
+                [
+                    self::PO_STATUS_DRAFT,
+                    self::PO_STATUS_IN_PROGRESS,
+                    self::PO_STATUS_APPROVED,
+                ],
+            );
+
+        if (isset($filters['cabang_id'])) {
+            $query->where(
+                'pr.cabang',
+                (int) $filters['cabang_id'],
+            );
+        }
+
+        if (isset($filters['department_id'])) {
+            $query->where(
+                'pr.id_department',
+                (int) $filters['department_id'],
+            );
+        }
+
+        $rows = $query
+            ->selectRaw(
+                "
+                pr.id AS purchase_request_id,
+                COALESCE(MAX(pr.nomor_pr), '-') AS pr_number,
+                MAX(pr.tanggal_pr) AS pr_date,
+                MAX(pr.status_po) AS status_po,
+                MAX(COALESCE(pr.total_amount, 0)) AS pr_amount,
+                {$poNumbersExpression} AS po_numbers,
+                COALESCE(
+                    SUM({$allocatedPoAmountExpression}),
+                    0
+                ) AS po_amount
+                ",
+            )
+            ->groupBy('pr.id')
+            ->havingRaw('COALESCE(SUM(COALESCE(poi.qty, 0)), 0) > 0')
+            ->get();
+
+        $items = $rows
+            ->map(function ($row): array {
+                $prAmount = round(
+                    (float) ($row->pr_amount ?? 0),
+                    2,
+                );
+
+                $poAmount = round(
+                    (float) ($row->po_amount ?? 0),
+                    2,
+                );
+
+                $differenceRaw = round(
+                    $prAmount - $poAmount,
+                    2,
+                );
+
+                $differenceAmount = round(
+                    abs($differenceRaw),
+                    2,
+                );
+
+                $differencePercent = $prAmount > 0
+                    ? round(
+                        ($differenceRaw / $prAmount) * 100,
+                        1,
+                    )
+                    : 0.0;
+
+                $varianceType = 'same';
+                $varianceLabel = 'Tidak Ada Selisih';
+
+                if ($differenceAmount > 0.009 && $differenceRaw > 0) {
+                    $varianceType = 'efficiency';
+                    $varianceLabel = 'Efisiensi Nilai';
+                } elseif ($differenceAmount > 0.009 && $differenceRaw < 0) {
+                    $varianceType = 'increase';
+                    $varianceLabel = 'Kenaikan Nilai';
+                } else {
+                    $differenceAmount = 0.0;
+                    $differenceRaw = 0.0;
+                    $differencePercent = 0.0;
+                }
+
+                return [
+                    'purchase_request_id' => $row->purchase_request_id !== null
+                        ? (int) $row->purchase_request_id
+                        : null,
+
+                    'pr_number' => (string) (
+                        $row->pr_number ?? '-'
+                    ),
+
+                    'pr_date' => $row->pr_date !== null
+                        ? (string) $row->pr_date
+                        : null,
+
+                    'status_po' => (string) (
+                        $row->status_po ?? PurchaseRequest::STATUS_PO_COMPLETED
+                    ),
+
+                    'po_numbers' => (string) (
+                        $row->po_numbers ?? '-'
+                    ),
+
+                    'pr_amount' => $prAmount,
+                    'po_amount' => $poAmount,
+                    'difference_amount' => $differenceAmount,
+                    'difference_raw' => $differenceRaw,
+                    'difference_percent' => $differencePercent,
+                    'variance_type' => $varianceType,
+                    'variance_label' => $varianceLabel,
+                ];
+            })
+            ->sortByDesc(function (array $item): float {
+                return abs(
+                    (float) $item['difference_raw'],
+                );
+            })
+            ->values();
+
+        $allItems = $items->all();
+        $totalCompletedPr = count($allItems);
+
+        $efficiencyItems = collect($allItems)
+            ->where('variance_type', 'efficiency');
+
+        $increaseItems = collect($allItems)
+            ->where('variance_type', 'increase');
+
+        $sameItems = collect($allItems)
+            ->where('variance_type', 'same');
+
+        $totalPrAmount = collect($allItems)
+            ->sum('pr_amount');
+
+        $totalPoAmount = collect($allItems)
+            ->sum('po_amount');
+
+        $efficiencyAmount = $efficiencyItems
+            ->sum('difference_amount');
+
+        $increaseAmount = $increaseItems
+            ->sum('difference_amount');
+
+        $netDifferenceAmount = round(
+            (float) $efficiencyAmount - (float) $increaseAmount,
+            2,
+        );
+
+        $averageDifferencePercent = $totalCompletedPr > 0
+            ? round(
+                collect($allItems)->avg('difference_percent'),
+                1,
+            )
+            : 0.0;
+
+        return [
+            'summary' => [
+                'completed_pr_count' => $totalCompletedPr,
+                'efficiency_pr_count' => $efficiencyItems->count(),
+                'increase_pr_count' => $increaseItems->count(),
+                'same_pr_count' => $sameItems->count(),
+                'total_pr_amount' => round((float) $totalPrAmount, 2),
+                'total_po_amount' => round((float) $totalPoAmount, 2),
+                'efficiency_amount' => round((float) $efficiencyAmount, 2),
+                'increase_amount' => round((float) $increaseAmount, 2),
+                'net_difference_amount' => $netDifferenceAmount,
+                'average_difference_percent' => $averageDifferencePercent,
+            ],
+
+            'items' => $items
+                ->take(10)
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
      * Mengubah pilihan periode menjadi
      * start date dan end date.
      */
@@ -1425,5 +2038,21 @@ class PurchaseOrderDashboardService
                 $endDate,
             )->endOfDay(),
         ];
+    }
+
+    private function applyOfficialPurchaseRequestStatusFilter(Builder $query): void
+    {
+        $query->whereIn('purchase_requests.status', [
+            PurchaseRequest::STATUS_IN_PROGRESS,
+            PurchaseRequest::STATUS_APPROVED,
+        ]);
+    }
+
+    private function applyOfficialPurchaseOrderStatusFilter(Builder $query): void
+    {
+        $query->whereIn('purchase_orders.status', [
+            self::PO_STATUS_IN_PROGRESS,
+            self::PO_STATUS_APPROVED,
+        ]);
     }
 }

@@ -4,6 +4,7 @@ import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { avatarText } from '@core/utils/formatters'
 import axios from '@axios'
 import { useRouter } from 'vue-router'
+import { useNavigationStore } from '@/stores/navigation'
 
 interface Props {
   badgeProps?: Record<string, any>
@@ -22,6 +23,7 @@ defineEmits<{
 type Anchor = 'top' | 'bottom' | 'start' | 'end' | 'center' | 'bottom end' | 'bottom start' | 'top end' | 'top start'
 
 const router = useRouter()
+const navigationStore = useNavigationStore()
 
 const notifications = ref<any[]>([])
 const unreadNotificationCount = ref(0)
@@ -32,8 +34,16 @@ const notificationFetching = ref(false)
 const readAllLoading = ref(false)
 
 let notificationToastTimer: ReturnType<typeof setTimeout> | null = null
-
 let pollingTimer: ReturnType<typeof setInterval> | null = null
+
+const refreshNavigationBadges = async (): Promise<void> => {
+  try {
+    await navigationStore.refreshBadges()
+  }
+  catch (error) {
+    console.error('Gagal refresh badge sidebar:', error)
+  }
+}
 
 const triggerNotificationToast = (): void => {
   showNotificationToast.value = true
@@ -81,8 +91,14 @@ const fetchNotifications = async (): Promise<void> => {
     notificationFetching.value = true
 
     const response = await axios.get('/notifications', {
-      headers: { Accept: 'application/json' },
-      params: { limit: 5 },
+      headers: {
+        Accept: 'application/json',
+        'X-SYOP-Background-Request': '1',
+      },
+      params: {
+        limit: 5,
+        _t: Date.now(),
+      },
     })
 
     const newUnreadCount = Number(response.data?.unread_count || 0)
@@ -90,17 +106,28 @@ const fetchNotifications = async (): Promise<void> => {
 
     notifications.value = newNotifications
 
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh badge sidebar barengan polling notifikasi
+    |--------------------------------------------------------------------------
+    | Jadi ketika creator submit PR/PO dan approver menerima notifikasi,
+    | badge sidebar approver ikut update tanpa logout-login.
+    |--------------------------------------------------------------------------
+    */
+    await refreshNavigationBadges()
+
     if (newUnreadCount > previousUnreadNotificationCount.value) {
       triggerNotificationToast()
-
       dispatchRefreshEventsByModules(newNotifications)
     }
 
     unreadNotificationCount.value = newUnreadCount
     previousUnreadNotificationCount.value = newUnreadCount
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Gagal mengambil notifikasi:', error)
-  } finally {
+  }
+  finally {
     notificationFetching.value = false
   }
 }
@@ -113,9 +140,10 @@ const readAllNotifications = async (event?: Event): Promise<void> => {
     readAllLoading.value = true
     
     await axios.patch('/notifications/read-all', {}, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+      },
     })
-    
 
     unreadNotificationCount.value = 0
     previousUnreadNotificationCount.value = 0
@@ -125,9 +153,13 @@ const readAllNotifications = async (event?: Event): Promise<void> => {
       is_read: true,
       read_at: item.read_at || new Date().toISOString(),
     }))
-  } catch (error) {
+
+    await refreshNavigationBadges()
+  }
+  catch (error) {
     console.error('Gagal membaca semua notifikasi:', error)
-  } finally {
+  }
+  finally {
     readAllLoading.value = false
   }
 }
@@ -152,7 +184,8 @@ const stopPolling = (): void => {
 const handleVisibilityChange = (): void => {
   if (document.hidden) {
     stopPolling()
-  } else {
+  }
+  else {
     fetchNotifications()
     startPolling()
   }
@@ -179,7 +212,9 @@ const markNotificationAsRead = async (notification: any): Promise<void> => {
 
   try {
     await axios.patch(`/notifications/${notification.id}/read`, {}, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+      },
     })
 
     notifications.value = notifications.value.map(item => {
@@ -194,7 +229,10 @@ const markNotificationAsRead = async (notification: any): Promise<void> => {
 
     unreadNotificationCount.value = Math.max(unreadNotificationCount.value - 1, 0)
     previousUnreadNotificationCount.value = unreadNotificationCount.value
-  } catch (error) {
+
+    await refreshNavigationBadges()
+  }
+  catch (error) {
     console.error('Gagal membaca notifikasi:', error)
   }
 }
@@ -205,11 +243,16 @@ const deleteReadNotifications = async (event?: Event): Promise<void> => {
 
   try {
     await axios.delete('/notifications/read', {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+      },
     })
 
     notifications.value = notifications.value.filter(item => !item.is_read)
-  } catch (error) {
+
+    await refreshNavigationBadges()
+  }
+  catch (error) {
     console.error('Gagal menghapus notifikasi yang sudah dibaca:', error)
   }
 }
@@ -234,6 +277,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopPolling()
+
+  if (notificationToastTimer) {
+    clearTimeout(notificationToastTimer)
+    notificationToastTimer = null
+  }
 
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })

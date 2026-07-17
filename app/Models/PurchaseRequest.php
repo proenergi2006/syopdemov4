@@ -55,6 +55,12 @@ class PurchaseRequest extends Model
 
         'requester_role_id',
         'requester_role_name_snapshot',
+
+        'status_pkp',
+        'jenis_pembayaran',
+        'top',
+        'dpp',
+        'ppn',
     ];
 
     protected $casts = [
