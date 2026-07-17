@@ -151,17 +151,11 @@ class MenuController extends Controller
     */
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        if (
-            !$user
-            || !$user->hasPermission('auth_menu.view')
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses melihat Menu Management.',
-            ], 403);
-        }
+        $this->ensurePermission(
+            request: $request,
+            permission: 'auth_menu.view',
+            message: 'Anda tidak memiliki akses melihat Menu Management.',
+        );
 
         $menus = Menu::query()
             ->orderByRaw('parent_id NULLS FIRST')
@@ -194,17 +188,11 @@ class MenuController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        if (
-            !$user
-            || !$user->hasPermission('auth_menu.create')
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses membuat menu.',
-            ], 403);
-        }
+        $this->ensurePermission(
+            request: $request,
+            permission: 'auth_menu.create',
+            message: 'Anda tidak memiliki akses membuat menu.',
+        );
 
         $validated = $this->validatePayload($request);
 
@@ -261,17 +249,11 @@ class MenuController extends Controller
 
     public function show(Request $request, Menu $menu): JsonResponse
     {
-        $user = $request->user();
-
-        if (
-            !$user
-            || !$user->hasPermission('auth_menu.view')
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses melihat detail menu.',
-            ], 403);
-        }
+        $this->ensurePermission(
+            request: $request,
+            permission: 'auth_menu.view',
+            message: 'Anda tidak memiliki akses melihat detail menu.',
+        );
 
         return response()->json([
             'success' => true,
@@ -282,17 +264,11 @@ class MenuController extends Controller
 
     public function update(Request $request, Menu $menu): JsonResponse
     {
-        $user = $request->user();
-
-        if (
-            !$user
-            || !$user->hasPermission('auth_menu.update')
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses memperbarui menu.',
-            ], 403);
-        }
+        $this->ensurePermission(
+            request: $request,
+            permission: 'auth_menu.update',
+            message: 'Anda tidak memiliki akses memperbarui menu.',
+        );
 
         $validated = $this->validatePayload($request, $menu);
 
@@ -339,17 +315,11 @@ class MenuController extends Controller
 
     public function toggleActive(Request $request, Menu $menu): JsonResponse
     {
-        $user = $request->user();
-
-        if (
-            !$user
-            || !$user->hasPermission('auth_menu.update')
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses mengubah status menu.',
-            ], 403);
-        }
+        $this->ensurePermission(
+            request: $request,
+            permission: 'auth_menu.update',
+            message: 'Anda tidak memiliki akses mengubah status menu.',
+        );
 
         $nextStatus = !$menu->is_active;
 
@@ -386,17 +356,11 @@ class MenuController extends Controller
 
     public function destroy(Request $request, Menu $menu): JsonResponse
     {
-        $user = $request->user();
-
-        if (
-            !$user
-            || !$user->hasPermission('auth_menu.delete')
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses menghapus menu.',
-            ], 403);
-        }
+        $this->ensurePermission(
+            request: $request,
+            permission: 'auth_menu.delete',
+            message: 'Anda tidak memiliki akses menghapus menu.',
+        );
 
         $hasChildren = Menu::query()
             ->where('parent_id', $menu->id)
@@ -432,6 +396,21 @@ class MenuController extends Controller
             'success' => true,
             'message' => 'Menu berhasil dihapus.',
         ]);
+    }
+
+    private function ensurePermission(
+        Request $request,
+        string $permission,
+        string $message,
+    ): void {
+        $user = $request->user();
+
+        if (
+            !$user
+            || !$user->hasPermission($permission)
+        ) {
+            abort(403, $message);
+        }
     }
 
     private function validatePayload(

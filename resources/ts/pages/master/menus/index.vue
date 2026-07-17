@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import Swal from 'sweetalert2'
+import { useRouter } from 'vue-router'
 import axiosIns from '@/plugins/axios'
 import {
   closeAlert,
@@ -11,6 +11,7 @@ import {
 } from '@/utils/alert'
 
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import { usePermissionStore } from '@/stores/permission'
 
 interface AxiosErrorShape {
   response?: {
@@ -55,6 +56,30 @@ type MenuForm = {
   show_in_sidebar: boolean
   is_active: boolean
 }
+
+const router = useRouter()
+const permissionStore = usePermissionStore()
+
+const viewPermissionCode = 'auth_menu.view'
+const createPermissionCode = 'auth_menu.create'
+const updatePermissionCode = 'auth_menu.update'
+const deletePermissionCode = 'auth_menu.delete'
+
+const canView = computed(() => {
+  return permissionStore.can(viewPermissionCode)
+})
+
+const canCreate = computed(() => {
+  return permissionStore.can(createPermissionCode)
+})
+
+const canUpdate = computed(() => {
+  return permissionStore.can(updatePermissionCode)
+})
+
+const canDelete = computed(() => {
+  return permissionStore.can(deletePermissionCode)
+})
 
 const isActionLoading = ref(false)
 const isLoading = ref(false)
@@ -384,6 +409,19 @@ watch(
   },
 )
 
+const isForbiddenResponse = (error: unknown): boolean => {
+  const err = error as AxiosErrorShape
+
+  return Number(err.response?.status ?? 0) === 403
+}
+
+const redirectToForbidden = async (): Promise<void> => {
+  closeAlert()
+  isDialogVisible.value = false
+
+  await router.replace('/forbidden')
+}
+
 const fetchMenus = async () => {
   isLoading.value = true
 
@@ -392,8 +430,13 @@ const fetchMenus = async () => {
 
     menus.value = response.data?.data?.tree ?? []
   } catch (error: any) {
-    Swal.fire({
-      icon: 'error',
+    if (isForbiddenResponse(error)) {
+      await redirectToForbidden()
+
+      return
+    }
+
+    showErrorToast({
       title: 'Gagal Memuat Menu',
       text:
         error.response?.data?.message
@@ -441,6 +484,12 @@ const resetFilter = () => {
 }
 
 const openCreateDialog = async () => {
+  if (!canCreate.value) {
+    await redirectToForbidden()
+
+    return
+  }
+
   resetForm()
   isEditMode.value = false
   isDialogVisible.value = true
@@ -450,7 +499,13 @@ const openCreateDialog = async () => {
   applyNextOrderNo()
 }
 
-const openEditDialog = (item: MenuItem) => {
+const openEditDialog = async (item: MenuItem) => {
+  if (!canUpdate.value) {
+    await redirectToForbidden()
+
+    return
+  }
+
   isEditMode.value = true
 
   form.value = {
@@ -613,6 +668,12 @@ const saveMenu = async (): Promise<void> => {
   } catch (error: any) {
     closeAlert()
 
+    if (isForbiddenResponse(error)) {
+      await redirectToForbidden()
+
+      return
+    }
+
     isDialogVisible.value = true
 
     const err = error as AxiosErrorShape
@@ -629,6 +690,12 @@ const saveMenu = async (): Promise<void> => {
 const toggleActive = async (item: MenuItem): Promise<void> => {
   if (isActionLoading.value)
     return
+
+  if (!canUpdate.value) {
+    await redirectToForbidden()
+
+    return
+  }
 
   const nextStatus = !item.is_active
 
@@ -672,6 +739,12 @@ const toggleActive = async (item: MenuItem): Promise<void> => {
   } catch (error: any) {
     closeAlert()
 
+    if (isForbiddenResponse(error)) {
+      await redirectToForbidden()
+
+      return
+    }
+
     const err = error as AxiosErrorShape
 
     showErrorToast({
@@ -691,6 +764,12 @@ const toggleActive = async (item: MenuItem): Promise<void> => {
 const deleteMenu = async (item: MenuItem): Promise<void> => {
   if (isActionLoading.value)
     return
+
+  if (!canDelete.value) {
+    await redirectToForbidden()
+
+    return
+  }
 
   const confirm = await showConfirmAlert({
     title: 'Hapus Menu?',
@@ -725,6 +804,12 @@ const deleteMenu = async (item: MenuItem): Promise<void> => {
   } catch (error: any) {
     closeAlert()
 
+    if (isForbiddenResponse(error)) {
+      await redirectToForbidden()
+
+      return
+    }
+
     const err = error as AxiosErrorShape
 
     showErrorToast({
@@ -752,8 +837,16 @@ const typeLabel = (type: string) => {
   return type
 }
 
-onMounted(() => {
-  fetchMenus()
+onMounted(async () => {
+  await permissionStore.loadPermissions(true)
+
+  if (!canView.value) {
+    await redirectToForbidden()
+
+    return
+  }
+
+  await fetchMenus()
 })
 </script>
 
@@ -774,6 +867,7 @@ onMounted(() => {
             </div>
 
             <VBtn
+                v-if="canCreate"
                 color="primary"
                 prepend-icon="tabler-plus"
                 @click="openCreateDialog"
@@ -989,6 +1083,7 @@ onMounted(() => {
                 <td class="text-right">
                   <div class="d-flex justify-end gap-1">
                     <VBtn
+                      v-if="canUpdate"
                       icon
                       size="small"
                       variant="text"
@@ -1005,6 +1100,7 @@ onMounted(() => {
                     </VBtn>
 
                     <VBtn
+                      v-if="canUpdate"
                       icon
                       size="small"
                       variant="text"
@@ -1021,6 +1117,7 @@ onMounted(() => {
                     </VBtn>
 
                     <VBtn
+                      v-if="canDelete"
                       icon
                       size="small"
                       variant="text"
