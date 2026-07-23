@@ -257,6 +257,7 @@ class PurchaseOrderInventoryController extends Controller
                 'terminal'
             ])
             ->where('id_po_supplier', $id)
+            ->orderBy('id_master','DESC')
             ->get();
 
         $latestHistory = $histories->first(); // perubahan terakhir

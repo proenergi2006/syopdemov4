@@ -210,54 +210,116 @@ class PurchaseOrderInventoryService
     {
         $detailExpenses = [];
 
-        if (!empty($form['biaya_oa'])) {
-            $detailExpenses[] = [
-                'accountNo' => $form['biaya_oa'],
-                'expenseAmount' => $form['total_biaya_oa'] ?? 0,
-                'allocateToItemCost' => (bool) $form['alokasi_biaya_oa'],
-                'expenseNotes' => $form['keterangan_biaya_oa'] ?? '',
-            ];
-        }
+        $terminal = Terminal::where('id', $form['terminal'])
+        ->first();
+        $cabang = Cabang::where('id', $terminal->id_cabang)
+        ->first();
 
-        if (!empty($form['biaya_lain_oa'])) {
-            $detailExpenses[] = [
-                'accountNo' => $form['biaya_lain_oa'],
-                'expenseAmount' => $form['jumlah_biaya'] ?? 0,
-                'allocateToItemCost' => (bool) $form['alokasi_biaya_oa_lain'],
-                'expenseNotes' => $form['ket_biaya_lain_oa'] ?? '',
-            ];
-        }
+        $expenseMaps = [
+        [
+            'account' => 'biaya_oa',
+            'amount' => 'total_biaya_oa',
+            'allocate' => 'alokasi_biaya_oa',
+            'notes' => 'keterangan_biaya_oa',
+        ],
+        [
+            'account' => 'biaya_lain_oa',
+            'amount' => 'jumlah_biaya',
+            'allocate' => 'alokasi_biaya_oa_lain',
+            'notes' => 'ket_biaya_lain_oa',
+        ],
+        [
+            'account' => 'biaya_pph22',
+            'amount' => 'pph22',
+            'allocate' => 'alokasi_pph22',
+            'notes' => 'keterangan_pph22',
+        ],
+        [
+            'account' => 'biaya_pbbkb',
+            'amount' => 'pbbkb',
+            'allocate' => 'alokasi_pbbkb',
+            'notes' => 'keterangan_pbbkb',
+        ],
+        [
+            'account' => 'biaya_migas',
+            'amount' => 'nominal_migas',
+            'allocate' => 'alokasi_migas',
+            'notes' => 'keterangan_migas',
+        ],
+        ];
 
-        if (!empty($form['biaya_pph22'])) {
-            $detailExpenses[] = [
-                'accountNo' => $form['biaya_pph22'],
-                'expenseAmount' => $form['pph22'] ?? 0,
-                'allocateToItemCost' => (bool) $form['alokasi_pph22'],
-                'expenseNotes' => $form['keterangan_pph22'] ?? '',
-            ];
-        }
-
-        if (!empty($form['biaya_pbbkb'])) {
-            $detailExpenses[] = [
-                'accountNo' => $form['biaya_pbbkb'],
-                'expenseAmount' => $form['pbbkb'] ?? 0,
-                'allocateToItemCost' => (bool) $form['alokasi_pbbkb'],
-                'expenseNotes' => $form['keterangan_pbbkb'] ?? '',
-            ];
-        }
-
-        if (!empty($form['biaya_migas'])) {
-            $detailExpenses[] = [
-                'accountNo' => $form['biaya_migas'],
-                'expenseAmount' => $form['nominal_migas'] ?? 0,
-                'allocateToItemCost' => (bool) $form['alokasi_migas'],
-                'expenseNotes' => $form['keterangan_migas'] ?? '',
-            ];
+        foreach ($expenseMaps as $map) {
+            if (!empty($form[$map['account']])) {
+                $detailExpenses[] = [
+                    'accountNo' => $form[$map['account']],
+                    'expenseAmount' => $form[$map['amount']] ?? 0,
+                    'allocateToItemCost' => (bool) ($form[$map['allocate']] ?? false),
+                    'expenseNotes' => $form[$map['notes']] ?? '',
+                    'departmentName' => $cabang->nama_cabang,
+                ];
+            }
         }
 
 
         return $detailExpenses;
     }
+    // public function buildExpenses(array $form)
+    // {
+    //     $detailExpenses = [];
+
+    //     $terminal = Terminal::where('id', $form['terminal'])
+    //     ->first();
+    //     $cabang = Cabang::where('id', $terminal->id_cabang)
+    //     ->first();
+
+    //     if (!empty($form['biaya_oa'])) {
+    //         $detailExpenses[] = [
+    //             'accountNo' => $form['biaya_oa'],
+    //             'expenseAmount' => $form['total_biaya_oa'] ?? 0,
+    //             'allocateToItemCost' => (bool) $form['alokasi_biaya_oa'],
+    //             'expenseNotes' => $form['keterangan_biaya_oa'] ?? '',
+    //         ];
+    //     }
+
+    //     if (!empty($form['biaya_lain_oa'])) {
+    //         $detailExpenses[] = [
+    //             'accountNo' => $form['biaya_lain_oa'],
+    //             'expenseAmount' => $form['jumlah_biaya'] ?? 0,
+    //             'allocateToItemCost' => (bool) $form['alokasi_biaya_oa_lain'],
+    //             'expenseNotes' => $form['ket_biaya_lain_oa'] ?? '',
+    //         ];
+    //     }
+
+    //     if (!empty($form['biaya_pph22'])) {
+    //         $detailExpenses[] = [
+    //             'accountNo' => $form['biaya_pph22'],
+    //             'expenseAmount' => $form['pph22'] ?? 0,
+    //             'allocateToItemCost' => (bool) $form['alokasi_pph22'],
+    //             'expenseNotes' => $form['keterangan_pph22'] ?? '',
+    //         ];
+    //     }
+
+    //     if (!empty($form['biaya_pbbkb'])) {
+    //         $detailExpenses[] = [
+    //             'accountNo' => $form['biaya_pbbkb'],
+    //             'expenseAmount' => $form['pbbkb'] ?? 0,
+    //             'allocateToItemCost' => (bool) $form['alokasi_pbbkb'],
+    //             'expenseNotes' => $form['keterangan_pbbkb'] ?? '',
+    //         ];
+    //     }
+
+    //     if (!empty($form['biaya_migas'])) {
+    //         $detailExpenses[] = [
+    //             'accountNo' => $form['biaya_migas'],
+    //             'expenseAmount' => $form['nominal_migas'] ?? 0,
+    //             'allocateToItemCost' => (bool) $form['alokasi_migas'],
+    //             'expenseNotes' => $form['keterangan_migas'] ?? '',
+    //         ];
+    //     }
+
+
+    //     return $detailExpenses;
+    // }
     // private function generateNomorPO($form)
     // {
     //     $count = DB::table('inventory_vendor_po')->count();
@@ -411,8 +473,9 @@ class PurchaseOrderInventoryService
         return DB::transaction(function () use ($id, $form, $user) {
 
         
-            $po = DB::table('inventory_vendor_po')
-                ->where('id_master', $id)
+            $po = InventoryVendorPo::
+                where('id_master', $id)
+                ->withSum('goodReceipt as total_ri', 'volume_terima')
                 ->first();
 
             if (!$po) {
@@ -508,7 +571,14 @@ class PurchaseOrderInventoryService
 
             // UPDATE ACCURATE
             if ($po->id_accurate) {
+            if ($isPriceChanged && $po->volume_terima>0) {
 
+                $this->updateAccuratePrice(
+                    $po,
+                    $form
+                );
+
+            } else {
                 $delete = $this->deleteAccuratePO(
                     $po->id_accurate
                 );
@@ -573,6 +643,7 @@ class PurchaseOrderInventoryService
             }
 
             return [ 'success' => true, 'message' => 'PO berhasil diupdate' ];
+            }
         });
     }
     public function approveCFO($id, array $form, array $user)
@@ -1149,4 +1220,90 @@ private function syncPriceAfterApprove(InventoryVendorPo $po)
         }
     }
 
+    private function updateAccuratePrice(object $po, array $form)
+    {
+        $query_params = [
+            'id' => $po->id_accurate,
+        ];
+        // Ambil detail PO Accurate
+        $detail = app(AccurateApiService::class)->get(
+             config('services.accurate.base_url') . '/accurate/api/purchase-order/detail.do?' . http_build_query($query_params)
+        );
+
+        if (($detail['s'] ?? false) == false) {
+            throw new Exception('Gagal mengambil data PO Accurate');
+        }
+
+        $vendor = MasterVendor::where('id', $form['vendor'])
+        ->first();
+
+        $accurate = $detail['d'];
+
+        $items = [];
+        foreach ($accurate['detailItem'] as $item) {
+            
+            $items[] = [
+                'id'             => $item['id'],
+                'itemNo'         => $item['item']['no'],
+                'quantity'       => $item['quantity'],
+                'unitPrice'      => $item['item']['itemType'] == 'INVENTORY'
+                                    ? $form['harga_tebus']
+                                    : $form['ongkos_angkut'],
+                'warehouseName'  => $item['warehouse']['name'] ?? null,
+                'departmentName' => $item['department']['name'] ?? null,
+            ];
+        }
+
+        $expenses = [];
+
+        $newExpenses = collect($this->buildExpenses($form))
+                    ->keyBy('accountNo');
+        foreach ($accurate['detailExpense'] ?? [] as $expense) {
+
+            $accountNo = $expense['account']['no'];
+
+            if (!$newExpenses->has($accountNo)) {
+                continue;
+            }
+
+            $new = $newExpenses[$accountNo];
+
+            $expenses[] = [
+                'id' => $expense['id'],
+                'accountNo' => $accountNo,
+                'expenseAmount' => $new['expenseAmount'],
+                'allocateToItemCost' => $new['allocateToItemCost'],
+                'expenseNotes' => $new['expenseNotes'],
+                'departmentName' => $expense['department']['name'] ?? null,
+            ];
+        }
+
+        $user = auth()->user()->load('cabang');
+        $payload = [
+            'id'            => $po->id_accurate,
+            'number'        => $accurate['number'],
+            'transDate'     => Carbon::parse($form['tanggal_inven'])->format('d/m/Y'),
+            'vendorNo'      => $vendor->kode_vendor,
+            'branchName' => $user->cabang->nama_cabang === 'Kantor Pusat'
+                    ? 'Head Office'
+                    : $user->cabang->nama_cabang,
+            'description'   => $form['catatan_po'],
+            'toAddress' => 'Graha Irama Lt 6 Jl. HR Rasuna Said Kota Administrasi Jakarta Selatan DKI Jakarta Indonesia',
+            'detailItem'    => $items,
+            'detailExpense' => $expenses,
+        ];
+        
+
+        $result = app(AccurateApiService::class)->post(
+            config('services.accurate.base_url') . '/accurate/api/purchase-order/save.do',
+            $payload
+        );
+        if (($result['s'] ?? false) == false) {
+            throw new Exception(
+                $result['d'][0] ?? 'Gagal update Accurate'
+            );
+        }
+
+        return $result;
+    }
 }

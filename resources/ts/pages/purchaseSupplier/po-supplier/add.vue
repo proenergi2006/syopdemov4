@@ -128,7 +128,15 @@ const val = ''
 // const showKodeItemOA = ref(false)
 // const showKodeAkunOA = ref(false)
 const showpph = computed(() => form.kd_tax === 'EC')
-const showpbbkb = computed(() => Number(form.pbbkb) > 0)
+const showpbbkb = computed(() => {
+  const selected = pbbkbList.value.find(
+    (p: any) => p.id === form.pbbkb
+  )
+
+  const nilaiPbbkb = selected?.nilai ?? 0
+  return nilaiPbbkb > 0
+
+})
 const showNetInput = ref(false)
 const showMigas = computed(() => form.iuran_migas)
 const totalHD = computed(() => safe(form.harga_tebus) * safe(form.volume_po))
@@ -503,6 +511,19 @@ const showKodeItemOA = computed(() => {
 
 const showKodeAkunOA = computed(() => {
   return Number(form.kategori_oa) === 2 && Number(form.jenis_oa) === 1
+})
+
+const isHargaReadonly = computed(() => {
+  // Jenis Harga Sementara
+  if (form.jenis_harga == 2) {
+    return false
+  }
+
+  // Jenis Harga Final
+  return (
+    Number(form.ceo_result) == 1 &&
+    Number(form.revert_ceo) == 0 || Number(form.total_ri)>0
+  )
 })
 // watch(
 //   () => form.kategori_oa,
@@ -1240,6 +1261,7 @@ const isPriceChanged = computed(() => {
                             :model-value="formatMoney(form.harga_tebus)"
                             @update:modelValue="(val) => form.harga_tebus = parse(val) || 0"
                             prefix="Rp"
+                            :readonly="isHargaReadonly"
                             :rules="[requiredNotZero('Harga Dasar')]"
                           />
                         </VCol>
@@ -1982,7 +2004,7 @@ const isPriceChanged = computed(() => {
                   />
 
                   <VTextarea
-                    v-if="form.disposisi_po==4 && canChange"
+                    v-if="canChange"
                     v-model="form.catatan_resubmit"
                     label="Catatan Pengajuan Ulang *"
                     rows="4"
@@ -2005,7 +2027,7 @@ const isPriceChanged = computed(() => {
                   Perubahan Harga
                 </VBtn>
                 <!-- <VBtn color="primary" size="large" @click="step = 'review'"> -->
-                <VBtn color="primary" size="large" @click="goToReview" v-if="canChange || canChangePrice">
+                <VBtn color="primary" size="large" @click="goToReview" v-if="canChange || (canChangePrice && !canChange)">
                   Review
                 </VBtn>
     

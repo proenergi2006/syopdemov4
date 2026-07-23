@@ -51,6 +51,7 @@ const po = reactive<any>({
   revert_ceo_summary: '',
 
   pbbkb_po: 0,
+  pbbkb: 0,
   harga_tebus: 0,
   subtotal: 0,
   ppn: 0,
@@ -119,6 +120,7 @@ const fetchPO = async (id: any) => {
         internal_notes: data.internal_notes,
         harga_tebus: data.harga_tebus,
         pbbkb_po: data.pbbkb_po,
+        pbbkb: data.pbbkb,
         nominal_migas: data.nominal_migas,
         subtotal: data.subtotal,
         ppn: data.ppn_12,
@@ -771,11 +773,11 @@ onMounted(() => {
                     </div>
 
                     <div
-                      v-if="Number(po.pbbkb_po) !== 0"
+                      v-if="Number(po.nilai_pbbkb) !== 0"
                       class="d-flex justify-space-between"
                     >
-                      <span>PBBKB</span>
-                      <strong>Rp {{ formatMoney(po.pbbkb_po) }}</strong>
+                      <span>PBBKB {{ po.nilai_pbbkb }}%</span>
+                      <strong>Rp {{ formatMoney(po.pbbkb) }}</strong>
                     </div>
 
                     <div
