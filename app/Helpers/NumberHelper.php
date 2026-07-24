@@ -1,4 +1,3 @@
-
 <?php
 
 if (!function_exists('terbilang')) {
@@ -8,8 +7,17 @@ if (!function_exists('terbilang')) {
         $x = abs((int)$x);
 
         $satuan = [
-            1 => "Satu", "Dua", "Tiga", "Empat", "Lima",
-            "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"
+            1 => "Satu",
+            "Dua",
+            "Tiga",
+            "Empat",
+            "Lima",
+            "Enam",
+            "Tujuh",
+            "Delapan",
+            "Sembilan",
+            "Sepuluh",
+            "Sebelas"
         ];
 
         if ($x < 12) return $satuan[$x] ?? '';
@@ -76,35 +84,35 @@ if (!function_exists('terbilang_inggris')) {
         if ($x < 100)
             return trim(
                 $tens[(int)($x / 10)] . " " .
-                terbilang_inggris($x % 10)
+                    terbilang_inggris($x % 10)
             );
 
         if ($x < 1000)
             return trim(
                 terbilang_inggris((int)($x / 100))
-                . " Hundred "
-                . terbilang_inggris($x % 100)
+                    . " Hundred "
+                    . terbilang_inggris($x % 100)
             );
 
         if ($x < 1000000)
             return trim(
                 terbilang_inggris((int)($x / 1000))
-                . " Thousand "
-                . terbilang_inggris($x % 1000)
+                    . " Thousand "
+                    . terbilang_inggris($x % 1000)
             );
 
         if ($x < 1000000000)
             return trim(
                 terbilang_inggris((int)($x / 1000000))
-                . " Million "
-                . terbilang_inggris($x % 1000000)
+                    . " Million "
+                    . terbilang_inggris($x % 1000000)
             );
 
         if ($x < 1000000000000)
             return trim(
                 terbilang_inggris((int)($x / 1000000000))
-                . " Billion "
-                . terbilang_inggris($x % 1000000000)
+                    . " Billion "
+                    . terbilang_inggris($x % 1000000000)
             );
 
         return '';
