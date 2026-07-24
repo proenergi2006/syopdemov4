@@ -353,11 +353,157 @@ class MasterVendorController extends Controller
                 );
             }
 
+
             /*
-        |--------------------------------------------------------------------------
-        | Pagination
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Prioritas Vendor yang menunggu approval user login
+            |--------------------------------------------------------------------------
+            | Hanya mengubah urutan data, tanpa mengubah:
+            | - permission;
+            | - visibility;
+            | - search;
+            | - filter;
+            | - response;
+            | - aturan approval.
+            |
+            | Vendor akan diprioritaskan apabila:
+            | 1. Status Vendor PENDING REVIEW.
+            | 2. Ada approval WAITING.
+            | 3. Approval berada pada step aktif terkecil.
+            | 4. Approval ditujukan kepada user login atau salah satu role user.
+            |--------------------------------------------------------------------------
+            */
+            $vendorTable = (new MasterVendor())->getTable();
+
+            $waitingMyApprovalPriority = DB::table(
+                'master_vendor_approvals as mva',
+            )
+                /*
+                |--------------------------------------------------------------------------
+                | Menghasilkan:
+                | 1 = menunggu approval user login
+                | 0 = bukan approval user login
+                |--------------------------------------------------------------------------
+                */
+                ->selectRaw(
+                    'CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END',
+                )
+
+                /*
+                |--------------------------------------------------------------------------
+                | Hubungkan approval dengan Vendor pada query utama
+                |--------------------------------------------------------------------------
+                */
+                ->whereColumn(
+                    'mva.vendor_id',
+                    "{$vendorTable}.id",
+                )
+
+                /*
+                |--------------------------------------------------------------------------
+                | Vendor harus masih dalam proses review
+                |--------------------------------------------------------------------------
+                */
+                ->whereRaw(
+                    "UPPER(TRIM({$vendorTable}.status_approval)) = ?",
+                    [
+                        'PENDING REVIEW',
+                    ],
+                )
+
+                /*
+                |--------------------------------------------------------------------------
+                | Approval harus masih WAITING
+                |--------------------------------------------------------------------------
+                */
+                ->whereRaw(
+                    'UPPER(TRIM(mva.status)) = ?',
+                    [
+                        'WAITING',
+                    ],
+                )
+
+                /*
+                |--------------------------------------------------------------------------
+                | Hanya approval pada step aktif terkecil
+                |--------------------------------------------------------------------------
+                | Approver tahap berikutnya tidak diprioritaskan sebelum tahap
+                | sebelumnya selesai.
+                |--------------------------------------------------------------------------
+                */
+                ->whereRaw(
+                    'mva.step_order = (
+                        SELECT MIN(mva_min.step_order)
+                        FROM master_vendor_approvals AS mva_min
+                        WHERE mva_min.vendor_id = mva.vendor_id
+                        AND UPPER(TRIM(mva_min.status)) = ?
+                    )',
+                    [
+                        'WAITING',
+                    ],
+                )
+
+                /*
+            |--------------------------------------------------------------------------
+            | Approval ditujukan kepada user atau role user login
+            |--------------------------------------------------------------------------
+            */
+                ->where(function ($approverQuery) use (
+                    $user,
+                    $userRoleIds,
+                ) {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Approver langsung berdasarkan USER
+                    |--------------------------------------------------------------------------
+                    */
+                    $approverQuery->where(function ($userQuery) use (
+                        $user,
+                    ) {
+                        $userQuery
+                            ->whereRaw(
+                                'UPPER(TRIM(mva.approver_type)) = ?',
+                                [
+                                    'USER',
+                                ],
+                            )
+                            ->where(
+                                'mva.approver_id',
+                                $user->id,
+                            );
+                    });
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Approver berdasarkan ROLE
+                |--------------------------------------------------------------------------
+                */
+                    if ($userRoleIds->isNotEmpty()) {
+                        $approverQuery->orWhere(function (
+                            $roleQuery,
+                        ) use (
+                            $userRoleIds,
+                        ) {
+                            $roleQuery
+                                ->whereRaw(
+                                    'UPPER(TRIM(mva.approver_type)) = ?',
+                                    [
+                                        'ROLE',
+                                    ],
+                                )
+                                ->whereIn(
+                                    'mva.approver_id',
+                                    $userRoleIds->all(),
+                                );
+                        });
+                    }
+                });
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pagination
+            |--------------------------------------------------------------------------
+            */
             $perPage = (int) $request->get(
                 'per_page',
                 10,
@@ -367,9 +513,25 @@ class MasterVendorController extends Controller
                 $perPage = 10;
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | Urutan data
+            |--------------------------------------------------------------------------
+            | Prioritas:
+            | 1. Vendor yang sedang menunggu approval user login.
+            | 2. Vendor lainnya berdasarkan ID terbaru seperti sebelumnya.
+            |--------------------------------------------------------------------------
+            */
             $data = $query
-                ->orderByDesc('id')
+                ->orderBy(
+                    $waitingMyApprovalPriority,
+                    'desc',
+                )
+                ->orderByDesc(
+                    "{$vendorTable}.id",
+                )
                 ->paginate($perPage);
+
 
             /*
         |--------------------------------------------------------------------------

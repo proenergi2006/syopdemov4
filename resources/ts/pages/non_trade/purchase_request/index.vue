@@ -454,7 +454,6 @@ const printPurchaseRequisition = async (
     : 'Mohon tunggu sebentar'
 
   let printWindow: Window | null = null
-  let pdfObjectUrl: string | null = null
 
   try {
     showLoadingAlert(
@@ -464,8 +463,7 @@ const printPurchaseRequisition = async (
 
     /*
     |--------------------------------------------------------------------------
-    | Buka tab langsung agar tidak kena popup blocker.
-    | Isi dengan loading page dulu agar tidak blank putih.
+    | Buka tab sebelum proses async agar tidak diblokir popup blocker.
     |--------------------------------------------------------------------------
     */
     printWindow = window.open('', '_blank')
@@ -478,11 +476,23 @@ const printPurchaseRequisition = async (
       )
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Tampilkan halaman loading sementara di tab cetak.
+    |--------------------------------------------------------------------------
+    */
+    printWindow.document.open()
     printWindow.document.write(`
       <!DOCTYPE html>
-      <html>
+      <html lang="${language}">
         <head>
+          <meta charset="UTF-8">
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          >
           <title>${loadingTitle}</title>
+
           <style>
             body {
               margin: 0;
@@ -496,6 +506,7 @@ const printPurchaseRequisition = async (
             }
 
             .box {
+              padding: 24px;
               text-align: center;
             }
 
@@ -527,6 +538,7 @@ const printPurchaseRequisition = async (
             }
           </style>
         </head>
+
         <body>
           <div class="box">
             <div class="spinner"></div>
@@ -536,12 +548,11 @@ const printPurchaseRequisition = async (
         </body>
       </html>
     `)
-
     printWindow.document.close()
 
     /*
     |--------------------------------------------------------------------------
-    | Ambil signed URL dari backend.
+    | Request ini hanya mengambil signed URL, bukan mengunduh file PDF.
     |--------------------------------------------------------------------------
     */
     const response = await axios.post(
@@ -560,17 +571,20 @@ const printPurchaseRequisition = async (
     if (response.data?.success === false) {
       throw new Error(
         response.data?.message
-          || (
-            language === 'en'
-              ? 'Failed to create print URL.'
-              : 'Gagal membuat URL cetak.'
-          ),
+        || (
+          language === 'en'
+            ? 'Failed to create print URL.'
+            : 'Gagal membuat URL cetak.'
+        ),
       )
     }
 
-    const url = response.data?.url
+    const printUrl = response.data?.url
 
-    if (!url) {
+    if (
+      typeof printUrl !== 'string'
+      || printUrl.trim() === ''
+    ) {
       throw new Error(
         language === 'en'
           ? 'Print URL was not found.'
@@ -580,54 +594,51 @@ const printPurchaseRequisition = async (
 
     /*
     |--------------------------------------------------------------------------
-    | Ambil PDF sebagai blob.
-    | Ini mengatasi live server yang masih mengirim Content-Type text/html.
+    | Pastikan URL menjadi absolute URL.
+    |
+    | Mendukung response backend berupa:
+    | - https://syopv4.proenergi.com/...
+    | - /transaction/purchase-request/...
     |--------------------------------------------------------------------------
     */
-    const pdfResponse = await axios.get(
-      url,
-      {
-        responseType: 'blob',
-        headers: {
-          Accept: 'application/pdf',
-        },
-      },
-    )
+    const absolutePrintUrl = new URL(
+      printUrl,
+      window.location.origin,
+    ).toString()
 
-    const pdfBlob = new Blob(
-      [pdfResponse.data],
-      {
-        type: 'application/pdf',
-      },
-    )
-
-    pdfObjectUrl = URL.createObjectURL(pdfBlob)
+    /*
+    |--------------------------------------------------------------------------
+    | Pastikan tab masih terbuka sebelum diarahkan ke PDF.
+    |--------------------------------------------------------------------------
+    */
+    if (printWindow.closed) {
+      throw new Error(
+        language === 'en'
+          ? 'The print window was closed.'
+          : 'Jendela cetak telah ditutup.',
+      )
+    }
 
     closeAlert()
 
     /*
     |--------------------------------------------------------------------------
-    | Arahkan tab loading ke blob PDF.
+    | Browser membuka PDF secara langsung.
+    |
+    | Tidak menggunakan:
+    | - responseType: 'blob'
+    | - new Blob()
+    | - URL.createObjectURL()
+    |
+    | Dengan begitu Axios tidak menunggu seluruh file PDF selesai diunduh.
     |--------------------------------------------------------------------------
     */
-    printWindow.location.href = pdfObjectUrl
-
-    window.setTimeout(() => {
-      if (pdfObjectUrl) {
-        URL.revokeObjectURL(pdfObjectUrl)
-        pdfObjectUrl = null
-      }
-    }, 300_000)
+    printWindow.location.replace(absolutePrintUrl)
   }
   catch (error: unknown) {
     closeAlert()
 
-    if (pdfObjectUrl) {
-      URL.revokeObjectURL(pdfObjectUrl)
-      pdfObjectUrl = null
-    }
-
-    if (printWindow)
+    if (printWindow && !printWindow.closed)
       printWindow.close()
 
     showErrorToast({

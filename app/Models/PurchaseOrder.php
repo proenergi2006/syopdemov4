@@ -120,4 +120,11 @@ class PurchaseOrder extends Model
     public const STATUS_RECEIVE_OPEN = 'OPEN';
     public const STATUS_RECEIVE_PARTIAL = 'PARTIAL RECEIVED';
     public const STATUS_RECEIVE_FULL = 'FULL RECEIVED';
+
+    public const STATUS_DRAFT = 'DRAFT';
+    public const STATUS_SUBMITTED = 'SUBMITTED';
+    public const STATUS_IN_PROGRESS = 'IN PROGRESS';
+    public const STATUS_APPROVED = 'APPROVED';
+    public const STATUS_REJECTED = 'REJECTED';
+    public const STATUS_CANCELLED = 'CANCELLED';
 }

@@ -31,6 +31,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class PurchaseRequestController extends Controller
 {
@@ -53,14 +55,43 @@ class PurchaseRequestController extends Controller
         }
     }
 
-    private function generateDraftPRNumber()
+    private function generateDraftPRNumber(): string
     {
-        $year = date('Y');
+        $year = (int) now()->format('Y');
 
-        // Hitung PR yang dibuat tahun ini (baik draft maupun approved)
-        $count = PurchaseRequest::whereYear('created_at', $year)->count() + 1;
+        /*
+        |--------------------------------------------------------------------------
+        | Hitung seluruh PR tahun berjalan
+        |--------------------------------------------------------------------------
+        | withTrashed() memastikan data soft delete tetap ikut dihitung.
+        */
+        $nextNumber = PurchaseRequest::withTrashed()
+            ->whereYear('created_at', $year)
+            ->count() + 1;
 
-        return "DRAFT/PR/$year/" . str_pad($count, 4, '0', STR_PAD_LEFT);
+        /*
+        |--------------------------------------------------------------------------
+        | Pastikan nomor belum pernah digunakan
+        |--------------------------------------------------------------------------
+        | Pengecekan juga mencakup PR yang sudah di-soft delete.
+        */
+        do {
+            $draftNumber = sprintf(
+                'DRAFT/PR/%d/%04d',
+                $year,
+                $nextNumber,
+            );
+
+            $alreadyExists = PurchaseRequest::withTrashed()
+                ->where('nomor_pr', $draftNumber)
+                ->exists();
+
+            if ($alreadyExists) {
+                $nextNumber++;
+            }
+        } while ($alreadyExists);
+
+        return $draftNumber;
     }
 
     public function index(
@@ -74,10 +105,10 @@ class PurchaseRequestController extends Controller
             $perPage = $perPage > 0 ? $perPage : 10;
 
             /*
-        |--------------------------------------------------------------------------
-        | Authentication
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Authentication
+            |--------------------------------------------------------------------------
+            */
             if (!$user) {
                 return response()->json([
                     'success' => false,
@@ -101,10 +132,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Permission Scope: Purchase Requisition View
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Permission Scope: Purchase Requisition View
+            |--------------------------------------------------------------------------
+            */
             $scope = strtoupper(
                 trim(
                     (string) (
@@ -128,10 +159,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Ambil seluruh role ID user
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Ambil seluruh role ID user
+            |--------------------------------------------------------------------------
+            */
             $userRoleIds = collect();
 
             if ($user->getAttribute('role_id')) {
@@ -166,13 +197,13 @@ class PurchaseRequestController extends Controller
                 ->values();
 
             /*
-        |--------------------------------------------------------------------------
-        | Filter khusus: hanya PR yang menunggu approval user login
-        |--------------------------------------------------------------------------
-        | Param dari FE:
-        | waiting_my_approval=1
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Filter khusus: hanya PR yang menunggu approval user login
+            |--------------------------------------------------------------------------
+            | Param dari FE:
+            | waiting_my_approval=1
+            |--------------------------------------------------------------------------
+            */
             $waitingMyApproval = $request->boolean(
                 'waiting_my_approval',
             );
@@ -195,10 +226,10 @@ class PurchaseRequestController extends Controller
             );
 
             /*
-        |--------------------------------------------------------------------------
-        | Abilities
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Abilities
+            |--------------------------------------------------------------------------
+            */
             $abilities = [
                 'can_view' => $user->hasPermission(
                     'purchase_request.view',
@@ -222,10 +253,10 @@ class PurchaseRequestController extends Controller
             ];
 
             /*
-        |--------------------------------------------------------------------------
-        | Base query
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Base query
+            |--------------------------------------------------------------------------
+            */
             $query = PurchaseRequest::query()
                 ->with([
                     'cabangData',
@@ -241,12 +272,12 @@ class PurchaseRequestController extends Controller
                 ]);
 
             /*
-        |--------------------------------------------------------------------------
-        | User Access Assignments
-        |--------------------------------------------------------------------------
-        | Digunakan untuk scope OWN_CABANG dan OWN_DEPARTMENT.
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | User Access Assignments
+            |--------------------------------------------------------------------------
+            | Digunakan untuk scope OWN_CABANG dan OWN_DEPARTMENT.
+            |--------------------------------------------------------------------------
+            */
             $userAccessAssignments = $this->getActiveUserAccessAssignments(
                 $user,
             );
@@ -271,10 +302,10 @@ class PurchaseRequestController extends Controller
                 ->values();
 
             /*
-        |--------------------------------------------------------------------------
-        | Apply Visibility Scope
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Apply Visibility Scope
+            |--------------------------------------------------------------------------
+            */
             if ($scope !== 'ALL') {
                 $query->where(function ($visibilityQuery) use (
                     $scope,
@@ -285,10 +316,10 @@ class PurchaseRequestController extends Controller
                     $userAccessibleDepartmentIds,
                 ) {
                     /*
-                |--------------------------------------------------------------------------
-                | Scope data normal
-                |--------------------------------------------------------------------------
-                */
+                    |--------------------------------------------------------------------------
+                    | Scope data normal
+                    |--------------------------------------------------------------------------
+                    */
                     $visibilityQuery->where(function ($scopeQuery) use (
                         $scope,
                         $user,
@@ -297,12 +328,12 @@ class PurchaseRequestController extends Controller
                         $userAccessibleDepartmentIds,
                     ) {
                         /*
-                    |--------------------------------------------------------------------------
-                    | OWN_DATA
-                    |--------------------------------------------------------------------------
-                    | Tetap berdasarkan creator.
-                    |--------------------------------------------------------------------------
-                    */
+                        |--------------------------------------------------------------------------
+                        | OWN_DATA
+                        |--------------------------------------------------------------------------
+                        | Tetap berdasarkan creator.
+                        |--------------------------------------------------------------------------
+                        */
                         if ($scope === 'OWN_DATA') {
                             if ($user->id) {
                                 $scopeQuery->where(
@@ -317,15 +348,15 @@ class PurchaseRequestController extends Controller
                         }
 
                         /*
-                    |--------------------------------------------------------------------------
-                    | OWN_DEPARTMENT
-                    |--------------------------------------------------------------------------
-                    | Scope department berarti user bisa melihat seluruh PR dari department
-                    | yang sama, lintas semua cabang.
-                    |
-                    | Department diambil dari master user + access assignment tambahan.
-                    |--------------------------------------------------------------------------
-                    */
+                        |--------------------------------------------------------------------------
+                        | OWN_DEPARTMENT
+                        |--------------------------------------------------------------------------
+                        | Scope department berarti user bisa melihat seluruh PR dari department
+                        | yang sama, lintas semua cabang.
+                        |
+                        | Department diambil dari master user + access assignment tambahan.
+                        |--------------------------------------------------------------------------
+                        */
                         if ($scope === 'OWN_DEPARTMENT') {
                             if ($userAccessibleDepartmentIds->isEmpty()) {
                                 $scopeQuery->whereRaw('1 = 0');
@@ -342,12 +373,12 @@ class PurchaseRequestController extends Controller
                         }
 
                         /*
-                    |--------------------------------------------------------------------------
-                    | OWN_CABANG
-                    |--------------------------------------------------------------------------
-                    | Sekarang berdasarkan semua branch dari assignment user.
-                    |--------------------------------------------------------------------------
-                    */
+                        |--------------------------------------------------------------------------
+                        | OWN_CABANG
+                        |--------------------------------------------------------------------------
+                        | Sekarang berdasarkan semua branch dari assignment user.
+                        |--------------------------------------------------------------------------
+                        */
                         if ($scope === 'OWN_CABANG') {
                             if ($userAccessibleBranchIds->isEmpty()) {
                                 $scopeQuery->whereRaw('1 = 0');
@@ -366,21 +397,21 @@ class PurchaseRequestController extends Controller
                         }
 
                         /*
-                    |--------------------------------------------------------------------------
-                    | NONE / scope tidak valid
-                    |--------------------------------------------------------------------------
-                    */
+                        |--------------------------------------------------------------------------
+                        | NONE / scope tidak valid
+                        |--------------------------------------------------------------------------
+                        */
                         $scopeQuery->whereRaw('1 = 0');
                     });
 
                     /*
-                |--------------------------------------------------------------------------
-                | Dokumen yang terkait dengan approval user
-                |--------------------------------------------------------------------------
-                | Tetap dipertahankan agar approver masih bisa melihat dokumen yang
-                | ada dalam flow approval dirinya.
-                |--------------------------------------------------------------------------
-                */
+                    |--------------------------------------------------------------------------
+                    | Dokumen yang terkait dengan approval user
+                    |--------------------------------------------------------------------------
+                    | Tetap dipertahankan agar approver masih bisa melihat dokumen yang
+                    | ada dalam flow approval dirinya.
+                    |--------------------------------------------------------------------------
+                    */
                     $visibilityQuery->orWhereHas(
                         'approvals',
                         function ($approvalQuery) use (
@@ -425,17 +456,17 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Filter: Menunggu Approval Saya
-        |--------------------------------------------------------------------------
-        | Harus dilakukan di query sebelum paginate.
-        |
-        | Syarat:
-        | - PR status IN PROGRESS
-        | - Ada approval dengan status WAITING
-        | - Approval tersebut assigned ke user login atau role user login
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Filter: Menunggu Approval Saya
+            |--------------------------------------------------------------------------
+            | Harus dilakukan di query sebelum paginate.
+            |
+            | Syarat:
+            | - PR status IN PROGRESS
+            | - Ada approval dengan status WAITING
+            | - Approval tersebut assigned ke user login atau role user login
+            |--------------------------------------------------------------------------
+            */
             if ($waitingMyApproval) {
                 $query->where(
                     'purchase_requests.status',
@@ -490,13 +521,13 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Filter Search
-        |--------------------------------------------------------------------------
-        | Jangan pakai orWhereHas cabangData karena purchase_requests.cabang
-        | bertipe varchar sedangkan cabang.id bigint.
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Filter Search
+            |--------------------------------------------------------------------------
+            | Jangan pakai orWhereHas cabangData karena purchase_requests.cabang
+            | bertipe varchar sedangkan cabang.id bigint.
+            |--------------------------------------------------------------------------
+            */
             if ($request->filled('search')) {
                 $search = trim(
                     (string) $request->input('search'),
@@ -563,10 +594,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Filter Tanggal
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Filter Tanggal
+            |--------------------------------------------------------------------------
+            */
             if ($request->filled('tanggal_mulai')) {
                 $query->whereDate(
                     'purchase_requests.tanggal_pr',
@@ -584,10 +615,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Filter Status Approval
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Filter Status Approval
+            |--------------------------------------------------------------------------
+            */
             if ($request->filled('status')) {
                 $status = strtoupper(
                     trim(
@@ -607,10 +638,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Filter Status PO
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Filter Status PO
+            |--------------------------------------------------------------------------
+            */
             if ($request->filled('status_po')) {
                 $statusPo = strtoupper(
                     trim(
@@ -638,10 +669,10 @@ class PurchaseRequestController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Optional filter department/cabang dari FE
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Optional filter department/cabang dari FE
+            |--------------------------------------------------------------------------
+            */
             if ($request->filled('id_department')) {
                 $query->where(
                     'purchase_requests.id_department',
@@ -651,30 +682,135 @@ class PurchaseRequestController extends Controller
 
             if ($request->filled('cabang')) {
                 /*
-            |--------------------------------------------------------------------------
-            | purchase_requests.cabang bertipe varchar di database tertentu.
-            |--------------------------------------------------------------------------
-            */
+                |--------------------------------------------------------------------------
+                | purchase_requests.cabang bertipe varchar di database tertentu.
+                |--------------------------------------------------------------------------
+                */
                 $query->where(
                     'purchase_requests.cabang',
                     (string) $request->input('cabang'),
                 );
             }
 
+
             /*
-        |--------------------------------------------------------------------------
-        | Pagination
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Prioritas PR yang menunggu approval user login
+            |--------------------------------------------------------------------------
+            | Hanya mengubah urutan data, tidak mengubah:
+            | - visibility scope
+            | - filter
+            | - search
+            | - permission
+            | - isi response
+            |
+            | PR yang sedang menunggu approval user/role login akan selalu tampil
+            | paling atas. Setelah approval user tersebut selesai, PR kembali mengikuti
+            | urutan normal berdasarkan ID terbaru.
+            |--------------------------------------------------------------------------
+            */
+            $query->withExists([
+                'approvals as is_waiting_my_approval' => function (
+                    $approvalQuery,
+                ) use (
+                    $user,
+                    $userRoleIds,
+                ) {
+                    $approvalQuery
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Hanya PR yang masih dalam proses approval
+                        |--------------------------------------------------------------------------
+                        */
+                        ->whereRaw(
+                            'purchase_requests.status = ?',
+                            [
+                                PurchaseRequest::STATUS_IN_PROGRESS,
+                            ],
+                        )
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Approval harus masih WAITING
+                        |--------------------------------------------------------------------------
+                        */
+                        ->where(
+                            'purchase_request_approvals.status',
+                            PurchaseRequestApproval::STATUS_WAITING,
+                        )
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Approval ditujukan langsung kepada user atau salah satu role user
+                        |--------------------------------------------------------------------------
+                        */
+                        ->where(function ($approverQuery) use (
+                            $user,
+                            $userRoleIds,
+                        ) {
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Approver berdasarkan user
+                            |--------------------------------------------------------------------------
+                            */
+                            $approverQuery->where(function ($userQuery) use (
+                                $user,
+                            ) {
+                                $userQuery
+                                    ->where(
+                                        'purchase_request_approvals.approver_type',
+                                        PurchaseRequestApproval::APPROVER_TYPE_USER,
+                                    )
+                                    ->where(
+                                        'purchase_request_approvals.approver_id',
+                                        $user->id,
+                                    );
+                            });
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Approver berdasarkan role
+                            |--------------------------------------------------------------------------
+                            */
+                            if ($userRoleIds->isNotEmpty()) {
+                                $approverQuery->orWhere(function ($roleQuery) use (
+                                    $userRoleIds,
+                                ) {
+                                    $roleQuery
+                                        ->where(
+                                            'purchase_request_approvals.approver_type',
+                                            PurchaseRequestApproval::APPROVER_TYPE_ROLE,
+                                        )
+                                        ->whereIn(
+                                            'purchase_request_approvals.approver_id',
+                                            $userRoleIds->all(),
+                                        );
+                                });
+                            }
+                        });
+                },
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pagination
+            |--------------------------------------------------------------------------
+            | Prioritas:
+            | 1. PR yang sedang menunggu approval user login
+            | 2. Data terbaru berdasarkan ID seperti urutan sebelumnya
+            |--------------------------------------------------------------------------
+            */
             $prs = $query
+                ->orderByDesc('is_waiting_my_approval')
                 ->orderByDesc('purchase_requests.id')
                 ->paginate($perPage);
 
+
             /*
-        |--------------------------------------------------------------------------
-        | Transform Response
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Transform Response
+            |--------------------------------------------------------------------------
+            */
             $prs->through(
                 function (PurchaseRequest $pr) use (
                     $user,
@@ -3189,7 +3325,7 @@ class PurchaseRequestController extends Controller
 
         $relativeUrl = URL::temporarySignedRoute(
             'transaction.purchase-request.print-signed',
-            now()->addMinutes(5),
+            now()->addMinutes(10),
             [
                 'publicId' => $publicId,
                 'lang' => $lang,
@@ -3221,6 +3357,8 @@ class PurchaseRequestController extends Controller
         Request $request,
         string $publicId,
     ) {
+        $lang = 'id';
+
         try {
             /*
         |--------------------------------------------------------------------------
@@ -3253,14 +3391,17 @@ class PurchaseRequestController extends Controller
 
             $pr = PurchaseRequest::with([
                 'cabangData:id,nama_cabang,inisial_cabang',
+
                 'departmentData:id,kode,nama',
 
                 'recommendedVendor:id,nama_vendor,status_pkp,jenis_pembayaran,top',
 
                 'items',
+
                 'items.unit:id,kode,nama',
 
                 'creator:id,name',
+
                 'submitter:id,name',
 
                 'approvals' => function ($query) {
@@ -3270,11 +3411,9 @@ class PurchaseRequestController extends Controller
                 },
             ])->findOrFail($id);
 
-            $items = $pr->getRelation('items');
-
             /*
         |--------------------------------------------------------------------------
-        | Validasi status
+        | Hanya PR final approved yang boleh dicetak
         |--------------------------------------------------------------------------
         */
             $currentStatus = strtoupper(
@@ -3283,25 +3422,20 @@ class PurchaseRequestController extends Controller
                 ),
             );
 
-            $allowedStatuses = [
-                'IN PROGRESS',
-                PurchaseRequest::STATUS_APPROVED,
-            ];
-
             if (
-                !in_array(
-                    $currentStatus,
-                    $allowedStatuses,
-                    true,
-                )
+                $currentStatus
+                !== PurchaseRequest::STATUS_APPROVED
             ) {
                 return response()->json([
                     'success' => false,
+
                     'message' => $lang === 'en'
-                        ? 'Purchase Requisition cannot be printed yet.'
-                        : 'Purchase Requisition belum dapat dicetak.',
+                        ? 'Purchase Requisition can only be printed after final approval.'
+                        : 'Purchase Requisition hanya dapat dicetak setelah final approval.',
                 ], 422);
             }
+
+            $items = $pr->getRelation('items');
 
             /*
         |--------------------------------------------------------------------------
@@ -3445,13 +3579,25 @@ class PurchaseRequestController extends Controller
                 'portrait',
             );
 
-            $fileName = str_replace(
-                ['/', '\\'],
+            /*
+        |--------------------------------------------------------------------------
+        | Nama file
+        |--------------------------------------------------------------------------
+        */
+            $fileName = preg_replace(
+                '/[^A-Za-z0-9._-]+/',
                 '-',
                 (string) $pr->nomor_pr,
             );
 
-            $pdfOutput = $pdf->output();
+            $fileName = trim(
+                (string) $fileName,
+                '-',
+            );
+
+            if ($fileName === '') {
+                $fileName = (string) $pr->id;
+            }
 
             $downloadFileName = sprintf(
                 'PR-%s-%s.pdf',
@@ -3459,22 +3605,61 @@ class PurchaseRequestController extends Controller
                 strtoupper($lang),
             );
 
-            return response()
-                ->make($pdfOutput, 200)
-                ->withHeaders([
-                    'Content-Type' => 'application/pdf',
-                    'Content-Disposition' => 'inline; filename="' . $downloadFileName . '"',
-                    'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
-                    'Pragma' => 'no-cache',
-                    'Expires' => '0',
-                    'X-Content-Type-Options' => 'nosniff',
-                ]);
+            /*
+        |--------------------------------------------------------------------------
+        | Render PDF
+        |--------------------------------------------------------------------------
+        */
+            $pdfOutput = $pdf->output();
+
+            /*
+        |--------------------------------------------------------------------------
+        | Inline PDF response
+        |--------------------------------------------------------------------------
+        */
+            return response(
+                $pdfOutput,
+                200,
+                [
+                    'Content-Type'
+                    => 'application/pdf',
+
+                    'Content-Disposition'
+                    => 'inline; filename="' . $downloadFileName . '"',
+
+                    'Content-Length'
+                    => (string) strlen($pdfOutput),
+
+                    'Cache-Control'
+                    => 'private, no-store, no-cache, must-revalidate, max-age=0',
+
+                    'Pragma'
+                    => 'no-cache',
+
+                    'Expires'
+                    => '0',
+
+                    'X-Content-Type-Options'
+                    => 'nosniff',
+                ],
+            );
+        } catch (
+            DecryptException |
+            ModelNotFoundException $e
+        ) {
+            return response()->json([
+                'success' => false,
+
+                'message' => $lang === 'en'
+                    ? 'Purchase Requisition was not found.'
+                    : 'Purchase Requisition tidak ditemukan.',
+            ], 404);
         } catch (\Throwable $e) {
             Log::error(
                 '[Purchase Requisition] Print error',
                 [
                     'public_id' => $publicId,
-                    'lang' => $request->query('lang'),
+                    'lang' => $lang,
                     'message' => $e->getMessage(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
@@ -3484,7 +3669,11 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mencetak Purchase Requisition.',
+
+                'message' => $lang === 'en'
+                    ? 'Failed to print Purchase Requisition.'
+                    : 'Gagal mencetak Purchase Requisition.',
+
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,

@@ -5104,40 +5104,67 @@ class GoodsReturnController extends Controller
 
     private function generateDraftGoodsReturnNumber(): string
     {
-        $year = now()->format('Y');
+        $year = (int) now()->format('Y');
 
-        $lastGoodsReturn = GoodsReturn::withTrashed()
-            ->whereYear(
-                'created_at',
-                $year,
-            )
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil nomor draft Goods Return terbesar tahun berjalan
+        |--------------------------------------------------------------------------
+        | withTrashed() memastikan nomor dari data soft delete tidak digunakan
+        | kembali.
+        */
+        $lastNumber = GoodsReturn::withTrashed()
             ->where(
                 'nomor_return',
                 'ILIKE',
                 "DRAFT/RETURN/{$year}/%",
             )
-            ->orderByDesc('id')
-            ->first();
+            ->whereRaw(
+                "nomor_return ~ ?",
+                [
+                    "^DRAFT/RETURN/{$year}/[0-9]+$",
+                ],
+            )
+            ->selectRaw("
+            COALESCE(
+                MAX(
+                    CAST(
+                        SPLIT_PART(nomor_return, '/', 4)
+                        AS INTEGER
+                    )
+                ),
+                0
+            ) AS last_number
+        ")
+            ->value('last_number');
 
-        $nextNumber = 1;
+        $nextNumber = (int) $lastNumber + 1;
 
-        if ($lastGoodsReturn) {
-            $lastNumber = (int) substr(
-                (string) $lastGoodsReturn->nomor_return,
-                -4,
+        /*
+        |--------------------------------------------------------------------------
+        | Pastikan nomor belum pernah digunakan
+        |--------------------------------------------------------------------------
+        | Pengecekan meliputi data aktif dan data soft delete.
+        */
+        do {
+            $draftNumber = sprintf(
+                'DRAFT/RETURN/%d/%04d',
+                $year,
+                $nextNumber,
             );
 
-            $nextNumber = $lastNumber + 1;
-        }
+            $alreadyExists = GoodsReturn::withTrashed()
+                ->where(
+                    'nomor_return',
+                    $draftNumber,
+                )
+                ->exists();
 
-        return 'DRAFT/RETURN/'
-            . $year
-            . '/'
-            . str_pad(
-                (string) $nextNumber,
-                4,
-                '0',
-                STR_PAD_LEFT,
-            );
+            if ($alreadyExists) {
+                $nextNumber++;
+            }
+        } while ($alreadyExists);
+
+        return $draftNumber;
     }
 }

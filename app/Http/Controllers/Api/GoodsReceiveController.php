@@ -3587,21 +3587,56 @@ class GoodsReceiveController extends Controller
 
     private function generateDraftGRNumber(): string
     {
-        $year = now()->format('Y');
+        $year = (int) now()->format('Y');
 
-        $lastGR = GoodsReceive::withTrashed()
-            ->whereYear('created_at', $year)
-            ->where('nomor_gr', 'ILIKE', "DRAFT/GR/{$year}/%")
-            ->orderByDesc('id')
-            ->first();
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil nomor draft GR terbesar pada tahun berjalan
+        |--------------------------------------------------------------------------
+        | Data soft delete tetap dihitung agar nomor tidak digunakan ulang.
+        */
+        $lastNumber = GoodsReceive::withTrashed()
+            ->where(
+                'nomor_gr',
+                'ILIKE',
+                "DRAFT/GR/{$year}/%",
+            )
+            ->selectRaw("
+            COALESCE(
+                MAX(
+                    CAST(
+                        SPLIT_PART(nomor_gr, '/', 4)
+                        AS INTEGER
+                    )
+                ),
+                0
+            ) AS last_number
+        ")
+            ->value('last_number');
 
-        $nextNumber = 1;
+        $nextNumber = (int) $lastNumber + 1;
 
-        if ($lastGR) {
-            $lastNumber = (int) substr($lastGR->nomor_gr, -4);
-            $nextNumber = $lastNumber + 1;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | Pastikan nomor belum pernah digunakan
+        |--------------------------------------------------------------------------
+        */
+        do {
+            $draftNumber = sprintf(
+                'DRAFT/GR/%d/%04d',
+                $year,
+                $nextNumber,
+            );
 
-        return 'DRAFT/GR/' . $year . '/' . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+            $alreadyExists = GoodsReceive::withTrashed()
+                ->where('nomor_gr', $draftNumber)
+                ->exists();
+
+            if ($alreadyExists) {
+                $nextNumber++;
+            }
+        } while ($alreadyExists);
+
+        return $draftNumber;
     }
 }

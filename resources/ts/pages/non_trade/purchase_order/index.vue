@@ -851,7 +851,6 @@ const printPurchaseOrder = async (
     : 'Mohon tunggu sebentar'
 
   let printWindow: Window | null = null
-  let pdfObjectUrl: string | null = null
 
   try {
     showLoadingAlert(
@@ -861,8 +860,7 @@ const printPurchaseOrder = async (
 
     /*
     |--------------------------------------------------------------------------
-    | Buka tab langsung supaya tidak kena popup blocker.
-    | Isinya loading page, bukan blank putih.
+    | Buka tab sebelum proses async agar tidak diblokir popup browser.
     |--------------------------------------------------------------------------
     */
     printWindow = window.open('', '_blank')
@@ -875,11 +873,25 @@ const printPurchaseOrder = async (
       )
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Tampilkan halaman loading sementara.
+    |--------------------------------------------------------------------------
+    */
+    printWindow.document.open()
+
     printWindow.document.write(`
       <!DOCTYPE html>
-      <html>
+      <html lang="${language}">
         <head>
+          <meta charset="UTF-8">
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          >
+
           <title>${loadingTitle}</title>
+
           <style>
             body {
               margin: 0;
@@ -893,6 +905,7 @@ const printPurchaseOrder = async (
             }
 
             .box {
+              padding: 24px;
               text-align: center;
             }
 
@@ -924,6 +937,7 @@ const printPurchaseOrder = async (
             }
           </style>
         </head>
+
         <body>
           <div class="box">
             <div class="spinner"></div>
@@ -939,6 +953,8 @@ const printPurchaseOrder = async (
     /*
     |--------------------------------------------------------------------------
     | Ambil signed URL dari backend.
+    |
+    | Request ini hanya mengambil URL kecil, bukan file PDF.
     |--------------------------------------------------------------------------
     */
     const response = await axios.post(
@@ -957,17 +973,20 @@ const printPurchaseOrder = async (
     if (response.data?.success === false) {
       throw new Error(
         response.data?.message
-          || (
-            language === 'en'
-              ? 'Failed to create print URL.'
-              : 'Gagal membuat URL cetak.'
-          ),
+        || (
+          language === 'en'
+            ? 'Failed to create print URL.'
+            : 'Gagal membuat URL cetak.'
+        ),
       )
     }
 
-    const url = response.data?.url
+    const printUrl = response.data?.url
 
-    if (!url) {
+    if (
+      typeof printUrl !== 'string'
+      || printUrl.trim() === ''
+    ) {
       throw new Error(
         language === 'en'
           ? 'Print URL was not found.'
@@ -977,54 +996,40 @@ const printPurchaseOrder = async (
 
     /*
     |--------------------------------------------------------------------------
-    | Ambil PDF sebagai blob.
-    | Ini mengatasi live server yang masih mengirim Content-Type text/html.
+    | Mendukung URL absolute maupun relative dari backend.
     |--------------------------------------------------------------------------
     */
-    const pdfResponse = await axios.get(
-      url,
-      {
-        responseType: 'blob',
-        headers: {
-          Accept: 'application/pdf',
-        },
-      },
-    )
+    const absolutePrintUrl = new URL(
+      printUrl,
+      window.location.origin,
+    ).toString()
 
-    const pdfBlob = new Blob(
-      [pdfResponse.data],
-      {
-        type: 'application/pdf',
-      },
-    )
-
-    pdfObjectUrl = URL.createObjectURL(pdfBlob)
+    if (printWindow.closed) {
+      throw new Error(
+        language === 'en'
+          ? 'The print window was closed.'
+          : 'Jendela cetak telah ditutup.',
+      )
+    }
 
     closeAlert()
 
     /*
     |--------------------------------------------------------------------------
-    | Arahkan tab loading ke blob PDF.
+    | Arahkan browser langsung ke endpoint PDF.
+    |
+    | Tidak lagi menggunakan:
+    | - axios.get PDF
+    | - responseType blob
+    | - URL.createObjectURL
     |--------------------------------------------------------------------------
     */
-    printWindow.location.href = pdfObjectUrl
-
-    window.setTimeout(() => {
-      if (pdfObjectUrl) {
-        URL.revokeObjectURL(pdfObjectUrl)
-        pdfObjectUrl = null
-      }
-    }, 300_000)
+    printWindow.location.replace(absolutePrintUrl)
   }
   catch (error: unknown) {
     closeAlert()
 
-    if (pdfObjectUrl) {
-      URL.revokeObjectURL(pdfObjectUrl)
-      pdfObjectUrl = null
-    }
-
-    if (printWindow)
+    if (printWindow && !printWindow.closed)
       printWindow.close()
 
     showErrorToast({

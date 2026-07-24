@@ -571,11 +571,136 @@ class PurchaseOrderController extends Controller
                 );
             }
 
+
             /*
-        |--------------------------------------------------------------------------
-        | Pagination
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Prioritas PO yang menunggu approval user login
+            |--------------------------------------------------------------------------
+            | Hanya memengaruhi urutan data.
+            |
+            | Syarat prioritas:
+            | 1. Status PO masih IN PROGRESS.
+            | 2. Ada approval WAITING.
+            | 3. Approval berada pada step aktif terkecil.
+            | 4. Approval ditujukan kepada user login atau salah satu role user.
+            |--------------------------------------------------------------------------
+            */
+            $query->withExists([
+                'approvals as is_waiting_my_approval' => function (
+                    $approvalQuery,
+                ) use (
+                    $user,
+                    $userRoleIds,
+                ) {
+                    $approvalQuery
+                        /*
+                    |--------------------------------------------------------------------------
+                    | PO masih dalam proses approval
+                    |--------------------------------------------------------------------------
+                    */
+                        ->whereRaw(
+                            'UPPER(TRIM(purchase_orders.status)) = ?',
+                            [
+                                'IN PROGRESS',
+                            ],
+                        )
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Approval masih WAITING
+                    |--------------------------------------------------------------------------
+                    */
+                        ->whereRaw(
+                            'UPPER(TRIM(purchase_order_approvals.status)) = ?',
+                            [
+                                PurchaseOrderApproval::STATUS_WAITING,
+                            ],
+                        )
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Hanya step aktif terkecil
+                    |--------------------------------------------------------------------------
+                    | Ini mencegah approver tahap berikutnya mendapat prioritas sebelum
+                    | tahap sebelumnya selesai.
+                    |--------------------------------------------------------------------------
+                    */
+                        ->whereRaw(
+                            'purchase_order_approvals.step_order = (
+                                SELECT MIN(poa_min.step_order)
+                                FROM purchase_order_approvals AS poa_min
+                                WHERE poa_min.purchase_order_id
+                                    = purchase_order_approvals.purchase_order_id
+                                AND UPPER(TRIM(poa_min.status)) = ?
+                            )',
+                            [
+                                PurchaseOrderApproval::STATUS_WAITING,
+                            ],
+                        )
+
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Approval ditujukan kepada user atau role user login
+                    |--------------------------------------------------------------------------
+                    */
+                        ->where(function ($approverQuery) use (
+                            $user,
+                            $userRoleIds,
+                        ) {
+                            /*
+                        |--------------------------------------------------------------------------
+                        | Approver langsung berdasarkan USER
+                        |--------------------------------------------------------------------------
+                        */
+                            $approverQuery->where(function ($userQuery) use (
+                                $user,
+                            ) {
+                                $userQuery
+                                    ->whereRaw(
+                                        'UPPER(TRIM(purchase_order_approvals.approver_type)) = ?',
+                                        [
+                                            PurchaseOrderApproval::APPROVER_TYPE_USER,
+                                        ],
+                                    )
+                                    ->where(
+                                        'purchase_order_approvals.approver_id',
+                                        $user->id,
+                                    );
+                            });
+
+                            /*
+                        |--------------------------------------------------------------------------
+                        | Approver berdasarkan ROLE
+                        |--------------------------------------------------------------------------
+                        */
+                            if ($userRoleIds->isNotEmpty()) {
+                                $approverQuery->orWhere(function (
+                                    $roleQuery,
+                                ) use (
+                                    $userRoleIds,
+                                ) {
+                                    $roleQuery
+                                        ->whereRaw(
+                                            'UPPER(TRIM(purchase_order_approvals.approver_type)) = ?',
+                                            [
+                                                PurchaseOrderApproval::APPROVER_TYPE_ROLE,
+                                            ],
+                                        )
+                                        ->whereIn(
+                                            'purchase_order_approvals.approver_id',
+                                            $userRoleIds->all(),
+                                        );
+                                });
+                            }
+                        });
+                },
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pagination
+            |--------------------------------------------------------------------------
+            */
             $perPage = (int) (
                 $request->per_page
                 ?? 10
@@ -585,7 +710,24 @@ class PurchaseOrderController extends Controller
                 ? $perPage
                 : 10;
 
-            $pos = $query->paginate($perPage);
+            /*
+            |--------------------------------------------------------------------------
+            | Urutan data
+            |--------------------------------------------------------------------------
+            | reorder() diperlukan karena base query sebelumnya sudah memiliki
+            | orderByDesc('id').
+            |
+            | Prioritas:
+            | 1. PO yang sedang menunggu approval user login.
+            | 2. PO lainnya berdasarkan ID terbaru seperti sebelumnya.
+            |--------------------------------------------------------------------------
+            */
+            $pos = $query
+                ->reorder()
+                ->orderByDesc('is_waiting_my_approval')
+                ->orderByDesc('purchase_orders.id')
+                ->paginate($perPage);
+
 
             /*
         |--------------------------------------------------------------------------
@@ -4489,7 +4631,7 @@ class PurchaseOrderController extends Controller
 
         $relativeUrl = URL::temporarySignedRoute(
             'transaction.purchase-order.print-signed',
-            now()->addMinutes(5),
+            now()->addMinutes(10),
             [
                 'publicId' => $publicId,
                 'lang' => $lang,
@@ -4519,14 +4661,16 @@ class PurchaseOrderController extends Controller
 
     public function print(
         Request $request,
-        $publicId,
+        string $publicId,
     ) {
+        $lang = 'id';
+
         try {
             /*
-            |--------------------------------------------------------------------------
-            | Bahasa Cetakan
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | Bahasa cetakan
+        |--------------------------------------------------------------------------
+        */
             $lang = strtolower(
                 trim(
                     (string) $request->query(
@@ -4540,28 +4684,28 @@ class PurchaseOrderController extends Controller
                 $lang = 'id';
             }
 
-            /*
-         * Translation pada Blade akan membaca locale ini.
-         */
             app()->setLocale($lang);
 
             /*
-            |--------------------------------------------------------------------------
-            | Purchase Order
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | Purchase Order
+        |--------------------------------------------------------------------------
+        */
             $id = Crypt::decryptString(
                 $publicId,
             );
 
             $po = PurchaseOrder::with([
                 'vendor',
+
                 'cabangData:id,nama_cabang,inisial_cabang',
+
                 'departmentData:id,kode,nama',
 
                 'purchaseRequests:id,nomor_pr,tanggal_pr,total_amount',
 
                 'items',
+
                 'items.unit:id,kode,nama',
 
                 'requesterSignedBy:id,name',
@@ -4574,23 +4718,60 @@ class PurchaseOrderController extends Controller
             ])->findOrFail($id);
 
             /*
-            |--------------------------------------------------------------------------
-            | Amount in Words
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | Validasi status
+        |--------------------------------------------------------------------------
+        | Sesuaikan daftar ini dengan aturan bisnis PO.
+        */
+            $currentStatus = strtoupper(
+                trim(
+                    (string) $po->status,
+                ),
+            );
+
+            $allowedStatuses = [
+                PurchaseOrder::STATUS_APPROVED,
+            ];
+
+            if (
+                !in_array(
+                    $currentStatus,
+                    $allowedStatuses,
+                    true,
+                )
+            ) {
+                return response()->json([
+                    'success' => false,
+
+                    'message' => $lang === 'en'
+                        ? 'Purchase Order cannot be printed yet.'
+                        : 'Purchase Order belum dapat dicetak.',
+                ], 422);
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Amount in words
+        |--------------------------------------------------------------------------
+        */
+            $totalAmount = (float) (
+                $po->total_nilai
+                ?? 0
+            );
+
             $terbilang = $lang === 'en'
                 ? $this->terbilangRupiahEnglish(
-                    (float) $po->total_nilai,
+                    $totalAmount,
                 )
                 : $this->terbilangRupiah(
-                    (float) $po->total_nilai,
+                    $totalAmount,
                 );
 
             /*
-            |--------------------------------------------------------------------------
-            | Generate PDF
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | Generate PDF
+        |--------------------------------------------------------------------------
+        */
             $pdf = Pdf::loadView(
                 'pdf.purchase-order',
                 [
@@ -4603,13 +4784,27 @@ class PurchaseOrderController extends Controller
                 'portrait',
             );
 
-            $fileName = str_replace(
-                ['/', '\\'],
+            $pdfOutput = $pdf->output();
+
+            /*
+        |--------------------------------------------------------------------------
+        | Nama file
+        |--------------------------------------------------------------------------
+        */
+            $fileName = preg_replace(
+                '/[^A-Za-z0-9._-]+/',
                 '-',
                 (string) $po->nomor_po,
             );
 
-            $pdfOutput = $pdf->output();
+            $fileName = trim(
+                (string) $fileName,
+                '-',
+            );
+
+            if ($fileName === '') {
+                $fileName = (string) $po->id;
+            }
 
             $downloadFileName = sprintf(
                 'PO-%s-%s.pdf',
@@ -4617,22 +4812,50 @@ class PurchaseOrderController extends Controller
                 strtoupper($lang),
             );
 
-            return response()
-                ->make($pdfOutput, 200)
-                ->withHeaders([
+            /*
+        |--------------------------------------------------------------------------
+        | Inline PDF response
+        |--------------------------------------------------------------------------
+        */
+            return response(
+                $pdfOutput,
+                200,
+                [
                     'Content-Type' => 'application/pdf',
-                    'Content-Disposition' => 'inline; filename="' . $downloadFileName . '"',
-                    'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+
+                    'Content-Disposition'
+                    => 'inline; filename="' . $downloadFileName . '"',
+
+                    'Content-Length'
+                    => (string) strlen($pdfOutput),
+
+                    'Cache-Control'
+                    => 'private, no-store, no-cache, must-revalidate, max-age=0',
+
                     'Pragma' => 'no-cache',
+
                     'Expires' => '0',
+
                     'X-Content-Type-Options' => 'nosniff',
-                ]);
+                ],
+            );
+        } catch (
+            DecryptException |
+            ModelNotFoundException $e
+        ) {
+            return response()->json([
+                'success' => false,
+
+                'message' => $lang === 'en'
+                    ? 'Purchase Order was not found.'
+                    : 'Purchase Order tidak ditemukan.',
+            ], 404);
         } catch (\Throwable $e) {
             Log::error(
                 '[Purchase Order] Print error',
                 [
                     'public_id' => $publicId,
-                    'lang' => $request->query('lang'),
+                    'lang' => $lang,
                     'message' => $e->getMessage(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
@@ -4642,7 +4865,11 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mencetak Purchase Order.',
+
+                'message' => $lang === 'en'
+                    ? 'Failed to print Purchase Order.'
+                    : 'Gagal mencetak Purchase Order.',
+
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -5608,20 +5835,58 @@ class PurchaseOrderController extends Controller
 
     private function generateDraftPONumber(): string
     {
-        $year = now()->format('Y');
+        $year = (int) now()->format('Y');
 
-        $lastPo = PurchaseOrder::whereYear('created_at', $year)
-            ->where('nomor_po', 'ILIKE', "DRAFT/PO/{$year}/%")
-            ->orderByDesc('id')
-            ->first();
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil nomor draft PO terbesar pada tahun berjalan
+        |--------------------------------------------------------------------------
+        | withTrashed() memastikan nomor PO yang sudah dihapus tetap dianggap
+        | pernah digunakan dan tidak dipakai ulang.
+        */
+        $lastNumber = PurchaseOrder::withTrashed()
+            ->where(
+                'nomor_po',
+                'ILIKE',
+                "DRAFT/PO/{$year}/%",
+            )
+            ->selectRaw("
+            COALESCE(
+                MAX(
+                    CAST(
+                        SPLIT_PART(nomor_po, '/', 4)
+                        AS INTEGER
+                    )
+                ),
+                0
+            ) AS last_number
+        ")
+            ->value('last_number');
 
-        $nextNumber = 1;
+        $nextNumber = (int) $lastNumber + 1;
 
-        if ($lastPo) {
-            $lastNumber = (int) substr($lastPo->nomor_po, -4);
-            $nextNumber = $lastNumber + 1;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | Pastikan nomor belum pernah digunakan
+        |--------------------------------------------------------------------------
+        | Tetap periksa data aktif maupun soft deleted.
+        */
+        do {
+            $draftNumber = sprintf(
+                'DRAFT/PO/%d/%04d',
+                $year,
+                $nextNumber,
+            );
 
-        return 'DRAFT/PO/' . $year . '/' . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+            $alreadyExists = PurchaseOrder::withTrashed()
+                ->where('nomor_po', $draftNumber)
+                ->exists();
+
+            if ($alreadyExists) {
+                $nextNumber++;
+            }
+        } while ($alreadyExists);
+
+        return $draftNumber;
     }
 }
