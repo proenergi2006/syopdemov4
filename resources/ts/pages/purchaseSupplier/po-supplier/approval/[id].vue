@@ -515,169 +515,169 @@ onMounted(() => {
         <VCol cols="12" md="3">
           <VCard rounded="lg" variant="flat" color="success" height="100%">
             <VCardText>
-              <div class="text-caption mb-1">
+                <div class="text-caption mb-1">
                 Total Nilai PO
-              </div>
+                </div>
 
-              <div class="text-h5 font-weight-bold">
-                Rp {{ formatMoney(po.total) }}
-              </div>
+                <div class="text-h5 font-weight-bold">
+                  Rp {{ formatMoney(po.total) }}
+                </div>
 
-              <div class="text-caption mt-2">
-                Harga dasar: Rp {{ formatMoney(po.harga_tebus) }}
-              </div>
+                <div class="text-caption mt-2">
+                  Harga dasar: Rp {{ formatMoney(po.harga_tebus) }}
+                </div>
             </VCardText>
           </VCard>
         </VCol>
       </VRow>
 
-      <!-- PRICE CHANGE ALERT -->
-      <VCard
-      v-if="isPriceChanged"
-      class="mb-6"
-      rounded="lg"
-      :color="priceChangeColor"
-      variant="tonal"
-      >
-      <VCardText>
-          <div class="d-flex justify-space-between align-center flex-wrap ga-4">
-          <div>
-              <div class="d-flex align-center ga-2 mb-2">
-              <VIcon
-                  size="28"
-                  :icon="priceChangeIcon"
-              />
+        <!-- PRICE CHANGE ALERT -->
+        <VCard
+          v-if="isPriceChanged"
+          class="mb-6"
+          rounded="lg"
+          :color="priceChangeColor"
+          variant="tonal"
+        >
+        <VCardText>
+            <div class="d-flex justify-space-between align-center flex-wrap ga-4">
+            <div>
+                <div class="d-flex align-center ga-2 mb-2">
+                <VIcon
+                    size="28"
+                    :icon="priceChangeIcon"
+                />
 
-              <div class="text-h6 font-weight-bold">
-                  Perubahan Harga Dasar
-              </div>
+                <div class="text-h6 font-weight-bold">
+                    Perubahan Harga Dasar
+                </div>
 
-              <VChip
-                  size="small"
-                  variant="flat"
-                  :color="priceChangeColor"
-              >
-                  {{ priceChangeLabel }}
-              </VChip>
-              </div>
+                <VChip
+                    size="small"
+                    variant="flat"
+                    :color="priceChangeColor"
+                >
+                    {{ priceChangeLabel }}
+                </VChip>
+                </div>
 
-              <div class="text-body-2 text-medium-emphasis">
-              Harga dasar berubah dari
-              <strong>Rp {{ formatMoney(previousPrice) }}</strong>
-              menjadi
-              <strong>Rp {{ formatMoney(currentPrice) }}</strong>.
-              </div>
-          </div>
+                <div class="text-body-2 text-medium-emphasis">
+                Harga dasar berubah dari
+                <strong>Rp {{ formatMoney(previousPrice) }}</strong>
+                menjadi
+                <strong>Rp {{ formatMoney(currentPrice) }}</strong>.
+                </div>
+            </div>
 
-          <div class="text-right">
-              <div class="text-caption text-medium-emphasis">
-              Selisih Harga
-              </div>
+            <!-- <div class="text-right">
+                <div class="text-caption text-medium-emphasis">
+                Selisih Harga
+                </div>
 
-              <div class="text-h5 font-weight-bold">
-              {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-              Rp {{ formatMoney(absolutePriceDiff) }}
-              </div>
+                <div class="text-h5 font-weight-bold">
+                {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+                Rp {{ formatMoney(absolutePriceDiff) }}
+                </div>
 
-              <div class="text-body-2">
-              {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-              {{ absolutePriceDiffPercent.toFixed(2) }}%
-              </div>
-          </div>
-          </div>
+                <div class="text-body-2">
+                {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+                {{ absolutePriceDiffPercent.toFixed(2) }}%
+                </div>
+            </div> -->
+            </div>
 
-          <VDivider class="my-5" />
+            <VDivider class="my-5" />
 
-          <VRow>
-          <VCol cols="12" md="4">
-              <VCard variant="flat" rounded="lg" class="pa-4">
-              <div class="text-caption text-medium-emphasis mb-1">
-                  Harga Sebelumnya
-              </div>
+            <VRow>
+            <VCol cols="12" md="4">
+                <VCard variant="flat" rounded="lg" class="pa-4">
+                <div class="text-caption text-medium-emphasis mb-1">
+                    Harga Sebelumnya
+                </div>
 
-              <div class="text-h6 font-weight-bold">
-                  Rp {{ formatMoney(previousPrice) }}
-              </div>
-              </VCard>
-          </VCol>
+                <div class="text-h6 font-weight-bold">
+                    Rp {{ formatMoney(previousPrice) }}
+                </div>
+                </VCard>
+            </VCol>
 
-          <VCol cols="12" md="4">
-              <VCard variant="flat" rounded="lg" class="pa-4">
-              <div class="text-caption text-medium-emphasis mb-1">
-                  Harga Saat Ini
-              </div>
+            <VCol cols="12" md="4">
+                <VCard variant="flat" rounded="lg" class="pa-4">
+                <div class="text-caption text-medium-emphasis mb-1">
+                    Harga Saat Ini
+                </div>
 
-              <div class="text-h6 font-weight-bold">
-                  Rp {{ formatMoney(currentPrice) }}
-              </div>
-              </VCard>
-          </VCol>
+                <div class="text-h6 font-weight-bold">
+                    Rp {{ formatMoney(currentPrice) }}
+                </div>
+                </VCard>
+            </VCol>
 
-          <VCol cols="12" md="4">
-              <VCard variant="flat" rounded="lg" class="pa-4">
-              <div class="text-caption text-medium-emphasis mb-1">
-                  Selisih Harga
-              </div>
+            <VCol cols="12" md="4">
+                <VCard variant="flat" rounded="lg" class="pa-4">
+                <div class="text-caption text-medium-emphasis mb-1">
+                    Selisih Harga
+                </div>
 
-              <div
-                  class="text-h6 font-weight-bold"
-                  :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
-              >
-                  {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-                  Rp {{ formatMoney(absolutePriceDiff) }}
-              </div>
+                <div
+                    class="text-h6 font-weight-bold"
+                    :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
+                >
+                    {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+                    Rp {{ formatMoney(absolutePriceDiff) }}
+                </div>
 
-              <div
-                  class="text-caption"
-                  :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
-              >
-                  {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-                  {{ absolutePriceDiffPercent.toFixed(2) }}%
-              </div>
-              </VCard>
-          </VCol>
-          </VRow>
+                <div
+                    class="text-caption"
+                    :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
+                >
+                    {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+                    {{ absolutePriceDiffPercent.toFixed(2) }}%
+                </div>
+                </VCard>
+            </VCol>
+            </VRow>
 
-          <VAlert
-          class="mt-5"
-          variant="flat"
-          color="surface"
-          border="start"
-          >
-          <div class="d-flex justify-space-between align-center flex-wrap ga-4">
-              <div>
-              <div class="font-weight-bold mb-1">
-                  Dampak ke Total PO
-              </div>
+            <VAlert
+            class="mt-5"
+            variant="flat"
+            color="surface"
+            border="start"
+            >
+            <div class="d-flex justify-space-between align-center flex-wrap ga-4">
+                <div>
+                <div class="font-weight-bold mb-1">
+                    Dampak ke Total PO
+                </div>
 
-              <div class="text-body-2 text-medium-emphasis">
-                  Total PO berubah dari
-                  <strong>Rp {{ formatMoney(previousTotal) }}</strong>
-                  menjadi
-                  <strong>Rp {{ formatMoney(currentTotal) }}</strong>.
-              </div>
-              </div>
+                <div class="text-body-2 text-medium-emphasis">
+                    Total PO berubah dari
+                    <strong>Rp {{ formatMoney(previousTotal) }}</strong>
+                    menjadi
+                    <strong>Rp {{ formatMoney(currentTotal) }}</strong>.
+                </div>
+                </div>
 
-              <div class="text-right">
-              <div class="text-caption text-medium-emphasis">
-                  Selisih Total
-              </div>
+                <div class="text-right">
+                <div class="text-caption text-medium-emphasis">
+                    Selisih Total
+                </div>
 
-              <div
-                  class="text-h6 font-weight-bold"
-                  :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
-              >
-                  {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
-                  Rp {{ formatMoney(absoluteTotalDiff) }}
-              </div>
+                <div
+                    class="text-h6 font-weight-bold"
+                    :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
+                >
+                    {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
+                    Rp {{ formatMoney(absoluteTotalDiff) }}
+                </div>
 
-              <div
-                  class="text-caption"
-                  :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
-              >
-                  {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
-                  {{ absoluteTotalDiffPercent.toFixed(2) }}%
-              </div>
+                <div
+                    class="text-caption"
+                    :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
+                >
+                    {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
+                    {{ absoluteTotalDiffPercent.toFixed(2) }}%
+                </div>
               </div>
           </div>
           </VAlert>
