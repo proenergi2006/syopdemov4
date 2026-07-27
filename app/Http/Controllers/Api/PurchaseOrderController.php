@@ -219,7 +219,7 @@ class PurchaseOrderController extends Controller
                 |--------------------------------------------------------------------------
                 | Dibutuhkan untuk:
                 | - visibility approver;
-                | - approval ANY/ALL;
+                | - approval ANY/ALL; 
                 | - can_approve;
                 | - riwayat approver.
                 |--------------------------------------------------------------------------

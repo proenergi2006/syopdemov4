@@ -11,6 +11,14 @@ import {
   closeAlert,
 } from '@/utils/alert'
 import { useRouter } from 'vue-router'
+import { usePermissionStore } from '@/stores/permission'
+
+const permissionStore = usePermissionStore()
+const isCheckingPermission = ref(true)
+
+const canApprovePO= computed(() => {
+  return permissionStore.can('purchase_order_trade.approve')
+})
 
 const router = useRouter()
 const onEdit = (item: any) => {
@@ -397,7 +405,7 @@ const statusItems = [
             </td>
 
               <td class="text-center" style="width: 5rem;">
-                <VBtn size="34" class="mr-1" variant="tonal" color="primary" @click="goToEdit(v.id_master)">
+                <VBtn v-if="canApprovePO" size="34" class="mr-1" variant="tonal" color="primary" @click="goToEdit(v.id_master)">
                   <VIcon icon="ri-information-2-line"/>
                 </VBtn>
               </td>

@@ -767,9 +767,9 @@ const requiredNotZero = (label: string)=> {
                   {{ getStatusLabel(v.disposisi_po) }}
                 </VChip>
 
-             <span class="text-caption">
+             <div class="text-caption">
                 {{ v.ceo_tanggal }}
-              </span>
+              </div>
             </td>
 
               <td class="text-center" style="width: 7rem;">
