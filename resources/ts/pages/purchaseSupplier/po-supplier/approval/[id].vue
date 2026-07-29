@@ -190,28 +190,37 @@ const doSubmit = async () => {
       url = `/inventory/purchase-order/${id}/approve-ceo`
     }
 
-    await axios.post(url, {
+    const res = await axios.post(url, {
       decision: po.result,
       note: po.note,
     })
 
-    // confirmDialog.value = false
+    // // confirmDialog.value = false
+    // await showSuccessAlert({
+    //   title: 'Berhasil',
+    //   text: `Approve PO berhasil`,
+    //   timer: 1800,
+    // })
+    
+    if (!res.data.success) {
+      throw new Error(res.data.message)
+    }
+
     await showSuccessAlert({
       title: 'Berhasil',
-      text: `Approve PO berhasil`,
-      timer: 1800,
+      text: 'Approve PO berhasil',
     })
 
 
     await fetchPO(id)
 
-  } catch (err) {
+  } catch (error) {
     closeAlert()
-    console.error(err)
 
-    await showErrorAlert({
+    console.log(error)
+   await showErrorAlert({
       title: 'Error',
-      text: getApiErrorMessage(err, 'Gagal menghapus vendor'),
+      text: String(error),
     })
   } finally {
     closeAlert()
