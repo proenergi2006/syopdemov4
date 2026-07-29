@@ -63,7 +63,6 @@ const form = reactive({
   //kode Item
   kode_item: null,
   keterangan_item :'',
-  alokasi_item :'',
 
   ongkos_angkut: 0,
   kategori_plat: '',
@@ -1076,14 +1075,6 @@ const isPriceChanged = computed(() => {
                               variant="outlined"
                             />
                           </VCol>
-    
-                         <VCol cols="12" md="2" >
-                          <VCheckbox
-                            label="Alokasi ke Barang"
-                            color="primary"
-                            hide-details
-                          />
-                        </VCol>
                         </VRow>
     
                       </div>
@@ -2247,15 +2238,6 @@ const isPriceChanged = computed(() => {
             </div>
           </VCol>
 
-          <VCol cols="12" md="2">
-            <div class="text-caption text-medium-emphasis">Alokasi</div>
-            <VChip
-              :color="form.alokasi_item ? 'success' : 'error'"
-              size="small"
-            >
-              {{ form.alokasi_item ? 'Yes' : 'No' }}
-            </VChip>
-          </VCol>
         </VRow>
         <VDivider class="mt-2" />
          <!-- OA -->

@@ -864,7 +864,7 @@ class PurchaseOrderInventoryService
                         ? ($res['d']['message'] ?? json_encode($res['d']))
                         : $res['d'];
 
-                    throw new \Exception($message);
+                    throw new \Exception($message." - response dari Accurate");
                 }
                 DB::afterCommit(function () use ($po, $form, $user) {
                     $this->poNotificationService->notifyRequester($po);
@@ -889,13 +889,14 @@ class PurchaseOrderInventoryService
                             $type
                         )
                     );
+                    
+                    return [
+                        'success' => true,
+                        'message' => 'Approval CEO berhasil disimpan',
+                    ];
                 });
 
             
-                return [
-                    'success' => true,
-                    'message' => 'Approval CFO berhasil disimpan',
-                ];
             });
         }catch (\Exception $e) {
             Log::error('Approve CEO Error', [
