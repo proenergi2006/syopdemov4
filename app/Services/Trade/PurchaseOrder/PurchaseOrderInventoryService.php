@@ -133,7 +133,7 @@ class PurchaseOrderInventoryService
             ]);
 
             
-            DB::afterCommit(function () use ($dataPo,$nomorPO, $form, $user, $idMaster) {
+            DB::afterCommit(function () use ($dataPo,$nomorPO, $form, $user, $idMaster, $idAccurate) {
                 DB::connection('mysql_old')
                 ->table('new_pro_inventory_vendor_po')
                 ->insert($dataPo);
@@ -144,7 +144,7 @@ class PurchaseOrderInventoryService
                 ->update([
                     'id_accurate' => $idAccurate
                 ]);
-                $this->poNotificationService->notifyCfo($idMaster);
+                $this->poNotificationService->notifyCfo($nomorPO);
                 $emails = User::whereHas('roles', function ($q) {
                     $q->where('nama', 'Chief Financial Officer');
                 })
@@ -155,7 +155,7 @@ class PurchaseOrderInventoryService
                     ->send(new POTradingMail(
                         $nomorPO,
                         $form,
-                        $user,
+                        $user['name'],
                         'need_cfo'
                     ));
             });
@@ -647,12 +647,12 @@ class PurchaseOrderInventoryService
                     
                         DB::afterCommit(function () use ($po, $form, $user) { 
                             $emails = User::whereHas('roles', function ($q) {
-                            $q->where('nama', 'Chief Executive Officer');
+                            $q->where('nama', 'Chief Financial Officer');
                         })
                         ->pluck('email')
                         ->toArray();
         
-                            Mail::to($emails)->send( new POTradingMail( $po->nomor_po, $form, $user, 'resubmit' ) ); 
+                            Mail::to($emails)->send( new POTradingMail( $po->nomor_po, $form, $user['name'], 'resubmit' ) );
                         });
                     }
                     
@@ -762,7 +762,7 @@ class PurchaseOrderInventoryService
                                 'volume_po' => $po->volume_po,
                                 'harga_tebus' => $po->harga_tebus,
                             ],
-                            $user,
+                            $po->created_by,
                             $type
                         )
                     );
@@ -803,7 +803,7 @@ class PurchaseOrderInventoryService
                 $po = InventoryVendorPo::where('id_master', $id)
                     ->firstOrFail();
                 if ($po->is_price_changed == 1) {
-                $sync= $this->syncPriceAfterApprove($po);
+                    $sync= $this->syncPriceAfterApprove($po);
 
                 }
 
@@ -885,18 +885,16 @@ class PurchaseOrderInventoryService
                                 'volume_po' => $po->volume_po,
                                 'harga_tebus' => $po->harga_tebus,
                             ],
-                            $user,
+                            $po->created_by,
                             $type
                         )
                     );
-                    
-                    return [
-                        'success' => true,
-                        'message' => 'Approval CEO berhasil disimpan',
-                    ];
                 });
 
-            
+                return [
+                    'success' => true,
+                    'message' => 'Approval CEO berhasil disimpan',
+                ];
             });
         }catch (\Exception $e) {
             Log::error('Approve CEO Error', [
@@ -1129,7 +1127,7 @@ class PurchaseOrderInventoryService
                                     'volume_po' => $po->volume_po,
                                     'harga_tebus' => $po->harga_tebus,
                                 ],
-                                $systemUser,
+                                $systemUser['name'],
                                 'need_ceo'
                             )
                         );

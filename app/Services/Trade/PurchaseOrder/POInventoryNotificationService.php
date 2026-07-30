@@ -73,7 +73,7 @@ class POInventoryNotificationService
                 'user_id' => $user->id,
                 'type' => 'purchase_order_trade.result',
                 'title' => 'Approved Purchase Order Trade',
-                'message' => "Purchase Order Trade {$po->nomor_po} sudah disetujui",
+                'message' => "Purchase Order Trade {$po->nomor_po} sudah diverifikasi",
                 'module' => 'purchase_order',
                 'reference_type' => InventoryVendorPo::class,
                 'reference_id' => $po->id_master,

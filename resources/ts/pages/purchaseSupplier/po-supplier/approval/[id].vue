@@ -217,7 +217,6 @@ const doSubmit = async () => {
   } catch (error) {
     closeAlert()
 
-    console.log(error)
    await showErrorAlert({
       title: 'Error',
       text: String(error),
