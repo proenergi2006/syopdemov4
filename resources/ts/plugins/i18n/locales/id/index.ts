@@ -1,10 +1,10 @@
-// import auth from './auth.json'
+import auth from './auth.json'
 import common from './common.json'
 import dashboard from './dashboard.json'
 import navigation from './navigation.json'
 
 export default {
-  // auth,
+  auth,
   common,
   dashboard,
 
