@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
 import axios from '@axios'
-import loginBackground from '@images/pages/bg2.png'
 import { requiredValidator } from '@validators'
 
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { VForm } from 'vuetify/components'
 import { onMounted } from 'vue'
 import { showErrorToast } from '@/utils/alert'
+
+const { t } = useI18n()
 
 const isPasswordVisible = ref(false)
 const refVForm = ref<InstanceType<typeof VForm> | null>(null)
@@ -90,28 +92,25 @@ const login = async () => {
      */
     if (loginData?.success === false) {
       const field = loginData?.field
-      const message
-        = loginData?.message
-          || 'Username atau password salah.'
 
       if (field === 'username') {
-        errors.value.username = message
+        errors.value.username = t('auth.login.errors.usernameNotFound')
         return
       }
 
       if (field === 'password') {
-        errors.value.password = message
+        errors.value.password = t('auth.login.errors.incorrectPassword')
         return
       }
 
-      errors.value.username = message
+      errors.value.username = t('auth.login.errors.invalidCredentials')
       return
     }
 
     const token = loginData?.token
 
     if (!token)
-      throw new Error('Token tidak ditemukan pada response login.')
+      throw new Error(t('auth.login.errors.tokenMissing'))
 
     /**
      * Simpan token dan pasang pada header Axios.
@@ -136,7 +135,7 @@ const login = async () => {
         || loginData?.user
 
     if (!authUser)
-      throw new Error('Data user tidak ditemukan.')
+      throw new Error(t('auth.login.errors.userDataMissing'))
 
     saveUserData(authUser)
 
@@ -203,13 +202,25 @@ const login = async () => {
 
     resetErrors()
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pesan error selalu dari i18n frontend, TIDAK PERNAH dari
+    | data?.message backend
+    |--------------------------------------------------------------------------
+    | Backend hanya dipakai sebagai sinyal (status + field/errors) untuk
+    | menentukan skenario mana yang terjadi. Teks yang ditampilkan ke user
+    | selalu berasal dari kamus terjemahan, supaya konsisten mengikuti
+    | bahasa yang dipilih user, bukan bahasa yang di-hardcode di controller.
+    |--------------------------------------------------------------------------
+    */
+
     /**
      * Validation error dan kesalahan kredensial
      * dengan status 422.
      */
     if (status === 422) {
       /**
-       * Format validation Laravel:
+       * Format validation Laravel (field wajib diisi):
        *
        * {
        *   errors: {
@@ -220,8 +231,13 @@ const login = async () => {
        */
       if (data?.errors) {
         errors.value = {
-          username: data.errors.username?.[0],
-          password: data.errors.password?.[0],
+          username: data.errors.username
+            ? t('auth.login.errors.usernameRequired')
+            : undefined,
+
+          password: data.errors.password
+            ? t('auth.login.errors.passwordRequired')
+            : undefined,
         }
 
         return
@@ -237,21 +253,18 @@ const login = async () => {
        * }
        */
       const field = data?.field
-      const message
-        = data?.message
-          || 'Username atau password salah.'
 
       if (field === 'username') {
-        errors.value.username = message
+        errors.value.username = t('auth.login.errors.usernameNotFound')
         return
       }
 
       if (field === 'password') {
-        errors.value.password = message
+        errors.value.password = t('auth.login.errors.incorrectPassword')
         return
       }
 
-      errors.value.username = message
+      errors.value.username = t('auth.login.errors.invalidCredentials')
       return
     }
 
@@ -261,21 +274,18 @@ const login = async () => {
      */
     if (status === 401) {
       const field = data?.field
-      const message
-        = data?.message
-          || 'Username atau password salah.'
 
       if (field === 'username') {
-        errors.value.username = message
+        errors.value.username = t('auth.login.errors.usernameNotFound')
         return
       }
 
       if (field === 'password') {
-        errors.value.password = message
+        errors.value.password = t('auth.login.errors.incorrectPassword')
         return
       }
 
-      errors.value.password = message
+      errors.value.password = t('auth.login.errors.invalidCredentials')
       return
     }
 
@@ -283,8 +293,7 @@ const login = async () => {
      * Akun nonaktif atau akses ditolak.
      */
     if (status === 403) {
-      errors.value.username
-        = data?.message || 'Akun tidak dapat digunakan.'
+      errors.value.username = t('auth.login.errors.accountDisabled')
 
       return
     }
@@ -295,7 +304,7 @@ const login = async () => {
      */
     if (!response) {
       errors.value.username
-        = 'Tidak dapat terhubung ke server.'
+        = t('auth.login.errors.connectionFailed')
 
       return
     }
@@ -303,9 +312,7 @@ const login = async () => {
     /**
      * Error server lainnya.
      */
-    errors.value.username
-      = data?.message
-        || 'Login gagal. Silakan coba kembali.'
+    errors.value.username = t('auth.login.errors.generic')
   }
   finally {
     loginLoading.value = false
@@ -334,203 +341,123 @@ onMounted(() => {
   sessionStorage.removeItem('ssoLoginError')
 
   showErrorToast({
-    title: 'Login SSO gagal',
+    title: t('auth.login.errors.ssoTitle'),
     text: ssoLoginError,
   })
 })
 </script>
 
 <template>
-  <div class="auth-page">
-    <VRow
-      no-gutters
-      class="auth-wrapper"
-    >
-      <!-- Background login -->
-      <VCol
-        cols="12"
-        lg="8"
-        class="d-none d-lg-flex auth-left"
+  <div class="auth-card-content">
+    <VCardText>
+      <h1 class="text-h5 mb-1">
+        {{ t('auth.login.appTitle') }}
+      </h1>
+
+      <p class="mb-0 text-medium-emphasis">
+        {{ t('auth.login.subtitle') }}
+      </p>
+    </VCardText>
+
+    <VCardText>
+      <VForm
+        ref="refVForm"
+        @submit.prevent="onSubmit"
       >
-        <VImg
-          :src="loginBackground"
-          alt="Pro Energi Oil and Gas"
-          cover
-          eager
-          class="auth-background-image"
-        />
-      </VCol>
+        <VRow>
+          <VCol cols="12">
+            <VTextField
+              v-model="username"
+              :label="t('auth.login.usernameLabel')"
+              :placeholder="t('auth.login.usernamePlaceholder')"
+              :rules="[requiredValidator]"
+              :error-messages="errors.username"
+              prepend-inner-icon="mdi-account-outline"
+              autocomplete="username"
+              autofocus
+            />
+          </VCol>
 
-      <!-- Form login -->
-      <VCol
-        cols="12"
-        lg="4"
-        class="auth-card-v2 d-flex align-center justify-center"
-      >
-        <VCard
-          flat
-          width="100%"
-          max-width="500"
-          class="login-card pa-4"
-        >
-          <VCardText>
-            <h1 class="text-h5 mb-1">
-              Operational System
-            </h1>
+          <VCol cols="12">
+            <VTextField
+              v-model="password"
+              :label="t('auth.login.passwordLabel')"
+              :placeholder="t('auth.login.passwordPlaceholder')"
+              :rules="[requiredValidator]"
+              :type="isPasswordVisible ? 'text' : 'password'"
+              :error-messages="errors.password"
+              :append-inner-icon="
+                isPasswordVisible
+                  ? 'mdi-eye-off-outline'
+                  : 'mdi-eye-outline'
+              "
+              prepend-inner-icon="mdi-lock-outline"
+              autocomplete="current-password"
+              @click:append-inner="
+                isPasswordVisible = !isPasswordVisible
+              "
+            />
+          </VCol>
 
-            <p class="mb-0 text-medium-emphasis">
-              Masuk gunakan akun anda
-            </p>
-          </VCardText>
-
-          <VCardText>
-            <VForm
-              ref="refVForm"
-              @submit.prevent="onSubmit"
+          <VCol
+            cols="12"
+            class="text-end mt-n2"
+          >
+            <RouterLink
+              to="/forgot-password"
+              class="text-primary text-body-2"
             >
-              <VRow>
-                <VCol cols="12">
-                  <VTextField
-                    v-model="username"
-                    label="Username"
-                    placeholder="Masukkan username"
-                    :rules="[requiredValidator]"
-                    :error-messages="errors.username"
-                    prepend-inner-icon="mdi-account-outline"
-                    autocomplete="username"
-                    autofocus
-                  />
-                </VCol>
+              {{ t('auth.login.forgotPasswordLink') }}
+            </RouterLink>
+          </VCol>
 
-                <VCol cols="12">
-                  <VTextField
-                    v-model="password"
-                    label="Password"
-                    placeholder="Masukkan password"
-                    :rules="[requiredValidator]"
-                    :type="isPasswordVisible ? 'text' : 'password'"
-                    :error-messages="errors.password"
-                    :append-inner-icon="
-                      isPasswordVisible
-                        ? 'mdi-eye-off-outline'
-                        : 'mdi-eye-outline'
-                    "
-                    prepend-inner-icon="mdi-lock-outline"
-                    autocomplete="current-password"
-                    @click:append-inner="
-                      isPasswordVisible = !isPasswordVisible
-                    "
-                  />
-                </VCol>
+          <VCol cols="12">
+            <VBtn
+              block
+              type="submit"
+              size="large"
+              class="text-none"
+              :loading="loginLoading"
+              :disabled="loginLoading"
+            >
+              {{ t('auth.login.submit') }}
+            </VBtn>
+          </VCol>
 
-                <VCol cols="12">
-                  <VBtn
-                    block
-                    type="submit"
-                    size="large"
-                    :loading="loginLoading"
-                    :disabled="loginLoading"
-                  >
-                    Login
-                  </VBtn>
-                </VCol>
+          <VCol
+            cols="12"
+            class="d-flex align-center mt-4"
+          >
+            <VDivider />
 
-                <VCol
-                  cols="12"
-                  class="d-flex align-center mt-4"
-                >
-                  <VDivider />
+            <span class="mx-4 text-medium-emphasis">
+              -
+            </span>
 
-                  <span class="mx-4 text-medium-emphasis">
-                    -
-                  </span>
+            <VDivider />
+          </VCol>
 
-                  <VDivider />
-                </VCol>
+          <VCol
+            cols="12"
+            class="text-center mt-4"
+          >
+            <div class="text-body-2 font-weight-medium text-primary">
+              {{ t('auth.login.versionLabel') }}
+            </div>
 
-                <VCol
-                  cols="12"
-                  class="text-center mt-4"
-                >
-                  <div class="text-body-2 font-weight-medium text-primary">
-                    SYOP Version 4.0
-                  </div>
-
-                  <div class="text-caption text-medium-emphasis">
-                    Pro Energi Operational System
-                  </div>
-                </VCol>
-              </VRow>
-            </VForm>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
+            <div class="text-caption text-medium-emphasis">
+              {{ t('auth.login.footerTagline') }}
+            </div>
+          </VCol>
+        </VRow>
+      </VForm>
+    </VCardText>
   </div>
 </template>
 
-<style lang="scss">
-@use "@core-scss/template/pages/page-auth.scss";
-
-.auth-page {
-  width: 100%;
-  min-height: 100vh;
-  overflow: hidden;
-}
-
-.auth-wrapper {
-  width: 100%;
-  min-height: 100vh;
-  margin: 0 !important;
-}
-
-.auth-left {
-  position: relative;
-  min-height: 100vh;
-  padding: 0 !important;
-  overflow: hidden;
-  background-color: #eef4fa;
-}
-
-.auth-background-image {
-  width: 100%;
-  height: 100vh;
-  min-height: 100vh;
-}
-
-/*
- * Memastikan gambar VImg memenuhi seluruh area sebelah kiri.
- */
-.auth-background-image :deep(.v-img__img) {
-  object-fit: cover;
-  object-position: center center;
-}
-
-.auth-card-v2 {
-  min-height: 100vh;
-  padding: 24px;
-  background-color: rgb(var(--v-theme-surface));
-}
-
-.login-card {
-  background-color: transparent !important;
-}
-
-@media (max-width: 1279px) {
-  .auth-card-v2 {
-    min-height: 100vh;
-    padding: 16px;
-  }
-
-  .login-card {
-    max-width: 500px !important;
-  }
-}
-</style>
-
 <route lang="yaml">
 meta:
-  layout: blank
+  layout: auth
   action: read
   subject: Auth
   redirectIfLoggedIn: true

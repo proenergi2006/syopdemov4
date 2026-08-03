@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Dashboard;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Dashboard\DashboardModuleResource;
 use App\Services\Dashboard\DashboardModuleService;
+use App\Services\Dashboard\PurchaseApprovalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,6 +13,7 @@ class DashboardModuleController extends Controller
 {
     public function __construct(
         private readonly DashboardModuleService $dashboardModuleService,
+        private readonly PurchaseApprovalNotificationService $approvalNotificationService,
     ) {}
 
     public function groups(Request $request): JsonResponse
@@ -73,6 +75,18 @@ class DashboardModuleController extends Controller
                 'total' => $modules->total(),
                 'has_more' => $modules->hasMorePages(),
             ],
+        ]);
+    }
+
+    public function approvalNotifications(Request $request): JsonResponse
+    {
+        $summary = $this->approvalNotificationService->getSummary(
+            $request->user(),
+        );
+
+        return response()->json([
+            'message' => 'Approval notifications retrieved successfully.',
+            'data' => $summary,
         ]);
     }
 }

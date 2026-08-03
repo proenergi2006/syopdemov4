@@ -6,10 +6,13 @@ use App\Models\GoodsReceive;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\User;
+use App\Support\ApprovalWaitingDuration;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -134,6 +137,12 @@ class PurchaseOrderDashboardService
                 )
                     ? (int) $filters['department_id']
                     : null,
+
+                'created_by' => isset(
+                    $filters['created_by'],
+                )
+                    ? (int) $filters['created_by']
+                    : null,
             ],
 
             'summary' => [
@@ -219,13 +228,16 @@ class PurchaseOrderDashboardService
             'departemen:id,nama',
         ]);
 
-        $userCabangId = $user->cabang_id !== null
-            ? (int) $user->cabang_id
-            : null;
-
-        $userDepartmentId = $user->departemen_id !== null
-            ? (int) $user->departemen_id
-            : null;
+        /*
+         * Dashboard PO masih menampilkan satu cabang & satu department
+         * dalam satu waktu (bukan agregat multi-assignment seperti listing
+         * PR/PO/GR/Goods Return). Untuk user yang hanya punya akses lewat
+         * user_access_assignments (belum/tidak punya master cabang_id atau
+         * departemen_id), pakai assignment pertama sebagai fallback supaya
+         * dashboard tidak error karena datanya kosong.
+         */
+        $userCabangId = $user->accessibleBranchIds()->first();
+        $userDepartmentId = $user->accessibleDepartmentIds()->first();
 
         $effectiveFilters = $filters;
 
@@ -240,6 +252,18 @@ class PurchaseOrderDashboardService
              */
                 $canFilterCabang = true;
                 $canFilterDepartment = true;
+
+                break;
+
+            case 'OWN_DATA':
+                /*
+             * Hanya PR/PO yang dibuat oleh user login sendiri,
+             * lintas cabang dan department.
+             */
+                $effectiveFilters['created_by'] = $user->id;
+
+                $canFilterCabang = false;
+                $canFilterDepartment = false;
 
                 break;
 
@@ -339,8 +363,190 @@ class PurchaseOrderDashboardService
 
                 'can_filter_department'
                 => $canFilterDepartment,
+
+                'own_data_only' => isset(
+                    $effectiveFilters['created_by'],
+                ),
             ],
         ];
+    }
+
+    /**
+     * Daftar Purchase Order yang sedang menunggu approval (status IN PROGRESS
+     * dan punya approval WAITING di step_order terkecil), lengkap dengan label
+     * step approval yang sedang digantung dan sudah berapa lama menunggu.
+     *
+     * Mengikuti filter periode (tanggal_po) yang sama dengan card ringkasan
+     * lain di dashboard ini, supaya angka yang tampil seragam -- kalau
+     * periode yang dipilih tidak punya PO menggantung, daftar akan kosong.
+     *
+     * Diurutkan dari yang paling lama menggantung (waiting_since paling tua).
+     */
+    public function getPendingApprovalPurchaseOrders(
+        array $filters,
+        int $perPage,
+    ): LengthAwarePaginator {
+        [
+            $startDate,
+            $endDate,
+        ] = $this->resolveDateRange($filters);
+
+        $currentApprovalSubquery = DB::table(
+            'purchase_order_approvals AS poa',
+        )
+            ->select('poa.purchase_order_id')
+            ->selectRaw(
+                "STRING_AGG(DISTINCT poa.label, ' / ' ORDER BY poa.label) AS current_approval_label",
+            )
+            ->selectRaw(
+                'MIN(poa.updated_at) AS waiting_since',
+            )
+            ->whereRaw(
+                'UPPER(TRIM(poa.status)) = ?',
+                ['WAITING'],
+            )
+            ->whereRaw(
+                'poa.step_order = (
+                    SELECT MIN(poa_min.step_order)
+                    FROM purchase_order_approvals AS poa_min
+                    WHERE poa_min.purchase_order_id = poa.purchase_order_id
+                      AND UPPER(TRIM(poa_min.status)) = ?
+                )',
+                ['WAITING'],
+            )
+            ->groupBy('poa.purchase_order_id');
+
+        $query = PurchaseOrder::query()
+            ->joinSub(
+                $currentApprovalSubquery,
+                'current_approval',
+                function ($join): void {
+                    $join->on(
+                        'current_approval.purchase_order_id',
+                        '=',
+                        'purchase_orders.id',
+                    );
+                },
+            )
+            ->leftJoin(
+                'master_vendor',
+                'master_vendor.id',
+                '=',
+                'purchase_orders.vendor_id',
+            )
+            ->leftJoin(
+                'departments',
+                'departments.id',
+                '=',
+                'purchase_orders.id_department',
+            )
+            ->leftJoin(
+                'cabang',
+                function ($join): void {
+                    $join->whereRaw(
+                        "cabang.id = CASE
+                            WHEN TRIM(purchase_orders.cabang::text) ~ '^[0-9]+$'
+                            THEN TRIM(purchase_orders.cabang::text)::bigint
+                            ELSE NULL
+                        END",
+                    );
+                },
+            )
+            ->whereRaw(
+                'UPPER(TRIM(purchase_orders.status)) = ?',
+                [self::PO_STATUS_IN_PROGRESS],
+            )
+            ->whereBetween(
+                'purchase_orders.tanggal_po',
+                [
+                    $startDate->toDateString(),
+                    $endDate->toDateString(),
+                ],
+            );
+
+        if (isset($filters['cabang_id'])) {
+            $query->where(
+                'purchase_orders.cabang',
+                (int) $filters['cabang_id'],
+            );
+        }
+
+        if (isset($filters['department_id'])) {
+            $query->where(
+                'purchase_orders.id_department',
+                (int) $filters['department_id'],
+            );
+        }
+
+        if (isset($filters['created_by'])) {
+            $query->where(
+                'purchase_orders.created_by',
+                (int) $filters['created_by'],
+            );
+        }
+
+        $query
+            ->select([
+                'purchase_orders.id as id',
+                'purchase_orders.nomor_po as nomor_po',
+                'purchase_orders.tanggal_po as tanggal_po',
+                'purchase_orders.submitted_at as submitted_at',
+                'purchase_orders.total_nilai as total_nilai',
+                'master_vendor.nama_vendor as vendor_name',
+                'cabang.nama_cabang as cabang_name',
+                'departments.nama as department_name',
+                'current_approval.current_approval_label as current_approval_label',
+                'current_approval.waiting_since as waiting_since',
+            ])
+            ->orderBy('current_approval.waiting_since', 'asc');
+
+        $paginator = $query->paginate($perPage);
+
+        $now = Carbon::now();
+
+        $paginator->getCollection()->transform(
+            function (PurchaseOrder $purchaseOrder) use ($now): array {
+                $waitingSince = $purchaseOrder->waiting_since
+                    ? Carbon::parse($purchaseOrder->waiting_since)
+                    : $now;
+
+                return array_merge(
+                    [
+                        'public_id' => $purchaseOrder->encrypted_id,
+                        'po_number' => $purchaseOrder->nomor_po,
+                        'po_date' => $purchaseOrder->tanggal_po,
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Tanggal Submit
+                        |--------------------------------------------------------------------------
+                        | PO bisa saja dibuat sebagai Draft jauh sebelum benar-benar
+                        | disubmit ke alur approval. waiting_since dihitung dari kapan
+                        | step approval aktif menjadi WAITING (submit pertama kali, atau
+                        | sejak approver sebelumnya approve) -- BUKAN dari tanggal_po.
+                        | submitted_at ditampilkan supaya selisihnya tidak ambigu di FE.
+                        |--------------------------------------------------------------------------
+                        */
+                        'submitted_at' => $purchaseOrder->submitted_at
+                            ? Carbon::parse($purchaseOrder->submitted_at)->toIso8601String()
+                            : null,
+
+                        'cabang_name' => $purchaseOrder->cabang_name,
+                        'department_name' => $purchaseOrder->department_name,
+                        'vendor_name' => $purchaseOrder->vendor_name,
+                        'total_amount' => (float) $purchaseOrder->total_nilai,
+                        'current_approval_label' => $purchaseOrder->current_approval_label,
+                        'waiting_since' => $waitingSince->toIso8601String(),
+                    ],
+                    ApprovalWaitingDuration::describe(
+                        $waitingSince,
+                        $now,
+                    ),
+                );
+            },
+        );
+
+        return $paginator;
     }
 
     /**
@@ -694,6 +900,13 @@ class PurchaseOrderDashboardService
                 (int) $filters['department_id'],
             );
         }
+
+        if (isset($filters['created_by'])) {
+            $query->where(
+                'purchase_requests.created_by',
+                (int) $filters['created_by'],
+            );
+        }
     }
 
     /**
@@ -727,6 +940,13 @@ class PurchaseOrderDashboardService
             $query->where(
                 'purchase_orders.id_department',
                 (int) $filters['department_id'],
+            );
+        }
+
+        if (isset($filters['created_by'])) {
+            $query->where(
+                'purchase_orders.created_by',
+                (int) $filters['created_by'],
             );
         }
     }
@@ -1486,6 +1706,13 @@ class PurchaseOrderDashboardService
             );
         }
 
+        if (isset($filters['created_by'])) {
+            $query->where(
+                'po.created_by',
+                (int) $filters['created_by'],
+            );
+        }
+
         $rows = $query
             ->selectRaw(
                 "
@@ -1756,6 +1983,13 @@ class PurchaseOrderDashboardService
             $query->where(
                 'pr.id_department',
                 (int) $filters['department_id'],
+            );
+        }
+
+        if (isset($filters['created_by'])) {
+            $query->where(
+                'pr.created_by',
+                (int) $filters['created_by'],
             );
         }
 

@@ -200,6 +200,8 @@ router.beforeEach(async to => {
     'sso',
     'not-authorized',
     'forbidden',
+    'forgot-password',
+    'reset-password',
   ]
 
   const routeName = String(to.name || '')

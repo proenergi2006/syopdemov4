@@ -1,0 +1,16 @@
+{
+  "actions": {
+    "reset": "Reset",
+    "apply": "Apply",
+    "refresh": "Refresh"
+  },
+  "attachment": {
+    "title": "Attachment",
+    "addButton": "+ Add Attachment",
+    "empty": "No attachments uploaded yet.",
+    "remove": "Remove",
+    "invalidTitle": "Invalid file",
+    "invalidType": "\"{file}\" is not a PDF/JPG/JPEG/PNG file.",
+    "tooLarge": "\"{file}\" is larger than 3MB."
+  }
+}

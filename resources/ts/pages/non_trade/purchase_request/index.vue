@@ -764,6 +764,14 @@ const approvePurchaseRequest = async (): Promise<void> => {
 
     await fetchPurchaseRequests()
     await navigationStore.refreshBadges()
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh modal detail jika sedang terbuka untuk PR ini
+    |--------------------------------------------------------------------------
+    */
+    if (detailDialog.value && detailPurchaseRequestPublicId.value === target.public_id)
+      await openDetail(target.public_id)
   }
   catch (error: unknown) {
     closeAlert()
@@ -884,6 +892,14 @@ const rejectPurchaseRequisition = async (): Promise<void> => {
 
     await fetchPurchaseRequests()
     await navigationStore.refreshBadges()
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh modal detail jika sedang terbuka untuk PR ini
+    |--------------------------------------------------------------------------
+    */
+    if (detailDialog.value && detailPurchaseRequestPublicId.value === target.public_id)
+      await openDetail(target.public_id)
   }
   catch (error: unknown) {
     closeAlert()
@@ -1466,14 +1482,26 @@ const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
           || normalizeApprovalText(item.role)
           || `Tahap ${index + 1}`,
         status,
-        processed_by:
-          normalizeApprovalText(item.approver_name_snapshot)
-          || normalizeApprovalText(item.processed_by_name)
-          || normalizeApprovalText(item.approved_by_name)
-          || normalizeApprovalText(item.rejected_by_name)
-          || normalizeApprovalText(item.user_name)
-          || normalizeApprovalText(item.approver_name)
-          || '-',
+        /*
+        |--------------------------------------------------------------------------
+        | Diproses Oleh
+        |--------------------------------------------------------------------------
+        | Hanya tampilkan nama untuk tahap yang benar-benar sudah diproses.
+        | Tahap WAITING/PENDING belum diproses siapapun, walaupun nama calon
+        | approver sudah tersimpan sebagai snapshot.
+        |--------------------------------------------------------------------------
+        */
+        processed_by: ['APPROVED', 'REJECTED'].includes(status)
+          ? (
+            normalizeApprovalText(item.approver_name_snapshot)
+            || normalizeApprovalText(item.processed_by_name)
+            || normalizeApprovalText(item.approved_by_name)
+            || normalizeApprovalText(item.rejected_by_name)
+            || normalizeApprovalText(item.user_name)
+            || normalizeApprovalText(item.approver_name)
+            || '-'
+          )
+          : '-',
         processed_at: actionAt,
         notes:
           normalizeApprovalText(item.notes)
@@ -3482,6 +3510,30 @@ onBeforeUnmount(() => {
         <VDivider />
 
         <VCardActions class="justify-end px-6 py-4">
+          <VBtn
+            v-if="detailPurchaseRequest && canApprovePurchaseRequest(detailPurchaseRequest)"
+            color="success"
+            variant="tonal"
+            prepend-icon="tabler-circle-check"
+            class="text-none"
+            :disabled="approveLoading"
+            @click="openApprovePurchaseRequest(detailPurchaseRequest)"
+          >
+            Approve
+          </VBtn>
+
+          <VBtn
+            v-if="detailPurchaseRequest && canApprovePurchaseRequest(detailPurchaseRequest)"
+            color="error"
+            variant="tonal"
+            prepend-icon="mdi-close-circle-outline"
+            class="text-none"
+            :disabled="rejectLoading"
+            @click="openRejectPurchaseRequest(detailPurchaseRequest)"
+          >
+            Reject
+          </VBtn>
+
           <VBtn
             variant="tonal"
             @click="detailDialog = false"

@@ -177,6 +177,35 @@ const summaryColor = computed(() => {
 
   return 'info'
 })
+
+const effectiveApprovals = computed(() => {
+  return normalizedApprovals.value.filter(item => item.status_key !== 'cancelled')
+})
+
+const isFinished = computed(() => {
+  if (normalizedApprovals.value.length === 0) return false
+  if (rejectedStep.value) return false
+  if (waitingStep.value) return false
+
+  return effectiveApprovals.value.length > 0
+    && effectiveApprovals.value.every(item => item.status_key === 'approved')
+})
+
+const currentPositionText = computed(() => {
+  if (waitingStep.value) return `Tahap ${waitingStep.value.step_order}`
+  if (rejectedStep.value) return `Reject Tahap ${rejectedStep.value.step_order}`
+  if (isFinished.value) return 'Selesai'
+
+  return normalizedApprovals.value.length === 0 ? 'Belum Diajukan' : '-'
+})
+
+const currentPositionColor = computed(() => {
+  if (waitingStep.value) return 'warning'
+  if (rejectedStep.value) return 'error'
+  if (isFinished.value) return 'success'
+
+  return 'secondary'
+})
 </script>
 
 <template>
@@ -280,7 +309,7 @@ const summaryColor = computed(() => {
           >
             <VCard
               variant="tonal"
-              :color="waitingStep ? 'warning' : rejectedStep ? 'error' : 'info'"
+              :color="currentPositionColor"
               class="summary-card"
             >
               <VCardText>
@@ -288,13 +317,7 @@ const summaryColor = computed(() => {
                   Posisi Saat Ini
                 </div>
                 <div class="text-subtitle-1 font-weight-bold text-wrap">
-                  {{
-                    waitingStep
-                      ? `Tahap ${waitingStep.step_order}`
-                      : rejectedStep
-                        ? `Reject Tahap ${rejectedStep.step_order}`
-                        : 'Selesai'
-                  }}
+                  {{ currentPositionText }}
                 </div>
               </VCardText>
             </VCard>

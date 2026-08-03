@@ -14,6 +14,20 @@ class PermissionModuleSeeder extends Seeder
         $modules = [
             /*
             |--------------------------------------------------------------------------
+            | Dashboard
+            |--------------------------------------------------------------------------
+            */
+            [
+                'code' => 'dashboard',
+                'name' => 'Dashboard',
+                'description' => 'Module halaman utama dashboard (launcher, CRM, PO, PR, GR, Goods Return).',
+                'route_prefix' => '/dashboards',
+                'sort_order' => 5,
+                'is_active' => true,
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
             | Master Vendor
             |--------------------------------------------------------------------------
             */
@@ -65,6 +79,48 @@ class PermissionModuleSeeder extends Seeder
                 'description' => 'Module penerimaan barang berdasarkan Purchase Order.',
                 'route_prefix' => '/non_trade/goods_receive',
                 'sort_order' => 40,
+                'is_active' => true,
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Goods Return
+            |--------------------------------------------------------------------------
+            */
+            [
+                'code' => 'goods_return',
+                'name' => 'Goods Return',
+                'description' => 'Module pengembalian barang berdasarkan Goods Receipt.',
+                'route_prefix' => '/non_trade/goods_return',
+                'sort_order' => 45,
+                'is_active' => true,
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Dashboard Module Management
+            |--------------------------------------------------------------------------
+            */
+            [
+                'code' => 'dashboard_module',
+                'name' => 'Dashboard Module Management',
+                'description' => 'Module pengelolaan dashboard module dan dashboard module group.',
+                'route_prefix' => '/master/dashboard-modules',
+                'sort_order' => 50,
+                'is_active' => true,
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Activity Log
+            |--------------------------------------------------------------------------
+            */
+            [
+                'code' => 'activity_log',
+                'name' => 'Activity Log',
+                'description' => 'Module pemantauan catatan aktivitas seluruh user, mulai dari login sampai logout.',
+                'route_prefix' => '/master/activity-log',
+                'sort_order' => 55,
                 'is_active' => true,
             ],
         ];

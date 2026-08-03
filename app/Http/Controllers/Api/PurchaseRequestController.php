@@ -282,9 +282,14 @@ class PurchaseRequestController extends Controller
                 $user,
             );
 
-            $userAccessibleBranchIds = $userAccessAssignments
-                ->pluck('branch_id')
-                ->map(fn($id) => (int) $id)
+            $userAccessibleBranchIds = collect([
+                (int) ($user->cabang_id ?? 0),
+            ])
+                ->merge(
+                    $userAccessAssignments
+                        ->pluck('branch_id')
+                        ->map(fn($id) => (int) $id),
+                )
                 ->filter(fn($id) => $id > 0)
                 ->unique()
                 ->values();
@@ -1514,8 +1519,11 @@ class PurchaseRequestController extends Controller
         }
     }
 
-    public function show($publicId)
-    {
+    public function show(
+        Request $request,
+        $publicId,
+        PurchaseRequestApprovalService $approvalService,
+    ) {
         try {
             $id = Crypt::decryptString($publicId);
 
@@ -1745,6 +1753,34 @@ class PurchaseRequestController extends Controller
                 $valueDifferenceLabel = 'Kenaikan Nilai';
             }
 
+            /*
+        |--------------------------------------------------------------------------
+        | Approval yang bisa diproses user login
+        |--------------------------------------------------------------------------
+        | Sama seperti index(), supaya tombol Approve/Reject di modal detail
+        | punya sumber kebenaran yang identik dengan list.
+        |--------------------------------------------------------------------------
+        */
+            $user = $request->user();
+
+            $currentApproval = $pr->approvals
+                ->first(
+                    function (
+                        PurchaseRequestApproval $approval,
+                    ) use (
+                        $approvalService,
+                        $user,
+                    ): bool {
+                        return strtoupper(
+                            (string) $approval->status,
+                        ) === PurchaseRequestApproval::STATUS_WAITING
+                            && $approvalService->userCanApprove(
+                                $approval,
+                                $user,
+                            );
+                    },
+                );
+
             return response()->json([
                 'success' => true,
                 'message' => 'Detail Purchase Requisition berhasil dimuat.',
@@ -1752,6 +1788,16 @@ class PurchaseRequestController extends Controller
                 'data' => [
                     'id' => $pr->id,
                     'public_id' => $pr->encrypted_id,
+
+                    'can_approve' => $currentApproval !== null,
+                    'approval_id' => $currentApproval?->id,
+
+                    'approval_step_order' => $currentApproval
+                        ? (int) $currentApproval->step_order
+                        : null,
+
+                    'approval_label' => $currentApproval?->label,
+                    'approval_mode' => $currentApproval?->approval_mode,
                     'nomor_pr' => $pr->nomor_pr,
                     'tanggal_pr' => $pr->tanggal_pr,
 
@@ -3679,41 +3725,6 @@ class PurchaseRequestController extends Controller
             $headersAlreadySent = headers_sent(
                 $headersSentFile,
                 $headersSentLine,
-            );
-
-            Log::info(
-                '[PR PDF HEADERS SENT CHECK]',
-                [
-                    'public_id' => $publicId,
-                    'pr_id' => $pr->id,
-                    'nomor_pr' => $pr->nomor_pr,
-
-                    'headers_sent' => $headersAlreadySent,
-
-                    'headers_sent_file' => $headersAlreadySent
-                        ? $headersSentFile
-                        : null,
-
-                    'headers_sent_line' => $headersAlreadySent
-                        ? $headersSentLine
-                        : null,
-
-                    'response_class' => get_class($response),
-
-                    'response_headers' => $response
-                        ->headers
-                        ->all(),
-
-                    /*
-                |--------------------------------------------------------------------------
-                | Header native PHP sebelum Symfony mengirim response
-                |--------------------------------------------------------------------------
-                | Biasanya belum berisi seluruh header response Laravel.
-                */
-                    'native_headers_before_return' => headers_list(),
-
-                    'pdf_size_bytes' => strlen($pdfOutput),
-                ],
             );
 
             return $response;

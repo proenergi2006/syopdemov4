@@ -101,16 +101,18 @@ class GoodsReturnController extends Controller
         |--------------------------------------------------------------------------
         | Identitas organisasi user
         |--------------------------------------------------------------------------
+        | Menggunakan seluruh cabang/department dari user_access_assignments
+        | (multi-assignment), dengan fallback ke master user apabila user
+        | belum pernah di-assign sama sekali.
+        |--------------------------------------------------------------------------
         */
-            $departmentId = (int) (
-                $user->departemen_id
-                ?? 0
-            );
+            $accessibleDepartmentIds = $user
+                ->accessibleDepartmentIds()
+                ->all();
 
-            $cabangId = (int) (
-                $user->cabang_id
-                ?? 0
-            );
+            $accessibleCabangIds = $user
+                ->accessibleBranchIds()
+                ->all();
 
             /*
         |--------------------------------------------------------------------------
@@ -175,7 +177,7 @@ class GoodsReturnController extends Controller
                     $user->id,
                 );
             } elseif ($viewScope === 'OWN_DEPARTMENT') {
-                if ($departmentId <= 0) {
+                if (empty($accessibleDepartmentIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
                     /*
@@ -183,13 +185,13 @@ class GoodsReturnController extends Controller
                 | Gunakan snapshot department Goods Return
                 |--------------------------------------------------------------------------
                 */
-                    $query->where(
+                    $query->whereIn(
                         'goods_returns.id_department',
-                        $departmentId,
+                        $accessibleDepartmentIds,
                     );
                 }
             } elseif ($viewScope === 'OWN_CABANG') {
-                if ($cabangId <= 0) {
+                if (empty($accessibleCabangIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
                     /*
@@ -197,9 +199,9 @@ class GoodsReturnController extends Controller
                 | Gunakan snapshot cabang Goods Return
                 |--------------------------------------------------------------------------
                 */
-                    $query->where(
+                    $query->whereIn(
                         'goods_returns.cabang',
-                        $cabangId,
+                        $accessibleCabangIds,
                     );
                 }
             }
@@ -831,9 +833,11 @@ class GoodsReturnController extends Controller
         */
             $user = $request->user();
 
-            $departmentId = $user->departemen_id;
+            $departmentIds = $user
+                ->accessibleDepartmentIds()
+                ->all();
 
-            if (!$departmentId) {
+            if (empty($departmentIds)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Department pengguna belum dikonfigurasi.',
@@ -857,10 +861,10 @@ class GoodsReturnController extends Controller
                 )
                 ->whereHas(
                     'purchaseOrder',
-                    function ($query) use ($departmentId) {
-                        $query->where(
+                    function ($query) use ($departmentIds) {
+                        $query->whereIn(
                             'id_department',
-                            $departmentId,
+                            $departmentIds,
                         );
                     },
                 )
@@ -2165,31 +2169,29 @@ class GoodsReturnController extends Controller
                     $user->id,
                 );
             } elseif ($viewScope === 'OWN_DEPARTMENT') {
-                $departmentId = (int) (
-                    $user->departemen_id
-                    ?? 0
-                );
+                $departmentIds = $user
+                    ->accessibleDepartmentIds()
+                    ->all();
 
-                if ($departmentId <= 0) {
+                if (empty($departmentIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
-                    $query->where(
+                    $query->whereIn(
                         'goods_returns.id_department',
-                        $departmentId,
+                        $departmentIds,
                     );
                 }
             } elseif ($viewScope === 'OWN_CABANG') {
-                $cabangId = (int) (
-                    $user->cabang_id
-                    ?? 0
-                );
+                $cabangIds = $user
+                    ->accessibleBranchIds()
+                    ->all();
 
-                if ($cabangId <= 0) {
+                if (empty($cabangIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
-                    $query->where(
+                    $query->whereIn(
                         'goods_returns.cabang',
-                        $cabangId,
+                        $cabangIds,
                     );
                 }
             }
@@ -2765,31 +2767,29 @@ class GoodsReturnController extends Controller
                     $user->id,
                 );
             } elseif ($viewScope === 'OWN_DEPARTMENT') {
-                $departmentId = (int) (
-                    $user->departemen_id
-                    ?? 0
-                );
+                $departmentIds = $user
+                    ->accessibleDepartmentIds()
+                    ->all();
 
-                if ($departmentId <= 0) {
+                if (empty($departmentIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
-                    $query->where(
+                    $query->whereIn(
                         'goods_returns.id_department',
-                        $departmentId,
+                        $departmentIds,
                     );
                 }
             } elseif ($viewScope === 'OWN_CABANG') {
-                $cabangId = (int) (
-                    $user->cabang_id
-                    ?? 0
-                );
+                $cabangIds = $user
+                    ->accessibleBranchIds()
+                    ->all();
 
-                if ($cabangId <= 0) {
+                if (empty($cabangIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
-                    $query->where(
+                    $query->whereIn(
                         'goods_returns.cabang',
-                        $cabangId,
+                        $cabangIds,
                     );
                 }
             }
@@ -3482,12 +3482,14 @@ class GoodsReturnController extends Controller
                     === (int) $user->id,
 
                 'OWN_DEPARTMENT' =>
-                (int) $goodsReturn->id_department
-                    === (int) ($user->departemen_id ?? 0),
+                $user->accessibleDepartmentIds()->contains(
+                    (int) $goodsReturn->id_department,
+                ),
 
                 'OWN_CABANG' =>
-                (int) $goodsReturn->cabang
-                    === (int) ($user->cabang_id ?? 0),
+                $user->accessibleBranchIds()->contains(
+                    (int) $goodsReturn->cabang,
+                ),
 
                 default => false,
             };
@@ -4172,12 +4174,14 @@ class GoodsReturnController extends Controller
                     === (int) $user->id,
 
                 'OWN_DEPARTMENT' =>
-                (int) $goodsReturn->id_department
-                    === (int) ($user->departemen_id ?? 0),
+                $user->accessibleDepartmentIds()->contains(
+                    (int) $goodsReturn->id_department,
+                ),
 
                 'OWN_CABANG' =>
-                (int) $goodsReturn->cabang
-                    === (int) ($user->cabang_id ?? 0),
+                $user->accessibleBranchIds()->contains(
+                    (int) $goodsReturn->cabang,
+                ),
 
                 default => false,
             };
@@ -4592,12 +4596,11 @@ class GoodsReturnController extends Controller
         | Department user
         |--------------------------------------------------------------------------
         */
-            $departmentId = (int) (
-                $user->departemen_id
-                ?? 0
-            );
+            $departmentIds = $user
+                ->accessibleDepartmentIds()
+                ->all();
 
-            if ($departmentId <= 0) {
+            if (empty($departmentIds)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Department akun Anda belum tersedia.',
@@ -4655,9 +4658,9 @@ class GoodsReturnController extends Controller
             | Department penerima
             |--------------------------------------------------------------------------
             */
-                ->where(
+                ->whereIn(
                     'goods_returns.id_department',
-                    $departmentId,
+                    $departmentIds,
                 )
 
                 ->orderByDesc(

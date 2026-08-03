@@ -6,6 +6,7 @@ import {
   onMounted,
   ref,
 } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 type PeriodType =
@@ -98,17 +99,33 @@ interface DashboardStatus {
   total: number
 }
 
-interface AttentionItem {
+interface PendingApprovalItem {
   public_id: string
   po_number: string
   po_date: string | null
+  submitted_at: string | null
   cabang_name: string | null
   department_name: string | null
   vendor_name: string | null
   total_amount: number
-  status: string
-  age_days: number
-  reason: string
+  current_approval_label: string | null
+  waiting_since: string | null
+  waiting_days: number
+  waiting_hours: number
+  waiting_label: string | null
+}
+
+interface PendingApprovalResponse {
+  success: boolean
+  message: string
+  data: PendingApprovalItem[]
+
+  meta: {
+    current_page: number
+    last_page: number
+    per_page: number
+    total: number
+  }
 }
 
 interface DashboardResponse {
@@ -119,7 +136,6 @@ interface DashboardResponse {
     summary: DashboardSummary
     trend: DashboardTrend[]
     statuses: DashboardStatus[]
-    attention_items: AttentionItem[]
     breakdown: {
       by_cabang: DashboardBreakdownItem[]
       by_department: DashboardBreakdownItem[]
@@ -209,6 +225,16 @@ interface ValueComparison {
 }
 
 const router = useRouter()
+const { t, locale } = useI18n()
+
+/*
+ * Format tanggal (nama bulan, dsb) ikut bahasa aktif; format angka
+ * dan mata uang tetap konsisten Rupiah/Indonesia terlepas dari bahasa,
+ * karena ini data finansial perusahaan Indonesia.
+ */
+const dateIntlLocale = computed(() => (
+  locale.value === 'en' ? 'en-US' : 'id-ID'
+))
 
 /*
 |--------------------------------------------------------------------------
@@ -237,33 +263,33 @@ const selectedDepartmentId = ref<number | string | null>(null)
 |--------------------------------------------------------------------------
 */
 
-const periodOptions = [
+const periodOptions = computed(() => [
   {
-    title: 'Harian',
+    title: t('dashboard.purchaseOrder.filters.periodOptions.day'),
     value: 'day',
     icon: 'mdi-calendar-today-outline',
   },
   {
-    title: 'Mingguan',
+    title: t('dashboard.purchaseOrder.filters.periodOptions.week'),
     value: 'week',
     icon: 'mdi-calendar-week-outline',
   },
   {
-    title: 'Bulanan',
+    title: t('dashboard.purchaseOrder.filters.periodOptions.month'),
     value: 'month',
     icon: 'mdi-calendar-month-outline',
   },
   {
-    title: 'Tahunan',
+    title: t('dashboard.purchaseOrder.filters.periodOptions.year'),
     value: 'year',
     icon: 'mdi-calendar-blank-multiple',
   },
   {
-    title: 'Rentang Tanggal',
+    title: t('dashboard.purchaseOrder.filters.periodOptions.range'),
     value: 'range',
     icon: 'mdi-calendar-range',
   },
-]
+])
 
 const yearOptions = Array.from(
   {
@@ -309,16 +335,16 @@ const cabangBreakdownMetric
 const departmentBreakdownMetric
   = ref<BreakdownMetric>('amount')
 
-const breakdownMetricOptions = [
+const breakdownMetricOptions = computed(() => [
   {
-    title: 'Nilai Transaksi',
+    title: t('dashboard.purchaseOrder.breakdown.metricOptions.amount'),
     value: 'amount',
   },
   {
-    title: 'Jumlah Dokumen',
+    title: t('dashboard.purchaseOrder.breakdown.metricOptions.count'),
     value: 'count',
   },
-]
+])
 
 const executiveChartSubtitle = computed(() => {
   return appliedPeriodLabel.value || selectedPeriodDescription.value
@@ -396,7 +422,21 @@ const summary = ref<DashboardSummary>({
 
 const trend = ref<DashboardTrend[]>([])
 const statuses = ref<DashboardStatus[]>([])
-const attentionItems = ref<AttentionItem[]>([])
+
+/*
+|--------------------------------------------------------------------------
+| Purchase Order Menunggu Approval
+|--------------------------------------------------------------------------
+*/
+
+const pendingApprovalItems = ref<PendingApprovalItem[]>([])
+const pendingApprovalPage = ref(1)
+const pendingApprovalLastPage = ref(1)
+const pendingApprovalTotal = ref(0)
+const pendingApprovalPerPage = 3
+
+const isLoadingPendingApprovals = ref(false)
+const pendingApprovalErrorMessage = ref('')
 
 const defaultItemPriceComparison = (): ItemPriceComparison => ({
   summary: {
@@ -436,12 +476,6 @@ const valueComparison = ref<ValueComparison>(
 
 const visibleStatuses = computed(() => {
   return statuses.value.filter(item => {
-    return !isExcludedDashboardStatus(item.status)
-  })
-})
-
-const visibleAttentionItems = computed(() => {
-  return attentionItems.value.filter(item => {
     return !isExcludedDashboardStatus(item.status)
   })
 })
@@ -595,14 +629,20 @@ const selectedPeriodDescription = computed(() => {
   if (selectedPeriod.value === 'month')
     return formatMonth(selectedMonth.value)
 
-  if (selectedPeriod.value === 'year')
-    return `Tahun ${selectedYear.value}`
+  if (selectedPeriod.value === 'year') {
+    return t('dashboard.purchaseOrder.filters.yearLabel', {
+      year: selectedYear.value,
+    })
+  }
 
   if (selectedPeriod.value === 'range') {
     if (!startDate.value || !endDate.value)
       return '-'
 
-    return `${formatDate(startDate.value)} sampai ${formatDate(endDate.value)}`
+    return t('dashboard.purchaseOrder.filters.rangeLabel', {
+      start: formatDate(startDate.value),
+      end: formatDate(endDate.value),
+    })
   }
 
   return '-'
@@ -616,46 +656,50 @@ const selectedPeriodDescription = computed(() => {
 
 const statisticCards = computed(() => [
   {
-    title: 'Total Purchase Requisition',
-    shortTitle: 'PR',
+    code: 'total_pr',
+    title: t('dashboard.purchaseOrder.stats.totalPr.title'),
+    shortTitle: t('dashboard.purchaseOrder.stats.totalPr.shortTitle'),
     value: formatNumber(summary.value.total_pr),
     fullValue: null,
-    subtitle: 'Jumlah kebutuhan yang diajukan',
+    subtitle: t('dashboard.purchaseOrder.stats.totalPr.subtitle'),
     icon: 'mdi-file-document-edit-outline',
     color: 'primary',
   },
   {
-    title: 'Nilai Purchase Requisition',
-    shortTitle: 'Nilai PR',
+    code: 'pr_amount',
+    title: t('dashboard.purchaseOrder.stats.prAmount.title'),
+    shortTitle: t('dashboard.purchaseOrder.stats.prAmount.shortTitle'),
     value: formatCompactCurrency(
       summary.value.total_pr_amount,
     ),
     fullValue: formatCurrency(
       summary.value.total_pr_amount,
     ),
-    subtitle: 'Total nilai kebutuhan pembelian',
+    subtitle: t('dashboard.purchaseOrder.stats.prAmount.subtitle'),
     icon: 'mdi-cash-clock',
     color: 'info',
   },
   {
-    title: 'Total Purchase Order',
-    shortTitle: 'PO',
+    code: 'total_po',
+    title: t('dashboard.purchaseOrder.stats.totalPo.title'),
+    shortTitle: t('dashboard.purchaseOrder.stats.totalPo.shortTitle'),
     value: formatNumber(summary.value.total_po),
     fullValue: null,
-    subtitle: 'Jumlah pesanan yang diterbitkan',
+    subtitle: t('dashboard.purchaseOrder.stats.totalPo.subtitle'),
     icon: 'mdi-file-sign',
     color: 'success',
   },
   {
-    title: 'Nilai Purchase Order',
-    shortTitle: 'Nilai PO',
+    code: 'po_amount',
+    title: t('dashboard.purchaseOrder.stats.poAmount.title'),
+    shortTitle: t('dashboard.purchaseOrder.stats.poAmount.shortTitle'),
     value: formatCompactCurrency(
       summary.value.total_po_amount,
     ),
     fullValue: formatCurrency(
       summary.value.total_po_amount,
     ),
-    subtitle: 'Total nilai realisasi pembelian',
+    subtitle: t('dashboard.purchaseOrder.stats.poAmount.subtitle'),
     icon: 'mdi-cash-check',
     color: 'warning',
   },
@@ -663,13 +707,15 @@ const statisticCards = computed(() => [
 
 const operationalStatistics = computed(() => [
   {
-    title: 'PR Belum Menjadi PO',
+    code: 'pr_not_ordered',
+    title: t('dashboard.purchaseOrder.operational.prNotOrdered'),
     value: formatNumber(summary.value.pr_not_ordered),
     icon: 'mdi-file-document-alert-outline',
     color: 'warning',
   },
   {
-    title: 'PO Menunggu Persetujuan',
+    code: 'pending_po_approval',
+    title: t('dashboard.purchaseOrder.operational.pendingApproval'),
     value: formatNumber(
       summary.value.pending_po_approval,
     ),
@@ -677,7 +723,8 @@ const operationalStatistics = computed(() => [
     color: 'warning',
   },
   {
-    title: 'Outstanding Receipt',
+    code: 'outstanding_receipt',
+    title: t('dashboard.purchaseOrder.operational.outstandingReceipt'),
     value: formatNumber(
       summary.value.outstanding_receipt,
     ),
@@ -685,7 +732,8 @@ const operationalStatistics = computed(() => [
     color: 'info',
   },
   {
-    title: 'Konversi PR ke PO',
+    code: 'conversion_rate',
+    title: t('dashboard.purchaseOrder.operational.conversionRate'),
     value: `${formatDecimal(summary.value.conversion_rate)}%`,
     icon: 'mdi-swap-horizontal-circle-outline',
     color: 'success',
@@ -703,25 +751,25 @@ const managementInsight = computed<ManagementInsight>(() => {
 
   if (summary.value.pr_not_ordered > 0) {
     messages.push(
-      `${formatNumber(
-        summary.value.pr_not_ordered,
-      )} PR yang telah disetujui belum diproses menjadi PO`,
+      t('dashboard.purchaseOrder.insight.prNotOrdered', {
+        count: formatNumber(summary.value.pr_not_ordered),
+      }),
     )
   }
 
   if (summary.value.pending_po_approval > 0) {
     messages.push(
-      `${formatNumber(
-        summary.value.pending_po_approval,
-      )} PO masih menunggu persetujuan`,
+      t('dashboard.purchaseOrder.insight.pendingApproval', {
+        count: formatNumber(summary.value.pending_po_approval),
+      }),
     )
   }
 
   if (summary.value.outstanding_receipt > 0) {
     messages.push(
-      `${formatNumber(
-        summary.value.outstanding_receipt,
-      )} PO belum selesai diterima`,
+      t('dashboard.purchaseOrder.insight.outstandingReceipt', {
+        count: formatNumber(summary.value.outstanding_receipt),
+      }),
     )
   }
 
@@ -730,9 +778,9 @@ const managementInsight = computed<ManagementInsight>(() => {
     && summary.value.conversion_rate < 80
   ) {
     messages.push(
-      `tingkat konversi PR ke PO baru mencapai ${formatDecimal(
-        summary.value.conversion_rate,
-      )}%`,
+      t('dashboard.purchaseOrder.insight.conversionRate', {
+        rate: formatDecimal(summary.value.conversion_rate),
+      }),
     )
   }
 
@@ -740,16 +788,15 @@ const managementInsight = computed<ManagementInsight>(() => {
     return {
       type: 'success',
       icon: 'mdi-check-decagram-outline',
-      title: 'Proses procurement dalam kondisi terkendali',
-      message:
-        'Belum ditemukan PR atau PO yang membutuhkan perhatian khusus pada periode terpilih.',
+      title: t('dashboard.purchaseOrder.insight.okTitle'),
+      message: t('dashboard.purchaseOrder.insight.okMessage'),
     }
   }
 
   return {
     type: 'warning',
     icon: 'mdi-alert-outline',
-    title: 'Perlu perhatian management',
+    title: t('dashboard.purchaseOrder.insight.warningTitle'),
     message: `${messages.join('. ')}.`,
   }
 })
@@ -1229,7 +1276,7 @@ const comparisonChartOptions = computed(() => {
           },
           total: {
             show: true,
-            label: 'Realisasi',
+            label: t('dashboard.purchaseOrder.chart.realizationCenterLabel'),
             formatter: () => {
               return `${formatDecimal(comparisonRealizationRate.value)}%`
             },
@@ -1239,7 +1286,7 @@ const comparisonChartOptions = computed(() => {
     },
 
     labels: [
-      'PO terhadap PR',
+      t('dashboard.purchaseOrder.chart.realizationSeriesLabel'),
     ],
 
     stroke: {
@@ -1265,13 +1312,13 @@ const comparisonChartOptions = computed(() => {
 
 const trendChartSeries = computed(() => [
   {
-    name: 'Nilai PR',
+    name: t('dashboard.purchaseOrder.chart.prAmountLabel'),
     data: trend.value.map(
       item => Number(item.pr_amount ?? 0),
     ),
   },
   {
-    name: 'Nilai PO',
+    name: t('dashboard.purchaseOrder.chart.poAmountLabel'),
     data: trend.value.map(
       item => Number(item.po_amount ?? 0),
     ),
@@ -1458,7 +1505,7 @@ const trendChartOptions = computed(() => {
     ],
 
     noData: {
-      text: 'Belum ada data tren PR dan PO',
+      text: t('dashboard.purchaseOrder.chart.noTrendChartData'),
       align: 'center',
       verticalAlign: 'middle',
     },
@@ -1930,7 +1977,7 @@ function getCurrencyScale(maxValue: number): {
       divisor: 1_000_000_000_000,
       shortSuffix: 'T',
       longSuffix: 'Triliun',
-      title: 'Triliun Rupiah',
+      title: t('dashboard.purchaseOrder.chart.scale.trillion'),
     }
   }
 
@@ -1939,7 +1986,7 @@ function getCurrencyScale(maxValue: number): {
       divisor: 1_000_000_000,
       shortSuffix: 'M',
       longSuffix: 'Miliar',
-      title: 'Miliar Rupiah',
+      title: t('dashboard.purchaseOrder.chart.scale.billion'),
     }
   }
 
@@ -1948,7 +1995,7 @@ function getCurrencyScale(maxValue: number): {
       divisor: 1_000_000,
       shortSuffix: 'Jt',
       longSuffix: 'Juta',
-      title: 'Juta Rupiah',
+      title: t('dashboard.purchaseOrder.chart.scale.million'),
     }
   }
 
@@ -1957,7 +2004,7 @@ function getCurrencyScale(maxValue: number): {
       divisor: 1_000,
       shortSuffix: 'Rb',
       longSuffix: 'Ribu',
-      title: 'Ribu Rupiah',
+      title: t('dashboard.purchaseOrder.chart.scale.thousand'),
     }
   }
 
@@ -1965,7 +2012,7 @@ function getCurrencyScale(maxValue: number): {
     divisor: 1,
     shortSuffix: '',
     longSuffix: '',
-    title: 'Rupiah',
+    title: t('dashboard.purchaseOrder.chart.scale.rupiah'),
   }
 }
 
@@ -1984,7 +2031,9 @@ function formatChartCurrency(
 }
 
 function buildCurrencyAxisTitle(maxValue: number): string {
-  return `Nilai transaksi (${getCurrencyScale(maxValue).title})`
+  return t('dashboard.purchaseOrder.chart.transactionValueAxis', {
+    scale: getCurrencyScale(maxValue).title,
+  })
 }
 
 function normalizeStatusValue(
@@ -2018,11 +2067,25 @@ function formatDate(
   if (Number.isNaN(date.getTime()))
     return value
 
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat(dateIntlLocale.value, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   }).format(date)
+}
+
+/*
+ * submitted_at datang sebagai timestamp ISO 8601 lengkap
+ * (mis. 2026-07-16T08:57:33+07:00), bukan tanggal murni
+ * seperti kolom *_date lain, jadi diambil bagian tanggalnya saja.
+ */
+function formatDateOnly(
+  value: string | null | undefined,
+): string {
+  if (!value)
+    return '-'
+
+  return formatDate(value.slice(0, 10))
 }
 
 function formatMonth(
@@ -2039,7 +2102,7 @@ function formatMonth(
     1,
   )
 
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat(dateIntlLocale.value, {
     month: 'long',
     year: 'numeric',
   }).format(date)
@@ -2053,7 +2116,10 @@ function formatWeek(
 
   const [year, week] = value.split('-W')
 
-  return `Minggu ${Number(week)}, Tahun ${year}`
+  return t('dashboard.purchaseOrder.filters.weekLabel', {
+    week: Number(week),
+    year,
+  })
 }
 
 function formatDateTime(
@@ -2062,13 +2128,23 @@ function formatDateTime(
   if (!value)
     return '-'
 
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat(dateIntlLocale.value, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(value)
+}
+
+function pendingApprovalWaitingColor(waitingDays: number): string {
+  if (waitingDays >= 7)
+    return 'error'
+
+  if (waitingDays >= 3)
+    return 'warning'
+
+  return 'info'
 }
 
 function statusColor(status: string): string {
@@ -2084,6 +2160,35 @@ function statusColor(status: string): string {
   return colors[
     status.toUpperCase()
   ] ?? 'primary'
+}
+
+/*
+ * Label status dikirim backend dalam bahasa Inggris apa adanya
+ * (mis. "In Progress"), jadi dipetakan ulang lewat kode status
+ * supaya ikut berubah sesuai bahasa aktif.
+ */
+function statusDisplayLabel(status: string): string {
+  const labels: Record<string, string> = {
+    'IN PROGRESS': t('dashboard.purchaseOrder.status.inProgress'),
+    'APPROVED': t('dashboard.purchaseOrder.status.approved'),
+  }
+
+  return labels[status.toUpperCase()] ?? status
+}
+
+/*
+ * scope_view datang sebagai kode akses (ALL / OWN_CABANG /
+ * OWN_DEPARTMENT) dari backend, dipetakan ke label yang lebih
+ * mudah dibaca dan ikut bahasa aktif.
+ */
+function scopeViewLabel(scope: string): string {
+  const labels: Record<string, string> = {
+    ALL: t('dashboard.purchaseOrder.filters.scope.all'),
+    OWN_CABANG: t('dashboard.purchaseOrder.filters.scope.ownCabang'),
+    OWN_DEPARTMENT: t('dashboard.purchaseOrder.filters.scope.ownDepartment'),
+  }
+
+  return labels[scope.toUpperCase()] ?? scope
 }
 
 function statusPercentage(total: number): number {
@@ -2327,8 +2432,7 @@ function buildFilterParams(): Record<
 
 async function fetchDashboard(): Promise<void> {
   if (!isFilterValid.value) {
-    errorMessage.value =
-      'Periode filter belum diisi dengan benar.'
+    errorMessage.value = t('dashboard.purchaseOrder.errors.periodInvalid')
 
     return
   }
@@ -2396,9 +2500,6 @@ async function fetchDashboard(): Promise<void> {
     trend.value = data.trend ?? []
     statuses.value = data.statuses ?? []
 
-    attentionItems.value =
-      data.attention_items ?? []
-
     itemPriceComparison.value = normalizeItemPriceComparison(
       data.item_price_comparison,
     )
@@ -2417,6 +2518,8 @@ async function fetchDashboard(): Promise<void> {
       selectedPeriodDescription.value
 
     lastUpdatedAt.value = new Date()
+
+    await fetchPendingApprovals(1)
   }
   catch (error) {
     console.error(
@@ -2424,12 +2527,66 @@ async function fetchDashboard(): Promise<void> {
       error,
     )
 
-    errorMessage.value =
-      'Data dashboard Purchase Order gagal dimuat.'
+    errorMessage.value = t('dashboard.purchaseOrder.errors.dashboardFailed')
   }
   finally {
     isLoading.value = false
   }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Purchase Order Menunggu Approval
+|--------------------------------------------------------------------------
+*/
+
+async function fetchPendingApprovals(
+  page = 1,
+): Promise<void> {
+  isLoadingPendingApprovals.value = true
+  pendingApprovalErrorMessage.value = ''
+
+  try {
+    /*
+     * Ikut filter periode + cabang + departemen yang sama dengan
+     * dashboard utama, supaya daftar ini seragam dengan card
+     * ringkasan lain (mis. filter Juni -> hanya PO Juni yang menggantung).
+     */
+    const params = {
+      ...buildFilterParams(),
+      page,
+      per_page: pendingApprovalPerPage,
+    }
+
+    const response = await axios.get<PendingApprovalResponse>(
+      '/dashboard/purchase-order/pending-approvals',
+      {
+        params,
+      },
+    )
+
+    pendingApprovalItems.value = response.data.data ?? []
+    pendingApprovalPage.value = response.data.meta.current_page
+    pendingApprovalLastPage.value = response.data.meta.last_page
+    pendingApprovalTotal.value = response.data.meta.total
+  }
+  catch (error) {
+    console.error(
+      'Failed to load pending approval purchase orders:',
+      error,
+    )
+
+    pendingApprovalErrorMessage.value = t('dashboard.purchaseOrder.errors.pendingApprovalsFailed')
+  }
+  finally {
+    isLoadingPendingApprovals.value = false
+  }
+}
+
+async function changePendingApprovalPage(
+  page: number,
+): Promise<void> {
+  await fetchPendingApprovals(page)
 }
 
 /*
@@ -2514,20 +2671,19 @@ onMounted(async () => {
                 class="d-flex flex-wrap align-center gap-2 mb-1"
               >
                 <h1 class="text-h4 font-weight-bold mb-0">
-                  Purchase Order Management Dashboard
+                  {{ t('dashboard.purchaseOrder.header.title') }}
                 </h1>
               </div>
 
               <p class="text-body-2 text-medium-emphasis mb-0">
-                Perbandingan kebutuhan Purchase Requisition
-                dan realisasi Purchase Order.
+                {{ t('dashboard.purchaseOrder.header.description') }}
               </p>
             </div>
           </div>
 
           <div class="text-md-end">
             <div class="text-caption text-medium-emphasis">
-              Terakhir diperbarui
+              {{ t('dashboard.purchaseOrder.header.lastUpdated') }}
             </div>
 
             <div class="text-body-2 font-weight-medium">
@@ -2543,7 +2699,7 @@ onMounted(async () => {
               class="mt-1 text-none"
               @click="refreshDashboard"
             >
-              Perbarui
+              {{ t('common.actions.refresh') }}
             </VBtn>
           </div>
         </div>
@@ -2562,11 +2718,11 @@ onMounted(async () => {
         <div class="filter-header">
           <div>
             <h2 class="text-h6 font-weight-semibold mb-1">
-              Filter Data
+              {{ t('dashboard.purchaseOrder.filters.title') }}
             </h2>
 
             <p class="text-body-2 text-medium-emphasis mb-0">
-              Periode aktif:
+              {{ t('dashboard.purchaseOrder.filters.activePeriod') }}
               <strong>
                 {{
                   appliedPeriodLabel
@@ -2581,7 +2737,7 @@ onMounted(async () => {
             variant="tonal"
             prepend-icon="mdi-shield-account-outline"
           >
-            Scope {{ access.scope_view }}
+            {{ t('dashboard.purchaseOrder.filters.scope.label', { scope: scopeViewLabel(access.scope_view) }) }}
           </VChip>
         </div>
 
@@ -2591,7 +2747,7 @@ onMounted(async () => {
             :items="periodOptions"
             item-title="title"
             item-value="value"
-            label="Jenis Periode"
+            :label="t('dashboard.purchaseOrder.filters.periodType')"
             prepend-inner-icon="mdi-calendar-filter-outline"
             variant="outlined"
             density="comfortable"
@@ -2602,7 +2758,7 @@ onMounted(async () => {
             v-if="selectedPeriod === 'day'"
             v-model="selectedDate"
             type="date"
-            label="Pilih Tanggal"
+            :label="t('dashboard.purchaseOrder.filters.pickDate')"
             prepend-inner-icon="mdi-calendar-today-outline"
             variant="outlined"
             density="comfortable"
@@ -2613,7 +2769,7 @@ onMounted(async () => {
             v-if="selectedPeriod === 'week'"
             v-model="selectedWeek"
             type="week"
-            label="Pilih Minggu"
+            :label="t('dashboard.purchaseOrder.filters.pickWeek')"
             prepend-inner-icon="mdi-calendar-week-outline"
             variant="outlined"
             density="comfortable"
@@ -2624,7 +2780,7 @@ onMounted(async () => {
             v-if="selectedPeriod === 'month'"
             v-model="selectedMonth"
             type="month"
-            label="Pilih Bulan"
+            :label="t('dashboard.purchaseOrder.filters.pickMonth')"
             prepend-inner-icon="mdi-calendar-month-outline"
             variant="outlined"
             density="comfortable"
@@ -2637,7 +2793,7 @@ onMounted(async () => {
             :items="yearOptions"
             item-title="title"
             item-value="value"
-            label="Pilih Tahun"
+            :label="t('dashboard.purchaseOrder.filters.pickYear')"
             prepend-inner-icon="mdi-calendar-blank-multiple"
             variant="outlined"
             density="comfortable"
@@ -2648,7 +2804,7 @@ onMounted(async () => {
             <VTextField
               v-model="startDate"
               type="date"
-              label="Tanggal Mulai"
+              :label="t('dashboard.purchaseOrder.filters.startDate')"
               prepend-inner-icon="mdi-calendar-start"
               variant="outlined"
               density="comfortable"
@@ -2658,7 +2814,7 @@ onMounted(async () => {
             <VTextField
               v-model="endDate"
               type="date"
-              label="Tanggal Selesai"
+              :label="t('dashboard.purchaseOrder.filters.endDate')"
               prepend-inner-icon="mdi-calendar-end"
               variant="outlined"
               density="comfortable"
@@ -2673,8 +2829,8 @@ onMounted(async () => {
             item-value="value"
             :label="
               access.can_filter_cabang
-                ? 'Semua Cabang'
-                : 'Cabang'
+                ? t('dashboard.purchaseOrder.filters.allBranches')
+                : t('dashboard.purchaseOrder.filters.branch')
             "
             prepend-inner-icon="mdi-office-building-outline"
             variant="outlined"
@@ -2692,8 +2848,8 @@ onMounted(async () => {
             item-value="value"
             :label="
               access.can_filter_department
-                ? 'Semua Departemen'
-                : 'Departemen'
+                ? t('dashboard.purchaseOrder.filters.allDepartments')
+                : t('dashboard.purchaseOrder.filters.department')
             "
             prepend-inner-icon="mdi-account-group-outline"
             variant="outlined"
@@ -2719,8 +2875,7 @@ onMounted(async () => {
               class="me-1"
             />
 
-            Filter cabang dan departemen mengikuti scope
-            permission pengguna.
+            {{ t('dashboard.purchaseOrder.filters.scopeNote') }}
           </div>
 
           <div class="d-flex align-center gap-2">
@@ -2732,7 +2887,7 @@ onMounted(async () => {
               @click="resetFilter"
               class="text-none"
             >
-              Reset
+              {{ t('common.actions.reset') }}
             </VBtn>
 
             <VBtn
@@ -2743,7 +2898,7 @@ onMounted(async () => {
               @click="applyFilter"
               class="text-none"
             >
-              Terapkan
+              {{ t('common.actions.apply') }}
             </VBtn>
           </div>
         </div>
@@ -2755,7 +2910,7 @@ onMounted(async () => {
           density="compact"
           class="mt-4"
         >
-          Lengkapi pilihan periode terlebih dahulu.
+          {{ t('dashboard.purchaseOrder.filters.incompletePeriod') }}
         </VAlert>
       </VCardText>
     </VCard>
@@ -2800,7 +2955,7 @@ onMounted(async () => {
     >
       <VCol
         v-for="(card, index) in statisticCards"
-        :key="card.title"
+        :key="card.code"
         cols="12"
         sm="6"
         xl="3"
@@ -2862,7 +3017,7 @@ onMounted(async () => {
         <VRow>
           <VCol
             v-for="item in operationalStatistics"
-            :key="item.title"
+            :key="item.code"
             cols="12"
             sm="6"
             lg="3"
@@ -2917,11 +3072,11 @@ onMounted(async () => {
         <VCard class="dashboard-card chart-card h-100">
           <VCardItem class="chart-card-header">
             <VCardTitle>
-              Realisasi PO terhadap PR
+              {{ t('dashboard.purchaseOrder.chart.realizationTitle') }}
             </VCardTitle>
 
             <VCardSubtitle>
-              Rasio nilai PO dibandingkan kebutuhan PR pada periode aktif
+              {{ t('dashboard.purchaseOrder.chart.realizationSubtitle') }}
             </VCardSubtitle>
           </VCardItem>
 
@@ -2939,21 +3094,21 @@ onMounted(async () => {
               class="comparison-summary-grid"
             >
               <div class="comparison-summary-item">
-                <span>Nilai PR</span>
+                <span>{{ t('dashboard.purchaseOrder.chart.prAmountLabel') }}</span>
                 <strong :title="formatCurrency(summary.total_pr_amount)">
                   {{ formatCompactCurrency(summary.total_pr_amount, 'short') }}
                 </strong>
               </div>
 
               <div class="comparison-summary-item">
-                <span>Nilai PO</span>
+                <span>{{ t('dashboard.purchaseOrder.chart.poAmountLabel') }}</span>
                 <strong :title="formatCurrency(summary.total_po_amount)">
                   {{ formatCompactCurrency(summary.total_po_amount, 'short') }}
                 </strong>
               </div>
 
               <div class="comparison-summary-item comparison-summary-wide">
-                <span>Selisih belum terealisasi</span>
+                <span>{{ t('dashboard.purchaseOrder.chart.unrealizedGap') }}</span>
                 <strong :title="formatCurrency(comparisonGapAmount)">
                   {{ formatCompactCurrency(comparisonGapAmount, 'short') }}
                 </strong>
@@ -2977,7 +3132,7 @@ onMounted(async () => {
               </VAvatar>
 
               <div class="font-weight-medium">
-                Belum ada data PR dan PO
+                {{ t('dashboard.purchaseOrder.chart.noComparisonData') }}
               </div>
             </div>
           </VCardText>
@@ -2991,11 +3146,11 @@ onMounted(async () => {
         <VCard class="dashboard-card chart-card h-100">
           <VCardItem class="chart-card-header">
             <VCardTitle>
-              Tren Nilai PR dan PO
+              {{ t('dashboard.purchaseOrder.chart.trendTitle') }}
             </VCardTitle>
 
             <VCardSubtitle>
-              Pergerakan kebutuhan dan realisasi pada
+              {{ t('dashboard.purchaseOrder.chart.trendSubtitlePrefix') }}
               {{ executiveChartSubtitle }}
             </VCardSubtitle>
           </VCardItem>
@@ -3026,7 +3181,7 @@ onMounted(async () => {
               </VAvatar>
 
               <div class="font-weight-medium">
-                Belum ada data tren
+                {{ t('dashboard.purchaseOrder.chart.noTrendData') }}
               </div>
             </div>
           </VCardText>
@@ -3375,12 +3530,11 @@ onMounted(async () => {
         <VCard class="dashboard-card chart-card h-100">
           <VCardItem class="chart-card-header chart-card-header-with-action">
             <VCardTitle>
-              Analisis PR dan PO per Cabang
+              {{ t('dashboard.purchaseOrder.breakdown.byBranch.title') }}
             </VCardTitle>
 
             <VCardSubtitle>
-              Perbandingan kebutuhan dan realisasi
-              berdasarkan cabang
+              {{ t('dashboard.purchaseOrder.breakdown.byBranch.subtitle') }}
             </VCardSubtitle>
 
             <template #append>
@@ -3419,7 +3573,7 @@ onMounted(async () => {
 
                 <div class="executive-breakdown-bars">
                   <div class="executive-breakdown-bar-row">
-                    <span class="executive-breakdown-label">PR</span>
+                    <span class="executive-breakdown-label">{{ t('dashboard.purchaseOrder.breakdown.prLabel') }}</span>
                     <VProgressLinear
                       :model-value="getBreakdownPercent(item.prValue, item.totalValue)"
                       color="primary"
@@ -3432,7 +3586,7 @@ onMounted(async () => {
                   </div>
 
                   <div class="executive-breakdown-bar-row">
-                    <span class="executive-breakdown-label">PO</span>
+                    <span class="executive-breakdown-label">{{ t('dashboard.purchaseOrder.breakdown.poLabel') }}</span>
                     <VProgressLinear
                       :model-value="getBreakdownPercent(item.poValue, item.totalValue)"
                       color="success"
@@ -3450,7 +3604,12 @@ onMounted(async () => {
                 v-if="breakdownByCabang.length > executiveCabangBreakdownItems.length"
                 class="executive-breakdown-note"
               >
-                Menampilkan {{ executiveCabangBreakdownItems.length }} cabang teratas dari {{ breakdownByCabang.length }} cabang.
+                {{
+                  t('dashboard.purchaseOrder.breakdown.byBranch.note', {
+                    shown: executiveCabangBreakdownItems.length,
+                    total: breakdownByCabang.length,
+                  })
+                }}
               </div>
             </div>
 
@@ -3471,7 +3630,7 @@ onMounted(async () => {
               </VAvatar>
 
               <div class="font-weight-medium">
-                Belum ada data per cabang
+                {{ t('dashboard.purchaseOrder.breakdown.byBranch.empty') }}
               </div>
             </div>
           </VCardText>
@@ -3485,12 +3644,11 @@ onMounted(async () => {
         <VCard class="dashboard-card chart-card h-100">
           <VCardItem class="chart-card-header chart-card-header-with-action">
             <VCardTitle>
-              Analisis PR dan PO per Departemen
+              {{ t('dashboard.purchaseOrder.breakdown.byDepartment.title') }}
             </VCardTitle>
 
             <VCardSubtitle>
-              Perbandingan kebutuhan dan realisasi
-              berdasarkan departemen
+              {{ t('dashboard.purchaseOrder.breakdown.byDepartment.subtitle') }}
             </VCardSubtitle>
 
             <template #append>
@@ -3529,7 +3687,7 @@ onMounted(async () => {
 
                 <div class="executive-breakdown-bars">
                   <div class="executive-breakdown-bar-row">
-                    <span class="executive-breakdown-label">PR</span>
+                    <span class="executive-breakdown-label">{{ t('dashboard.purchaseOrder.breakdown.prLabel') }}</span>
                     <VProgressLinear
                       :model-value="getBreakdownPercent(item.prValue, item.totalValue)"
                       color="primary"
@@ -3542,7 +3700,7 @@ onMounted(async () => {
                   </div>
 
                   <div class="executive-breakdown-bar-row">
-                    <span class="executive-breakdown-label">PO</span>
+                    <span class="executive-breakdown-label">{{ t('dashboard.purchaseOrder.breakdown.poLabel') }}</span>
                     <VProgressLinear
                       :model-value="getBreakdownPercent(item.poValue, item.totalValue)"
                       color="success"
@@ -3560,7 +3718,12 @@ onMounted(async () => {
                 v-if="breakdownByDepartment.length > executiveDepartmentBreakdownItems.length"
                 class="executive-breakdown-note"
               >
-                Menampilkan {{ executiveDepartmentBreakdownItems.length }} departemen teratas dari {{ breakdownByDepartment.length }} departemen.
+                {{
+                  t('dashboard.purchaseOrder.breakdown.byDepartment.note', {
+                    shown: executiveDepartmentBreakdownItems.length,
+                    total: breakdownByDepartment.length,
+                  })
+                }}
               </div>
             </div>
 
@@ -3581,7 +3744,7 @@ onMounted(async () => {
               </VAvatar>
 
               <div class="font-weight-medium">
-                Belum ada data per departemen
+                {{ t('dashboard.purchaseOrder.breakdown.byDepartment.empty') }}
               </div>
             </div>
           </VCardText>
@@ -3598,11 +3761,11 @@ onMounted(async () => {
         <VCard class="dashboard-card h-100">
           <VCardItem>
             <VCardTitle>
-              Status Purchase Order
+              {{ t('dashboard.purchaseOrder.status.title') }}
             </VCardTitle>
 
             <VCardSubtitle>
-              Kondisi PO pada periode terpilih
+              {{ t('dashboard.purchaseOrder.status.subtitle') }}
             </VCardSubtitle>
           </VCardItem>
 
@@ -3618,7 +3781,7 @@ onMounted(async () => {
               >
                 <div class="d-flex justify-space-between mb-2">
                   <span class="text-body-2">
-                    {{ status.label }}
+                    {{ statusDisplayLabel(status.status) }}
                   </span>
 
                   <strong>
@@ -3641,7 +3804,7 @@ onMounted(async () => {
               v-else
               class="empty-state"
             >
-              Belum ada data status.
+              {{ t('dashboard.purchaseOrder.status.empty') }}
             </div>
           </VCardText>
         </VCard>
@@ -3664,102 +3827,142 @@ onMounted(async () => {
             </template>
 
             <VCardTitle>
-              Purchase Order yang Perlu Perhatian
+              {{ t('dashboard.purchaseOrder.pendingApproval.title') }}
             </VCardTitle>
 
             <VCardSubtitle>
-              Prioritas keputusan dan tindak lanjut management
+              {{ t('dashboard.purchaseOrder.pendingApproval.subtitle') }}
             </VCardSubtitle>
+
+            <template #append>
+              <VChip
+                v-if="pendingApprovalTotal > 0"
+                color="warning"
+                variant="tonal"
+                size="small"
+              >
+                {{ t('dashboard.purchaseOrder.pendingApproval.countBadge', { count: formatNumber(pendingApprovalTotal) }) }}
+              </VChip>
+            </template>
           </VCardItem>
 
           <VCardText class="pa-0">
-            <div
-              v-if="visibleAttentionItems.length"
-              class="table-wrapper"
+            <VAlert
+              v-if="pendingApprovalErrorMessage"
+              type="error"
+              variant="tonal"
+              density="compact"
+              class="ma-4"
             >
-              <VTable hover>
-                <thead>
-                  <tr>
-                    <th>Purchase Order</th>
-                    <th>Cabang / Departemen</th>
-                    <th>Vendor</th>
-                    <th>Nilai</th>
-                    <th>Umur</th>
-                    <th>Keterangan</th>
-                  </tr>
-                </thead>
+              {{ pendingApprovalErrorMessage }}
+            </VAlert>
 
-                <tbody>
-                  <tr
-                    v-for="item in visibleAttentionItems"
-                    :key="item.public_id"
-                  >
-                    <td>
-                      <div class="font-weight-semibold">
-                        {{ item.po_number }}
-                      </div>
-
-                      <div class="text-caption text-medium-emphasis">
-                        {{ formatDate(item.po_date) }}
-                      </div>
-                    </td>
-
-                    <td>
-                      <div>
-                        {{ item.cabang_name ?? '-' }}
-                      </div>
-
-                      <div class="text-caption text-medium-emphasis">
-                        {{ item.department_name ?? '-' }}
-                      </div>
-                    </td>
-
-                    <td>
-                      {{ item.vendor_name ?? '-' }}
-                    </td>
-
-                    <td class="text-no-wrap">
-                      {{ formatCurrency(item.total_amount) }}
-                    </td>
-
-                    <td class="text-no-wrap">
-                      {{ formatNumber(item.age_days) }} hari
-                    </td>
-
-                    <td>
-                      <VChip
-                        color="warning"
-                        variant="tonal"
-                        size="small"
-                      >
-                        {{ item.reason }}
-                      </VChip>
-                    </td>
-                  </tr>
-                </tbody>
-              </VTable>
+            <div
+              v-if="isLoadingPendingApprovals"
+              class="pa-6"
+            >
+              <VSkeletonLoader type="table-row@3" />
             </div>
 
-            <div
-              v-else
-              class="empty-state"
-            >
-              <VAvatar
-                color="success"
-                variant="tonal"
-                size="60"
-                class="mb-3"
+            <template v-else>
+              <div
+                v-if="pendingApprovalItems.length"
+                class="table-wrapper"
               >
-                <VIcon
-                  icon="mdi-check-all"
-                  size="31"
-                />
-              </VAvatar>
+                <VTable hover>
+                  <thead>
+                    <tr>
+                      <th class="text-none">
+                        {{ t('dashboard.purchaseOrder.pendingApproval.columnPo') }}
+                      </th>
+                      <th class="text-none">
+                        {{ t('dashboard.purchaseOrder.pendingApproval.columnValue') }}
+                      </th>
+                      <th class="text-none">
+                        {{ t('dashboard.purchaseOrder.pendingApproval.columnWaiting') }}
+                      </th>
+                    </tr>
+                  </thead>
 
-              <div class="font-weight-medium">
-                Tidak ada PO yang perlu perhatian
+                  <tbody>
+                    <tr
+                      v-for="item in pendingApprovalItems"
+                      :key="item.public_id"
+                    >
+                      <td>
+                        <div class="font-weight-semibold">
+                          {{ item.po_number }}
+                        </div>
+
+                        <div class="text-caption text-medium-emphasis">
+                          {{ t('dashboard.purchaseOrder.pendingApproval.submittedOn', { date: formatDateOnly(item.submitted_at) }) }}
+                        </div>
+
+                        <div
+                          v-if="
+                            item.submitted_at
+                              && formatDateOnly(item.submitted_at) !== formatDate(item.po_date)
+                          "
+                          class="text-caption text-disabled"
+                        >
+                          {{ t('dashboard.purchaseOrder.pendingApproval.createdOn', { date: formatDate(item.po_date) }) }}
+                        </div>
+                      </td>
+
+                      <td class="text-no-wrap">
+                        {{ formatCurrency(item.total_amount) }}
+                      </td>
+
+                      <td>
+                        <VChip
+                          :color="pendingApprovalWaitingColor(item.waiting_days)"
+                          variant="tonal"
+                          size="small"
+                          prepend-icon="mdi-account-clock-outline"
+                        >
+                          {{ item.current_approval_label ?? t('dashboard.purchaseOrder.pendingApproval.unknownApprover') }}
+                          · {{ item.waiting_label ?? '-' }}
+                        </VChip>
+                      </td>
+                    </tr>
+                  </tbody>
+                </VTable>
+
+                <div
+                  v-if="pendingApprovalLastPage > 1"
+                  class="d-flex justify-center pa-4"
+                >
+                  <VPagination
+                    v-model="pendingApprovalPage"
+                    :length="pendingApprovalLastPage"
+                    :total-visible="3"
+                    size="small"
+                    @update:model-value="changePendingApprovalPage"
+                  />
+                </div>
               </div>
-            </div>
+
+              <div
+                v-else
+                class="empty-state"
+              >
+                <VAvatar
+                  color="success"
+                  variant="tonal"
+                  size="60"
+                  class="mb-3"
+                >
+                  <VIcon
+                    icon="mdi-check-all"
+                    size="31"
+                  />
+                </VAvatar>
+
+                <div class="font-weight-medium">
+                  {{ t('dashboard.purchaseOrder.pendingApproval.empty') }}
+                </div>
+              </div>
+            </template>
           </VCardText>
         </VCard>
       </VCol>

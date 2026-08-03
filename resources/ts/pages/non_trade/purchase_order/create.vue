@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import axios from '@axios'
 import {
   showConfirmAlert,
@@ -33,6 +34,7 @@ interface PurchaseOrderForm {
   top: number | null
   notes: string
   purchase_request_ids: number[]
+  lampiran_po: File[]
 }
 
 interface VendorOption {
@@ -88,6 +90,7 @@ interface PurchaseOrderItem {
 }
 
 const permissionStore = usePermissionStore()
+const { t } = useI18n()
 
 const canCreate = computed(() => {
   return permissionStore.can('purchase_order.create')
@@ -137,7 +140,77 @@ const form = reactive<PurchaseOrderForm>({
   top: null,
   notes: '',
   purchase_request_ids: [],
+  lampiran_po: [],
 })
+
+const fileRef = ref<HTMLInputElement | null>(null)
+const lampiranError = ref('')
+
+const MAX_FILE_SIZE = 3 * 1024 * 1024
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
+
+const getExtension = (fileName: string): string => {
+  return fileName.split('.').pop()?.toLowerCase() || ''
+}
+
+const triggerFileInput = (): void => {
+  fileRef.value?.click()
+}
+
+const handleFileUpload = (event: Event): void => {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+
+  lampiranError.value = ''
+
+  const invalidMessages: string[] = []
+
+  for (const file of Array.from(input.files)) {
+    const ext = getExtension(file.name)
+    const validMime = ALLOWED_TYPES.includes(file.type)
+    const validExt = ALLOWED_EXTENSIONS.includes(ext)
+
+    if (!validMime && !validExt) {
+      invalidMessages.push(t('common.attachment.invalidType', { file: file.name }))
+      continue
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      invalidMessages.push(t('common.attachment.tooLarge', { file: file.name }))
+      continue
+    }
+
+    const exists = form.lampiran_po.some(
+      existing => existing.name === file.name && existing.size === file.size,
+    )
+
+    if (!exists) form.lampiran_po.push(file)
+  }
+
+  if (invalidMessages.length) {
+    lampiranError.value = invalidMessages.join(' ')
+
+    showWarningToast({
+      title: t('common.attachment.invalidTitle'),
+      text: invalidMessages.join(' '),
+    })
+  }
+
+  input.value = ''
+}
+
+const removeLampiran = (index: number): void => {
+  form.lampiran_po.splice(index, 1)
+}
+
+const formatFileSize = (bytes: number): string => {
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+}
+
+const getFileType = (file: File): string => {
+  return file.type === 'application/pdf' ? 'PDF' : 'IMAGE'
+}
 
 const tanggalPO = useNativeDatePicker(toRef(form, 'tanggal_po'))
 
@@ -1480,6 +1553,15 @@ const validateForm = async (): Promise<boolean> => {
     return false
   }
 
+  if (!form.lampiran_po.length) {
+    showWarningToast({
+      title: 'Warning',
+      text: 'Minimal 1 lampiran Purchase Order wajib diisi.',
+    })
+
+    return false
+  }
+
   if (!form.purchase_request_ids.length) {
     showWarningToast({
       title: 'Warning',
@@ -1628,6 +1710,44 @@ const buildPayload = () => {
   }
 }
 
+const buildFormData = (): FormData => {
+  const payload = buildPayload()
+  const formData = new FormData()
+
+  formData.append('tanggal_po', payload.tanggal_po)
+  formData.append('vendor_id', String(payload.vendor_id))
+  formData.append('cabang', String(payload.cabang))
+  formData.append('id_department', String(payload.id_department))
+
+  formData.append('jenis_pembayaran', payload.jenis_pembayaran || '')
+
+  if (payload.top !== null)
+    formData.append('top', String(payload.top))
+
+  formData.append('notes', payload.notes || '')
+
+  payload.purchase_request_ids.forEach(id => {
+    formData.append('purchase_request_ids[]', String(id))
+  })
+
+  formData.append('subtotal', String(payload.subtotal))
+  formData.append('dpp', String(payload.dpp))
+  formData.append('ppn', String(payload.ppn))
+  formData.append('total_nilai', String(payload.total_nilai))
+
+  payload.items.forEach((item, index) => {
+    Object.entries(item).forEach(([key, value]) => {
+      formData.append(`items[${index}][${key}]`, String(value))
+    })
+  })
+
+  form.lampiran_po.forEach(file => {
+    formData.append('lampiran_po[]', file)
+  })
+
+  return formData
+}
+
 const savePurchaseOrder = async (): Promise<void> => {
 
   const payload = buildPayload()
@@ -1659,10 +1779,9 @@ const savePurchaseOrder = async (): Promise<void> => {
   try {
     showLoadingAlert('Menyimpan data...', 'Mohon tunggu sebentar')
 
-    await axios.post('/transaction/purchase-order', buildPayload(), {
+    await axios.post('/transaction/purchase-order', buildFormData(), {
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
       },
     })
 
@@ -2503,6 +2622,96 @@ onMounted(async () => {
               :error="isSubmitted && !form.top"
               :error-messages="isSubmitted && !form.top ? ['TOP wajib diisi'] : []"
             />
+          </VCol>
+
+          <!-- LAMPIRAN -->
+          <VCol cols="12">
+            <div class="mt-4">
+              <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-2">
+                <div class="text-subtitle-1 font-weight-bold">
+                  {{ t('common.attachment.title') }} *
+                </div>
+
+                <div class="d-flex gap-2">
+                  <input
+                    ref="fileRef"
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    class="d-none"
+                    @change="handleFileUpload"
+                  />
+
+                  <VBtn
+                    type="button"
+                    color="primary"
+                    variant="outlined"
+                    size="small"
+                    @click="triggerFileInput"
+                    class="text-none"
+                  >
+                    {{ t('common.attachment.addButton') }}
+                  </VBtn>
+                </div>
+              </div>
+
+              <VDivider class="mb-4" />
+
+              <VAlert
+                v-if="lampiranError"
+                type="warning"
+                variant="tonal"
+                class="mb-4"
+              >
+                {{ lampiranError }}
+              </VAlert>
+
+              <VAlert
+                v-if="!form.lampiran_po.length"
+                :type="isSubmitted ? 'warning' : 'info'"
+                variant="tonal"
+              >
+                {{ t('common.attachment.empty') }}
+              </VAlert>
+
+              <VList
+                v-else
+                density="comfortable"
+                border
+                rounded
+              >
+                <VListItem
+                  v-for="(file, index) in form.lampiran_po"
+                  :key="`${file.name}-${file.size}-${index}`"
+                >
+                  <template #prepend>
+                    <VIcon
+                      :icon="getFileType(file) === 'PDF' ? 'mdi-file-pdf-box' : 'mdi-file-image-outline'"
+                    />
+                  </template>
+
+                  <VListItemTitle class="text-body-2">
+                    {{ file.name }}
+                  </VListItemTitle>
+
+                  <VListItemSubtitle>
+                    {{ getFileType(file) }} • {{ formatFileSize(file.size) }}
+                  </VListItemSubtitle>
+
+                  <template #append>
+                    <VBtn
+                      type="button"
+                      color="error"
+                      variant="text"
+                      size="small"
+                      @click="removeLampiran(index)"
+                    >
+                      {{ t('common.attachment.remove') }}
+                    </VBtn>
+                  </template>
+                </VListItem>
+              </VList>
+            </div>
           </VCol>
 
           <VCol cols="12">

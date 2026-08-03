@@ -77,6 +77,16 @@ class EnsureSanctumTokenIsNotIdle
         ) {
             Cache::forget($cacheKey);
 
+            activity('auth')
+                ->causedBy($accessToken->tokenable)
+                ->withProperties([
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'idle_timeout_minutes' => $idleTimeoutMinutes,
+                ])
+                ->event('session_expired')
+                ->log('Sesi user berakhir otomatis karena idle timeout.');
+
             $accessToken->delete();
 
             return response()->json([

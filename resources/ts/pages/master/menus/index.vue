@@ -1283,6 +1283,8 @@ onMounted(async () => {
                 label="Nama Menu"
                 placeholder="Contoh: Vendor"
                 density="comfortable"
+                hint="Gunakan Bahasa Inggris. Nama ini dipakai sebagai kunci terjemahan multi-bahasa di sidebar (lihat resources/ts/plugins/i18n/locales/*/navigation.json)."
+                persistent-hint
             />
             </VCol>
 

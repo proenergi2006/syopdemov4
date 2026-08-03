@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class User extends Authenticatable
 {
     use HasApiTokens, Notifiable;
+
+    /**
+     * Kirim notifikasi reset password lewat queue (tabel `jobs`),
+     * bukan Illuminate\Auth\Notifications\ResetPassword bawaan yang
+     * dikirim sinkron.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
+    }
 
     protected $fillable = [
         'name',
@@ -306,9 +317,7 @@ class User extends Authenticatable
             UserPermission::SCOPE_ALL => null,
 
             UserPermission::SCOPE_OWN_DEPARTMENT =>
-            $this->departemen_id
-                ? [(int) $this->departemen_id]
-                : [],
+            $this->accessibleDepartmentIds()->all(),
 
             UserPermission::SCOPE_ASSIGNED_DEPARTMENTS =>
             $this->getAssignedDepartmentIds(
@@ -389,8 +398,9 @@ class User extends Authenticatable
             UserPermission::SCOPE_ALL => true,
 
             UserPermission::SCOPE_OWN_DEPARTMENT =>
-            (int) $this->departemen_id
-                === $departmentId,
+            $this->accessibleDepartmentIds()->contains(
+                $departmentId,
+            ),
 
             UserPermission::SCOPE_ASSIGNED_DEPARTMENTS =>
             in_array(
@@ -730,15 +740,43 @@ class User extends Authenticatable
             ->exists();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Accessible Branch IDs (scope OWN_CABANG)
+    |--------------------------------------------------------------------------
+    | Gabungan branch/cabang master + seluruh branch dari
+    | user_access_assignments (multi cabang & department), supaya konsisten
+    | dengan accessibleDepartmentIds(). Kalau user belum pernah di-assign
+    | sama sekali, otomatis hanya berisi cabang master (atau kosong).
+    |--------------------------------------------------------------------------
+    */
     public function accessibleBranchIds()
     {
-        return $this->activeAccessAssignments()
-            ->pluck('branch_id')
-            ->map(fn($id) => (int) $id)
+        return collect([
+            (int) ($this->cabang_id ?? 0),
+        ])
+            ->merge(
+                $this->activeAccessAssignments()
+                    ->pluck('branch_id')
+                    ->map(fn($id) => (int) $id),
+            )
+            ->filter(fn($id) => $id > 0)
             ->unique()
             ->values();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Accessible Department IDs (scope OWN_DEPARTMENT)
+    |--------------------------------------------------------------------------
+    | Tanpa parameter $branchId: gabungan department master + seluruh
+    | department dari user_access_assignments, dengan fallback ke master
+    | department kalau user belum pernah di-assign sama sekali.
+    |
+    | Dengan parameter $branchId: hanya department dari assignment untuk
+    | branch tersebut (dipakai untuk dropdown department bertingkat).
+    |--------------------------------------------------------------------------
+    */
     public function accessibleDepartmentIds(?int $branchId = null)
     {
         $query = $this->activeAccessAssignments();
@@ -747,11 +785,32 @@ class User extends Authenticatable
             $query->where('branch_id', $branchId);
         }
 
-        return $query
+        $departmentIds = $query
             ->pluck('department_id')
             ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
             ->unique()
             ->values();
+
+        if ($branchId !== null) {
+            return $departmentIds;
+        }
+
+        $departmentIds = $departmentIds
+            ->push((int) ($this->departemen_id ?? 0))
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($departmentIds->isNotEmpty()) {
+            return $departmentIds;
+        }
+
+        $departmentId = (int) ($this->departemen_id ?? 0);
+
+        return $departmentId > 0
+            ? collect([$departmentId])
+            : collect();
     }
 
     private function normalizePermissionScope(?string $scope): string

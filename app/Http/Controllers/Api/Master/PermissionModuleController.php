@@ -511,7 +511,7 @@ class PermissionModuleController extends Controller
                     $normalizedCode,
                     $routePrefix,
                 ): PermissionModule {
-                    return PermissionModule::query()->create([
+                    $module = PermissionModule::query()->create([
                         'code' => $normalizedCode,
 
                         'name' => trim(
@@ -544,12 +544,18 @@ class PermissionModuleController extends Controller
                             ?? false
                         ),
                     ]);
+
+                    $this->createStandardPermissions($module);
+
+                    return $module;
                 },
             );
 
+            $module->loadCount('permissions');
+
             return response()->json([
                 'success' => true,
-                'message' => 'Permission Module berhasil dibuat.',
+                'message' => 'Permission Module berhasil dibuat beserta 4 permission standar (view/create/update/delete).',
 
                 'data' => [
                     'id' => (int) $module->id,
@@ -559,8 +565,8 @@ class PermissionModuleController extends Controller
                     'route_prefix' => $module->route_prefix,
                     'sort_order' => (int) $module->sort_order,
                     'is_active' => (bool) $module->is_active,
-                    'permissions_count' => 0,
-                    'active_permissions_count' => 0,
+                    'permissions_count' => (int) $module->permissions_count,
+                    'active_permissions_count' => (int) $module->permissions_count,
                     'created_at' => $module->created_at,
                     'updated_at' => $module->updated_at,
                 ],
@@ -588,6 +594,45 @@ class PermissionModuleController extends Controller
                     ? $e->getMessage()
                     : null,
             ], 500);
+        }
+    }
+
+    /*
+|--------------------------------------------------------------------------
+| Generate 4 Permission Standar (view/create/update/delete)
+|--------------------------------------------------------------------------
+| Dipanggil otomatis setiap Permission Module baru dibuat, supaya seluruh
+| module selalu punya bentuk permission yang seragam. Admin tetap bisa
+| menambah action lain (contoh: approve, post, submit) lewat storePermission(),
+| atau menghapus salah satu dari 4 ini lewat destroyPermission() kalau memang
+| tidak relevan untuk module tersebut.
+|--------------------------------------------------------------------------
+*/
+    private function createStandardPermissions(
+        PermissionModule $module,
+    ): void {
+        $standardActions = [
+            'view' => 'Lihat',
+            'create' => 'Tambah',
+            'update' => 'Ubah',
+            'delete' => 'Hapus',
+        ];
+
+        foreach ($standardActions as $action => $actionLabel) {
+            Permission::query()->create([
+                'module' => $module->code,
+                'action' => $action,
+                'code' => "{$module->code}.{$action}",
+                'name' => "{$actionLabel} {$module->name}",
+
+                'description' => sprintf(
+                    'Mengizinkan pengguna %s pada module %s.',
+                    strtolower($actionLabel),
+                    $module->name,
+                ),
+
+                'is_active' => true,
+            ]);
         }
     }
 

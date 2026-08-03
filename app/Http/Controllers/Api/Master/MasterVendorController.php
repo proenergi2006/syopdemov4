@@ -225,10 +225,14 @@ class MasterVendorController extends Controller
                             break;
 
                         case 'OWN_DEPARTMENT':
-                            if (!empty($user->department_id)) {
-                                $scopeQuery->where(
+                            $accessibleDepartmentIds = $user
+                                ->accessibleDepartmentIds()
+                                ->all();
+
+                            if (!empty($accessibleDepartmentIds)) {
+                                $scopeQuery->whereIn(
                                     'id_department',
-                                    $user->department_id,
+                                    $accessibleDepartmentIds,
                                 );
                             } else {
                                 $scopeQuery->whereRaw('1 = 0');
@@ -626,10 +630,10 @@ class MasterVendorController extends Controller
                     );
 
                     $isSameDepartment = (
-                        !empty($user->departemen_id)
-                        && !empty($item->id_department)
-                        && (int) $item->id_department
-                        === (int) $user->departemen_id
+                        !empty($item->id_department)
+                        && $user->accessibleDepartmentIds()->contains(
+                            (int) $item->id_department,
+                        )
                     );
 
                     /*
@@ -3326,11 +3330,9 @@ class MasterVendorController extends Controller
             'OWN_DATA' => (int) $vendor->created_by
                 === (int) $user->id,
 
-            'OWN_DEPARTMENT' => (
-                !empty($user->department_id)
-                && (int) $vendor->id_department
-                === (int) $user->department_id
-            ),
+            'OWN_DEPARTMENT' => $user
+                ->accessibleDepartmentIds()
+                ->contains((int) $vendor->id_department),
 
             default => false,
         };

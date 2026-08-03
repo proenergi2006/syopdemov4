@@ -57,6 +57,7 @@ class DatabaseSeeder extends Seeder
             ApprovalFlowSeeder::class,
             GoodsReturnReasonSeeder::class,
             DashboardModuleSeeder::class,
+            ActivityLogSeeder::class,
 
             /*
             |--------------------------------------------------------------------------

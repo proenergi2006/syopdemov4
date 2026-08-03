@@ -1,0 +1,50 @@
+{
+  "Dashboard": "Dashboard",
+  "Master": "Master",
+  "Non Trade": "Non Trade",
+  "Auth": "Autentikasi",
+  "Monitoring": "Monitoring",
+
+  "Regional": "Regional",
+  "Produk": "Produk",
+  "PBBKB": "PBBKB",
+  "Fleet Management": "Manajemen Armada",
+  "Cabang": "Cabang",
+  "Departemen": "Departemen",
+  "Vendor": "Vendor",
+  "Terminal": "Terminal",
+  "Customer": "Pelanggan",
+  "Volume": "Volume",
+  "Wilayah Angkut": "Wilayah Angkut",
+  "Harga Jual": "Harga Jual",
+  "Harga Dasar Pertamina": "Harga Dasar Pertamina",
+  "Approval Flow": "Alur Persetujuan",
+  "Menu Management": "Manajemen Menu",
+  "Dashboard Module Management": "Manajemen Dashboard Module",
+  "Activity Log": "Log Aktivitas",
+
+  "Purchase Requisition": "Purchase Requisition",
+  "Purchase Order": "Purchase Order",
+  "Goods Receipt": "Goods Receipt",
+  "Goods Return": "Goods Return",
+
+  "Users": "Pengguna",
+  "Roles": "Peran",
+  "Role Menu": "Menu Peran",
+  "Role Permissions": "Izin Peran",
+  "User Permission": "Izin Pengguna",
+  "Permission Modules": "Modul Izin",
+
+  "Provinsi": "Provinsi",
+  "Kabupaten": "Kabupaten",
+  "Wilayah": "Wilayah",
+  "Area": "Area",
+  "Contoh": "Contoh",
+
+  "Transportir": "Transportir",
+  "Sopir": "Sopir",
+  "Mobil": "Mobil",
+  "Ongkos Angkut": "Ongkos Angkut",
+
+  "Log Viewer": "Log Viewer"
+}

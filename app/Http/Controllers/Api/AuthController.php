@@ -11,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 use App\Models\PermissionModule;
 use App\Models\Cabang;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -34,6 +36,15 @@ class AuthController extends Controller
                 ->first();
 
             if (!$user) {
+                activity('auth')
+                    ->withProperties([
+                        'ip' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'username' => $username,
+                    ])
+                    ->event('login_failed')
+                    ->log("Percobaan login gagal: username \"{$username}\" tidak ditemukan.");
+
                 return response()->json([
                     'success' => false,
                     'field' => 'username',
@@ -42,6 +53,16 @@ class AuthController extends Controller
             }
 
             if (!Hash::check($validated['password'], $user->password)) {
+                activity('auth')
+                    ->causedBy($user)
+                    ->withProperties([
+                        'ip' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'username' => $username,
+                    ])
+                    ->event('login_failed')
+                    ->log("Percobaan login gagal: password salah untuk username \"{$username}\".");
+
                 return response()->json([
                     'success' => false,
                     'field' => 'password',
@@ -50,6 +71,16 @@ class AuthController extends Controller
             }
 
             if (isset($user->is_active) && !$user->is_active) {
+                activity('auth')
+                    ->causedBy($user)
+                    ->withProperties([
+                        'ip' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'username' => $username,
+                    ])
+                    ->event('login_blocked')
+                    ->log("Login ditolak: akun \"{$username}\" nonaktif.");
+
                 return response()->json([
                     'success' => false,
                     'message' => 'User nonaktif.',
@@ -79,6 +110,16 @@ class AuthController extends Controller
             );
 
             $token = $newToken->plainTextToken;
+
+            activity('auth')
+                ->causedBy($user)
+                ->withProperties([
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'username' => $username,
+                ])
+                ->event('login')
+                ->log("User \"{$username}\" berhasil login.");
 
             return response()->json([
                 'success' => true,
@@ -237,6 +278,15 @@ class AuthController extends Controller
                 $token->delete();
             }
 
+            activity('auth')
+                ->causedBy($user)
+                ->withProperties([
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ])
+                ->event('logout')
+                ->log("User \"{$user->username}\" logout.");
+
             return response()->json([
                 'success' => true,
                 'message' => 'Logout berhasil.',
@@ -251,6 +301,232 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal logout.',
+                'debug' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
+            ], 500);
+        }
+    }
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'email' => ['required', 'string', 'email'],
+            ], [
+                'email.required' => 'Email wajib diisi.',
+                'email.email' => 'Format email tidak valid.',
+            ]);
+
+            $email = trim($validated['email']);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Cek Email Terdaftar
+            |--------------------------------------------------------------------------
+            */
+            $user = User::query()
+                ->where('email', $email)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'field' => 'email',
+                    'message' => 'Email tidak terdaftar.',
+                ], 422);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Kirim Link Reset Password
+            |--------------------------------------------------------------------------
+            | Password::sendResetLink() sudah menangani throttle bawaan Laravel
+            | (config('auth.passwords.users.throttle'), default 60 detik per email)
+            | sebelum token baru benar-benar dibuat/dikirim.
+            |--------------------------------------------------------------------------
+            */
+            $status = Password::sendResetLink([
+                'email' => $email,
+            ]);
+
+            if ($status === Password::RESET_THROTTLED) {
+                return response()->json([
+                    'success' => false,
+                    'throttled' => true,
+                    'message' => 'Silakan tunggu beberapa saat sebelum mengirim ulang link reset password.',
+                ], 429);
+            }
+
+            if ($status !== Password::RESET_LINK_SENT) {
+                Log::warning('[Auth] Forgot password unexpected status', [
+                    'email' => $email,
+                    'status' => $status,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal mengirim link reset password. Silakan coba lagi.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Link reset password telah dikirim ke email Anda.',
+            ]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('[Auth] Forgot password error', [
+                'email' => $request->input('email'),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat memproses permintaan.',
+                'debug' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * Cek validitas token reset password TANPA mengonsumsinya, supaya
+     * halaman reset-password bisa langsung tahu link sudah kedaluwarsa
+     * begitu dibuka -- tidak perlu menunggu user submit form dulu.
+     */
+    public function verifyResetToken(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'token' => ['required', 'string'],
+                'email' => ['required', 'string', 'email'],
+            ], [
+                'token.required' => 'Token reset password tidak valid.',
+                'email.required' => 'Email wajib diisi.',
+                'email.email' => 'Format email tidak valid.',
+            ]);
+
+            $user = User::query()
+                ->where('email', trim($validated['email']))
+                ->first();
+
+            $isValid = $user
+                ? Password::tokenExists($user, $validated['token'])
+                : false;
+
+            return response()->json([
+                'success' => true,
+                'valid' => $isValid,
+            ]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('[Auth] Verify reset token error', [
+                'email' => $request->input('email'),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'valid' => false,
+                'message' => 'Terjadi kesalahan saat memeriksa link reset password.',
+                'debug' => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
+            ], 500);
+        }
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'token' => ['required', 'string'],
+                'email' => ['required', 'string', 'email'],
+                'password' => [
+                    'required',
+                    'string',
+                    'min:8',
+                    'confirmed',
+                    'regex:/[a-z]/',
+                    'regex:/[A-Z]/',
+                    'regex:/[0-9]/',
+                    'regex:/[^A-Za-z0-9]/',
+                ],
+            ], [
+                'token.required' => 'Token reset password tidak valid.',
+                'email.required' => 'Email wajib diisi.',
+                'email.email' => 'Format email tidak valid.',
+                'password.required' => 'Password baru wajib diisi.',
+                'password.min' => 'Password baru minimal 8 karakter.',
+                'password.confirmed' => 'Konfirmasi password baru tidak sesuai.',
+                'password.regex' => 'Password baru wajib memiliki huruf besar, huruf kecil, angka, dan simbol.',
+            ]);
+
+            $status = Password::reset(
+                $validated,
+                function (User $user, string $password): void {
+                    $user->password = Hash::make($password);
+                    $user->save();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Putuskan Seluruh Sesi Aktif
+                    |--------------------------------------------------------------------------
+                    | Setelah password direset, seluruh token akses lama tidak lagi
+                    | valid supaya sesi yang mungkin dibajak ikut terputus.
+                    |--------------------------------------------------------------------------
+                    */
+                    $user->tokens()->delete();
+                },
+            );
+
+            if (
+                $status === Password::INVALID_TOKEN
+                || $status === Password::INVALID_USER
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Link reset password tidak valid atau sudah kedaluwarsa.',
+                ], 422);
+            }
+
+            if ($status !== Password::PASSWORD_RESET) {
+                Log::warning('[Auth] Reset password unexpected status', [
+                    'email' => $validated['email'],
+                    'status' => $status,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal mereset password. Silakan coba lagi.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password berhasil direset. Silakan login dengan password baru Anda.',
+            ]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('[Auth] Reset password error', [
+                'email' => $request->input('email'),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mereset password.',
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,

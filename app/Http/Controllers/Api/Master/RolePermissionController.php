@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
+use App\Models\PermissionModule;
 use App\Models\Role;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class RolePermissionController extends Controller
 {
@@ -202,6 +204,102 @@ class RolePermissionController extends Controller
                     fn(Permission $permission) =>
                     (int) $permission->id,
                 );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Permission Module adalah core dari Permission
+        |--------------------------------------------------------------------------
+        | Permission hanya boleh diberikan (is_active=true) ke role apabila
+        | module induknya (permissions.module) sudah terdaftar dan aktif di
+        | permission_modules. Menonaktifkan permission yang sudah terlanjur
+        | diberikan tetap diperbolehkan, supaya data lama tetap bisa dibersihkan.
+        |--------------------------------------------------------------------------
+        */
+            $activeModuleCodes = PermissionModule::query()
+                ->where('is_active', true)
+                ->pluck('code')
+                ->map(
+                    fn($code) => strtolower(trim((string) $code)),
+                )
+                ->all();
+
+            /*
+        |--------------------------------------------------------------------------
+        | Pasangan role-permission yang sudah aktif sebelumnya
+        |--------------------------------------------------------------------------
+        | Dipakai supaya bulk save tidak diblokir hanya karena role tersebut
+        | kebetulan sudah memiliki permission lama pada module yang sekarang
+        | dinonaktifkan. Payload selalu mengirim seluruh baris permission yang
+        | sedang ditampilkan di halaman (bukan hanya yang diubah), sehingga
+        | permission lama tersebut tetap ikut terkirim dengan is_active=true.
+        | Hanya PENAMBAHAN baru (role belum pernah memiliki permission itu)
+        | yang perlu diblokir; menyimpan ulang permission yang sudah ada tidak.
+        |--------------------------------------------------------------------------
+        */
+            $existingActivePairs = DB::table('role_permissions')
+                ->whereIn('role_id', $roleIds)
+                ->whereIn('permission_id', $permissionIds)
+                ->where('is_active', true)
+                ->get(['role_id', 'permission_id'])
+                ->map(
+                    fn($row) => $row->role_id . ':' . $row->permission_id,
+                )
+                ->flip();
+
+            $invalidPermissionCodes = $permissionPayloads
+                ->filter(
+                    fn($payload) => (bool) (
+                        $payload['is_active']
+                        ?? $payload['is_allowed']
+                        ?? false
+                    ),
+                )
+                ->filter(function ($payload) use ($permissions, $activeModuleCodes) {
+                    $permission = $permissions->get(
+                        (int) ($payload['permission_id'] ?? 0),
+                    );
+
+                    if (!$permission) {
+                        return false;
+                    }
+
+                    return !in_array(
+                        strtolower(trim((string) $permission->module)),
+                        $activeModuleCodes,
+                        true,
+                    );
+                })
+                ->filter(function ($payload) use ($roleIds, $existingActivePairs) {
+                    $permissionId = (int) ($payload['permission_id'] ?? 0);
+
+                    foreach ($roleIds as $roleId) {
+                        if (!$existingActivePairs->has($roleId . ':' . $permissionId)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                })
+                ->map(
+                    fn($payload) => $permissions->get(
+                        (int) ($payload['permission_id'] ?? 0),
+                    ),
+                )
+                ->filter()
+                ->pluck('code')
+                ->unique()
+                ->values();
+
+            if ($invalidPermissionCodes->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'permissions' => [
+                        sprintf(
+                            'Permission berikut tidak dapat diberikan karena Permission Module induknya belum terdaftar/aktif: %s. Daftarkan module tersebut terlebih dahulu di Kelola Permission Module.',
+                            $invalidPermissionCodes->implode(', '),
+                        ),
+                    ],
+                ]);
+            }
 
             /*
         |--------------------------------------------------------------------------

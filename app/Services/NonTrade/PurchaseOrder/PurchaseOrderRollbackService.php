@@ -72,7 +72,7 @@ class PurchaseOrderRollbackService
         }
     }
 
-    private function refreshPurchaseRequestPOStatus(int $purchaseRequestId): void
+    public function refreshPurchaseRequestPOStatus(int $purchaseRequestId): void
     {
         $pr = PurchaseRequest::where('id', $purchaseRequestId)
             ->lockForUpdate()

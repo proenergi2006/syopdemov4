@@ -1,0 +1,50 @@
+{
+  "Dashboard": "Dashboard",
+  "Master": "Master",
+  "Non Trade": "Non Trade",
+  "Auth": "Auth",
+  "Monitoring": "Monitoring",
+
+  "Regional": "Regional",
+  "Produk": "Product",
+  "PBBKB": "PBBKB",
+  "Fleet Management": "Fleet Management",
+  "Cabang": "Branch",
+  "Departemen": "Department",
+  "Vendor": "Vendor",
+  "Terminal": "Terminal",
+  "Customer": "Customer",
+  "Volume": "Volume",
+  "Wilayah Angkut": "Transport Area",
+  "Harga Jual": "Selling Price",
+  "Harga Dasar Pertamina": "Pertamina Base Price",
+  "Approval Flow": "Approval Flow",
+  "Menu Management": "Menu Management",
+  "Dashboard Module Management": "Dashboard Module Management",
+  "Activity Log": "Activity Log",
+
+  "Purchase Requisition": "Purchase Requisition",
+  "Purchase Order": "Purchase Order",
+  "Goods Receipt": "Goods Receipt",
+  "Goods Return": "Goods Return",
+
+  "Users": "Users",
+  "Roles": "Roles",
+  "Role Menu": "Role Menu",
+  "Role Permissions": "Role Permissions",
+  "User Permission": "User Permission",
+  "Permission Modules": "Permission Modules",
+
+  "Provinsi": "Province",
+  "Kabupaten": "Regency",
+  "Wilayah": "Region",
+  "Area": "Area",
+  "Contoh": "Example",
+
+  "Transportir": "Transporter",
+  "Sopir": "Driver",
+  "Mobil": "Vehicle",
+  "Ongkos Angkut": "Freight Cost",
+
+  "Log Viewer": "Log Viewer"
+}

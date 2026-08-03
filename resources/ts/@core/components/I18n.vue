@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { Anchor } from 'vuetify/lib/components'
 import type { I18nLanguage } from '@layouts/types'
+import { persistLocale } from '@/plugins/i18n'
+import type { AppLocale } from '@/plugins/i18n'
 
 const props = withDefaults(defineProps<Props>(), {
   location: 'bottom end',
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'change', id: string): void
 }>()
 
@@ -17,7 +19,15 @@ interface Props {
 
 const { locale } = useI18n({ useScope: 'global' })
 
-const currentLang = ref(['en'])
+// ℹ️ Selection state mirrors the active locale so the menu always
+// highlights the language that's actually in effect, including on load.
+const currentLang = computed(() => [locale.value])
+
+function selectLanguage(lang: I18nLanguage): void {
+  locale.value = lang.i18nLang as AppLocale
+  persistLocale(lang.i18nLang as AppLocale)
+  emit('change', lang.i18nLang)
+}
 </script>
 
 <template>
@@ -39,7 +49,7 @@ const currentLang = ref(['en'])
     >
       <!-- List -->
       <VList
-        v-model:selected="currentLang"
+        :selected="currentLang"
         active-color="primary"
         min-width="175px"
       >
@@ -48,7 +58,7 @@ const currentLang = ref(['en'])
           v-for="lang in props.languages"
           :key="lang.i18nLang"
           :value="lang.i18nLang"
-          @click="locale = lang.i18nLang; $emit('change', lang.i18nLang)"
+          @click="selectLanguage(lang)"
         >
           <!-- Language label -->
           <VListItemTitle>{{ lang.label }}</VListItemTitle>

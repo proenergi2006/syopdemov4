@@ -289,7 +289,15 @@ const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
         ?? '',
       ).toUpperCase()
 
-      return ['APPROVED', 'APPROVE', 'REJECTED', 'REJECT'].includes(status)
+      /*
+      |--------------------------------------------------------------------------
+      | Tampilkan juga tahap yang sedang WAITING
+      |--------------------------------------------------------------------------
+      | Supaya posisi approval saat ini tetap terlihat di ringkasan singkat,
+      | bukan hanya tahap yang sudah selesai diproses (APPROVED/REJECTED).
+      |--------------------------------------------------------------------------
+      */
+      return ['APPROVED', 'APPROVE', 'REJECTED', 'REJECT', 'WAITING'].includes(status)
     })
     .map((item: any, index: number): SimpleApprovalHistory => {
       const stepOrder = Number(
@@ -298,6 +306,16 @@ const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
         ?? item.step
         ?? index + 1,
       )
+
+      const status = String(
+        item.status
+        ?? item.result
+        ?? item.action
+        ?? item.approval_status
+        ?? '',
+      ).toUpperCase()
+
+      const isProcessed = ['APPROVED', 'APPROVE', 'REJECTED', 'REJECT'].includes(status)
 
       return {
         id: item.id ?? `${stepOrder}-${index}`,
@@ -310,22 +328,28 @@ const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
           ?? item.role
           ?? item.title
           ?? `Tahap ${stepOrder}`,
-        status: String(
-          item.status
-          ?? item.result
-          ?? item.action
-          ?? item.approval_status
-          ?? '',
-        ).toUpperCase(),
-        processed_by:
-          item.processed_by_name
-          ?? item.approved_by_name
-          ?? item.rejected_by_name
-          ?? item.user_name
-          ?? item.approver_name
-          ?? item.approver_name_snapshot
-          ?? item.processor_name
-          ?? '-',
+        status,
+        /*
+        |--------------------------------------------------------------------------
+        | Diproses Oleh
+        |--------------------------------------------------------------------------
+        | Hanya tampilkan nama untuk tahap yang benar-benar sudah diproses.
+        | Tahap WAITING belum diproses siapapun, walaupun nama calon approver
+        | sudah tersimpan sebagai snapshot.
+        |--------------------------------------------------------------------------
+        */
+        processed_by: isProcessed
+          ? (
+              item.processed_by_name
+              ?? item.approved_by_name
+              ?? item.rejected_by_name
+              ?? item.user_name
+              ?? item.approver_name
+              ?? item.approver_name_snapshot
+              ?? item.processor_name
+              ?? '-'
+            )
+          : '-',
         processed_at:
           item.processed_at
           ?? item.approved_at
@@ -650,6 +674,10 @@ const rejectPurchaseOrder = async (): Promise<void> => {
 
     await fetchPurchaseOrders()
     await navigationStore.refreshBadges()
+
+    // refresh modal detail jika sedang terbuka untuk PO ini
+    if (detailDialog.value && detailPurchaseOrderPublicId.value === target.public_id)
+      await openDetail(target.public_id)
   } catch (error: unknown) {
     closeAlert()
 
@@ -1365,6 +1393,14 @@ const approvePurchaseOrder = async (): Promise<void> => {
 
     await fetchPurchaseOrders()
     await navigationStore.refreshBadges()
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh modal detail jika sedang terbuka untuk PO ini
+    |--------------------------------------------------------------------------
+    */
+    if (detailDialog.value && detailPurchaseOrderPublicId.value === target.public_id)
+      await openDetail(target.public_id)
   }
   catch (error: unknown) {
     closeAlert()
@@ -2454,6 +2490,61 @@ onBeforeUnmount(() => {
               </VCol>
             </VRow>
 
+            <!-- ATTACHMENTS -->
+            <VCard
+              flat
+              class="rounded-md"
+            >
+              <VCardText>
+                <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-3">
+                  <div class="d-flex align-center gap-2">
+                    <VIcon
+                      icon="tabler-paperclip"
+                      color="primary"
+                    />
+                    <div class="text-subtitle-1 font-weight-bold">
+                      Lampiran Purchase Order
+                    </div>
+                  </div>
+
+                  <VChip
+                    size="small"
+                    color="primary"
+                    variant="tonal"
+                  >
+                    {{ detailPurchaseOrder.attachments?.length || 0 }} File
+                  </VChip>
+                </div>
+
+                <div
+                  v-if="detailPurchaseOrder.attachments?.length"
+                  class="d-flex flex-wrap gap-2"
+                >
+                  <VBtn
+                    v-for="(file, index) in detailPurchaseOrder.attachments"
+                    :key="index"
+                    :href="file.file_url || file.filepath"
+                    target="_blank"
+                    variant="tonal"
+                    color="primary"
+                    size="small"
+                    prepend-icon="tabler-external-link"
+                  >
+                    {{ file.original_filename || 'Lampiran PO' }}
+                  </VBtn>
+                </div>
+
+                <VAlert
+                  v-else
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                >
+                  Tidak ada lampiran purchase order.
+                </VAlert>
+              </VCardText>
+            </VCard>
+
             <VCard flat class="rounded-lg">
               <VCardText>
                 <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
@@ -2774,6 +2865,30 @@ onBeforeUnmount(() => {
         <VDivider />
 
         <VCardActions class="justify-end px-6 py-4">
+          <VBtn
+            v-if="detailPurchaseOrder && canApprovePO(detailPurchaseOrder)"
+            color="success"
+            variant="tonal"
+            prepend-icon="tabler-circle-check"
+            class="text-none"
+            :disabled="approveLoading"
+            @click="openApprovePO(detailPurchaseOrder)"
+          >
+            Approve
+          </VBtn>
+
+          <VBtn
+            v-if="detailPurchaseOrder && canApprovePO(detailPurchaseOrder)"
+            color="error"
+            variant="tonal"
+            prepend-icon="mdi-close-circle-outline"
+            class="text-none"
+            :disabled="rejectLoading"
+            @click="openRejectPO(detailPurchaseOrder)"
+          >
+            Reject
+          </VBtn>
+
           <VBtn
             variant="tonal"
             @click="detailDialog = false"

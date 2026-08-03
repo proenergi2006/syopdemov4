@@ -1,0 +1,191 @@
+{
+  "moduleLauncher": {
+    "header": {
+      "title": "Management Dashboard",
+      "badge": "Management View",
+      "description": "Choose a category and module you want to monitor in more detail.",
+      "categoryLabel": "Category",
+      "totalModulesLabel": "Total Modules"
+    },
+    "filters": {
+      "categoryLabel": "Module Category",
+      "displayLabel": "Show",
+      "displayOptions": {
+        "four": "4 Modules",
+        "eight": "8 Modules",
+        "twelve": "12 Modules",
+        "all": "Show All"
+      },
+      "allCategory": "All"
+    },
+    "section": {
+      "title": "{category} Dashboard",
+      "description": "Choose a module to open its dashboard and detailed analytics.",
+      "permissionBadge": "Based on permission"
+    },
+    "empty": {
+      "title": "No modules available",
+      "description": "There are no dashboard modules to show in this category."
+    },
+    "card": {
+      "available": "Available",
+      "comingSoon": "Coming Soon",
+      "openDashboard": "Open dashboard",
+      "notAvailable": "Not available yet",
+      "pendingApproval": "{count} awaiting your approval",
+      "viewAll": "View All"
+    },
+    "infiniteScroll": {
+      "loadMore": "Scroll to load more modules",
+      "allLoaded": "All modules have been shown"
+    },
+    "errors": {
+      "groupsFailed": "Failed to load dashboard categories.",
+      "modulesFailed": "Failed to load dashboard modules."
+    }
+  },
+
+  "purchaseOrder": {
+    "header": {
+      "title": "Purchase Order Management Dashboard",
+      "description": "Comparison between Purchase Requisition needs and Purchase Order realization.",
+      "lastUpdated": "Last updated"
+    },
+    "filters": {
+      "title": "Data Filter",
+      "activePeriod": "Active period:",
+      "periodType": "Period Type",
+      "pickDate": "Pick a Date",
+      "pickWeek": "Pick a Week",
+      "pickMonth": "Pick a Month",
+      "pickYear": "Pick a Year",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "weekLabel": "Week {week}, {year}",
+      "yearLabel": "Year {year}",
+      "rangeLabel": "{start} to {end}",
+      "allBranches": "All Branches",
+      "branch": "Branch",
+      "allDepartments": "All Departments",
+      "department": "Department",
+      "scopeNote": "Branch and department filters follow the user's permission scope.",
+      "incompletePeriod": "Please complete the period selection first.",
+      "periodOptions": {
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly",
+        "year": "Yearly",
+        "range": "Date Range"
+      },
+      "scope": {
+        "label": "Scope {scope}",
+        "all": "All",
+        "ownCabang": "My Branch",
+        "ownDepartment": "My Department"
+      }
+    },
+    "errors": {
+      "periodInvalid": "The period filter has not been filled in correctly.",
+      "dashboardFailed": "Failed to load the Purchase Order dashboard data.",
+      "pendingApprovalsFailed": "Failed to load the list of Purchase Orders awaiting approval."
+    },
+    "stats": {
+      "totalPr": {
+        "title": "Total Purchase Requisition",
+        "shortTitle": "PR",
+        "subtitle": "Number of submitted requests"
+      },
+      "prAmount": {
+        "title": "Purchase Requisition Value",
+        "shortTitle": "PR Value",
+        "subtitle": "Total value of purchase needs"
+      },
+      "totalPo": {
+        "title": "Total Purchase Order",
+        "shortTitle": "PO",
+        "subtitle": "Number of orders issued"
+      },
+      "poAmount": {
+        "title": "Purchase Order Value",
+        "shortTitle": "PO Value",
+        "subtitle": "Total value of realized purchases"
+      }
+    },
+    "operational": {
+      "prNotOrdered": "PR Not Yet a PO",
+      "pendingApproval": "PO Awaiting Approval",
+      "outstandingReceipt": "Outstanding Receipt",
+      "conversionRate": "PR to PO Conversion"
+    },
+    "insight": {
+      "okTitle": "Procurement process is under control",
+      "okMessage": "No PR or PO requiring special attention was found for the selected period.",
+      "warningTitle": "Needs management attention",
+      "prNotOrdered": "{count} approved PR(s) have not been processed into a PO",
+      "pendingApproval": "{count} PO(s) are still awaiting approval",
+      "outstandingReceipt": "{count} PO(s) have not been fully received",
+      "conversionRate": "the PR to PO conversion rate is only {rate}%"
+    },
+    "chart": {
+      "realizationTitle": "PO Realization against PR",
+      "realizationSubtitle": "Ratio of PO value compared to PR needs in the active period",
+      "realizationSeriesLabel": "PO vs PR",
+      "realizationCenterLabel": "Realization",
+      "prAmountLabel": "PR Value",
+      "poAmountLabel": "PO Value",
+      "unrealizedGap": "Unrealized gap",
+      "noComparisonData": "No PR and PO data yet",
+      "trendTitle": "PR and PO Value Trend",
+      "trendSubtitlePrefix": "Movement of needs and realization in",
+      "noTrendData": "No trend data yet",
+      "noTrendChartData": "No PR and PO trend data yet",
+      "transactionValueAxis": "Transaction value ({scale})",
+      "scale": {
+        "rupiah": "Rupiah",
+        "thousand": "Thousand Rupiah",
+        "million": "Million Rupiah",
+        "billion": "Billion Rupiah",
+        "trillion": "Trillion Rupiah"
+      }
+    },
+    "breakdown": {
+      "byBranch": {
+        "title": "PR and PO Analysis by Branch",
+        "subtitle": "Comparison of needs and realization by branch",
+        "note": "Showing the top {shown} branches out of {total} branches.",
+        "empty": "No data by branch yet"
+      },
+      "byDepartment": {
+        "title": "PR and PO Analysis by Department",
+        "subtitle": "Comparison of needs and realization by department",
+        "note": "Showing the top {shown} departments out of {total} departments.",
+        "empty": "No data by department yet"
+      },
+      "prLabel": "PR",
+      "poLabel": "PO",
+      "metricOptions": {
+        "amount": "Transaction Value",
+        "count": "Document Count"
+      }
+    },
+    "status": {
+      "title": "Purchase Order Status",
+      "subtitle": "PO condition for the selected period",
+      "empty": "No status data yet.",
+      "inProgress": "In Progress",
+      "approved": "Approved"
+    },
+    "pendingApproval": {
+      "title": "Purchase Orders Needing Attention",
+      "subtitle": "POs awaiting approval within the period filter above, sorted by the longest pending since submission",
+      "countBadge": "{count} PO",
+      "columnPo": "Purchase Order",
+      "columnValue": "Value",
+      "columnWaiting": "Awaiting Approval",
+      "submittedOn": "Submitted {date}",
+      "createdOn": "(PO created {date})",
+      "unknownApprover": "Not yet determined",
+      "empty": "No Purchase Orders awaiting approval"
+    }
+  }
+}

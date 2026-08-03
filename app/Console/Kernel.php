@@ -18,6 +18,17 @@ class Kernel extends ConsoleKernel
         $schedule->command('po-supplier:auto-approve-cfo')
             ->everyTenMinutes()
             ->withoutOverlapping();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Activity Log Cleanup
+        |--------------------------------------------------------------------------
+        | Hapus activity log yang lebih lama dari config('activitylog.delete_records_older_than_days')
+        | supaya tabel activity_log tidak membesar tanpa batas.
+        |--------------------------------------------------------------------------
+        */
+        $schedule->command('activitylog:clean')
+            ->daily();
     }
 
     /**

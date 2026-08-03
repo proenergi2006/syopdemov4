@@ -61,6 +61,38 @@ class DashboardModuleSeeder extends Seeder
                 'description' => 'Mengizinkan pengguna melihat dashboard Goods Return.',
                 'is_active' => true,
             ],
+            [
+                'module' => 'dashboard_module',
+                'action' => 'view',
+                'code' => 'dashboard_module.view',
+                'name' => 'Lihat Kelola Dashboard Module',
+                'description' => 'Mengizinkan pengguna melihat halaman Kelola Dashboard Module.',
+                'is_active' => true,
+            ],
+            [
+                'module' => 'dashboard_module',
+                'action' => 'create',
+                'code' => 'dashboard_module.create',
+                'name' => 'Tambah Dashboard Module',
+                'description' => 'Mengizinkan pengguna menambah Dashboard Module.',
+                'is_active' => true,
+            ],
+            [
+                'module' => 'dashboard_module',
+                'action' => 'update',
+                'code' => 'dashboard_module.update',
+                'name' => 'Ubah Dashboard Module',
+                'description' => 'Mengizinkan pengguna mengubah Dashboard Module.',
+                'is_active' => true,
+            ],
+            [
+                'module' => 'dashboard_module',
+                'action' => 'delete',
+                'code' => 'dashboard_module.delete',
+                'name' => 'Hapus Dashboard Module',
+                'description' => 'Mengizinkan pengguna menghapus Dashboard Module.',
+                'is_active' => true,
+            ],
         ];
 
         foreach ($permissions as $permission) {

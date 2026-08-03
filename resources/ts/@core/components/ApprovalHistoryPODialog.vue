@@ -138,8 +138,9 @@ const normalizedApprovals = computed(() => {
           || `Tahap ${item.step_order}`,
 
         approver_display:
-          normalizeText(item.approver_name_snapshot)
-          || '-',
+          (statusUpper === 'APPROVED' || statusUpper === 'REJECTED')
+            ? (normalizeText(item.approver_name_snapshot) || '-')
+            : '-',
 
         approver_type_display:
           normalizeText(item.approver_type).toUpperCase()
@@ -189,6 +190,35 @@ const summaryColor = computed(() => {
   if (normalizedApprovals.value.length > 0 && approvedCount.value === normalizedApprovals.value.length) return 'success'
 
   return 'info'
+})
+
+const effectiveApprovals = computed(() => {
+  return normalizedApprovals.value.filter(item => item.status_key !== 'cancelled')
+})
+
+const isFinished = computed(() => {
+  if (normalizedApprovals.value.length === 0) return false
+  if (rejectedStep.value) return false
+  if (waitingStep.value) return false
+
+  return effectiveApprovals.value.length > 0
+    && effectiveApprovals.value.every(item => item.status_key === 'approved')
+})
+
+const currentPositionText = computed(() => {
+  if (waitingStep.value) return `Tahap ${waitingStep.value.step_order}`
+  if (rejectedStep.value) return `Reject Tahap ${rejectedStep.value.step_order}`
+  if (isFinished.value) return 'Selesai'
+
+  return normalizedApprovals.value.length === 0 ? 'Belum Diajukan' : '-'
+})
+
+const currentPositionColor = computed(() => {
+  if (waitingStep.value) return 'warning'
+  if (rejectedStep.value) return 'error'
+  if (isFinished.value) return 'success'
+
+  return 'secondary'
 })
 </script>
 
@@ -293,7 +323,7 @@ const summaryColor = computed(() => {
           >
             <VCard
               variant="tonal"
-              :color="waitingStep ? 'warning' : rejectedStep ? 'error' : 'info'"
+              :color="currentPositionColor"
               class="summary-card"
             >
               <VCardText>
@@ -301,13 +331,7 @@ const summaryColor = computed(() => {
                   Posisi Saat Ini
                 </div>
                 <div class="text-subtitle-1 font-weight-bold text-wrap">
-                  {{
-                    waitingStep
-                      ? `Tahap ${waitingStep.step_order}`
-                      : rejectedStep
-                        ? `Reject Tahap ${rejectedStep.step_order}`
-                        : 'Selesai'
-                  }}
+                  {{ currentPositionText }}
                 </div>
               </VCardText>
             </VCard>

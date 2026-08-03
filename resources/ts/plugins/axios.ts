@@ -58,15 +58,41 @@ axiosIns.interceptors.response.use(
       localStorage.removeItem('accessToken')
       localStorage.removeItem('access_token')
 
-      const isLoginPage = window.location.pathname.includes('/login')
+      /*
+      |--------------------------------------------------------------------------
+      | Halaman publik/guest
+      |--------------------------------------------------------------------------
+      | Jangan tampilkan alert "sesi berakhir" di halaman yang memang tidak
+      | membutuhkan login (login, reset-password, forgot-password, sso).
+      | Request 401 di halaman-halaman ini bukan berarti sesi user berakhir --
+      | bisa jadi memang belum pernah login sama sekali.
+      |--------------------------------------------------------------------------
+      */
+      const publicPagePatterns = [
+        '/login',
+        '/reset-password',
+        '/forgot-password',
+        '/sso',
+      ]
 
-      if (!isLoginPage && !isUnauthorizedHandling) {
+      const isPublicPage = publicPagePatterns.some(
+        pattern => window.location.pathname.includes(pattern),
+      )
+
+      if (!isPublicPage && !isUnauthorizedHandling) {
         isUnauthorizedHandling = true
 
+        /*
+        |--------------------------------------------------------------------------
+        | "missing_token" sengaja tidak dianggap sesi berakhir
+        |--------------------------------------------------------------------------
+        | Reason ini muncul ketika memang tidak ada token sama sekali (belum
+        | pernah login), bukan karena sesi yang sebelumnya aktif jadi berakhir.
+        |--------------------------------------------------------------------------
+        */
         const isSessionExpired = [
           'idle_timeout',
           'invalid_token',
-          'missing_token',
           'token_expired',
         ].includes(reason)
 

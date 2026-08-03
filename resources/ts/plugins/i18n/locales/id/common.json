@@ -1,0 +1,16 @@
+{
+  "actions": {
+    "reset": "Reset",
+    "apply": "Terapkan",
+    "refresh": "Perbarui"
+  },
+  "attachment": {
+    "title": "Lampiran",
+    "addButton": "+ Tambah Lampiran",
+    "empty": "Belum ada lampiran yang diunggah.",
+    "remove": "Hapus",
+    "invalidTitle": "File tidak valid",
+    "invalidType": "\"{file}\" bukan file PDF/JPG/JPEG/PNG.",
+    "tooLarge": "\"{file}\" lebih dari 3MB."
+  }
+}

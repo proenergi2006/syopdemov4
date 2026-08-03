@@ -85,9 +85,6 @@ const passwordStrengthScore = computed(() => {
   if (hasSymbol.value)
     score += 1
 
-  if (newPassword.value.length >= 12)
-    score += 1
-
   return score
 })
 
@@ -119,7 +116,7 @@ const passwordStrength = computed(() => {
     }
   }
 
-  if (passwordStrengthScore.value === 4 || passwordStrengthScore.value === 5) {
+  if (passwordStrengthScore.value === 4) {
     return {
       label: 'Password Kuat',
       color: 'info',

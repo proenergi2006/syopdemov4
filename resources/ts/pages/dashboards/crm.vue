@@ -8,6 +8,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 type DisplayMode = 4 | 8 | 12 | 'all'
@@ -59,10 +60,25 @@ interface DashboardModuleGroupsResponse {
   data: DashboardModuleGroup[]
 }
 
+interface ApprovalNotification {
+  pending_count: number
+  oldest_waiting_at: string | null
+  waiting_days: number
+  waiting_hours: number
+  waiting_label: string | null
+}
+
+interface ApprovalNotificationsResponse {
+  message: string
+  data: Record<string, ApprovalNotification>
+}
+
 const router = useRouter()
+const { t } = useI18n()
 
 const dashboardModules = ref<DashboardModule[]>([])
 const dashboardGroups = ref<DashboardModuleGroup[]>([])
+const approvalNotifications = ref<Record<string, ApprovalNotification>>({})
 
 const selectedGroupCode = ref('ALL')
 const displayMode = ref<DisplayMode>(4)
@@ -71,7 +87,12 @@ const currentPage = ref(1)
 const lastPage = ref(1)
 const totalModules = ref(0)
 
-const isInitialLoading = ref(false)
+/*
+ * Default true supaya skeleton loading langsung tampil saat halaman
+ * dibuka, bukan empty state -- fetchDashboardGroups() berjalan lebih
+ * dulu di onMounted sebelum fetchDashboardModules() sempat men-set ini.
+ */
+const isInitialLoading = ref(true)
 const isLoadingMore = ref(false)
 
 const errorMessage = ref('')
@@ -80,30 +101,30 @@ const loadMoreTrigger = ref<HTMLElement | null>(null)
 
 let scrollObserver: IntersectionObserver | null = null
 
-const displayOptions = [
+const displayOptions = computed(() => [
   {
-    title: '4 Modul',
+    title: t('dashboard.moduleLauncher.filters.displayOptions.four'),
     value: 4,
   },
   {
-    title: '8 Modul',
+    title: t('dashboard.moduleLauncher.filters.displayOptions.eight'),
     value: 8,
   },
   {
-    title: '12 Modul',
+    title: t('dashboard.moduleLauncher.filters.displayOptions.twelve'),
     value: 12,
   },
   {
-    title: 'Tampilkan Semua',
+    title: t('dashboard.moduleLauncher.filters.displayOptions.all'),
     value: 'all',
   },
-]
+])
 
 const groupOptions = computed(() => [
   {
     id: 0,
     code: 'ALL',
-    name: 'Semua',
+    name: t('dashboard.moduleLauncher.filters.allCategory'),
     icon: 'mdi-view-grid-outline',
     modules_count: dashboardGroups.value.reduce(
       (total, group) => total + group.modules_count,
@@ -135,7 +156,7 @@ const showInfiniteScroll = computed(() => {
 const selectedGroupName = computed(() => {
   return groupOptions.value.find(
     group => group.code === selectedGroupCode.value,
-  )?.name ?? 'Semua'
+  )?.name ?? t('dashboard.moduleLauncher.filters.allCategory')
 })
 
 async function fetchDashboardGroups(): Promise<void> {
@@ -149,7 +170,7 @@ async function fetchDashboardGroups(): Promise<void> {
   catch (error) {
     console.error('Failed to load dashboard groups:', error)
 
-    errorMessage.value = 'Kategori dashboard gagal dimuat.'
+    errorMessage.value = t('dashboard.moduleLauncher.errors.groupsFailed')
   }
 }
 
@@ -220,11 +241,68 @@ async function fetchDashboardModules(
   catch (error) {
     console.error('Failed to load dashboard modules:', error)
 
-    errorMessage.value = 'Daftar modul dashboard gagal dimuat.'
+    errorMessage.value = t('dashboard.moduleLauncher.errors.modulesFailed')
   }
   finally {
     isInitialLoading.value = false
     isLoadingMore.value = false
+  }
+}
+
+async function fetchApprovalNotifications(): Promise<void> {
+  try {
+    const response = await axios.get<ApprovalNotificationsResponse>(
+      '/dashboard/approval-notifications',
+    )
+
+    approvalNotifications.value = response.data.data
+  }
+  catch (error) {
+    /*
+     * Notifikasi approval bersifat pelengkap, jadi kegagalan
+     * fetch tidak perlu memblokir tampilan dashboard utama.
+     */
+    console.error('Failed to load approval notifications:', error)
+  }
+}
+
+function approvalNotificationFor(
+  dashboardModule: DashboardModule,
+): ApprovalNotification | null {
+  const notification = approvalNotifications.value[dashboardModule.code]
+
+  if (!notification || notification.pending_count <= 0)
+    return null
+
+  return notification
+}
+
+/*
+ * Halaman daftar (index) sesuai modul, tempat approver benar-benar
+ * memproses approval-nya. Route dashboard module sendiri (route_path)
+ * mengarah ke halaman analitik, bukan ke daftar approval.
+ */
+const approvalListRouteByModuleCode: Record<string, string> = {
+  PURCHASE_REQUISITION: '/non_trade/purchase_request',
+  PURCHASE_ORDER: '/non_trade/purchase_order',
+}
+
+async function openApprovalList(
+  dashboardModule: DashboardModule,
+): Promise<void> {
+  const path = approvalListRouteByModuleCode[dashboardModule.code]
+
+  if (!path)
+    return
+
+  try {
+    await router.push(path)
+  }
+  catch (error) {
+    console.error(
+      `Failed to open approval list for ${dashboardModule.title}:`,
+      error,
+    )
   }
 }
 
@@ -321,6 +399,7 @@ onMounted(async () => {
 
   await fetchDashboardGroups()
   await fetchDashboardModules(true)
+  await fetchApprovalNotifications()
 })
 
 onBeforeUnmount(() => {
@@ -355,7 +434,7 @@ onBeforeUnmount(() => {
               <div>
                 <div class="d-flex flex-wrap align-center gap-2 mb-2">
                   <h1 class="text-h4 font-weight-bold mb-0">
-                    Management Dashboard
+                    {{ t('dashboard.moduleLauncher.header.title') }}
                   </h1>
 
                   <VChip
@@ -363,12 +442,12 @@ onBeforeUnmount(() => {
                     variant="tonal"
                     size="small"
                   >
-                    Management View
+                    {{ t('dashboard.moduleLauncher.header.badge') }}
                   </VChip>
                 </div>
 
                 <p class="text-body-1 text-medium-emphasis mb-0">
-                  Pilih kategori dan modul yang ingin dipantau secara lebih detail.
+                  {{ t('dashboard.moduleLauncher.header.description') }}
                 </p>
               </div>
             </div>
@@ -381,7 +460,7 @@ onBeforeUnmount(() => {
             <div class="dashboard-summary-box">
               <div>
                 <div class="text-caption text-medium-emphasis mb-1">
-                  Kategori
+                  {{ t('dashboard.moduleLauncher.header.categoryLabel') }}
                 </div>
 
                 <div class="text-h6 font-weight-bold">
@@ -393,7 +472,7 @@ onBeforeUnmount(() => {
 
               <div>
                 <div class="text-caption text-medium-emphasis mb-1">
-                  Total Modul
+                  {{ t('dashboard.moduleLauncher.header.totalModulesLabel') }}
                 </div>
 
                 <div class="text-h4 font-weight-bold text-primary">
@@ -415,7 +494,7 @@ onBeforeUnmount(() => {
             lg="9"
           >
             <div class="text-body-2 font-weight-medium mb-3">
-              Kategori Modul
+              {{ t('dashboard.moduleLauncher.filters.categoryLabel') }}
             </div>
 
             <VChipGroup
@@ -454,7 +533,7 @@ onBeforeUnmount(() => {
               :items="displayOptions"
               item-title="title"
               item-value="value"
-              label="Tampilkan"
+              :label="t('dashboard.moduleLauncher.filters.displayLabel')"
               prepend-inner-icon="mdi-view-grid-plus-outline"
               variant="outlined"
               density="compact"
@@ -480,11 +559,11 @@ onBeforeUnmount(() => {
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
       <div>
         <h2 class="text-h5 font-weight-semibold mb-1">
-          {{ selectedGroupName }} Dashboard
+          {{ t('dashboard.moduleLauncher.section.title', { category: selectedGroupName }) }}
         </h2>
 
         <p class="text-body-2 text-medium-emphasis mb-0">
-          Pilih modul untuk membuka dashboard dan analisis detail.
+          {{ t('dashboard.moduleLauncher.section.description') }}
         </p>
       </div>
 
@@ -493,7 +572,7 @@ onBeforeUnmount(() => {
         color="secondary"
         variant="tonal"
       >
-        Berdasarkan permission
+        {{ t('dashboard.moduleLauncher.section.permissionBadge') }}
       </VChip>
     </div>
 
@@ -538,11 +617,11 @@ onBeforeUnmount(() => {
         </VAvatar>
 
         <h3 class="text-h5 mb-2">
-          Modul belum tersedia
+          {{ t('dashboard.moduleLauncher.empty.title') }}
         </h3>
 
         <p class="text-body-2 text-medium-emphasis mb-0">
-          Tidak ada modul dashboard yang dapat ditampilkan pada kategori ini.
+          {{ t('dashboard.moduleLauncher.empty.description') }}
         </p>
       </VCardText>
     </VCard>
@@ -580,20 +659,28 @@ onBeforeUnmount(() => {
           >
             <VCardText class="d-flex flex-column h-100 pa-6">
               <div class="d-flex justify-space-between align-start mb-5">
-                <VAvatar
-                  :color="dashboardModule.color"
-                  variant="tonal"
-                  rounded="lg"
-                  size="56"
+                <VBadge
+                  :model-value="!!approvalNotificationFor(dashboardModule)"
+                  :content="approvalNotificationFor(dashboardModule)?.pending_count"
+                  color="error"
+                  overlap
+                  bordered
                 >
-                  <VIcon
-                    :icon="
-                      dashboardModule.icon
-                        ?? 'mdi-view-dashboard-outline'
-                    "
-                    size="30"
-                  />
-                </VAvatar>
+                  <VAvatar
+                    :color="dashboardModule.color"
+                    variant="tonal"
+                    rounded="lg"
+                    size="56"
+                  >
+                    <VIcon
+                      :icon="
+                        dashboardModule.icon
+                          ?? 'mdi-view-dashboard-outline'
+                      "
+                      size="30"
+                    />
+                  </VAvatar>
+                </VBadge>
 
                 <VChip
                   v-if="dashboardModule.is_available"
@@ -602,7 +689,7 @@ onBeforeUnmount(() => {
                   size="small"
                   prepend-icon="mdi-check-circle-outline"
                 >
-                  Tersedia
+                  {{ t('dashboard.moduleLauncher.card.available') }}
                 </VChip>
 
                 <VChip
@@ -612,11 +699,11 @@ onBeforeUnmount(() => {
                   size="small"
                   prepend-icon="mdi-clock-outline"
                 >
-                  Segera
+                  {{ t('dashboard.moduleLauncher.card.comingSoon') }}
                 </VChip>
               </div>
 
-              <div class="mb-5">
+              <div class="mb-4">
                 <div class="d-flex flex-wrap align-center gap-2 mb-2">
                   <h3 class="text-h5 font-weight-semibold mb-0">
                     {{ dashboardModule.title }}
@@ -636,32 +723,41 @@ onBeforeUnmount(() => {
                   size="x-small"
                   variant="outlined"
                   prepend-icon="mdi-folder-outline"
-                  class="mb-3"
                 >
                   {{ dashboardModule.group.name }}
                 </VChip>
-
-                <p class="text-body-2 text-medium-emphasis mb-0">
-                  {{ dashboardModule.description }}
-                </p>
               </div>
 
-              <div class="dashboard-feature-list mb-6">
-                <div
-                  v-for="feature in dashboardModule.features"
-                  :key="feature"
-                  class="dashboard-feature-item"
-                >
+              <div
+                v-if="approvalNotificationFor(dashboardModule)"
+                class="dashboard-approval-alert d-flex align-center justify-space-between gap-3 mb-5"
+              >
+                <div class="d-flex align-center gap-2">
                   <VIcon
-                    icon="mdi-check-circle-outline"
-                    :color="dashboardModule.color"
-                    size="18"
+                    icon="mdi-clock-alert-outline"
+                    color="warning"
+                    size="20"
                   />
 
-                  <span class="text-body-2">
-                    {{ feature }}
+                  <span class="text-body-2 font-weight-medium text-no-wrap">
+                    {{
+                      t(
+                        'dashboard.moduleLauncher.card.pendingApproval',
+                        { count: approvalNotificationFor(dashboardModule)?.pending_count },
+                      )
+                    }}
                   </span>
                 </div>
+
+                <VBtn
+                  size="x-small"
+                  variant="tonal"
+                  color="warning"
+                  class="text-no-wrap"
+                  @click.stop="openApprovalList(dashboardModule)"
+                >
+                  {{ t('dashboard.moduleLauncher.card.viewAll') }}
+                </VBtn>
               </div>
 
               <VSpacer />
@@ -678,8 +774,8 @@ onBeforeUnmount(() => {
                 <span class="text-body-2 font-weight-medium">
                   {{
                     dashboardModule.is_available
-                      ? 'Buka dashboard'
-                      : 'Belum tersedia'
+                      ? t('dashboard.moduleLauncher.card.openDashboard')
+                      : t('dashboard.moduleLauncher.card.notAvailable')
                   }}
                 </span>
 
@@ -741,14 +837,14 @@ onBeforeUnmount(() => {
         v-if="hasMoreModules && !isLoadingMore"
         class="text-center text-body-2 text-medium-emphasis py-6"
       >
-        Scroll untuk memuat modul berikutnya
+        {{ t('dashboard.moduleLauncher.infiniteScroll.loadMore') }}
       </div>
 
       <div
         v-else-if="!hasMoreModules && dashboardModules.length > 0"
         class="text-center text-body-2 text-medium-emphasis py-6"
       >
-        Semua modul telah ditampilkan
+        {{ t('dashboard.moduleLauncher.infiniteScroll.allLoaded') }}
       </div>
     </div>
   </section>
@@ -802,6 +898,14 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
+.dashboard-approval-alert {
+  border: 1px solid rgba(var(--v-theme-warning), 0.28);
+  border-radius: 10px;
+  background-color: rgba(var(--v-theme-warning), 0.1);
+  padding-block: 8px;
+  padding-inline: 12px;
+}
+
 .dashboard-module-card {
   position: relative;
   overflow: hidden;
@@ -842,18 +946,6 @@ onBeforeUnmount(() => {
 .dashboard-module-card--active:hover .dashboard-module-card__line {
   opacity: 1;
   transform: scaleX(1);
-}
-
-.dashboard-feature-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.dashboard-feature-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .dashboard-load-more-trigger {

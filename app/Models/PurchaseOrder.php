@@ -107,6 +107,15 @@ class PurchaseOrder extends Model
         return $this->hasMany(GoodsReceive::class);
     }
 
+    public function attachments()
+    {
+        return $this->hasMany(
+            PoAttachment::class,
+            'purchase_order_id',
+            'id'
+        );
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');

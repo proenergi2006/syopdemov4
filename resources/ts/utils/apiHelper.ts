@@ -1,17 +1,37 @@
 export const getApiErrorMessage = (
   error: any,
-  fallback = 'Terjadi kesalahan pada server.'
+  fallback = 'Terjadi kesalahan pada server.',
 ): string => {
   const status = error?.response?.status
-  const message = error?.response?.data?.message
+  const data = error?.response?.data
 
-  if (!status) {
+  if (!status)
     return 'Tidak dapat terhubung ke server.'
+
+  /*
+  |--------------------------------------------------------------------------
+  | Laravel ValidationException
+  |--------------------------------------------------------------------------
+  | `message` selalu generik ("The given data was invalid."), pesan
+  | spesifiknya ada di `errors`. Utamakan pesan field pertama supaya
+  | ValidationException::withMessages([...]) di backend benar-benar
+  | tersampaikan ke user.
+  |--------------------------------------------------------------------------
+  */
+  const errors = data?.errors
+
+  if (errors && typeof errors === 'object') {
+    const firstField = Object.keys(errors)[0]
+    const firstMessage = firstField ? errors[firstField]?.[0] : null
+
+    if (firstMessage && typeof firstMessage === 'string')
+      return firstMessage
   }
 
-  if (message && typeof message === 'string') {
+  const message = data?.message
+
+  if (message && typeof message === 'string')
     return message
-  }
 
   switch (status) {
     case 400:

@@ -1,4 +1,15 @@
 // Write your overrides
+
+/*
+ * SweetAlert2 default z-index (1060) ada di bawah VDialog Vuetify (2400),
+ * jadi showLoadingAlert()/showConfirmAlert() jadi tidak kelihatan (ketutup)
+ * kalau dipanggil sewaktu ada VDialog yang masih terbuka di belakangnya.
+ * Naikkan supaya SweetAlert selalu tampil paling atas.
+ */
+.swal2-container {
+  z-index: 12000 !important;
+}
+
 .swal2-confirm.swal-confirm-btn {
   color: #fff !important;
 }

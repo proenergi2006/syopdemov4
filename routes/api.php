@@ -61,12 +61,22 @@ use App\Http\Controllers\Api\Dashboard\PurchaseOrderDashboardController;
 use App\Http\Controllers\Monitoring\LogViewerController;
 use App\Http\Controllers\Api\Master\UserAccessAssignmentController;
 use App\Http\Controllers\Api\Master\MenuController as MasterMenuController;
+use App\Http\Controllers\Api\Master\DashboardModuleController as MasterDashboardModuleController;
+use App\Http\Controllers\Api\Master\ActivityLogController as MasterActivityLogController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 // routes/api.php
 
 Route::post('/auth/sso', [AuthController::class, 'sso']);
-Route::middleware(['auth:sanctum', 'auth.token.idle'])->group(function () {
+
+Route::post(
+    '/auth/forgot-password',
+    [AuthController::class, 'forgotPassword'],
+)->middleware('throttle:forgot-password');
+
+Route::get('/auth/reset-password/verify', [AuthController::class, 'verifyResetToken']);
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+Route::middleware(['auth:sanctum', 'auth.token.idle', 'log.activity'])->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/auth/me/permissions', [AuthController::class, 'permissions']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -159,6 +169,30 @@ Route::middleware(['auth:sanctum', 'auth.token.idle'])->group(function () {
         Route::delete('/{menu}', [MasterMenuController::class, 'destroy']);
     });
 
+    // Dashboard Module Management
+    Route::prefix('master/dashboard-modules')->group(function () {
+        Route::get('/', [MasterDashboardModuleController::class, 'index']);
+        Route::post('/', [MasterDashboardModuleController::class, 'store']);
+        Route::get('/groups', [MasterDashboardModuleController::class, 'groups']);
+        Route::post('/groups', [MasterDashboardModuleController::class, 'storeGroup']);
+        Route::put('/groups/{group}', [MasterDashboardModuleController::class, 'updateGroup']);
+        Route::patch('/groups/{group}/toggle-active', [MasterDashboardModuleController::class, 'toggleGroupActive']);
+        Route::delete('/groups/{group}', [MasterDashboardModuleController::class, 'destroyGroup']);
+        Route::get('/permission-options', [MasterDashboardModuleController::class, 'permissionOptions']);
+        Route::get('/{dashboardModule}', [MasterDashboardModuleController::class, 'show']);
+        Route::put('/{dashboardModule}', [MasterDashboardModuleController::class, 'update']);
+        Route::patch('/{dashboardModule}/toggle-active', [MasterDashboardModuleController::class, 'toggleActive']);
+        Route::patch('/{dashboardModule}/toggle-available', [MasterDashboardModuleController::class, 'toggleAvailable']);
+        Route::delete('/{dashboardModule}', [MasterDashboardModuleController::class, 'destroy']);
+    });
+
+    // Activity Log
+    Route::prefix('master/activity-log')->group(function () {
+        Route::get('/', [MasterActivityLogController::class, 'index']);
+        Route::get('/filter-options', [MasterActivityLogController::class, 'filterOptions']);
+        Route::get('/{id}', [MasterActivityLogController::class, 'show']);
+    });
+
     Route::prefix('monitoring')
         ->group(function () {
             Route::get(
@@ -189,9 +223,19 @@ Route::middleware(['auth:sanctum', 'auth.token.idle'])->group(function () {
             )->name('modules');
 
             Route::get(
+                '/approval-notifications',
+                [DashboardModuleController::class, 'approvalNotifications'],
+            )->name('approval-notifications');
+
+            Route::get(
                 '/purchase-order',
                 [PurchaseOrderDashboardController::class, 'index'],
             )->name('purchase-order');
+
+            Route::get(
+                '/purchase-order/pending-approvals',
+                [PurchaseOrderDashboardController::class, 'pendingApprovals'],
+            )->name('purchase-order.pending-approvals');
         });
 
     // ===================== DATA MASTER =====================

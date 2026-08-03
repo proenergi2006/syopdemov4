@@ -48,5 +48,20 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Forgot Password Limiter
+        |--------------------------------------------------------------------------
+        | Lapisan tambahan di luar throttle bawaan Password::sendResetLink()
+        | (yang mencegah spam per-email), supaya endpoint-nya sendiri tidak
+        | bisa terus-menerus di-hit dari satu IP/email yang sama.
+        |--------------------------------------------------------------------------
+        */
+        RateLimiter::for('forgot-password', function (Request $request) {
+            $email = strtolower(trim((string) $request->input('email')));
+
+            return Limit::perMinute(3)->by($email . '|' . $request->ip());
+        });
     }
 }

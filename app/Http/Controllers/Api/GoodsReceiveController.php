@@ -91,16 +91,18 @@ class GoodsReceiveController extends Controller
         |--------------------------------------------------------------------------
         | Identitas organisasi user
         |--------------------------------------------------------------------------
+        | Menggunakan seluruh cabang/department dari user_access_assignments
+        | (multi-assignment), dengan fallback ke master user apabila user
+        | belum pernah di-assign sama sekali.
+        |--------------------------------------------------------------------------
         */
-            $departmentId = (int) (
-                $user->departemen_id
-                ?? 0
-            );
+            $accessibleDepartmentIds = $user
+                ->accessibleDepartmentIds()
+                ->all();
 
-            $cabangId = (int) (
-                $user->cabang_id
-                ?? 0
-            );
+            $accessibleCabangIds = $user
+                ->accessibleBranchIds()
+                ->all();
 
             /*
         |--------------------------------------------------------------------------
@@ -199,18 +201,18 @@ class GoodsReceiveController extends Controller
             } elseif ($viewScope === 'OWN_DEPARTMENT') {
                 /*
             |--------------------------------------------------------------------------
-            | Hanya GR dari PO department user login
+            | Hanya GR dari PO seluruh department assignment user login
             |--------------------------------------------------------------------------
             */
-                if ($departmentId <= 0) {
+                if (empty($accessibleDepartmentIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
                     $query->whereHas(
                         'purchaseOrder',
-                        function ($poQuery) use ($departmentId) {
-                            $poQuery->where(
+                        function ($poQuery) use ($accessibleDepartmentIds) {
+                            $poQuery->whereIn(
                                 'id_department',
-                                $departmentId,
+                                $accessibleDepartmentIds,
                             );
                         },
                     );
@@ -218,18 +220,21 @@ class GoodsReceiveController extends Controller
             } elseif ($viewScope === 'OWN_CABANG') {
                 /*
             |--------------------------------------------------------------------------
-            | Hanya GR dari PO cabang user login
+            | Hanya GR dari PO seluruh cabang assignment user login
             |--------------------------------------------------------------------------
             */
-                if ($cabangId <= 0) {
+                if (empty($accessibleCabangIds)) {
                     $query->whereRaw('1 = 0');
                 } else {
                     $query->whereHas(
                         'purchaseOrder',
-                        function ($poQuery) use ($cabangId) {
-                            $poQuery->where(
+                        function ($poQuery) use ($accessibleCabangIds) {
+                            $poQuery->whereIn(
                                 'cabang',
-                                $cabangId,
+                                array_map(
+                                    'strval',
+                                    $accessibleCabangIds,
+                                ),
                             );
                         },
                     );
@@ -926,15 +931,14 @@ class GoodsReceiveController extends Controller
 
                 /*
             |--------------------------------------------------------------------------
-            | Department user harus sama dengan department PO
+            | Department PO harus termasuk salah satu department assignment user
             |--------------------------------------------------------------------------
             */
-                $userDepartmentId = (int) (
-                    $user->departemen_id
-                    ?? 0
-                );
+                $userDepartmentIds = $user
+                    ->accessibleDepartmentIds()
+                    ->all();
 
-                if ($userDepartmentId <= 0) {
+                if (empty($userDepartmentIds)) {
                     throw ValidationException::withMessages([
                         'department_id' => [
                             'Department akun login tidak ditemukan.',
@@ -943,8 +947,11 @@ class GoodsReceiveController extends Controller
                 }
 
                 if (
-                    (int) $po->id_department
-                    !== $userDepartmentId
+                    !in_array(
+                        (int) $po->id_department,
+                        $userDepartmentIds,
+                        true,
+                    )
                 ) {
                     throw ValidationException::withMessages([
                         'purchase_order_public_id' => [
