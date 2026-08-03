@@ -19,135 +19,163 @@ use Throwable;
 
 class PurchaseOrderInventoryService
 {
+    protected POInventoryNotificationService $poNotificationService;
+    
+    public function __construct(
+        POInventoryNotificationService $poNotificationService
+    ) {
+        $this->poNotificationService = $poNotificationService;
+    }
     public function create(array $form, array $user)
     {
-       return DB::transaction(function () use ($form, $user) {
+        try {
+        return DB::transaction(function () use ($form, $user) {
 
-        // $last = DB::table('inventory_vendor_po')->count();
-        // $idMaster = now()->format('Ym') . str_pad(
-        //     ($last + 1),
-        //     9,
-        //     '0',
-        //     STR_PAD_LEFT
-        // )
-        $lastOld = DB::connection('mysql_old')
-            ->table('new_pro_inventory_vendor_po')
-            ->selectRaw("COALESCE(MAX(CAST(SUBSTRING(id_master, 7, 9) AS UNSIGNED)), 0) as last_id")
-            ->first();
+            // $last = DB::table('inventory_vendor_po')->count();
+            // $idMaster = now()->format('Ym') . str_pad(
+            //     ($last + 1),
+            //     9,
+            //     '0',
+            //     STR_PAD_LEFT
+            // )
+            $lastOld = DB::connection('mysql_old')
+                ->table('new_pro_inventory_vendor_po')
+                ->selectRaw("COALESCE(MAX(CAST(SUBSTRING(id_master, 7, 9) AS UNSIGNED)), 0) as last_id")
+                ->first();
 
-        $next = $lastOld->last_id + 1;
+            $next = $lastOld->last_id + 1;
 
-        $idMaster = now()->format('Ym') . str_pad($next, 9, '0', STR_PAD_LEFT);
+            $idMaster = now()->format('Ym') . str_pad($next, 9, '0', STR_PAD_LEFT);
 
-        $nomorPO = $this->generateNomorPO($form);
+            $nomorPO = $this->generateNomorPO($form);
 
-        $subtotal = $form['volume_po'] * $form['harga_tebus'];
+            $subtotal = $form['volume_po'] * $form['harga_tebus'];
 
-        $ppn = $form['ppn12'] ?? 0;
-        $dpp = $form['dpp'] ?? 0;
-        $pph22 = $form['pph22'] ?? 0;
+            $ppn = $form['ppn12'] ?? 0;
+            $dpp = $form['dpp'] ?? 0;
+            $pph22 = $form['pph22'] ?? 0;
 
-        // $total = $subtotal + $ppn - $pph22;
+            // $total = $subtotal + $ppn - $pph22;
 
-        $dataPo = [
-            'id_master' => $idMaster,
-            'id_vendor' => $form['vendor'],
-            'id_produk' => $form['produk'],
-            'id_terminal' => $form['terminal'],
-            'nomor_po' => $nomorPO,
-            'tanggal_inven' => $form['tanggal_inven'],
-            'volume_po' => $form['volume_po'],
-            'harga_tebus' => $form['harga_tebus'],
-            'kd_tax' => $form['kd_tax'],
-            'subtotal' => $subtotal,
-            'ppn_12' => $ppn,
-            'dpp_11_12' => $dpp,
-            'pph_22' => $pph22,
-            'total_order' => $form['total_order'],
-            'terms' => $form['terms'],
-            'terms_day' => $form['terms_day'],
-            'jenis_harga' => $form['jenis_harga'],
-            'jenis_kirim' => $form['jenis_kirim'],
-            'kategori_plat' => $form['kategori_plat'],
-            'kategori_oa' => $form['kategori_oa'],
-            'ongkos_angkut' => $form['ongkos_angkut'],
-            'is_biaya' => $form['jenis_oa'],
-            'nilai_pbbkb' => $form['nilai_pbbkb'],
-            'pbbkb' => $form['pbbkb'],
-            'keterangan' => $form['catatan_po'],
-            'internal_notes' => $form['internal_notes'],
-            'iuran_migas' => $form['iuran_migas'],
-            'nominal_migas' => $form['nominal_migas'],
-            'disposisi_po' => 1,
-            'created_time' => now(),
-            'created_by' => $user['name'],
-            'created_ip' => request()->ip(),
-        ];
-        DB::table('inventory_vendor_po')->insert($dataPo);
+            $dataPo = [
+                'id_master' => $idMaster,
+                'id_vendor' => $form['vendor'],
+                'id_produk' => $form['produk'],
+                'id_terminal' => $form['terminal'],
+                'nomor_po' => $nomorPO,
+                'tanggal_inven' => $form['tanggal_inven'],
+                'volume_po' => $form['volume_po'],
+                'harga_tebus' => $form['harga_tebus'],
+                'kd_tax' => $form['kd_tax'],
+                'subtotal' => $subtotal,
+                'ppn_12' => $ppn,
+                'dpp_11_12' => $dpp,
+                'pph_22' => $pph22,
+                'total_order' => $form['total_order'],
+                'terms' => $form['terms'],
+                'terms_day' => $form['terms_day'],
+                'jenis_harga' => $form['jenis_harga'],
+                'jenis_kirim' => $form['jenis_kirim'],
+                'kategori_plat' => $form['kategori_plat'],
+                'kategori_oa' => $form['kategori_oa'],
+                'ongkos_angkut' => $form['ongkos_angkut'],
+                'is_biaya' => $form['jenis_oa'],
+                'nilai_pbbkb' => $form['nilai_pbbkb'],
+                'pbbkb' => $form['pbbkb'],
+                'keterangan' => $form['catatan_po'],
+                'internal_notes' => $form['internal_notes'],
+                'iuran_migas' => $form['iuran_migas'],
+                'nominal_migas' => $form['nominal_migas'],
+                'disposisi_po' => 1,
+                'created_time' => now(),
+                'created_by' => $user['name'],
+                'created_ip' => request()->ip(),
+            ];
+            DB::table('inventory_vendor_po')->insert($dataPo);
 
-        DB::connection('mysql_old')
-        ->table('new_pro_inventory_vendor_po')
-        ->insert($dataPo);
+            
 
-        $detailItems = $this->buildDetailItems($form);
-        $detailExpenses = $this->buildExpenses($form);
+            $detailItems = $this->buildDetailItems($form);
+            $detailExpenses = $this->buildExpenses($form);
 
-        $res = $this->sendToAccurate($form, $detailItems, $detailExpenses, $nomorPO);
-        
+            $res = $this->sendToAccurate($form, $detailItems, $detailExpenses, $nomorPO);
+            
 
-        if (!$res || ($res['s'] ?? false) == false) {
+            if (!$res || ($res['s'] ?? false) == false) {
 
-            Log::info('Accurate response', $res);
+                Log::info('Accurate response', $res);
 
-            $message = is_array($res['d'])
-                ? ($res['d']['message'] ?? json_encode($res['d']))
-                : $res['d'];
+                $message = is_array($res['d'])
+                    ? ($res['d']['message'] ?? json_encode($res['d']))
+                    : $res['d'];
 
-            throw new \Exception($message.'- Response Accurate');
+                throw new \Exception($message.'- Response Accurate');
+            }
+
+            $idAccurate = $res['r']['id'] ?? null;
+            $res2=$this->closeAccurate($idAccurate, $form, 'Menunggu Approve');
+            
+            if (!$res2 || ($res2['s'] ?? false) == false) {
+
+                Log::info('Accurate response 2', $res2);
+
+                $message = is_array($res2['d'])
+                    ? ($res2['d']['message'] ?? json_encode($res2['d']))
+                    : $res2['d'];
+
+                throw new \Exception($message);
+            }
+
+            DB::table('inventory_vendor_po')
+            ->where('id_master', $idMaster)
+            ->update([
+                'id_accurate' => $idAccurate
+            ]);
+
+            
+            DB::afterCommit(function () use ($dataPo,$nomorPO, $form, $user, $idMaster, $idAccurate) {
+                DB::connection('mysql_old')
+                ->table('new_pro_inventory_vendor_po')
+                ->insert($dataPo);
+
+                DB::connection('mysql_old')
+                ->table('new_pro_inventory_vendor_po')
+                ->where('id_master', $idMaster)
+                ->update([
+                    'id_accurate' => $idAccurate
+                ]);
+                $this->poNotificationService->notifyCfo($nomorPO);
+                $emails = User::whereHas('roles', function ($q) {
+                    $q->where('nama', 'Chief Financial Officer');
+                })
+                ->pluck('email')
+                ->toArray();
+
+                Mail::to($emails)
+                    ->send(new POTradingMail(
+                        $nomorPO,
+                        $form,
+                        $user['name'],
+                        'need_cfo'
+                    ));
+            });
+
+            return [
+                'success' => true,
+                'msg' => 'PO berhasil disimpan',
+            ];
+            });
+        }catch (\Exception $e) {
+            Log::error('Create PO Trade Error', [
+                'form' => $form,
+                'user' => $user,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            throw $e;
         }
-
-        $idAccurate = $res['r']['id'] ?? null;
-        $res2=$this->closeAccurate($idAccurate, $form, 'Menunggu Approve');
-        
-        if (!$res2 || ($res2['s'] ?? false) == false) {
-
-            Log::info('Accurate response 2', $res2);
-
-            $message = is_array($res2['d'])
-                ? ($res2['d']['message'] ?? json_encode($res2['d']))
-                : $res2['d'];
-
-            throw new \Exception($message);
-        }
-
-        DB::table('inventory_vendor_po')
-        ->where('id_master', $idMaster)
-        ->update([
-            'id_accurate' => $idAccurate
-        ]);
-        DB::connection('mysql_old')
-        ->table('new_pro_inventory_vendor_po')
-        ->where('id_master', $idMaster)
-        ->update([
-            'id_accurate' => $idAccurate
-        ]);
-
-        
-        DB::afterCommit(function () use ($nomorPO, $form, $user) {
-            Mail::to('gary.salsabilla@proenergi.com')
-                ->send(new POTradingMail(
-                    $nomorPO,
-                    $form,
-                    $user,
-                    'need_cfo'
-                ));
-        });
-
-        return [
-            'success' => true,
-            'msg' => 'PO berhasil disimpan',
-        ];
-        });
     }
 
     public function buildDetailItems(array $form)
@@ -470,181 +498,194 @@ class PurchaseOrderInventoryService
 
     public function update($id, array $form, array $user)
     {
-        return DB::transaction(function () use ($id, $form, $user) {
+        try {
+            return DB::transaction(function () use ($id, $form, $user) {
 
-        
-            $po = InventoryVendorPo::
-                where('id_master', $id)
-                ->withSum('goodReceipt as total_ri', 'volume_terima')
-                ->first();
+            
+                $po = InventoryVendorPo::
+                    where('id_master', $id)
+                    ->withSum('goodReceipt as total_ri', 'volume_terima')
+                    ->first();
 
-            if (!$po) {
-                throw new Exception('PO tidak ditemukan');
-            }
-
-            $isPriceChanged = (float)$po->harga_tebus !== (float)$form['harga_tebus'];
-
-            /*
-            |--------------------------------------------------------------------------
-            | Validasi Perubahan Harga
-            |--------------------------------------------------------------------------
-            */
-
-            if ($isPriceChanged && $form['jenis_harga'] != 2) {
-                throw ValidationException::withMessages([
-                    'harga_tebus' => 'Perubahan harga hanya diperbolehkan untuk Jenis Harga Sementara.'
-                ]);
-            }
- 
-            $subtotal = $form['volume_po'] * $form['harga_tebus'];
-
-            // $total = $subtotal
-            //     + ($form['ppn12'] ?? 0)
-            //     - ($form['pph22'] ?? 0);
-
-            $updateData = [
-                'id_terminal' => $form['terminal'],
-                'tanggal_inven' => $form['tanggal_inven'],
-                'volume_po' => $form['volume_po'],
-                'harga_tebus' => $form['harga_tebus'],
-                'subtotal' => $subtotal,
-                'ppn_12' => $form['ppn12'] ?? 0,
-                'dpp_11_12' => $form['dpp'] ?? 0,
-                'pph_22' => $form['pph22'] ?? 0,
-                'total_order' => $form['total_order'],
-                'kd_tax' => $form['kd_tax'],
-                'terms' => $form['terms'],
-                'terms_day' => $form['terms_day'],
-                'kategori_oa' => $form['kategori_oa'],
-                'kategori_plat' => $form['kategori_plat'],
-                'jenis_kirim' => $form['jenis_kirim'],
-                'jenis_harga' => $form['jenis_harga'],
-                'ongkos_angkut' => $form['ongkos_angkut'],
-                'is_biaya' => $form['jenis_oa'],
-                'internal_notes' => $form['internal_notes'],
-                'keterangan' => $form['catatan_po'],
-                'iuran_migas' => $form['iuran_migas'],
-                'nominal_migas' => $form['nominal_migas'],
-                'nilai_pbbkb' => $form['nilai_pbbkb'],
-                'pbbkb' => $form['pbbkb'],
-
-                // reset approval
-                'disposisi_po' => 1,
-                'cfo_result' => 0,
-                'ceo_result' => 0,
-                'revert_cfo' => 0,
-                'revert_ceo' => 0,
-
-                'is_price_changed' => $isPriceChanged ? 1 : 0,
-                'lastupdate_time' => now(),
-                'lastupdate_by' => $user['name'],
-                'lastupdate_ip' => request()->ip(),
-            ];
-            if (
-                $po->is_close != 1 &&
-                $po->is_cancel != 1 &&
-                $po->ceo_result == 1 &&
-                $po->revert_ceo == 0 &&
-                ($po->resubmission_count ?? 0) < 3
-            ) {
-                $this->saveHistory($po,$form['catatan_resubmit']);
-
-                $po->resubmission_count = ($po->resubmission_count ?? 0) + 1;
-                $po->is_resubmission = 1;
-                $po->resubmission_date = now();
-
-                //update PO
-                $updateData['resubmission_count'] = $po->resubmission_count;
-                $updateData['is_resubmission'] = 1;
-                $updateData['resubmission_date'] = $po->resubmission_date;
-            }
-
-            DB::table('inventory_vendor_po')
-            ->where('id_master', $id)
-            ->update($updateData);
-
-            //update SYOP lama
-            DB::connection('mysql_old')
-            ->table('new_pro_inventory_vendor_po')
-            ->where('id_master', $id)
-            ->update($updateData);
-
-            // UPDATE ACCURATE
-            if ($po->id_accurate) {
-            if ($isPriceChanged && $po->volume_terima>0) {
-
-                $this->updateAccuratePrice(
-                    $po,
-                    $form
-                );
-
-            } else {
-                $delete = $this->deleteAccuratePO(
-                    $po->id_accurate
-                );
-
-                if (($delete['s'] ?? false) == false) {
-                    throw new Exception('Gagal delete Accurate');
+                if (!$po) {
+                    throw new Exception('PO tidak ditemukan');
                 }
 
-                $items = $this->buildDetailItems($form);
+                $isPriceChanged = (float)$po->harga_tebus !== (float)$form['harga_tebus'];
 
-                $expenses = $this->buildExpenses($form);
+                /*
+                |--------------------------------------------------------------------------
+                | Validasi Perubahan Harga
+                |--------------------------------------------------------------------------
+                */
 
-                $save = $this->sendToAccurate(
-                    $form,
-                    $items,
-                    $expenses,
-                    $po->nomor_po
-                );
-
-                if (($save['s'] ?? false) == false) {
-                    throw new Exception('Gagal save Accurate');
+                if ($isPriceChanged && $form['jenis_harga'] != 2) {
+                    throw ValidationException::withMessages([
+                        'harga_tebus' => 'Perubahan harga hanya diperbolehkan untuk Jenis Harga Sementara.'
+                    ]);
                 }
-
-                $newId = $save['r']['id'];
-
-                $close = $this->closeAccurate(
-                    $newId,
-                    $form,
-                    'Menunggu Approve'
-                );
-
-                if (($close['s'] ?? false) == false) {
-                    throw new Exception('Gagal close Accurate');
-                }
-
-                if ($isPriceChanged && $po->disposisi_po>1){
-                
-                    DB::afterCommit(function () use ($po, $form, $user) { 
-                        $emails = User::whereHas('roles', function ($q) {
-                           $q->where('nama', 'Chief Executive Officer');
-                       })
-                       ->pluck('email')
-                       ->toArray();
     
-                        Mail::to($emails)->send( new POTradingMail( $po->nomor_po, $form, $user, 'resubmit' ) ); 
-                    });
+                $subtotal = $form['volume_po'] * $form['harga_tebus'];
+
+                // $total = $subtotal
+                //     + ($form['ppn12'] ?? 0)
+                //     - ($form['pph22'] ?? 0);
+
+                $updateData = [
+                    'id_terminal' => $form['terminal'],
+                    'tanggal_inven' => $form['tanggal_inven'],
+                    'volume_po' => $form['volume_po'],
+                    'harga_tebus' => $form['harga_tebus'],
+                    'subtotal' => $subtotal,
+                    'ppn_12' => $form['ppn12'] ?? 0,
+                    'dpp_11_12' => $form['dpp'] ?? 0,
+                    'pph_22' => $form['pph22'] ?? 0,
+                    'total_order' => $form['total_order'],
+                    'kd_tax' => $form['kd_tax'],
+                    'terms' => $form['terms'],
+                    'terms_day' => $form['terms_day'],
+                    'kategori_oa' => $form['kategori_oa'],
+                    'kategori_plat' => $form['kategori_plat'],
+                    'jenis_kirim' => $form['jenis_kirim'],
+                    'jenis_harga' => $form['jenis_harga'],
+                    'ongkos_angkut' => $form['ongkos_angkut'],
+                    'is_biaya' => $form['jenis_oa'],
+                    'internal_notes' => $form['internal_notes'],
+                    'keterangan' => $form['catatan_po'],
+                    'iuran_migas' => $form['iuran_migas'],
+                    'nominal_migas' => $form['nominal_migas'],
+                    'nilai_pbbkb' => $form['nilai_pbbkb'],
+                    'pbbkb' => $form['pbbkb'],
+
+                    // reset approval
+                    'disposisi_po' => 1,
+                    'cfo_result' => 0,
+                    'ceo_result' => 0,
+                    'revert_cfo' => 0,
+                    'revert_ceo' => 0,
+
+                    'is_price_changed' => $isPriceChanged ? 1 : 0,
+                    'lastupdate_time' => now(),
+                    'lastupdate_by' => $user['name'],
+                    'lastupdate_ip' => request()->ip(),
+                ];
+                if (
+                    $po->is_close != 1 &&
+                    $po->is_cancel != 1 &&
+                    $po->ceo_result == 1 &&
+                    $po->revert_ceo == 0 &&
+                    ($po->resubmission_count ?? 0) < 3
+                ) {
+                    $this->saveHistory($po,$form['catatan_resubmit']);
+
+                    $po->resubmission_count = ($po->resubmission_count ?? 0) + 1;
+                    $po->is_resubmission = 1;
+                    $po->resubmission_date = now();
+
+                    //update PO
+                    $updateData['resubmission_count'] = $po->resubmission_count;
+                    $updateData['is_resubmission'] = 1;
+                    $updateData['resubmission_date'] = $po->resubmission_date;
                 }
-                
+
                 DB::table('inventory_vendor_po')
-                    ->where('id_master', $id)
-                    ->update([
-                        'id_accurate' => $newId
-                    ]);
+                ->where('id_master', $id)
+                ->update($updateData);
 
-                //update syop old
+                //update SYOP lama
                 DB::connection('mysql_old')
-                    ->table('new_pro_inventory_vendor_po')
-                    ->where('id_master', $id)
-                    ->update([
-                        'id_accurate' => $newId
-                    ]);
-            }
+                ->table('new_pro_inventory_vendor_po')
+                ->where('id_master', $id)
+                ->update($updateData);
 
-            return [ 'success' => true, 'message' => 'PO berhasil diupdate' ];
-            }
-        });
+                // UPDATE ACCURATE
+                if ($po->id_accurate) {
+                if ($isPriceChanged && $po->volume_terima>0) {
+
+                    $this->updateAccuratePrice(
+                        $po,
+                        $form
+                    );
+
+                } else {
+                    $delete = $this->deleteAccuratePO(
+                        $po->id_accurate
+                    );
+
+                    if (($delete['s'] ?? false) == false) {
+                        throw new Exception('Gagal delete Accurate');
+                    }
+
+                    $items = $this->buildDetailItems($form);
+
+                    $expenses = $this->buildExpenses($form);
+
+                    $save = $this->sendToAccurate(
+                        $form,
+                        $items,
+                        $expenses,
+                        $po->nomor_po
+                    );
+
+                    if (($save['s'] ?? false) == false) {
+                        throw new Exception('Gagal save Accurate');
+                    }
+
+                    $newId = $save['r']['id'];
+
+                    $close = $this->closeAccurate(
+                        $newId,
+                        $form,
+                        'Menunggu Approve'
+                    );
+
+                    if (($close['s'] ?? false) == false) {
+                        throw new Exception('Gagal close Accurate');
+                    }
+
+                    if ($isPriceChanged && $po->disposisi_po>1){
+                    
+                        DB::afterCommit(function () use ($po, $form, $user) { 
+                            $emails = User::whereHas('roles', function ($q) {
+                            $q->where('nama', 'Chief Financial Officer');
+                        })
+                        ->pluck('email')
+                        ->toArray();
+        
+                            Mail::to($emails)->send( new POTradingMail( $po->nomor_po, $form, $user['name'], 'resubmit' ) );
+                        });
+                    }
+                    
+                    DB::table('inventory_vendor_po')
+                        ->where('id_master', $id)
+                        ->update([
+                            'id_accurate' => $newId
+                        ]);
+
+                    //update syop old
+                    DB::connection('mysql_old')
+                        ->table('new_pro_inventory_vendor_po')
+                        ->where('id_master', $id)
+                        ->update([
+                            'id_accurate' => $newId
+                        ]);
+                }
+
+                return [ 'success' => true, 'message' => 'PO berhasil diupdate' ];
+                }
+            });
+        }catch (\Exception $e) {
+            Log::error('Create PO Error', [
+                'id_master' => $id,
+                'form' => $form,
+                'user' => $user,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            throw $e;
+        }
     }
     public function approveCFO($id, array $form, array $user)
     {
@@ -704,6 +745,7 @@ class PurchaseOrderInventoryService
                 // 🔥 EMAIL SETELAH COMMIT
                 DB::afterCommit(function () use ($po, $form, $user) {
 
+                    $this->poNotificationService->notifyCeo($po);
                     $emails = User::whereHas('roles', function ($q) {
                         $q->where('nama', 'Chief Executive Officer');
                     })
@@ -720,7 +762,7 @@ class PurchaseOrderInventoryService
                                 'volume_po' => $po->volume_po,
                                 'harga_tebus' => $po->harga_tebus,
                             ],
-                            $user,
+                            $po->created_by,
                             $type
                         )
                     );
@@ -741,6 +783,8 @@ class PurchaseOrderInventoryService
                 'form' => $form,
                 'user' => $user,
                 'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line'  => $e->getLine(),
             ]);
 
             return [
@@ -752,106 +796,121 @@ class PurchaseOrderInventoryService
 
     public function approveCEO($id, array $form, array $user)
     {
-        return DB::transaction(function () use ($id, $form, $user) {
+        try{
+            return DB::transaction(function () use ($id, $form, $user) {
 
-        
-            $po = InventoryVendorPo::where('id_master', $id)
-                ->firstOrFail();
-            if ($po->is_price_changed == 1) {
-               $sync= $this->syncPriceAfterApprove($po);
+            
+                $po = InventoryVendorPo::where('id_master', $id)
+                    ->firstOrFail();
+                if ($po->is_price_changed == 1) {
+                    $sync= $this->syncPriceAfterApprove($po);
 
-            }
+                }
 
-            $po_old = InventoryVendorPoOld::where('id_master', $id)
-                ->firstOrFail();
+                $po_old = InventoryVendorPoOld::where('id_master', $id)
+                    ->firstOrFail();
 
-            // =========================
-            // APPROVE
-            // =========================
-            if ($form['decision'] == 1) {
+                // =========================
+                // APPROVE
+                // =========================
+                if ($form['decision'] == 1) {
 
-                $po->update([
-                    'ceo_result'   => 1,
-                    'ceo_summary'  => $form['note'] ?? null,
-                    'ceo_pic'      => $user['name'],
-                    'ceo_tanggal'  => now(),
-                    'disposisi_po' => 4,
-                ]);
-                $po_old->update([
-                    'ceo_result'   => 1,
-                    'ceo_summary'  => $form['note'] ?? null,
-                    'ceo_pic'      => $user['name'],
-                    'ceo_tanggal'  => now(),
-                    'disposisi_po' => 4,
-                ]);
-            }
+                    $po->update([
+                        'ceo_result'   => 1,
+                        'ceo_summary'  => $form['note'] ?? null,
+                        'ceo_pic'      => $user['name'],
+                        'ceo_tanggal'  => now(),
+                        'disposisi_po' => 4,
+                    ]);
+                    $po_old->update([
+                        'ceo_result'   => 1,
+                        'ceo_summary'  => $form['note'] ?? null,
+                        'ceo_pic'      => $user['name'],
+                        'ceo_tanggal'  => now(),
+                        'disposisi_po' => 4,
+                    ]);
+                }
 
-            // =========================
-            // REJECT / REVERT
-            // =========================
-            if ($form['decision'] == 2) {
+                // =========================
+                // REJECT / REVERT
+                // =========================
+                if ($form['decision'] == 2) {
 
-                $po->update([
-                    'ceo_result'         => 2,
-                    'revert_ceo'         => 1,
-                    'revert_ceo_summary' => $form['note'] ?? null,
-                    'ceo_pic'            => $user['name'],
-                    'ceo_tanggal'        => now(),
-                    'disposisi_po'       => 5,
-                ]);
-                $po_old->update([
-                    'ceo_result'         => 2,
-                    'revert_ceo'         => 1,
-                    'revert_ceo_summary' => $form['note'] ?? null,
-                    'ceo_pic'            => $user['name'],
-                    'ceo_tanggal'        => now(),
-                    'disposisi_po'       => 5,
-                ]);
-            }
+                    $po->update([
+                        'ceo_result'         => 2,
+                        'revert_ceo'         => 1,
+                        'revert_ceo_summary' => $form['note'] ?? null,
+                        'ceo_pic'            => $user['name'],
+                        'ceo_tanggal'        => now(),
+                        'disposisi_po'       => 5,
+                    ]);
+                    $po_old->update([
+                        'ceo_result'         => 2,
+                        'revert_ceo'         => 1,
+                        'revert_ceo_summary' => $form['note'] ?? null,
+                        'ceo_pic'            => $user['name'],
+                        'ceo_tanggal'        => now(),
+                        'disposisi_po'       => 5,
+                    ]);
+                }
 
-            $res=$this->openAccurate($po->id_accurate,  $po->id_terminal);
-                
-            if (!$res || ($res['s'] ?? false) == false) {
+                $res=$this->openAccurate($po->id_accurate,  $po->id_terminal);
+                    
+                if (!$res || ($res['s'] ?? false) == false) {
 
-                Log::info('Accurate response ', $res);
+                    Log::info('Accurate response ', $res);
 
-                $message = is_array($res['d'])
-                    ? ($res['d']['message'] ?? json_encode($res['d']))
-                    : $res['d'];
+                    $message = is_array($res['d'])
+                        ? ($res['d']['message'] ?? json_encode($res['d']))
+                        : $res['d'];
 
-                throw new \Exception($message);
-            }
-            DB::afterCommit(function () use ($po, $form, $user) {
+                    throw new \Exception($message." - response dari Accurate");
+                }
+                DB::afterCommit(function () use ($po, $form, $user) {
+                    $this->poNotificationService->notifyRequester($po);
+                    $emails = User::whereHas('departemen', function ($q) {
+                        $q->where('kode', 'PROC');
+                    })
+                    ->pluck('email')
+                    ->toArray();
 
-                $emails = User::whereHas('departemen', function ($q) {
-                    $q->where('kode', 'PROC');
-                })
-                ->pluck('email')
-                ->toArray();
+                    $type = $form['decision'] == 1 ? 'approved' : 'rejected';
 
-                $type = $form['decision'] == 1 ? 'approved' : 'rejected';
+                    Mail::to($emails)->send(
+                        new POTradingMail(
+                            $po->nomor_po,
+                            [
+                                'vendor' => $po->id_vendor,
+                                'produk' => $po->id_produk,
+                                'volume_po' => $po->volume_po,
+                                'harga_tebus' => $po->harga_tebus,
+                            ],
+                            $po->created_by,
+                            $type
+                        )
+                    );
+                });
 
-                Mail::to($emails)->send(
-                    new POTradingMail(
-                        $po->nomor_po,
-                        [
-                            'vendor' => $po->id_vendor,
-                            'produk' => $po->id_produk,
-                            'volume_po' => $po->volume_po,
-                            'harga_tebus' => $po->harga_tebus,
-                        ],
-                        $user,
-                        $type
-                    )
-                );
+                return [
+                    'success' => true,
+                    'message' => 'Approval CEO berhasil disimpan',
+                ];
             });
+        }catch (\Exception $e) {
+            Log::error('Approve CEO Error', [
+                'id' => $id,
+                'form' => $form,
+                'user' => $user,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
 
-           
             return [
-                'success' => true,
-                'message' => 'Approval CFO berhasil disimpan',
+                'success' => false,
+                'message' => $e->getMessage(),
             ];
-        });
+        }
     }
     // private function getCfoEmails()
     // {
@@ -860,20 +919,35 @@ class PurchaseOrderInventoryService
     //         ->pluck('email')
     //         ->toArray();
     // }
-   private function saveHistory($po,$catatan_resubmit): void
+    private function saveHistory($po, $catatan_resubmit): void
     {
-        $data = (array) $po;
+        try {
+            $data = $po->getAttributes();
 
-        unset($data['id']);
-        unset($data['id_master']);
+            unset($data['id']);
+            unset($data['id_master']);
 
-        $data['id_po_supplier'] = $po->id_master;
-        $data['keterangan_resubmission'] = $catatan_resubmit;
+            $data['id_po_supplier'] = $po->id_master;
+            $data['keterangan_resubmission'] = $catatan_resubmit;
 
-        DB::table('inventory_vendor_po_history')->insert($data);
-        DB::connection('mysql_old')
-        ->table('new_pro_inventory_vendor_po_history')
-        ->insert($data);
+            DB::table('inventory_vendor_po_history')->insert($data);
+
+            DB::connection('mysql_old')
+                ->table('new_pro_inventory_vendor_po_history')
+                ->insert($data);
+
+        } catch (\Exception $e) {
+            Log::error('Save History PO Error', [
+                'id_master' => $po->id_master ?? null,
+                'catatan_resubmit' => $catatan_resubmit,
+                'data' => $po ?? null,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            throw $e;
+        }
     }
 
 
@@ -988,84 +1062,84 @@ class PurchaseOrderInventoryService
 
     public function autoApproveCfo()
     {
-    try {
-        $result = DB::transaction(function () {
+        try {
+            $result = DB::transaction(function () {
 
-            $pos = InventoryVendorPo::where('disposisi_po', '>', 0)
-                ->where('ceo_result', 0)
-                ->where('cfo_result', 0)
-                ->whereYear('tanggal_inven', '>=', 2024)
-                ->where('created_time', '<=', now()->subMinutes(20))
-                ->get();
+                $pos = InventoryVendorPo::where('disposisi_po', '>', 0)
+                    ->where('ceo_result', 0)
+                    ->where('cfo_result', 0)
+                    ->whereYear('tanggal_inven', '>=', 2024)
+                    ->where('created_time', '<=', now()->subMinutes(20))
+                    ->get();
 
-            if ($pos->isEmpty()) {
-                return [
-                    'success' => true,
-                    'message' => 'Tidak ada PO yang perlu auto approve',
-                    'total' => 0,
+                if ($pos->isEmpty()) {
+                    return [
+                        'success' => true,
+                        'message' => 'Tidak ada PO yang perlu auto approve',
+                        'total' => 0,
+                    ];
+                }
+
+                $systemUser = [
+                    'name' => 'Syop System',
+                    'email' => null,
                 ];
-            }
 
-            $systemUser = [
-                'name' => 'Syop System',
-                'email' => null,
-            ];
-
-            foreach ($pos as $po) {
-                $po->update([
-                    'cfo_result'   => 1,
-                    'cfo_summary'  => 'Approved By System Automatically',
-                    'cfo_pic'      => $systemUser['name'],
-                    'cfo_tanggal'  => now(),
-                    'disposisi_po' => 2,
-                ]);
-
-                InventoryVendorPoOld::where('id_master', $po->id_master)
-                    ->update([
+                foreach ($pos as $po) {
+                    $po->update([
                         'cfo_result'   => 1,
                         'cfo_summary'  => 'Approved By System Automatically',
                         'cfo_pic'      => $systemUser['name'],
                         'cfo_tanggal'  => now(),
                         'disposisi_po' => 2,
                     ]);
-            }
 
-            DB::afterCommit(function () use ($pos, $systemUser) {
-                $emails = User::whereHas('roles', function ($q) {
-                        $q->where('nama', 'Chief Executive Officer');
-                    })
-                    ->whereNotNull('email')
-                    ->pluck('email')
-                    ->filter()
-                    ->toArray();
-
-                if (empty($emails)) {
-                    return;
+                    InventoryVendorPoOld::where('id_master', $po->id_master)
+                        ->update([
+                            'cfo_result'   => 1,
+                            'cfo_summary'  => 'Approved By System Automatically',
+                            'cfo_pic'      => $systemUser['name'],
+                            'cfo_tanggal'  => now(),
+                            'disposisi_po' => 2,
+                        ]);
                 }
 
-                foreach ($pos as $po) {
-                    Mail::to($emails)->send(
-                        new POTradingMail(
-                            $po->nomor_po,
-                            [
-                                'vendor' => $po->id_vendor,
-                                'produk' => $po->id_produk,
-                                'volume_po' => $po->volume_po,
-                                'harga_tebus' => $po->harga_tebus,
-                            ],
-                            $systemUser,
-                            'need_ceo'
-                        )
-                    );
-                }
+                DB::afterCommit(function () use ($pos, $systemUser) {
+                    $emails = User::whereHas('roles', function ($q) {
+                            $q->where('nama', 'Chief Executive Officer');
+                        })
+                        ->whereNotNull('email')
+                        ->pluck('email')
+                        ->filter()
+                        ->toArray();
+
+                    if (empty($emails)) {
+                        return;
+                    }
+
+                    foreach ($pos as $po) {
+                        Mail::to($emails)->send(
+                            new POTradingMail(
+                                $po->nomor_po,
+                                [
+                                    'vendor' => $po->id_vendor,
+                                    'produk' => $po->id_produk,
+                                    'volume_po' => $po->volume_po,
+                                    'harga_tebus' => $po->harga_tebus,
+                                ],
+                                $systemUser['name'],
+                                'need_ceo'
+                            )
+                        );
+                    }
+                });
+
+                return [
+                    'success' => true,
+                    'message' => 'Auto approval CFO berhasil',
+                    'total' => $pos->count(),
+                ];
             });
-
-            return [
-                'success' => true,
-                'message' => 'Auto approval CFO berhasil',
-                'total' => $pos->count(),
-            ];
-        });
 
         return $result;
 
@@ -1082,8 +1156,8 @@ class PurchaseOrderInventoryService
     }
 }
 
-private function syncPriceAfterApprove(InventoryVendorPo $po)
-{
+    private function syncPriceAfterApprove(InventoryVendorPo $po)
+    {
     $mysql = DB::connection('mysql_old');
 
     // =========================
@@ -1176,7 +1250,7 @@ private function syncPriceAfterApprove(InventoryVendorPo $po)
             'jenis_harga'      => 1,
             'is_price_changed' => 2,
         ]);
-}
+    }
 
     public function changePrice($id)
     {
@@ -1204,7 +1278,6 @@ private function syncPriceAfterApprove(InventoryVendorPo $po)
             });
 
             return $result;
-            dd($result);
 
         } catch (Throwable $e) {
 

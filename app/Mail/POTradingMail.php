@@ -20,7 +20,7 @@ class POTradingMail extends Mailable
             'produk' => $form['produk'],
             'volume_po' => $form['volume_po'],
             'total_order' => $form['volume_po'] * $form['harga_tebus'],
-            'created_by' => $user['name'],
+            'created_by' => $user,
             'id_master' => $form['id_master'] ?? null,
         ];
 
