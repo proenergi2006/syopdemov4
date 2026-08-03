@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApprovalFlow;
+use App\Models\PoAttachment;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderApproval;
 use App\Models\PurchaseOrderItem;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Crypt;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderNotificationService;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderMailService;
@@ -108,18 +110,20 @@ class PurchaseOrderController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | Department dan cabang user login
+        | Department dan cabang assignment user login
+        |--------------------------------------------------------------------------
+        | Menggunakan seluruh cabang/department dari user_access_assignments
+        | (multi-assignment), dengan fallback ke master user apabila user
+        | belum pernah di-assign sama sekali.
         |--------------------------------------------------------------------------
         */
-            $userDepartmentId = (int) (
-                $user->departemen_id
-                ?? 0
-            );
+            $userDepartmentIds = $user
+                ->accessibleDepartmentIds()
+                ->all();
 
-            $userCabangId = (int) (
-                $user->cabang_id
-                ?? 0
-            );
+            $userCabangIds = $user
+                ->accessibleBranchIds()
+                ->all();
 
             /*
         |--------------------------------------------------------------------------
@@ -263,8 +267,8 @@ class PurchaseOrderController extends Controller
                 $userRoleIds,
                 $canView,
                 $viewScope,
-                $userDepartmentId,
-                $userCabangId,
+                $userDepartmentIds,
+                $userCabangIds,
             ) {
                 /*
             |--------------------------------------------------------------------------
@@ -277,8 +281,8 @@ class PurchaseOrderController extends Controller
                     $user,
                     $canView,
                     $viewScope,
-                    $userDepartmentId,
-                    $userCabangId,
+                    $userDepartmentIds,
+                    $userCabangIds,
                 ) {
                     /*
                 |--------------------------------------------------------------------------
@@ -332,15 +336,15 @@ class PurchaseOrderController extends Controller
                 |--------------------------------------------------------------------------
                 */
                     if ($viewScope === 'OWN_DEPARTMENT') {
-                        if ($userDepartmentId <= 0) {
+                        if (empty($userDepartmentIds)) {
                             $scopeQuery->whereRaw('1 = 0');
 
                             return;
                         }
 
-                        $scopeQuery->where(
+                        $scopeQuery->whereIn(
                             'id_department',
-                            $userDepartmentId,
+                            $userDepartmentIds,
                         );
 
                         return;
@@ -352,15 +356,15 @@ class PurchaseOrderController extends Controller
                 |--------------------------------------------------------------------------
                 */
                     if ($viewScope === 'OWN_CABANG') {
-                        if ($userCabangId <= 0) {
+                        if (empty($userCabangIds)) {
                             $scopeQuery->whereRaw('1 = 0');
 
                             return;
                         }
 
-                        $scopeQuery->where(
+                        $scopeQuery->whereIn(
                             'cabang',
-                            $userCabangId,
+                            array_map('strval', $userCabangIds),
                         );
 
                         return;
@@ -412,6 +416,26 @@ class PurchaseOrderController extends Controller
                         },
                     );
                 }
+
+                /*
+            |--------------------------------------------------------------------------
+            | Pembuat Purchase Requisition yang ditarik ke PO ini
+            |--------------------------------------------------------------------------
+            | User yang PR-nya dijadikan PO tetap dapat melihat PO tersebut
+            | meskipun cabang/department/scope PO di luar aksesnya. Satu PO
+            | bisa berisi banyak PR dari user berbeda-beda, jadi cukup salah
+            | satu PR di PO tersebut milik user login.
+            |--------------------------------------------------------------------------
+            */
+                $visibilityQuery->orWhereHas(
+                    'purchaseRequests',
+                    function ($q) use ($user) {
+                        $q->where(
+                            'purchase_requests.created_by',
+                            $user->id,
+                        );
+                    },
+                );
             });
 
             /*
@@ -741,7 +765,7 @@ class PurchaseOrderController extends Controller
                     $canUpdate,
                     $canDelete,
                     $canSubmit,
-                    $userDepartmentId,
+                    $userDepartmentIds,
                 ) {
                     /*
                 |--------------------------------------------------------------------------
@@ -845,10 +869,10 @@ class PurchaseOrderController extends Controller
                     $isCreator = (int) $po->created_by
                         === (int) $user->id;
 
-                    $isSameDepartment = (
-                        $userDepartmentId > 0
-                        && (int) $po->id_department
-                        === (int) $userDepartmentId
+                    $isSameDepartment = in_array(
+                        (int) $po->id_department,
+                        $userDepartmentIds,
+                        true,
                     );
 
                     /*
@@ -1308,6 +1332,30 @@ class PurchaseOrderController extends Controller
                 'nullable',
                 'string',
             ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Lampiran Purchase Order
+        |--------------------------------------------------------------------------
+        | Wajib minimal 1 file, maksimal 3MB per file, mengikuti konsep
+        | lampiran Purchase Requisition.
+        |--------------------------------------------------------------------------
+        */
+            'lampiran_po' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'lampiran_po.*' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:3072',
+            ],
+        ], [
+            'lampiran_po.required' => 'Minimal 1 lampiran Purchase Order wajib diisi.',
+            'lampiran_po.min' => 'Minimal 1 lampiran Purchase Order wajib diisi.',
         ]);
 
         $requestedDepartmentId = (int) (
@@ -1547,6 +1595,8 @@ class PurchaseOrderController extends Controller
             ]);
         }
 
+        $storedPaths = [];
+
         try {
             $po = DB::transaction(
                 function () use (
@@ -1557,6 +1607,8 @@ class PurchaseOrderController extends Controller
                     $purchaseRequestIds,
                     $itemPayloads,
                     $requestedDepartmentId,
+                    $request,
+                    &$storedPaths,
                 ) {
                     /*
                 |--------------------------------------------------------------------------
@@ -2139,6 +2191,67 @@ class PurchaseOrderController extends Controller
 
                     /*
                 |--------------------------------------------------------------------------
+                | Simpan Lampiran Purchase Order
+                |--------------------------------------------------------------------------
+                | Konsep sama dengan lampiran Purchase Requisition: disimpan di
+                | storage/app/public/syopv4/uploads/purchase_orders/lampiran/{po_id},
+                | folder otomatis dibuat apabila belum pernah ada di server.
+                |--------------------------------------------------------------------------
+                */
+                    if ($request->hasFile('lampiran_po')) {
+                        $folder = "syopv4/uploads/purchase_orders/lampiran/{$po->id}";
+
+                        Storage::disk('public')->makeDirectory($folder);
+
+                        $fullFolderPath = storage_path('app/public/' . $folder);
+
+                        if (\Illuminate\Support\Facades\File::exists($fullFolderPath)) {
+                            @chmod($fullFolderPath, 0777);
+                        }
+
+                        foreach ($request->file('lampiran_po') as $file) {
+                            if (!$file || !$file->isValid()) {
+                                continue;
+                            }
+
+                            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                            $extension = strtolower($file->getClientOriginalExtension());
+
+                            $safeOriginalName = \Illuminate\Support\Str::slug($originalName);
+
+                            if ($safeOriginalName === '') {
+                                $safeOriginalName = 'file';
+                            }
+
+                            $filename = str_replace('/', '-', $po->nomor_po)
+                                . '_' . now()->format('YmdHis')
+                                . '_' . uniqid()
+                                . '_' . $safeOriginalName
+                                . '.' . $extension;
+
+                            $path = $file->storeAs($folder, $filename, 'public');
+
+                            $storedPaths[] = $path;
+
+                            $fullFilePath = storage_path('app/public/' . $path);
+
+                            if (\Illuminate\Support\Facades\File::exists($fullFilePath)) {
+                                @chmod($fullFilePath, 0777);
+                            }
+
+                            PoAttachment::create([
+                                'purchase_order_id' => $po->id,
+                                'filename'          => $filename,
+                                'original_filename' => $file->getClientOriginalName(),
+                                'mime_type'         => $file->getMimeType(),
+                                'file_size'         => $file->getSize(),
+                                'filepath'          => $path,
+                            ]);
+                        }
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
                 | Create PO Items dan update outstanding
                 |--------------------------------------------------------------------------
                 */
@@ -2199,7 +2312,7 @@ class PurchaseOrderController extends Controller
                     foreach (
                         $purchaseRequestIds as $purchaseRequestId
                     ) {
-                        $this->refreshPurchaseRequestPOStatus(
+                        $this->poRollbackService->refreshPurchaseRequestPOStatus(
                             (int) $purchaseRequestId,
                         );
                     }
@@ -2218,13 +2331,19 @@ class PurchaseOrderController extends Controller
                 ],
             ], 201);
         } catch (ValidationException $e) {
+            $this->deleteStoredAttachmentFiles($storedPaths);
+
             throw $e;
         } catch (AuthorizationException $e) {
+            $this->deleteStoredAttachmentFiles($storedPaths);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 403);
         } catch (\Throwable $e) {
+            $this->deleteStoredAttachmentFiles($storedPaths);
+
             Log::error(
                 '[Purchase Order] Store error',
                 [
@@ -2239,10 +2358,26 @@ class PurchaseOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menyimpan Purchase Order.',
+                'error_code' => 'purchase_order.store_failed',
                 'error' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
             ], 500);
+        }
+    }
+
+    /**
+     * Hapus file lampiran yang sudah terlanjur tersimpan di disk apabila
+     * proses penyimpanan Purchase Order gagal setelah file diunggah.
+     *
+     * @param string[] $paths
+     */
+    private function deleteStoredAttachmentFiles(array $paths): void
+    {
+        foreach ($paths as $path) {
+            if ($path && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
         }
     }
 
@@ -2266,6 +2401,7 @@ class PurchaseOrderController extends Controller
                 'purchaseRequests.items.unit',
                 'items.unit:id,kode,nama',
                 'items.purchaseRequestItem.unit',
+                'attachments',
                 'creator',
                 'requesterSigner',
                 'approvals',
@@ -2274,12 +2410,40 @@ class PurchaseOrderController extends Controller
             $items = $po->getRelation('items');
             $purchaseRequests = $po->getRelation('purchaseRequests');
 
+            /*
+        |--------------------------------------------------------------------------
+        | Approval yang bisa diproses user login
+        |--------------------------------------------------------------------------
+        | Sama seperti index(), supaya tombol Approve/Reject di modal detail
+        | punya sumber kebenaran yang identik dengan list.
+        |--------------------------------------------------------------------------
+        */
+            $currentApproval = $this->poApprovalService
+                ->getUserCurrentApproval(
+                    $po,
+                    $request->user(),
+                );
+
             return response()->json([
                 'success' => true,
                 'message' => 'Detail Purchase Order berhasil dimuat.',
                 'data' => [
                     'id' => $po->id,
                     'public_id' => $po->encrypted_id,
+
+                    'can_approve' => (
+                        strtoupper(trim((string) $po->status)) === 'IN PROGRESS'
+                        && $currentApproval !== null
+                    ),
+
+                    'approval_id' => $currentApproval?->id,
+
+                    'approval_step_order' => $currentApproval
+                        ? (int) $currentApproval->step_order
+                        : null,
+
+                    'approval_label' => $currentApproval?->label,
+
                     'nomor_po' => $po->nomor_po,
                     'tanggal_po' => $po->tanggal_po
                         ? \Carbon\Carbon::parse($po->tanggal_po)->format('Y-m-d')
@@ -2318,6 +2482,20 @@ class PurchaseOrderController extends Controller
                     'submitted_at' => $po->submitted_at,
                     'submitted_by' => $po->requester_signed_by,
                     'submitted_by_name' => $po->requesterSigner?->name ?? '-',
+
+                    'attachments' => $po->getRelation('attachments')->map(function (PoAttachment $attachment) {
+                        return [
+                            'id' => $attachment->id,
+                            'filename' => $attachment->filename,
+                            'original_filename' => $attachment->original_filename,
+                            'mime_type' => $attachment->mime_type,
+                            'file_size' => $attachment->file_size,
+                            'filepath' => $attachment->filepath,
+                            'file_url' => $attachment->filepath
+                                ? Storage::disk('public')->url($attachment->filepath)
+                                : null,
+                        ];
+                    })->values(),
 
                     'purchase_requests' => $purchaseRequests->map(function ($pr) use ($items) {
                         return [
@@ -2697,7 +2875,49 @@ class PurchaseOrderController extends Controller
                 'nullable',
                 'string',
             ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Lampiran Purchase Order
+        |--------------------------------------------------------------------------
+        | Minimal 1 lampiran wajib tersisa (lampiran lama yang dipertahankan
+        | ditambah lampiran baru), divalidasi manual di bawah karena mencakup
+        | dua field sekaligus (existing_attachment_ids + lampiran_po).
+        |--------------------------------------------------------------------------
+        */
+            'existing_attachment_ids' => [
+                'nullable',
+                'string',
+            ],
+
+            'lampiran_po.*' => [
+                'sometimes',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:3072',
+            ],
         ]);
+
+        $existingAttachmentIds = json_decode(
+            $request->existing_attachment_ids ?? '[]',
+            true,
+        );
+
+        if (!is_array($existingAttachmentIds)) {
+            $existingAttachmentIds = [];
+        }
+
+        $newAttachmentCount = $request->hasFile('lampiran_po')
+            ? count($request->file('lampiran_po'))
+            : 0;
+
+        if (count($existingAttachmentIds) + $newAttachmentCount < 1) {
+            throw ValidationException::withMessages([
+                'lampiran_po' => [
+                    'Minimal 1 lampiran Purchase Order wajib diisi.',
+                ],
+            ]);
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -2912,6 +3132,8 @@ class PurchaseOrderController extends Controller
             ]);
         }
 
+        $storedPaths = [];
+
         try {
             $po = DB::transaction(
                 function () use (
@@ -2924,6 +3146,9 @@ class PurchaseOrderController extends Controller
                     $itemPayloads,
                     $requestedDepartmentId,
                     $departmentPermissionCode,
+                    $request,
+                    $existingAttachmentIds,
+                    &$storedPaths,
                 ) {
                     /*
                 |--------------------------------------------------------------------------
@@ -3572,6 +3797,88 @@ class PurchaseOrderController extends Controller
 
                     /*
                 |--------------------------------------------------------------------------
+                | Hapus Lampiran Lama Yang Dihapus Di FE
+                |--------------------------------------------------------------------------
+                */
+                    $deletedAttachments = PoAttachment::where('purchase_order_id', $po->id)
+                        ->when(count($existingAttachmentIds) > 0, function ($query) use ($existingAttachmentIds) {
+                            $query->whereNotIn('id', $existingAttachmentIds);
+                        })
+                        ->when(count($existingAttachmentIds) === 0, function ($query) {
+                            $query->whereRaw('1 = 1');
+                        })
+                        ->get();
+
+                    foreach ($deletedAttachments as $attachment) {
+                        if (
+                            $attachment->filepath
+                            && Storage::disk('public')->exists($attachment->filepath)
+                        ) {
+                            Storage::disk('public')->delete($attachment->filepath);
+                        }
+
+                        $attachment->delete();
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
+                | Tambah Lampiran Baru
+                |--------------------------------------------------------------------------
+                */
+                    if ($request->hasFile('lampiran_po')) {
+                        $folder = "syopv4/uploads/purchase_orders/lampiran/{$po->id}";
+
+                        Storage::disk('public')->makeDirectory($folder);
+
+                        $fullFolderPath = storage_path('app/public/' . $folder);
+
+                        if (\Illuminate\Support\Facades\File::exists($fullFolderPath)) {
+                            @chmod($fullFolderPath, 0777);
+                        }
+
+                        foreach ($request->file('lampiran_po') as $file) {
+                            if (!$file || !$file->isValid()) {
+                                continue;
+                            }
+
+                            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                            $extension = strtolower($file->getClientOriginalExtension());
+
+                            $safeOriginalName = \Illuminate\Support\Str::slug($originalName);
+
+                            if ($safeOriginalName === '') {
+                                $safeOriginalName = 'file';
+                            }
+
+                            $filename = str_replace('/', '-', $po->nomor_po)
+                                . '_' . now()->format('YmdHis')
+                                . '_' . uniqid()
+                                . '_' . $safeOriginalName
+                                . '.' . $extension;
+
+                            $path = $file->storeAs($folder, $filename, 'public');
+
+                            $storedPaths[] = $path;
+
+                            $fullFilePath = storage_path('app/public/' . $path);
+
+                            if (\Illuminate\Support\Facades\File::exists($fullFilePath)) {
+                                @chmod($fullFilePath, 0777);
+                            }
+
+                            PoAttachment::create([
+                                'purchase_order_id' => $po->id,
+                                'filename'          => $filename,
+                                'original_filename' => $file->getClientOriginalName(),
+                                'mime_type'         => $file->getMimeType(),
+                                'file_size'         => $file->getSize(),
+                                'filepath'          => $path,
+                            ]);
+                        }
+                    }
+
+                    /*
+                |--------------------------------------------------------------------------
                 | Insert Ulang Item PO
                 |--------------------------------------------------------------------------
                 */
@@ -3617,7 +3924,7 @@ class PurchaseOrderController extends Controller
                             (int) $purchaseRequestId,
                         );
 
-                        $this->refreshPurchaseRequestPOStatus(
+                        $this->poRollbackService->refreshPurchaseRequestPOStatus(
                             (int) $purchaseRequestId,
                         );
                     }
@@ -3636,18 +3943,26 @@ class PurchaseOrderController extends Controller
                 ],
             ], 200);
         } catch (ValidationException $e) {
+            $this->deleteStoredAttachmentFiles($storedPaths);
+
             throw $e;
         } catch (AuthorizationException $e) {
+            $this->deleteStoredAttachmentFiles($storedPaths);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 403);
         } catch (ModelNotFoundException $e) {
+            $this->deleteStoredAttachmentFiles($storedPaths);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Purchase Order tidak ditemukan.',
             ], 404);
         } catch (\Throwable $e) {
+            $this->deleteStoredAttachmentFiles($storedPaths);
+
             Log::error(
                 '[Purchase Order] Update error',
                 [
@@ -3663,6 +3978,7 @@ class PurchaseOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memperbarui Purchase Order.',
+                'error_code' => 'purchase_order.update_failed',
                 'error' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -4890,12 +5206,11 @@ class PurchaseOrderController extends Controller
         */
             $user = $request->user();
 
-            $departmentId = (int) (
-                $user->departemen_id
-                ?? 0
-            );
+            $departmentIds = $user
+                ->accessibleDepartmentIds()
+                ->all();
 
-            if ($departmentId <= 0) {
+            if (empty($departmentIds)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Department akun Anda belum tersedia.',
@@ -4989,9 +5304,9 @@ class PurchaseOrderController extends Controller
             | Cabang tidak difilter.
             |--------------------------------------------------------------------------
             */
-                ->where(
+                ->whereIn(
                     'id_department',
-                    $departmentId,
+                    $departmentIds,
                 )
 
                 /*
@@ -5758,79 +6073,6 @@ class PurchaseOrderController extends Controller
                 'qty_outstanding' => max($qtyRequest - $qtyPo, 0),
             ]);
         }
-    }
-
-    private function refreshPurchaseRequestPOStatus(int $purchaseRequestId): void
-    {
-        $pr = PurchaseRequest::where('id', $purchaseRequestId)
-            ->lockForUpdate()
-            ->first();
-
-        if (!$pr) {
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Ambil hanya item PR yang masih aktif
-        |--------------------------------------------------------------------------
-        | Item yang sudah soft delete tidak boleh mempengaruhi status_po PR.
-        |--------------------------------------------------------------------------
-        */
-        $summary = PurchaseRequestItem::query()
-            ->where('purchase_request_id', $purchaseRequestId)
-            ->whereNull('deleted_at')
-            ->selectRaw('
-            COALESCE(SUM(qty), 0) AS total_qty_request,
-            COALESCE(SUM(qty_po), 0) AS total_qty_po,
-            COALESCE(SUM(qty_outstanding), 0) AS total_qty_outstanding
-        ')
-            ->first();
-
-        $totalQtyRequest = (float) ($summary->total_qty_request ?? 0);
-        $totalQtyPo = (float) ($summary->total_qty_po ?? 0);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Hitung outstanding dari total qty request - total qty PO
-        |--------------------------------------------------------------------------
-        | Jangan hanya bergantung ke qty_outstanding tersimpan, supaya lebih aman
-        | jika ada data lama / hasil edit / pembulatan decimal.
-        |--------------------------------------------------------------------------
-        */
-        $totalOutstanding = max(
-            $totalQtyRequest - $totalQtyPo,
-            0,
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Toleransi angka decimal
-        |--------------------------------------------------------------------------
-        | Untuk menghindari kasus 5.0000001 atau 4.9999999 pada decimal.
-        |--------------------------------------------------------------------------
-        */
-        $epsilon = 0.00001;
-
-        if ($totalQtyRequest <= $epsilon || $totalQtyPo <= $epsilon) {
-            $statusPo = 'OPEN';
-        } elseif ($totalQtyPo + $epsilon < $totalQtyRequest) {
-            $statusPo = 'PARTIAL';
-        } else {
-            /*
-        |--------------------------------------------------------------------------
-        | Qty PR sudah habis digunakan oleh PO
-        |--------------------------------------------------------------------------
-        | Draft PO tetap dihitung sebagai penggunaan qty PR sesuai rule yang
-        | sudah disepakati. Jadi jika qty sudah full, status_po PR harus COMPLETED.
-        |--------------------------------------------------------------------------
-        */
-            $statusPo = 'COMPLETED';
-        }
-
-        $pr->update([
-            'status_po' => $statusPo,
-        ]);
     }
 
     private function generateDraftPONumber(): string
