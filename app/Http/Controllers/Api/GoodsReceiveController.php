@@ -713,7 +713,7 @@ class GoodsReceiveController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk membuat Goods Receipt.',
+                'message' => __('goods_receive_messages.store.forbidden'),
             ], 403);
         }
 
@@ -978,8 +978,11 @@ class GoodsReceiveController extends Controller
                     }
 
                     if (
-                        (int) $goodsReturn->id_department
-                        !== $userDepartmentId
+                        !in_array(
+                            (int) $goodsReturn->id_department,
+                            $userDepartmentIds,
+                            true,
+                        )
                     ) {
                         throw ValidationException::withMessages([
                             'goods_return_public_id' => [
@@ -1189,12 +1192,10 @@ class GoodsReceiveController extends Controller
                             ) {
                                 throw ValidationException::withMessages([
                                     "items.{$index}.qty_receive" => [
-                                        'Qty replacement item '
-                                            . ($poItem->nama_item ?? '-')
-                                            . ' melebihi outstanding replacement. '
-                                            . 'Maksimal '
-                                            . $qtyReplacementOutstanding
-                                            . '.',
+                                        __('goods_receive_messages.validation.qty_replacement_exceeds_outstanding', [
+                                            'item_name' => $poItem->nama_item ?? '-',
+                                            'max_qty' => $qtyReplacementOutstanding,
+                                        ]),
                                     ],
                                 ]);
                             }
@@ -1274,12 +1275,10 @@ class GoodsReceiveController extends Controller
                             ) {
                                 throw ValidationException::withMessages([
                                     "items.{$index}.qty_receive" => [
-                                        'Qty receive item '
-                                            . ($poItem->nama_item ?? '-')
-                                            . ' melebihi outstanding Purchase Order. '
-                                            . 'Maksimal '
-                                            . $qtyAvailableOutstanding
-                                            . '.',
+                                        __('goods_receive_messages.validation.qty_receive_exceeds_outstanding', [
+                                            'item_name' => $poItem->nama_item ?? '-',
+                                            'max_qty' => $qtyAvailableOutstanding,
+                                        ]),
                                     ],
                                 ]);
                             }
@@ -1483,8 +1482,7 @@ class GoodsReceiveController extends Controller
                 if ($validReturnCandidates->count() > 1) {
                     throw ValidationException::withMessages([
                         'purchase_order_public_id' => [
-                            'Terdapat lebih dari satu Goods Return yang masih membutuhkan replacement. '
-                                . 'Goods Return sumber harus dipilih secara spesifik.',
+                            __('goods_receive_messages.validation.multiple_return_candidates'),
                         ],
                     ]);
                 }
@@ -1500,7 +1498,7 @@ class GoodsReceiveController extends Controller
                 ) {
                     throw ValidationException::withMessages([
                         'items' => [
-                            'Item atau qty penerimaan tidak sesuai dengan outstanding replacement Goods Return.',
+                            __('goods_receive_messages.validation.item_qty_mismatch_replacement'),
                         ],
                     ]);
                 }
@@ -1708,9 +1706,16 @@ class GoodsReceiveController extends Controller
         } catch (ValidationException $e) {
 
             foreach ($storedFilePaths as $filePath) {
-                Storage::disk('public')->delete(
-                    $filePath,
-                );
+                try {
+                    Storage::disk('public')->delete(
+                        $filePath,
+                    );
+                } catch (\Throwable $cleanupError) {
+                    Log::error('[Goods Receipt] Cleanup attachment file error', [
+                        'message' => $cleanupError->getMessage(),
+                        'path' => $filePath,
+                    ]);
+                }
             }
 
             return response()->json([
@@ -1727,33 +1732,51 @@ class GoodsReceiveController extends Controller
             ], 422);
         } catch (DecryptException $e) {
             foreach ($storedFilePaths as $filePath) {
-                Storage::disk('public')->delete(
-                    $filePath,
-                );
+                try {
+                    Storage::disk('public')->delete(
+                        $filePath,
+                    );
+                } catch (\Throwable $cleanupError) {
+                    Log::error('[Goods Receipt] Cleanup attachment file error', [
+                        'message' => $cleanupError->getMessage(),
+                        'path' => $filePath,
+                    ]);
+                }
             }
+
+            Log::warning('[Goods Receipt] Store - invalid id', [
+                'message' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+            ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'ID Purchase Order, Goods Return, atau item tidak valid.',
+                'message' => __('goods_receive_messages.store.invalid_ids'),
             ], 422);
         } catch (ModelNotFoundException $e) {
             foreach ($storedFilePaths as $filePath) {
-                Storage::disk('public')->delete(
-                    $filePath,
-                );
+                try {
+                    Storage::disk('public')->delete(
+                        $filePath,
+                    );
+                } catch (\Throwable $cleanupError) {
+                    Log::error('[Goods Receipt] Cleanup attachment file error', [
+                        'message' => $cleanupError->getMessage(),
+                        'path' => $filePath,
+                    ]);
+                }
             }
+
+            Log::warning('[Goods Receipt] Store - not found', [
+                'message' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+            ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Purchase Order, Goods Return, atau item tidak ditemukan.',
+                'message' => __('goods_receive_messages.store.not_found'),
             ], 404);
         } catch (\Throwable $e) {
-            foreach ($storedFilePaths as $filePath) {
-                Storage::disk('public')->delete(
-                    $filePath,
-                );
-            }
-
             Log::error(
                 '[Goods Receipt] Store error',
                 [
@@ -1781,9 +1804,22 @@ class GoodsReceiveController extends Controller
                 ],
             );
 
+            foreach ($storedFilePaths as $filePath) {
+                try {
+                    Storage::disk('public')->delete(
+                        $filePath,
+                    );
+                } catch (\Throwable $cleanupError) {
+                    Log::error('[Goods Receipt] Cleanup attachment file error', [
+                        'message' => $cleanupError->getMessage(),
+                        'path' => $filePath,
+                    ]);
+                }
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membuat Goods Receipt.',
+                'message' => __('goods_receive_messages.store.failed'),
 
                 'debug'
                 => app()->environment('local')
@@ -1795,7 +1831,23 @@ class GoodsReceiveController extends Controller
 
     public function edit($publicId, Request $request)
     {
-        return $this->show($publicId, $request);
+        try {
+            return $this->show($publicId, $request);
+        } catch (\Throwable $e) {
+            Log::error('[Goods Receipt] Edit error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('goods_receive_messages.show.load_failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function update(Request $request, $publicId)
@@ -1808,7 +1860,7 @@ class GoodsReceiveController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk mengubah Goods Receipt.',
+                'message' => __('goods_receive_messages.update.forbidden'),
             ], 403);
         }
 
@@ -1911,10 +1963,15 @@ class GoodsReceiveController extends Controller
                     'array',
                 ],
 
+                /*
+                | Aturan wajib sama persis dengan store() agar lampiran yang
+                | lolos saat create tidak ditolak saat update (dan sebaliknya).
+                | Dokumen Office sengaja tidak diizinkan -- hanya PDF & gambar.
+                */
                 'attachments.*' => [
                     'file',
-                    'max:5120',
-                    'mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx',
+                    'mimes:pdf,jpg,jpeg,png,webp',
+                    'max:3072',
                 ],
 
                 'remove_all_attachments' => [
@@ -1955,7 +2012,7 @@ class GoodsReceiveController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Goods Receipt hanya dapat diubah jika status masih DRAFT.',
+                    'message' => __('goods_receive_messages.update.only_draft'),
                 ], 422);
             }
 
@@ -1986,7 +2043,7 @@ class GoodsReceiveController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cabang atau department pada Purchase Order belum lengkap.',
+                    'message' => __('goods_receive_messages.update.branch_department_incomplete'),
                 ], 422);
             }
 
@@ -2341,12 +2398,17 @@ class GoodsReceiveController extends Controller
                     ?? [],
             )
                 ->filter()
-                ->map(function ($encryptedAttachmentId) {
+                ->map(function ($encryptedAttachmentId) use ($request) {
                     try {
                         return Crypt::decrypt(
                             $encryptedAttachmentId,
                         );
                     } catch (\Throwable $e) {
+                        Log::warning('[Goods Receipt] Update - invalid deleted attachment id', [
+                            'message' => $e->getMessage(),
+                            'user_id' => $request->user()?->id,
+                        ]);
+
                         return null;
                     }
                 })
@@ -2600,7 +2662,7 @@ class GoodsReceiveController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    'message' => 'Detail Goods Receipt berhasil dimuat.',
+                    'message' => __('goods_receive_messages.show.loaded'),
                     'data' => [
                         'id' => $gr->id,
                         'public_id' => $gr->encrypted_id,
@@ -2787,7 +2849,7 @@ class GoodsReceiveController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Gagal memuat detail Goods Receipt.',
+                    'message' => __('goods_receive_messages.show.load_failed'),
                     'data' => null,
                     'debug' => app()->environment('local') ? $e->getMessage() : null,
                 ], 500);
@@ -2802,7 +2864,7 @@ class GoodsReceiveController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat detail Goods Receipt.',
+                'message' => __('goods_receive_messages.show.load_failed'),
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
@@ -2821,7 +2883,7 @@ class GoodsReceiveController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk posting Goods Receipt.',
+                    'message' => __('goods_receive_messages.post.forbidden'),
                 ], 403);
             }
 
@@ -2854,7 +2916,7 @@ class GoodsReceiveController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Goods Receipt berhasil diposting.',
+                'message' => __('goods_receive_messages.post.success'),
 
                 'data' => [
                     'id'
@@ -2874,14 +2936,26 @@ class GoodsReceiveController extends Controller
                 ],
             ], 200);
         } catch (DecryptException $e) {
+            Log::warning('[Goods Receipt] Post - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Receipt tidak valid.',
+                'message' => __('goods_receive_messages.post.invalid_id'),
             ], 422);
         } catch (ModelNotFoundException $e) {
+            Log::warning('[Goods Receipt] Post - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Receipt tidak ditemukan.',
+                'message' => __('goods_receive_messages.post.not_found'),
             ], 404);
         } catch (\Throwable $e) {
             Log::error(
@@ -2906,7 +2980,147 @@ class GoodsReceiveController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal posting Goods Receipt.',
+                'message' => __('goods_receive_messages.post.failed'),
+
+                'debug'
+                => app()->environment('local')
+                    ? $e->getMessage()
+                    : null,
+            ], 500);
+        }
+    }
+
+    public function cancel(
+        Request $request,
+        $publicId,
+    ) {
+        try {
+            $user = $request->user();
+
+            if (
+                !$user
+                || !$user->hasPermission('goods_receive.cancel')
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('goods_receive_messages.cancel.forbidden'),
+                ], 403);
+            }
+
+            $validated = $request->validate([
+                'cancel_notes' => ['required', 'string', 'max:2000'],
+            ]);
+
+            $id = Crypt::decryptString(
+                urldecode(
+                    (string) $publicId,
+                ),
+            );
+
+            $gr = GoodsReceive::query()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->goodsReceivePostingService->cancel(
+                $gr,
+                $user,
+                $validated['cancel_notes'],
+            );
+
+            $gr->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => __('goods_receive_messages.cancel.success'),
+
+                'data' => [
+                    'id'
+                    => $gr->id,
+
+                    'public_id'
+                    => $gr->encrypted_id,
+
+                    'nomor_gr'
+                    => $gr->nomor_gr,
+
+                    'status'
+                    => $gr->status,
+
+                    'cancelled_by'
+                    => $gr->cancelled_by,
+
+                    'cancelled_at'
+                    => $gr->cancelled_at,
+
+                    'cancel_notes'
+                    => $gr->cancel_notes,
+                ],
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? __('goods_receive_messages.cancel.failed'),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (DecryptException $e) {
+            Log::warning('[Goods Receipt] Cancel - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('goods_receive_messages.cancel.invalid_id'),
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            Log::warning('[Goods Receipt] Cancel - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('goods_receive_messages.cancel.not_found'),
+            ], 404);
+        } catch (\Exception $e) {
+            Log::warning('[Goods Receipt] Cancel - invalid status', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('goods_receive_messages.cancel.invalid_status'),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error(
+                '[Goods Receipt] Cancel error',
+                [
+                    'public_id'
+                    => $publicId,
+
+                    'user_id'
+                    => $request->user()?->id,
+
+                    'message'
+                    => $e->getMessage(),
+
+                    'file'
+                    => $e->getFile(),
+
+                    'line'
+                    => $e->getLine(),
+                ],
+            );
+
+            return response()->json([
+                'success' => false,
+                'message' => __('goods_receive_messages.cancel.failed'),
 
                 'debug'
                 => app()->environment('local')
@@ -2938,7 +3152,7 @@ class GoodsReceiveController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk melihat history Goods Return.',
+                    'message' => __('goods_receive_messages.return_history.forbidden'),
                 ], 403);
             }
 
@@ -3280,7 +3494,7 @@ class GoodsReceiveController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'History Goods Return berhasil dimuat.',
+                'message' => __('goods_receive_messages.return_history.loaded'),
 
                 'data' => [
                     /*
@@ -3376,15 +3590,27 @@ class GoodsReceiveController extends Controller
                 ],
             ], 200);
         } catch (DecryptException $e) {
+            Log::warning('[Goods Receipt] Return history - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Receipt tidak valid.',
+                'message' => __('goods_receive_messages.return_history.invalid_id'),
                 'data' => null,
             ], 422);
         } catch (ModelNotFoundException $e) {
+            Log::warning('[Goods Receipt] Return history - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Receipt tidak ditemukan.',
+                'message' => __('goods_receive_messages.return_history.not_found'),
                 'data' => null,
             ], 404);
         } catch (\Throwable $e) {
@@ -3410,7 +3636,7 @@ class GoodsReceiveController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat history Goods Return.',
+                'message' => __('goods_receive_messages.return_history.load_failed'),
                 'data' => null,
 
                 'debug'
@@ -3431,7 +3657,7 @@ class GoodsReceiveController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk menghapus Goods Receipt.',
+                'message' => __('goods_receive_messages.destroy.forbidden'),
             ], 403);
         }
 
@@ -3473,7 +3699,7 @@ class GoodsReceiveController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Goods Receipt hanya dapat dihapus jika status masih DRAFT.',
+                    'message' => __('goods_receive_messages.destroy.only_draft'),
                 ], 422);
             }
 
@@ -3582,7 +3808,7 @@ class GoodsReceiveController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menghapus Goods Receipt.',
+                'message' => __('goods_receive_messages.destroy.failed'),
 
                 'debug'
                 => app()->environment('local')

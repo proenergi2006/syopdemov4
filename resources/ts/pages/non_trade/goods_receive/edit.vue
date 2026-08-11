@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import axios from '@axios'
 import {
   showLoadingAlert,
@@ -69,6 +70,7 @@ const isCheckingPermission = ref(true)
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const publicId = computed(() =>
   String(route.query.id || ''),
@@ -84,6 +86,48 @@ const deletedAttachmentIds = ref<string[]>([])
 const initialExistingAttachmentCount = ref(0)
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024
+
+/*
+|--------------------------------------------------------------------------
+| Whitelist lampiran
+|--------------------------------------------------------------------------
+| Wajib sama persis dengan aturan `mimes` pada GoodsReceiveController
+| (store & update): pdf, jpg, jpeg, png, webp. Sebelumnya pengecekan
+| memakai file.type.startsWith('image/') yang ikut meloloskan gif, bmp,
+| svg, dan tiff -- file lolos di frontend lalu ditolak backend dengan
+| pesan validasi yang membingungkan user.
+|--------------------------------------------------------------------------
+*/
+const ALLOWED_ATTACHMENT_MIMES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+]
+
+const ALLOWED_ATTACHMENT_EXTENSIONS = [
+  'pdf',
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+]
+
+const isAllowedAttachment = (file: File): boolean => {
+  const mimeType = String(file.type || '').toLowerCase()
+
+  if (mimeType)
+    return ALLOWED_ATTACHMENT_MIMES.includes(mimeType)
+
+  /*
+   * Sebagian browser/OS tidak mengisi file.type sama sekali.
+   * Jangan tolak mentah-mentah, jatuhkan ke pengecekan ekstensi.
+   */
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+
+  return ALLOWED_ATTACHMENT_EXTENSIONS.includes(extension)
+}
 
 const form = ref({
   public_id: '',
@@ -170,14 +214,12 @@ const handleAttachmentChange = (files: File[] | File | null): void => {
   const validFiles: GrAttachmentItem[] = []
 
   selectedFiles.forEach(file => {
-    const isValidType =
-      file.type === 'application/pdf'
-      || file.type.startsWith('image/')
+    const isValidType = isAllowedAttachment(file)
 
     if (!isValidType) {
       showErrorToast({
-        title: 'Format File Tidak Valid',
-        text: `${file.name} hanya boleh PDF atau gambar.`,
+        title: t('goodsReceive.edit.attachment.invalidTypeTitle'),
+        text: t('goodsReceive.edit.attachment.invalidTypeText', { file: file.name }),
       })
 
       return
@@ -185,8 +227,8 @@ const handleAttachmentChange = (files: File[] | File | null): void => {
 
     if (file.size > MAX_FILE_SIZE) {
       showErrorToast({
-        title: 'Ukuran File Terlalu Besar',
-        text: `${file.name} melebihi batas maksimal 3 MB.`,
+        title: t('goodsReceive.edit.attachment.tooLargeTitle'),
+        text: t('goodsReceive.edit.attachment.tooLargeText', { file: file.name }),
       })
 
       return
@@ -236,7 +278,7 @@ const loadDetail = async (): Promise<void> => {
 
   try {
     if (!publicId.value) {
-      throw new Error('Data Goods Receipt tidak ditemukan.')
+      throw new Error(t('goodsReceive.edit.toast.notFound'))
     }
 
     const response = await axios.get(
@@ -249,7 +291,7 @@ const loadDetail = async (): Promise<void> => {
     const data = response.data?.data ?? null
 
     if (!data) {
-      throw new Error('Data Goods Receive tidak ditemukan.')
+      throw new Error(t('goodsReceive.edit.toast.dataNotFound'))
     }
 
     form.value = {
@@ -313,9 +355,9 @@ const loadDetail = async (): Promise<void> => {
   } catch (error: any) {
     const err = error as AxiosErrorShape
 
-    loadError.value = error?.message?.includes('Public ID') || error?.message?.includes('Data Goods Receive')
+    loadError.value = error?.message?.includes('Public ID') || error?.message?.includes('Data Goods Receipt')
       ? error.message
-      : getApiErrorMessage(err, 'Gagal memuat data Goods Receive.')
+      : getApiErrorMessage(err, t('goodsReceive.edit.toast.loadFailed'))
   } finally {
     isLoadingDetail.value = false
   }
@@ -324,8 +366,8 @@ const loadDetail = async (): Promise<void> => {
 const validateItems = (): boolean => {
   if (!isDraft.value) {
     showErrorToast({
-      title: 'Tidak dapat disimpan',
-      text: 'Goods Receipt hanya dapat diubah jika status masih DRAFT.',
+      title: t('goodsReceive.edit.toast.notDraftTitle'),
+      text: t('goodsReceive.edit.toast.notDraftText'),
     })
 
     return false
@@ -333,8 +375,8 @@ const validateItems = (): boolean => {
 
   if (!form.value.tanggal_gr) {
     showErrorToast({
-      title: 'Tanggal wajib diisi',
-      text: 'Tanggal GR wajib diisi.',
+      title: t('goodsReceive.edit.toast.dateRequiredTitle'),
+      text: t('goodsReceive.edit.toast.dateRequiredText'),
     })
 
     return false
@@ -342,8 +384,8 @@ const validateItems = (): boolean => {
 
   if (!items.value.length) {
     showErrorToast({
-      title: 'Item kosong',
-      text: 'Item Goods Receipt belum tersedia.',
+      title: t('goodsReceive.edit.toast.emptyItemsTitle'),
+      text: t('goodsReceive.edit.toast.emptyItemsText'),
     })
 
     return false
@@ -354,8 +396,8 @@ const validateItems = (): boolean => {
 
     if (qtyReceive <= 0) {
       showErrorToast({
-        title: 'Qty tidak valid',
-        text: `Qty receive untuk item ${item.item_name} harus lebih dari 0.`,
+        title: t('goodsReceive.edit.toast.invalidQtyTitle'),
+        text: t('goodsReceive.edit.toast.invalidQtyText', { item: item.item_name }),
       })
 
       return false
@@ -367,8 +409,8 @@ const validateItems = (): boolean => {
 
     if (qtyReceive > maxReceive) {
       showErrorToast({
-        title: 'Qty melebihi sisa PO',
-        text: `Qty receive untuk item ${item.item_name} melebihi qty yang tersedia.`,
+        title: t('goodsReceive.edit.toast.qtyExceedsAvailableTitle'),
+        text: t('goodsReceive.edit.toast.qtyExceedsAvailableText', { item: item.item_name }),
       })
 
       return false
@@ -376,8 +418,8 @@ const validateItems = (): boolean => {
 
     if (!item.public_id) {
       showErrorToast({
-        title: 'Item tidak valid',
-        text: `Public ID item ${item.item_name} tidak ditemukan.`,
+        title: t('goodsReceive.edit.toast.invalidItemTitle'),
+        text: t('goodsReceive.edit.toast.invalidItemText', { item: item.item_name }),
       })
 
       return false
@@ -385,8 +427,8 @@ const validateItems = (): boolean => {
 
     if (!item.purchase_order_item_public_id) {
       showErrorToast({
-        title: 'Item PO tidak valid',
-        text: `Purchase Order Item ID untuk ${item.item_name} tidak ditemukan.`,
+        title: t('goodsReceive.edit.toast.invalidPoItemTitle'),
+        text: t('goodsReceive.edit.toast.invalidPoItemText', { item: item.item_name }),
       })
 
       return false
@@ -423,10 +465,10 @@ const submit = async (): Promise<void> => {
   if (!validateItems() || submitLoading.value) return
 
   const confirm = await showConfirmAlert({
-    title: 'Yakin Simpan?',
-    text: 'Data perubahan akan disimpan.',
-    confirmButtonText: 'Ya, simpan',
-    cancelButtonText: 'Batal',
+    title: t('goodsReceive.edit.toast.saveConfirmTitle'),
+    text: t('goodsReceive.edit.toast.saveConfirmText'),
+    confirmButtonText: t('goodsReceive.edit.toast.saveConfirmButton'),
+    cancelButtonText: t('common.actions.cancel'),
   })
 
   if (!confirm.isConfirmed) return
@@ -434,7 +476,7 @@ const submit = async (): Promise<void> => {
   submitLoading.value = true
 
   try {
-    showLoadingAlert('Menyimpan Goods Receipt', 'Mohon tunggu sebentar')
+    showLoadingAlert(t('goodsReceive.edit.toast.savingTitle'), t('common.alert.pleaseWait'))
 
     const payload = new FormData()
 
@@ -482,7 +524,6 @@ const submit = async (): Promise<void> => {
       {
         headers: {
           Accept: 'application/json',
-          'Content-Type': 'multipart/form-data',
         },
       },
     )
@@ -499,8 +540,8 @@ const submit = async (): Promise<void> => {
     const err = error as AxiosErrorShape
 
     showErrorToast({
-      title: 'Error',
-      text: getApiErrorMessage(err, 'Gagal menyimpan Goods Receipt.'),
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(err, t('goodsReceive.edit.toast.saveFailed')),
     })
   } finally {
     submitLoading.value = false
@@ -540,10 +581,10 @@ onMounted(async () => {
 
             <div>
             <div class="text-h6 font-weight-medium">
-                Memuat data Goods Receipt...
+                {{ t('goodsReceive.edit.loadingTitle') }}
             </div>
             <div class="text-body-2 text-medium-emphasis">
-                Mohon tunggu sebentar
+                {{ t('common.alert.pleaseWait') }}
             </div>
             </div>
         </div>
@@ -573,7 +614,7 @@ onMounted(async () => {
                 </div>
 
                 <div class="text-caption text-disabled mt-2">
-                Silakan coba muat ulang data. Jika masalah masih berlanjut, hubungi tim IT.
+                {{ t('goodsReceive.edit.errorHint') }}
                 </div>
             </div>
             </div>
@@ -586,7 +627,7 @@ onMounted(async () => {
                 class="text-none"
                 @click="loadDetail"
             >
-                Coba Lagi
+                {{ t('goodsReceive.edit.retryButton') }}
             </VBtn>
 
             <VBtn
@@ -596,7 +637,7 @@ onMounted(async () => {
                 class="text-none"
                 @click="backToIndex"
             >
-                Kembali
+                {{ t('goodsReceive.create.backButton') }}
             </VBtn>
             </div>
         </div>
@@ -609,11 +650,11 @@ onMounted(async () => {
             <div class="d-flex flex-wrap align-center justify-space-between gap-4">
               <div>
                 <h2 class="text-h5 font-weight-bold mb-1">
-                  Form Edit Goods Receipt
+                  {{ t('goodsReceive.edit.pageTitle') }}
                 </h2>
 
                 <div class="text-body-2 text-medium-emphasis">
-                  Ubah data Goods Receipt selama status masih DRAFT.
+                  {{ t('goodsReceive.edit.pageSubtitle') }}
                 </div>
               </div>
 
@@ -624,7 +665,7 @@ onMounted(async () => {
                 class="text-none"
                 @click="backToIndex"
               >
-                Kembali
+                {{ t('goodsReceive.create.backButton') }}
               </VBtn>
             </div>
           </VCardText>
@@ -639,7 +680,7 @@ onMounted(async () => {
           border="start"
           class="mb-4"
         >
-          Goods Receipt ini tidak dapat diedit karena status sudah {{ form.status }}.
+          {{ t('goodsReceive.edit.notEditableWarning', { status: form.status }) }}
         </VAlert>
 
         <VCard class="rounded-lg">
@@ -648,8 +689,8 @@ onMounted(async () => {
               <VCol cols="12" md="4">
                 <AppDateTimePicker
                   v-model="form.tanggal_gr"
-                  label="Tanggal GR"
-                  placeholder="Pilih tanggal GR"
+                  :label="t('goodsReceive.edit.fields.tanggalGr')"
+                  :placeholder="t('goodsReceive.edit.fields.tanggalGrPlaceholder')"
                   :disabled="!isDraft"
                   :config="{ dateFormat: 'Y-m-d' }"
                 />
@@ -658,7 +699,7 @@ onMounted(async () => {
               <VCol cols="12" md="4">
                 <VTextField
                   v-model="form.nomor_gr"
-                  label="Nomor GR"
+                  :label="t('goodsReceive.edit.fields.nomorGr')"
                   readonly
                   density="compact"
                   prepend-inner-icon="tabler-file-invoice"
@@ -669,7 +710,7 @@ onMounted(async () => {
                 <VCol cols="12" md="4">
                     <VTextField
                     v-model="form.nomor_po"
-                    label="Purchase Order"
+                    :label="t('goodsReceive.edit.fields.purchaseOrder')"
                     readonly
                     density="compact"
                     prepend-inner-icon="tabler-file-description"
@@ -689,7 +730,7 @@ onMounted(async () => {
                 <VCol cols="12" md="4">
                     <VTextField
                     v-model="form.vendor_name"
-                    label="Vendor"
+                    :label="t('goodsReceive.edit.fields.vendor')"
                     readonly
                     density="compact"
                     />
@@ -700,7 +741,7 @@ onMounted(async () => {
                 <VCol cols="12" md="4">
                     <VTextField
                     v-model="form.cabang_name"
-                    label="Cabang"
+                    :label="t('goodsReceive.edit.fields.cabang')"
                     readonly
                     density="compact"
                     />
@@ -709,7 +750,7 @@ onMounted(async () => {
                 <VCol cols="12" md="4">
                     <VTextField
                     v-model="form.department_name"
-                    label="Department"
+                    :label="t('goodsReceive.edit.fields.department')"
                     readonly
                     density="compact"
                     />
@@ -718,7 +759,7 @@ onMounted(async () => {
                 <VCol cols="12" md="4">
                     <VTextField
                     v-model="form.created_by"
-                    label="Dibuat Oleh"
+                    :label="t('goodsReceive.edit.fields.createdBy')"
                     readonly
                     density="compact"
                     prepend-inner-icon="tabler-user"
@@ -728,8 +769,8 @@ onMounted(async () => {
                 <VCol cols="12">
                     <VTextarea
                     v-model="form.notes"
-                    label="Catatan"
-                    placeholder="Catatan Goods Receipt"
+                    :label="t('goodsReceive.edit.fields.notes')"
+                    :placeholder="t('goodsReceive.edit.fields.notesPlaceholder')"
                     rows="2"
                     density="compact"
                     :readonly="!isDraft"
@@ -746,11 +787,11 @@ onMounted(async () => {
             <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
               <div>
                 <h3 class="text-h6 font-weight-bold mb-1">
-                  Lampiran
+                  {{ t('goodsReceive.edit.attachment.title') }}
                 </h3>
 
                 <div class="text-body-2 text-medium-emphasis">
-                  Upload dokumen pendukung seperti Surat Jalan, Delivery Order, atau Foto Barang.
+                  {{ t('goodsReceive.edit.attachment.subtitle') }}
                 </div>
               </div>
 
@@ -759,7 +800,7 @@ onMounted(async () => {
                 variant="tonal"
                 prepend-icon="tabler-paperclip"
               >
-                {{ attachments.length }} File
+                {{ t('goodsReceive.edit.attachment.fileCount', { count: attachments.length }) }}
               </VChip>
             </div>
 
@@ -772,9 +813,9 @@ onMounted(async () => {
               variant="outlined"
               prepend-icon=""
               prepend-inner-icon="tabler-upload"
-              label="Upload Attachment"
-              placeholder="Pilih file PDF atau gambar"
-              accept="application/pdf,image/*"
+              :label="t('goodsReceive.edit.attachment.uploadLabel')"
+              :placeholder="t('goodsReceive.edit.attachment.uploadPlaceholder')"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
               :disabled="!isDraft"
               @update:model-value="handleAttachmentChange"
             />
@@ -784,8 +825,7 @@ onMounted(async () => {
               variant="tonal"
               class="mt-3"
             >
-              Format yang diperbolehkan: PDF, JPG, JPEG, PNG.
-              Maksimal ukuran file 3 MB per file.
+              {{ t('goodsReceive.edit.attachment.formatInfo') }}
             </VAlert>
 
             <VAlert
@@ -795,7 +835,7 @@ onMounted(async () => {
               density="compact"
               class="mt-4"
             >
-              Tidak ada Lampiran.
+              {{ t('goodsReceive.edit.attachment.empty') }}
             </VAlert>
 
             <VTable
@@ -804,11 +844,11 @@ onMounted(async () => {
             >
               <thead>
                 <tr>
-                  <th width="60">No</th>
-                  <th>Nama File</th>
-                  <th width="160">Ukuran</th>
-                  <th width="180">Tipe</th>
-                  <th width="120" class="text-center">Aksi</th>
+                  <th width="60">{{ t('goodsReceive.edit.attachment.table.no') }}</th>
+                  <th>{{ t('goodsReceive.edit.attachment.table.fileName') }}</th>
+                  <th width="160">{{ t('goodsReceive.edit.attachment.table.size') }}</th>
+                  <th width="180">{{ t('goodsReceive.edit.attachment.table.type') }}</th>
+                  <th width="120" class="text-center">{{ t('goodsReceive.edit.attachment.table.actions') }}</th>
                 </tr>
               </thead>
 
@@ -833,7 +873,7 @@ onMounted(async () => {
                         </div>
 
                         <div class="text-caption text-medium-emphasis">
-                          {{ attachment.is_existing ? 'File tersimpan' : 'File baru' }}
+                          {{ attachment.is_existing ? t('goodsReceive.edit.attachment.existingFile') : t('goodsReceive.edit.attachment.newFile') }}
                         </div>
                       </div>
                     </div>
@@ -884,11 +924,11 @@ onMounted(async () => {
             <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
                 <div>
                     <h3 class="text-h6 font-weight-bold mb-1">
-                    List Item
+                    {{ t('goodsReceive.edit.items.title') }}
                     </h3>
 
                     <div class="text-body-2 text-medium-emphasis">
-                    Isi qty barang yang diterima berdasarkan remaining quantity PO.
+                    {{ t('goodsReceive.edit.items.subtitle') }}
                     </div>
                 </div>
 
@@ -901,7 +941,7 @@ onMounted(async () => {
                     @click="setReceiveAll"
                     class="text-none"
                     >
-                    Terima Semua
+                    {{ t('goodsReceive.edit.items.receiveAllButton') }}
                     </VBtn>
 
                     <VBtn
@@ -912,7 +952,7 @@ onMounted(async () => {
                     @click="clearReceiveQty"
                     class="text-none"
                     >
-                    Reset
+                    {{ t('goodsReceive.edit.items.resetButton') }}
                     </VBtn>
                 </div>
             </div>
@@ -920,13 +960,13 @@ onMounted(async () => {
             <VTable class="text-no-wrap rounded border">
                 <thead>
                     <tr>
-                        <th width="50">No</th>
-                        <th>Item</th>
-                        <th width="120" class="text-end">Qty PO</th>
-                        <th width="140" class="text-end">Sudah GR</th>
-                        <th width="140" class="text-end">Sisa</th>
-                        <th width="160" class="text-end">Qty Terima</th>
-                        <th width="220">Catatan</th>
+                        <th width="50">{{ t('goodsReceive.edit.items.table.no') }}</th>
+                        <th>{{ t('goodsReceive.edit.items.table.item') }}</th>
+                        <th width="120" class="text-end">{{ t('goodsReceive.edit.items.table.qtyPo') }}</th>
+                        <th width="140" class="text-end">{{ t('goodsReceive.edit.items.table.sudahGr') }}</th>
+                        <th width="140" class="text-end">{{ t('goodsReceive.edit.items.table.sisa') }}</th>
+                        <th width="160" class="text-end">{{ t('goodsReceive.edit.items.table.qtyTerima') }}</th>
+                        <th width="220">{{ t('goodsReceive.edit.items.table.notes') }}</th>
                     </tr>
                 </thead>
 
@@ -971,7 +1011,7 @@ onMounted(async () => {
                                 type="text"
                                 inputmode="decimal"
                                 min="0.01"
-                                placeholder="Qty Terima"
+                                :placeholder="t('goodsReceive.edit.items.table.qtyTerima')"
                                 density="compact"
                                 hide-details="auto"
                                 variant="outlined"
@@ -984,7 +1024,7 @@ onMounted(async () => {
                         <td>
                             <VTextField
                             v-model="item.notes"
-                            placeholder="Catatan item"
+                            :placeholder="t('goodsReceive.edit.items.notesPlaceholder')"
                             density="compact"
                             hide-details
                             :readonly="!isDraft"
@@ -1003,7 +1043,7 @@ onMounted(async () => {
                   variant="tonal"
                   density="compact"
                 >
-                  Total Item:
+                  {{ t('goodsReceive.edit.items.totalItem') }}
                   <strong>{{ totalItemSelected }}</strong>
                 </VAlert>
               </VCol>
@@ -1014,7 +1054,7 @@ onMounted(async () => {
                   variant="tonal"
                   density="compact"
                 >
-                  Total Qty Terima:
+                  {{ t('goodsReceive.edit.items.totalQtyReceive') }}
                   <strong>{{ formatDecimalQty(totalReceiveQty) }}</strong>
                 </VAlert>
               </VCol>
@@ -1025,7 +1065,7 @@ onMounted(async () => {
                   variant="tonal"
                   density="compact"
                 >
-                  Status:
+                  {{ t('goodsReceive.edit.items.status') }}
                   <strong>{{ form.status || '-' }}</strong>
                 </VAlert>
               </VCol>
@@ -1039,7 +1079,7 @@ onMounted(async () => {
               class="text-none"
               @click="backToIndex"
             >
-              Batal
+              {{ t('goodsReceive.edit.toast.cancelButtonText') }}
             </VBtn>
 
             <VBtn
@@ -1050,7 +1090,7 @@ onMounted(async () => {
               :disabled="!canSubmit"
               @click="submit"
             >
-              Simpan Perubahan
+              {{ t('goodsReceive.edit.toast.saveButton') }}
             </VBtn>
           </VCardActions>
         </VCard>
