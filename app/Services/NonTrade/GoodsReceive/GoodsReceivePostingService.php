@@ -464,7 +464,7 @@ class GoodsReceivePostingService
             $gr->loadMissing(['items', 'purchaseOrder.items']);
 
             if ($gr->status !== 'POSTED') {
-                throw new Exception('Goods Receive hanya dapat dibatalkan jika status sudah POSTED.');
+                throw new Exception('Goods Receipt hanya dapat dibatalkan jika status sudah POSTED.');
             }
 
             $this->rollbackService->rollback($gr);
@@ -503,9 +503,9 @@ class GoodsReceivePostingService
         if ($totalQtyReceived <= 0) {
             $statusReceive = 'OPEN';
         } elseif ($totalQtyReceived < $totalQtyPo) {
-            $statusReceive = 'PARTIAL';
+            $statusReceive = 'PARTIAL RECEIVED';
         } else {
-            $statusReceive = 'COMPLETED';
+            $statusReceive = 'FULL RECEIVED';
         }
 
         $po->status_receive = $statusReceive;

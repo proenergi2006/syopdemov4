@@ -39,6 +39,18 @@ class EnsureSanctumTokenIsNotIdle
 
         /*
         |--------------------------------------------------------------------------
+        | Remember Me
+        |--------------------------------------------------------------------------
+        | Token dengan ability 'remember-me' tidak pernah idle-timeout. Sesi hanya
+        | berakhir saat user logout manual atau token dihapus dari daftar sesi.
+        |--------------------------------------------------------------------------
+        */
+        if (in_array('remember-me', $accessToken->abilities ?? [], true)) {
+            return $next($request);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | Route yang tidak dihitung sebagai aktivitas user
         |--------------------------------------------------------------------------
         | API notifikasi/polling jangan memperpanjang idle session.

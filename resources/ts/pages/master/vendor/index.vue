@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import axios from '@axios'
 import {
   showLoadingAlert,
@@ -112,6 +113,7 @@ interface VendorAbilities {
 }
 
 const navigationStore = useNavigationStore()
+const { t } = useI18n()
 
 const defaultVendorAbilities = (): VendorAbilities => ({
   can_view: false,
@@ -135,8 +137,8 @@ const openApprovalHistory = async (
 ): Promise<void> => {
   try {
     showLoadingAlert(
-      'Memuat history approval...',
-      'Mohon tunggu sebentar',
+      t('vendor.toast.loadingHistory'),
+      t('vendor.toast.loadingHistorySubtitle'),
     )
 
     const res = await axios.get(
@@ -291,8 +293,8 @@ const approveVendor = async (vendor: any): Promise<void> => {
 
   if (vendor.can_approve !== true) {
     showErrorToast({
-      title: 'Akses Ditolak',
-      text: 'Anda bukan approver aktif untuk Vendor ini.',
+      title: t('vendor.toast.approveNotApprover'),
+      text: t('vendor.toast.approveNotApproverText'),
     })
 
     return
@@ -426,8 +428,8 @@ const approveVendor = async (vendor: any): Promise<void> => {
 
   try {
     showLoadingAlert(
-      'Approve Vendor...',
-      'Mohon tunggu sebentar',
+      t('vendor.toast.approveLoadingText'),
+      t('vendor.toast.loadingHistorySubtitle'),
     )
 
     /*
@@ -488,8 +490,8 @@ const openRejectVendor = (vendor: any): void => {
 
   if (vendor.can_approve !== true) {
     showErrorToast({
-      title: 'Akses Ditolak',
-      text: 'Anda bukan approver aktif untuk Vendor ini.',
+      title: t('vendor.toast.approveNotApprover'),
+      text: t('vendor.toast.approveNotApproverText'),
     })
 
     return
@@ -594,8 +596,8 @@ const rejectVendor = async (): Promise<void> => {
   */
   if (!notes) {
     showErrorToast({
-      title: 'Catatan Wajib Diisi',
-      text: 'Silakan isi alasan penolakan Vendor.',
+      title: t('vendor.rejectDialog.notesLabel'),
+      text: t('vendor.rejectDialog.notesError'),
     })
 
     return
@@ -636,8 +638,8 @@ const rejectVendor = async (): Promise<void> => {
 
   try {
     showLoadingAlert(
-      'Reject Vendor...',
-      'Mohon tunggu sebentar',
+      t('vendor.toast.rejectLoadingText'),
+      t('vendor.toast.loadingHistorySubtitle'),
     )
 
     const response = await axios.patch(
@@ -705,8 +707,8 @@ const submitRejectVendor = async (
 
   try {
     showLoadingAlert(
-      'Reject Vendor...',
-      'Mohon tunggu sebentar',
+      t('vendor.toast.rejectLoadingText'),
+      t('vendor.toast.loadingHistorySubtitle'),
     )
 
     const response = await axios.patch(
@@ -775,11 +777,11 @@ const isVendorDraft = (vendor: any): boolean => {
 const searchQuery = ref<string | null>('')
 const selectedStatus = ref<string>('all')
 
-const statusItems: Array<{ title: string; value: string | null }> = [
-  { title: 'Semua', value: 'all' },
-  { title: 'Aktif', value: 'true' },
-  { title: 'Nonaktif', value: 'false' },
-]
+const statusItems = computed(() => [
+  { title: t('vendor.list.filters.statusAll'), value: 'all' },
+  { title: t('vendor.list.filters.statusActive'), value: 'true' },
+  { title: t('vendor.list.filters.statusInactive'), value: 'false' },
+])
 
 // =========================
 // Pagination
@@ -987,8 +989,8 @@ const submitVendor = async (vendor: any): Promise<void> => {
 
   try {
     showLoadingAlert(
-      'Submit Vendor...',
-      'Mohon tunggu sebentar',
+      t('vendor.toast.submitLoadingText'),
+      t('vendor.toast.loadingHistorySubtitle'),
     )
 
     const response = await axios.patch(
@@ -1066,8 +1068,8 @@ const openDelete = async (row: Vendor): Promise<void> => {
 
   if (!vendorPublicId) {
     showErrorToast({
-      title: 'Data Tidak Valid',
-      text: 'Public ID vendor tidak ditemukan.',
+      title: t('vendor.toast.invalidVendor'),
+      text: t('vendor.toast.invalidVendorText'),
     })
 
     return
@@ -1087,8 +1089,8 @@ const openDelete = async (row: Vendor): Promise<void> => {
 
   try {
     showLoadingAlert(
-      'Menghapus vendor...',
-      'Mohon tunggu sebentar',
+      t('vendor.toast.deleteLoadingText'),
+      t('vendor.toast.loadingHistorySubtitle'),
     )
 
     const response = await axios.delete(
@@ -1350,14 +1352,14 @@ onMounted(async () => {
 <template>
   <section>
     <!-- Filters -->
-    <VCard title="Filters" class="mb-6">
+    <VCard :title="t('vendor.list.filters.title')" class="mb-6">
       <VCardText>
         <VRow>
           <VCol cols="12" sm="5">
             <VTextField
               v-model="searchQuery"
-              label="Cari (kode/nama/inisial)"
-              placeholder="Cari vendor..."
+              :label="t('vendor.list.filters.searchLabel')"
+              :placeholder="t('vendor.list.filters.searchPlaceholder')"
               density="compact"
               clearable
             />
@@ -1366,7 +1368,7 @@ onMounted(async () => {
           <VCol cols="12" sm="4">
             <VSelect
               v-model="selectedStatus"
-              label="Status"
+              :label="t('vendor.list.filters.statusLabel')"
               :items="statusItems"
               item-title="title"
               item-value="value"
@@ -1382,7 +1384,7 @@ onMounted(async () => {
               @click="resetFilters"
               class="text-none"
             >
-              Reset Filter
+              {{ t('vendor.list.filters.resetButton') }}
             </VBtn>
           </VCol>
         </VRow>
@@ -1393,7 +1395,7 @@ onMounted(async () => {
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
         <VBtn color="primary" @click="goToCreate" class="text-none" v-if="abilities.can_create" prepend-icon="tabler-plus">
-        Tambah Vendor
+        {{ t('vendor.list.buttons.createButton') }}
         </VBtn>
 
         <VSpacer />
@@ -1405,7 +1407,7 @@ onMounted(async () => {
             size="small"
             variant="tonal"
           >
-            Loading...
+            {{ t('vendor.list.buttons.loadingText') }}
           </VChip>
 
           <!-- ERROR -->
@@ -1417,7 +1419,7 @@ onMounted(async () => {
             prepend-icon="tabler-refresh"
             @click="fetchRows"
           >
-            Reload Data
+            {{ t('vendor.list.buttons.reloadData') }}
           </VBtn>
         </div>
       </VCardText>
@@ -1427,13 +1429,13 @@ onMounted(async () => {
       <VTable class="text-no-wrap">
         <thead>
           <tr>
-            <th scope="col">No</th>
-            <th scope="col">Kode</th>
-            <th scope="col">Nama Vendor</th>
-            <th scope="col">Inisial</th>
-            <th scope="col">Status</th>
-            <th scope="col">Status Pengajuan</th>
-            <th scope="col" class="text-center" style="width: 5rem;">Actions</th>
+            <th scope="col">{{ t('vendor.list.table.headers.no') }}</th>
+            <th scope="col">{{ t('vendor.list.table.headers.code') }}</th>
+            <th scope="col">{{ t('vendor.list.table.headers.name') }}</th>
+            <th scope="col">{{ t('vendor.list.table.headers.initial') }}</th>
+            <th scope="col">{{ t('vendor.list.table.headers.status') }}</th>
+            <th scope="col">{{ t('vendor.list.table.headers.submissionStatus') }}</th>
+            <th scope="col" class="text-center" style="width: 5rem;">{{ t('vendor.list.table.headers.actions') }}</th>
           </tr>
         </thead>
 
@@ -1459,7 +1461,7 @@ onMounted(async () => {
                     size="14"
                     start
                   />
-                  Menunggu Approval Anda
+                  {{ t('vendor.list.table.waitingApprovalBadge') }}
                 </VChip>
               </div>
             </td>
@@ -1467,7 +1469,7 @@ onMounted(async () => {
             <td class="text-medium-emphasis">{{ v.inisial_vendor ?? '-' }}</td>
             <td>
               <VChip :color="v.is_active ? 'success' : 'secondary'" size="small">
-                {{ v.is_active ? 'Aktif' : 'Tidak Aktif' }}
+                {{ v.is_active ? t('vendor.list.table.statusActive') : t('vendor.list.table.statusInactive') }}
               </VChip>
             </td>
             <td>
@@ -1507,7 +1509,7 @@ onMounted(async () => {
                         />
                       </template>
 
-                      <VListItemTitle>Lihat Detail</VListItemTitle>
+                      <VListItemTitle>{{ t('vendor.list.menu.viewDetail') }}</VListItemTitle>
                     </VListItem>
 
                     <VListItem
@@ -1522,7 +1524,7 @@ onMounted(async () => {
                       </template>
 
                       <VListItemTitle>
-                        History Approval
+                        {{ t('vendor.list.menu.approvalHistory') }}
                       </VListItemTitle>
                     </VListItem>
 
@@ -1542,7 +1544,7 @@ onMounted(async () => {
                         </template>
 
                         <VListItemTitle>
-                          Edit
+                          {{ t('vendor.list.menu.edit') }}
                         </VListItemTitle>
                       </VListItem>
 
@@ -1560,7 +1562,7 @@ onMounted(async () => {
                         </template>
 
                         <VListItemTitle>
-                          Submit
+                          {{ t('vendor.list.menu.submit') }}
                         </VListItemTitle>
                       </VListItem>
 
@@ -1579,13 +1581,13 @@ onMounted(async () => {
                         </template>
 
                         <VListItemTitle class="text-error">
-                          Delete
+                          {{ t('vendor.list.menu.delete') }}
                         </VListItemTitle>
                       </VListItem>
                     </template>
 
                     <VListItem
-                      v-if="!isVendorRejected(v)"
+                      v-if="!isVendorRejected(v) && canUpdate"
                       href="javascript:void(0)"
                       @click="openStatusDialog(v)"
                     >
@@ -1602,7 +1604,7 @@ onMounted(async () => {
                       </template>
 
                       <VListItemTitle>
-                        {{ v.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                        {{ v.is_active ? t('vendor.list.menu.deactivate') : t('vendor.list.menu.activate') }}
                       </VListItemTitle>
                     </VListItem>
 
@@ -1621,7 +1623,7 @@ onMounted(async () => {
                         </template>
 
                         <VListItemTitle>
-                          Approve
+                          {{ t('vendor.list.menu.approve') }}
                         </VListItemTitle>
                       </VListItem>
 
@@ -1636,7 +1638,7 @@ onMounted(async () => {
                         </template>
 
                         <VListItemTitle>
-                          Reject
+                          {{ t('vendor.list.menu.reject') }}
                         </VListItemTitle>
                       </VListItem>
                     </template>
@@ -1650,7 +1652,7 @@ onMounted(async () => {
         <tfoot v-show="!rows.length && !loading">
           <tr>
             <td colspan="8" class="text-center">
-              No data available
+              {{ t('vendor.list.table.noDataAvailable') }}
             </td>
           </tr>
         </tfoot>
@@ -1661,7 +1663,7 @@ onMounted(async () => {
       <!-- Footer pagination -->
       <VCardText class="d-flex align-center flex-wrap justify-end gap-4 pa-2">
         <div class="d-flex align-center me-3" style="width: 220px;">
-          <span class="text-no-wrap me-3">Rows per page:</span>
+          <span class="text-no-wrap me-3">{{ t('vendor.list.pagination.rowsPerPage') }}</span>
 
           <VSelect
             v-model="rowPerPage"
@@ -1691,7 +1693,7 @@ onMounted(async () => {
     <VDialog v-model="statusDialog" max-width="420">
       <VCard>
         <VCardTitle class="text-h6">
-          Update Status Vendor
+          {{ t('vendor.statusDialog.title') }}
         </VCardTitle>
 
         <VCardText v-if="statusTarget">
@@ -1708,7 +1710,7 @@ onMounted(async () => {
             :disabled="statusLoading"
             @click="closeStatusDialog"
           >
-            Batal
+            {{ t('vendor.statusDialog.cancelButton') }}
           </VBtn>
 
           <VBtn
@@ -1716,7 +1718,7 @@ onMounted(async () => {
             :loading="statusLoading"
             @click="confirmUpdateStatus"
           >
-            Ya, Ubah
+            {{ t('vendor.statusDialog.confirmButton') }}
           </VBtn>
         </VCardActions>
       </VCard>
@@ -2365,7 +2367,7 @@ onMounted(async () => {
               color="error"
             />
 
-            Reject Master Vendor
+            {{ t('vendor.rejectDialog.title') }}
           </VCardTitle>
 
           <VDivider />
@@ -2380,8 +2382,8 @@ onMounted(async () => {
 
             <VTextarea
               v-model="rejectVendorNotes"
-              label="Catatan reject *"
-              placeholder="Masukkan alasan penolakan Vendor"
+              :label="t('vendor.rejectDialog.notesLabel')"
+              :placeholder="t('vendor.rejectDialog.notesPlaceholder')"
               rows="4"
               auto-grow
               clearable
@@ -2395,14 +2397,13 @@ onMounted(async () => {
               :error-messages="
                 rejectVendorSubmitted
                   && !rejectVendorNotes.trim()
-                    ? ['Catatan penolakan wajib diisi']
+                    ? [t('vendor.rejectDialog.notesError')]
                     : []
               "
             />
 
             <div class="text-caption text-medium-emphasis mt-2">
-              Catatan wajib diisi agar pembuat Vendor mengetahui alasan
-              penolakan.
+              {{ t('vendor.rejectDialog.notesHelp') }}
             </div>
           </VCardText>
 
@@ -2417,7 +2418,7 @@ onMounted(async () => {
               :disabled="rejectVendorLoading"
               @click="closeRejectVendorDialog"
             >
-              Batal
+              {{ t('vendor.rejectDialog.cancelButton') }}
             </VBtn>
 
             <VBtn
@@ -2429,7 +2430,7 @@ onMounted(async () => {
               "
               @click="confirmRejectVendor"
             >
-              Simpan Catatan
+              {{ t('vendor.rejectDialog.saveNotesButton') }}
             </VBtn>
           </VCardActions>
         </VCard>

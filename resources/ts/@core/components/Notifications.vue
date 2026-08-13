@@ -4,6 +4,7 @@ import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { avatarText } from '@core/utils/formatters'
 import axios from '@axios'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useNavigationStore } from '@/stores/navigation'
 
 interface Props {
@@ -24,6 +25,7 @@ type Anchor = 'top' | 'bottom' | 'start' | 'end' | 'center' | 'bottom end' | 'bo
 
 const router = useRouter()
 const navigationStore = useNavigationStore()
+const { t, locale } = useI18n()
 
 const notifications = ref<any[]>([])
 const unreadNotificationCount = ref(0)
@@ -198,7 +200,7 @@ const formatNotificationDate = (date?: string): string => {
 
   if (Number.isNaN(value.getTime())) return '-'
 
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -294,8 +296,8 @@ onBeforeUnmount(() => {
       class="notification-toast"
     >
       <div class="notification-toast-arrow" />
-      <strong>Notifikasi baru</strong>
-      <span>Anda mendapatkan notifikasi baru.</span>
+      <strong>{{ t('common.notifications.toastTitle') }}</strong>
+      <span>{{ t('common.notifications.toastText') }}</span>
     </div>
 
     <VBadge
@@ -331,7 +333,7 @@ onBeforeUnmount(() => {
           <VCard class="d-flex flex-column">
             <VCardItem class="notification-section">
               <VCardTitle class="text-base">
-                Notifications
+                {{ t('common.notifications.header') }}
               </VCardTitle>
 
               <template #append>
@@ -340,7 +342,7 @@ onBeforeUnmount(() => {
                   color="primary"
                   size="small"
                 >
-                  {{ unreadNotificationCount }} New
+                  {{ t('common.notifications.newChip', { count: unreadNotificationCount }) }}
                 </VChip>
                 <VBtn
                   icon
@@ -416,7 +418,7 @@ onBeforeUnmount(() => {
                             variant="tonal"
                             @click.stop="openNotificationModule($event, notification)"
                           >
-                            Lihat
+                            {{ t('common.notifications.viewButton') }}
                           </VBtn>
                         </div>
                       </div>
@@ -428,8 +430,8 @@ onBeforeUnmount(() => {
 
                 <VListItem
                   v-else
-                  title="Belum ada notifikasi"
-                  subtitle="Notifikasi terbaru akan muncul di sini."
+                  :title="t('common.notifications.emptyTitle')"
+                  :subtitle="t('common.notifications.emptySubtitle')"
                   min-height="72px"
                 >
                   <template #prepend>
@@ -452,7 +454,7 @@ onBeforeUnmount(() => {
                 :loading="readAllLoading"
                 @click.stop="readAllNotifications"
               >
-                READ ALL NOTIFICATIONS
+                {{ t('common.notifications.readAllButton') }}
               </VBtn>
             </VCardText>
           </VCard>

@@ -1,23 +1,19 @@
 @php
     $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', config('app.url'))), '/');
-    $poUrl = $frontendUrl . '/non_trade/purchase_order';
+    $poUrl = $frontendUrl . '/non_stock/purchase_order';
     $logoUrl = 'https://syop.proenergi.com/proEnergi/libraries/themes/images/logo-proenergi.png';
 
     $currentMode = $mode ?? 'approval_request';
 
-    $title = match ($currentMode) {
-        'final_approved' => 'Purchase Order Telah Disetujui',
-        'step_approved' => 'Update Approval Purchase Order',
-        'rejected' => 'Purchase Order Ditolak',
-        default => 'Approval Purchase Order',
-    };
+    $translationMode = in_array($currentMode, ['final_approved', 'step_approved', 'rejected'], true)
+        ? $currentMode
+        : 'default';
 
-    $description = match ($currentMode) {
-        'final_approved' => 'Purchase Order Anda telah mendapatkan final approval oleh ' . optional($actor)->name . '.',
-        'step_approved' => 'Purchase Order Anda telah disetujui oleh ' . optional($actor)->name . ' dan masih menunggu approval berikutnya.',
-        'rejected' => 'Purchase Order Anda telah ditolak oleh ' . optional($actor)->name . '.',
-        default => 'Terdapat Purchase Order yang membutuhkan approval Anda.',
-    };
+    $title = __('mail.po.title.' . $translationMode);
+
+    $description = __('mail.po.description.' . $translationMode, [
+        'actor_name' => optional($actor)->name,
+    ]);
 
     $displayStatus = match ($currentMode) {
         'approval_request' => 'IN PROGRESS',
@@ -67,31 +63,31 @@
                     <tr>
                         <td style="padding:28px;">
                             <h2 style="margin:0 0 10px;font-size:22px;color:#111827;">
-                                Approval Purchase Order
+                                {{ __('mail.po.body_heading') }}
                             </h2>
 
                             <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#4b5563;">
-                                Dear <strong>{{ $recipient->name }}</strong>,<br>
+                                {{ __('mail.greeting') }} <strong>{{ $recipient->name }}</strong>,<br>
                                 {{ $description }}
                             </p>
 
                             <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:18px 0;">
                                 <tr>
-                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;width:35%;font-size:13px;color:#6b7280;">No. PO</td>
+                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;width:35%;font-size:13px;color:#6b7280;">{{ __('mail.po.field_no') }}</td>
                                     <td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;font-weight:bold;">{{ $po->nomor_po }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Tanggal PO</td>
+                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">{{ __('mail.po.field_date') }}</td>
                                     <td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;">{{ date('d/m/Y', strtotime($po->tanggal_po)) }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Total Nilai</td>
+                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">{{ __('mail.po.field_total') }}</td>
                                     <td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;font-weight:bold;">
                                         Rp {{ number_format($po->total_nilai ?? 0, 0, ',', '.') }}
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Status</td>
+                                    <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">{{ __('mail.po.field_status') }}</td>
                                     <td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;">
                                         <span style="
                                             display:inline-block;
@@ -109,7 +105,7 @@
                                 </tr>
                                 @if (!empty($notes))
                                     <tr>
-                                        <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Catatan Penolakan</td>
+                                        <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">{{ __('mail.po.field_rejection_notes') }}</td>
                                         <td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;color:#991b1b;line-height:1.5;">
                                             {!! nl2br(e($notes)) !!}
                                         </td>
@@ -118,25 +114,25 @@
                             </table>
 
                             <p style="margin:18px 0;font-size:14px;line-height:1.6;color:#4b5563;">
-                                Silakan klik tombol berikut untuk membuka halaman Purchase Order di SYOP v4.
+                                {{ __('mail.po.instruction') }}
                             </p>
 
                             <p style="margin:24px 0;">
                                 <a href="{{ $poUrl }}"
                                    style="display:inline-block;padding:12px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:14px;">
-                                    Buka Purchase Order
+                                    {{ __('mail.po.button') }}
                                 </a>
                             </p>
 
                             <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">
-                                Email ini dikirim otomatis oleh sistem SYOP v4. Mohon tidak membalas email ini.
+                                {{ __('mail.footer_notice') }}
                             </p>
                         </td>
                     </tr>
 
                     <tr>
                         <td style="padding:16px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;text-align:center;">
-                           Copyright © 2026 <a href="https://proenergi.com/en">Proenergi.com</a> All Right Reserved.
+                           Copyright © {{ date('Y') }} <a href="https://proenergi.com/en">Proenergi.com</a> {{ __('mail.footer_rights') }}
                         </td>
                     </tr>
                 </table>

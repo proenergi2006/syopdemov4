@@ -15,6 +15,7 @@ class PurchaseRequestItem extends Model
     protected $fillable = [
         'purchase_request_id',
         'nama_item',
+        'master_material_group_id',
         'qty',
         'qty_po',
         'qty_outstanding',
@@ -44,6 +45,15 @@ class PurchaseRequestItem extends Model
     public function unit()
     {
         return $this->belongsTo(Unit::class, 'satuan', 'id');
+    }
+
+    public function materialGroup()
+    {
+        return $this->belongsTo(
+            MasterMaterialGroup::class,
+            'master_material_group_id',
+            'id'
+        );
     }
 
     public function goodsReceiveItems()

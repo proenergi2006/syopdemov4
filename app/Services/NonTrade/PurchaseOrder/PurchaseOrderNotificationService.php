@@ -154,17 +154,19 @@ class PurchaseOrderNotificationService
         }
 
         foreach ($approverUsers as $user) {
+            $messageParams = ['nomor_po' => $po->nomor_po];
+
             Notification::create([
                 'user_id' => $user->id,
 
                 'type' => 'purchase_order_approval',
 
-                'title' => 'Approval Purchase Order',
+                'title' => __('notification_messages.purchase_order.approval_request.title'),
+                'title_key' => 'notification_messages.purchase_order.approval_request.title',
 
-                'message'
-                => 'Purchase Order '
-                    . $po->nomor_po
-                    . ' menunggu approval Anda.',
+                'message' => __('notification_messages.purchase_order.approval_request.message', $messageParams),
+                'message_key' => 'notification_messages.purchase_order.approval_request.message',
+                'message_params' => $messageParams,
 
                 'module' => 'purchase_order',
 
@@ -174,7 +176,7 @@ class PurchaseOrderNotificationService
 
                 'reference_public_id' => $po->encrypted_id,
 
-                'url' => '/non_trade/purchase_order',
+                'url' => '/non_stock/purchase_order',
             ]);
         }
 
@@ -225,6 +227,18 @@ class PurchaseOrderNotificationService
         //     return;
         // }
 
+        $translationGroup = $hasPendingApproval
+            ? 'approval_step_pending'
+            : 'approval_step_final';
+
+        $messageParams = [
+            'nomor_po' => $po->nomor_po,
+            'approver_name' => $approver->name ?? '-',
+        ];
+
+        $titleKey = "notification_messages.purchase_order.{$translationGroup}.title";
+        $messageKey = "notification_messages.purchase_order.{$translationGroup}.message";
+
         Notification::create([
             'user_id' => $po->requester_signed_by,
 
@@ -232,21 +246,12 @@ class PurchaseOrderNotificationService
                 ? 'purchase_order_approval_step_approved'
                 : 'purchase_order_approved',
 
-            'title' => $hasPendingApproval
-                ? 'Tahap Approval PO Disetujui'
-                : 'Purchase Order Disetujui',
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
 
-            'message' => $hasPendingApproval
-                ? 'Purchase Order '
-                . $po->nomor_po
-                . ' telah disetujui oleh '
-                . ($approver->name ?? '-')
-                . ' dan masih menunggu approval berikutnya.'
-                : 'Purchase Order '
-                . $po->nomor_po
-                . ' telah final disetujui oleh '
-                . ($approver->name ?? '-')
-                . '.',
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
 
             'module' => 'purchase_order',
 
@@ -256,7 +261,7 @@ class PurchaseOrderNotificationService
 
             'reference_public_id' => $po->encrypted_id,
 
-            'url' => '/non_trade/purchase_order',
+            'url' => '/non_stock/purchase_order',
         ]);
     }
 
@@ -271,19 +276,22 @@ class PurchaseOrderNotificationService
             return;
         }
 
+        $messageParams = [
+            'nomor_po' => $po->nomor_po,
+            'rejecter_name' => $rejecter->name ?? '-',
+        ];
+
         Notification::create([
             'user_id' => $po->requester_signed_by,
 
             'type' => 'purchase_order_rejected',
 
-            'title' => 'Purchase Order Ditolak',
+            'title' => __('notification_messages.purchase_order.rejected.title'),
+            'title_key' => 'notification_messages.purchase_order.rejected.title',
 
-            'message'
-            => 'Purchase Order '
-                . $po->nomor_po
-                . ' telah ditolak oleh '
-                . ($rejecter->name ?? '-')
-                . '.',
+            'message' => __('notification_messages.purchase_order.rejected.message', $messageParams),
+            'message_key' => 'notification_messages.purchase_order.rejected.message',
+            'message_params' => $messageParams,
 
             'module' => 'purchase_order',
 
@@ -293,7 +301,7 @@ class PurchaseOrderNotificationService
 
             'reference_public_id' => $po->encrypted_id,
 
-            'url' => '/non_trade/purchase_order',
+            'url' => '/non_stock/purchase_order',
         ]);
     }
 

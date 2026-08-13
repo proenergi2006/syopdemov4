@@ -2083,7 +2083,7 @@ onMounted(async () => {
             <VTextField
               v-model="groupForm.name"
               label="Nama Group"
-              placeholder="Contoh: Non Trade"
+              placeholder="Contoh: Non Stock"
               density="comfortable"
             />
           </VCol>

@@ -22,8 +22,15 @@ class NotificationController extends Controller
                 return [
                     'id' => $notification->id,
                     'type' => $notification->type,
-                    'title' => $notification->title,
-                    'message' => $notification->message,
+
+                    'title' => $notification->title_key
+                        ? __($notification->title_key, $notification->title_params ?? [])
+                        : $notification->title,
+
+                    'message' => $notification->message_key
+                        ? __($notification->message_key, $notification->message_params ?? [])
+                        : $notification->message,
+
                     'module' => $notification->module,
                     'reference_type' => $notification->reference_type,
                     'reference_id' => $notification->reference_id,
@@ -41,7 +48,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Notifikasi berhasil dimuat.',
+            'message' => __('notification_ui_messages.loaded'),
             'unread_count' => $unreadCount,
             'data' => $notifications,
         ]);
@@ -60,7 +67,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Semua notifikasi berhasil dibaca.',
+            'message' => __('notification_ui_messages.all_read'),
         ]);
     }
 
@@ -81,7 +88,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Notifikasi berhasil dibaca.',
+            'message' => __('notification_ui_messages.read'),
         ]);
     }
 
@@ -95,7 +102,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Notifikasi yang sudah dibaca berhasil dihapus.',
+            'message' => __('notification_ui_messages.read_deleted'),
         ]);
     }
 }

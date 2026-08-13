@@ -33,7 +33,7 @@ class GoodsReturnController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('goods_return_messages.user_not_authenticated'),
                 ], 401);
             }
 
@@ -746,7 +746,7 @@ class GoodsReturnController extends Controller
             if (!$canAccess) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses ke master alasan retur.',
+                    'message' => __('goods_return_messages.reasons.forbidden'),
                 ], 403);
             }
 
@@ -776,7 +776,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data alasan retur berhasil diambil.',
+                'message' => __('goods_return_messages.reasons.loaded'),
                 'data' => $reasons,
             ], 200);
         } catch (\Throwable $e) {
@@ -792,7 +792,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengambil data alasan retur.',
+                'message' => __('goods_return_messages.reasons.load_failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -817,7 +817,7 @@ class GoodsReturnController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk membuat retur barang.',
+                    'message' => __('goods_return_messages.create_forbidden'),
                 ], 403);
             }
 
@@ -840,7 +840,7 @@ class GoodsReturnController extends Controller
             if (empty($departmentIds)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Department pengguna belum dikonfigurasi.',
+                    'message' => __('goods_return_messages.create.department_not_configured'),
                     'data' => [],
                 ], 422);
             }
@@ -1027,7 +1027,7 @@ class GoodsReturnController extends Controller
                 if (!$goodsReceive) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Goods Receipt tidak ditemukan atau seluruh qty barang sudah diretur.',
+                        'message' => __('goods_return_messages.create.gr_not_found_or_fully_returned'),
                     ], 422);
                 }
 
@@ -1307,7 +1307,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data form retur barang berhasil diambil.',
+                'message' => __('goods_return_messages.form.loaded'),
                 'data' => [
                     'goods_receives' => $goodsReceives,
                     'selected_goods_receive'
@@ -1315,9 +1315,14 @@ class GoodsReturnController extends Controller
                 ],
             ], 200);
         } catch (DecryptException $e) {
+            Log::warning('[Goods Return] Get create data - invalid id', [
+                'message' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Receipt tidak valid.',
+                'message' => __('goods_return_messages.form.invalid_id'),
             ], 422);
         } catch (\Throwable $e) {
             Log::error(
@@ -1336,7 +1341,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengambil data form retur barang.',
+                'message' => __('goods_return_messages.form.load_failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -1367,7 +1372,7 @@ class GoodsReturnController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk membuat retur barang.',
+                    'message' => __('goods_return_messages.create_forbidden'),
                 ], 403);
             }
 
@@ -1687,25 +1692,25 @@ class GoodsReturnController extends Controller
                 }
 
                 if ($qtyReturn > $qtyReturnable) {
+                    $formattedQtyReturnable = rtrim(
+                        rtrim(
+                            number_format(
+                                $qtyReturnable,
+                                4,
+                                ',',
+                                '.',
+                            ),
+                            '0',
+                        ),
+                        ',',
+                    );
+
                     throw ValidationException::withMessages([
                         "items.{$index}.qty_return" => [
-                            'Qty retur item '
-                                . ($goodsReceiveItem->nama_item ?? '-')
-                                . ' melebihi qty yang masih dapat diretur. '
-                                . 'Maksimal: '
-                                . rtrim(
-                                    rtrim(
-                                        number_format(
-                                            $qtyReturnable,
-                                            4,
-                                            ',',
-                                            '.',
-                                        ),
-                                        '0',
-                                    ),
-                                    ',',
-                                )
-                                . '.',
+                            __('goods_return_messages.validation.qty_return_exceeds_returnable', [
+                                'item_name' => $goodsReceiveItem->nama_item ?? '-',
+                                'max_qty' => $formattedQtyReturnable,
+                            ]),
                         ],
                     ]);
                 }
@@ -1759,9 +1764,9 @@ class GoodsReturnController extends Controller
                 if ($unitId === null) {
                     throw ValidationException::withMessages([
                         "items.{$index}.goods_receive_item_public_id" => [
-                            'Unit item '
-                                . ($goodsReceiveItem->nama_item ?? '-')
-                                . ' tidak ditemukan pada Goods Receipt maupun Purchase Order.',
+                            __('goods_return_messages.validation.unit_item_not_found', [
+                                'item_name' => $goodsReceiveItem->nama_item ?? '-',
+                            ]),
                         ],
                     ]);
                 }
@@ -1892,7 +1897,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Draft retur barang berhasil dibuat.',
+                'message' => __('goods_return_messages.draft.created'),
 
                 'data' => [
                     'id'
@@ -1971,9 +1976,14 @@ class GoodsReturnController extends Controller
                 }
             }
 
+            Log::warning('[Goods Return] Store - invalid id', [
+                'message' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Receipt atau item tidak valid.',
+                'message' => __('goods_return_messages.draft.invalid_ids'),
             ], 422);
         } catch (ModelNotFoundException $e) {
             if (DB::transactionLevel() > 0) {
@@ -1990,9 +2000,14 @@ class GoodsReturnController extends Controller
                 }
             }
 
+            Log::warning('[Goods Return] Store - not found', [
+                'message' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Receipt atau item sumber tidak ditemukan.',
+                'message' => __('goods_return_messages.draft.not_found'),
             ], 404);
         } catch (\Throwable $e) {
             if (DB::transactionLevel() > 0) {
@@ -2024,7 +2039,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membuat draft retur barang.',
+                'message' => __('goods_return_messages.draft.create_failed'),
 
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
@@ -2043,7 +2058,7 @@ class GoodsReturnController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('goods_return_messages.user_not_authenticated'),
                 ], 401);
             }
 
@@ -2088,7 +2103,7 @@ class GoodsReturnController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk melihat Goods Return.',
+                    'message' => __('goods_return_messages.index_forbidden'),
                 ], 403);
             }
 
@@ -2416,7 +2431,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Detail Goods Return berhasil dimuat.',
+                'message' => __('goods_return_messages.show.loaded'),
 
                 'data' => [
                     'id'
@@ -2612,14 +2627,26 @@ class GoodsReturnController extends Controller
                 ],
             ], 200);
         } catch (DecryptException $e) {
+            Log::warning('[Goods Return] Show - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Return tidak valid.',
+                'message' => __('goods_return_messages.invalid_id'),
             ], 422);
         } catch (ModelNotFoundException $e) {
+            Log::warning('[Goods Return] Show - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Return tidak ditemukan atau tidak dapat Anda akses.',
+                'message' => __('goods_return_messages.not_found_or_no_access'),
             ], 404);
         } catch (\Throwable $e) {
             Log::error(
@@ -2635,7 +2662,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat detail Goods Return.',
+                'message' => __('goods_return_messages.show.load_failed'),
 
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
@@ -2654,7 +2681,7 @@ class GoodsReturnController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('goods_return_messages.user_not_authenticated'),
                 ], 401);
             }
 
@@ -2666,7 +2693,7 @@ class GoodsReturnController extends Controller
             if (!$user->hasPermission('goods_return.update')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk mengubah Goods Return.',
+                    'message' => __('goods_return_messages.edit_forbidden'),
                 ], 403);
             }
 
@@ -2711,7 +2738,7 @@ class GoodsReturnController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk melihat Goods Return.',
+                    'message' => __('goods_return_messages.index_forbidden'),
                 ], 403);
             }
 
@@ -2811,7 +2838,7 @@ class GoodsReturnController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Goods Return hanya dapat diubah jika status masih DRAFT.',
+                    'message' => __('goods_return_messages.only_draft'),
                 ], 422);
             }
 
@@ -3087,7 +3114,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data edit Goods Return berhasil dimuat.',
+                'message' => __('goods_return_messages.edit.loaded'),
 
                 'data' => [
                     'public_id'
@@ -3205,14 +3232,26 @@ class GoodsReturnController extends Controller
                 ],
             ], 200);
         } catch (DecryptException $e) {
+            Log::warning('[Goods Return] Edit - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Return tidak valid.',
+                'message' => __('goods_return_messages.invalid_id'),
             ], 422);
         } catch (ModelNotFoundException $e) {
+            Log::warning('[Goods Return] Edit - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Return tidak ditemukan atau tidak dapat Anda akses.',
+                'message' => __('goods_return_messages.not_found_or_no_access'),
             ], 404);
         } catch (\Throwable $e) {
             Log::error(
@@ -3237,7 +3276,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat data edit Goods Return.',
+                'message' => __('goods_return_messages.edit.load_failed'),
 
                 'debug'
                 => app()->environment('local')
@@ -3272,7 +3311,7 @@ class GoodsReturnController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk mengubah Goods Return.',
+                    'message' => __('goods_return_messages.edit_forbidden'),
                 ], 403);
             }
 
@@ -3457,7 +3496,7 @@ class GoodsReturnController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Goods Return hanya dapat diubah jika status masih DRAFT.',
+                    'message' => __('goods_return_messages.only_draft'),
                 ], 422);
             }
 
@@ -3499,7 +3538,7 @@ class GoodsReturnController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Goods Return tidak ditemukan atau tidak dapat Anda akses.',
+                    'message' => __('goods_return_messages.not_found_or_no_access'),
                 ], 404);
             }
 
@@ -3710,25 +3749,25 @@ class GoodsReturnController extends Controller
                     $qtyReturn
                     > ($qtyReturnable + 0.0001)
                 ) {
+                    $formattedQtyReturnable = rtrim(
+                        rtrim(
+                            number_format(
+                                $qtyReturnable,
+                                4,
+                                ',',
+                                '.',
+                            ),
+                            '0',
+                        ),
+                        ',',
+                    );
+
                     throw ValidationException::withMessages([
                         "items.{$index}.qty_return" => [
-                            'Qty retur item '
-                                . ($goodsReceiveItem->nama_item ?? '-')
-                                . ' melebihi qty yang masih dapat diretur. '
-                                . 'Maksimal '
-                                . rtrim(
-                                    rtrim(
-                                        number_format(
-                                            $qtyReturnable,
-                                            4,
-                                            ',',
-                                            '.',
-                                        ),
-                                        '0',
-                                    ),
-                                    ',',
-                                )
-                                . '.',
+                            __('goods_return_messages.validation.qty_return_exceeds_returnable', [
+                                'item_name' => $goodsReceiveItem->nama_item ?? '-',
+                                'max_qty' => $formattedQtyReturnable,
+                            ]),
                         ],
                     ]);
                 }
@@ -3812,14 +3851,19 @@ class GoodsReturnController extends Controller
                 $validated['deleted_attachment_ids']
                     ?? [],
             )
-                ->map(function ($encryptedId) {
+                ->map(function ($encryptedId) use ($request) {
                     try {
                         return (int) Crypt::decryptString(
                             urldecode(
                                 (string) $encryptedId,
                             ),
                         );
-                    } catch (\Throwable) {
+                    } catch (\Throwable $e) {
+                        Log::warning('[Goods Return] Update - invalid deleted attachment id', [
+                            'message' => $e->getMessage(),
+                            'user_id' => $request->user()?->id,
+                        ]);
+
                         return null;
                     }
                 })
@@ -3963,7 +4007,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Draft Goods Return berhasil diperbarui.',
+                'message' => __('goods_return_messages.update.success'),
 
                 'data' => [
                     'id'
@@ -4027,9 +4071,15 @@ class GoodsReturnController extends Controller
                 }
             }
 
+            Log::warning('[Goods Return] Update - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Return atau item tidak valid.',
+                'message' => __('goods_return_messages.update.invalid_ids'),
             ], 422);
         } catch (ModelNotFoundException $e) {
             if (DB::transactionLevel() > 0) {
@@ -4046,9 +4096,15 @@ class GoodsReturnController extends Controller
                 }
             }
 
+            Log::warning('[Goods Return] Update - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Return atau item sumber tidak ditemukan.',
+                'message' => __('goods_return_messages.draft.not_found'),
             ], 404);
         } catch (\Throwable $e) {
             if (DB::transactionLevel() > 0) {
@@ -4092,7 +4148,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memperbarui Goods Return.',
+                'message' => __('goods_return_messages.update.failed'),
 
                 'debug'
                 => app()->environment('local')
@@ -4126,7 +4182,7 @@ class GoodsReturnController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk menghapus Goods Return.',
+                    'message' => __('goods_return_messages.destroy.forbidden'),
                 ], 403);
             }
 
@@ -4191,7 +4247,7 @@ class GoodsReturnController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Goods Return tidak ditemukan atau tidak dapat Anda akses.',
+                    'message' => __('goods_return_messages.not_found_or_no_access'),
                 ], 404);
             }
 
@@ -4209,7 +4265,7 @@ class GoodsReturnController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Goods Return hanya dapat dihapus jika status masih DRAFT.',
+                    'message' => __('goods_return_messages.destroy.only_draft'),
                 ], 422);
             }
 
@@ -4268,25 +4324,37 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Draft Goods Return berhasil dihapus.',
+                'message' => __('goods_return_messages.destroy.success'),
             ], 200);
         } catch (DecryptException $e) {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
 
+            Log::warning('[Goods Return] Delete - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Return tidak valid.',
+                'message' => __('goods_return_messages.invalid_id'),
             ], 422);
         } catch (ModelNotFoundException $e) {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
 
+            Log::warning('[Goods Return] Delete - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Return tidak ditemukan.',
+                'message' => __('goods_return_messages.not_found'),
             ], 404);
         } catch (\Throwable $e) {
             if (DB::transactionLevel() > 0) {
@@ -4306,7 +4374,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menghapus Goods Return.',
+                'message' => __('goods_return_messages.destroy.failed'),
 
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
@@ -4329,7 +4397,7 @@ class GoodsReturnController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk memposting retur barang.',
+                    'message' => __('goods_return_messages.post.forbidden'),
                 ], 403);
             }
 
@@ -4349,7 +4417,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Goods Return berhasil diposting.',
+                'message' => __('goods_return_messages.post.success'),
 
                 'data' => [
                     'id' => $goodsReturn->id,
@@ -4381,14 +4449,26 @@ class GoodsReturnController extends Controller
                 'errors' => $e->errors(),
             ], 422);
         } catch (DecryptException $e) {
+            Log::warning('[Goods Return] Post - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Return tidak valid.',
+                'message' => __('goods_return_messages.invalid_id'),
             ], 422);
         } catch (ModelNotFoundException $e) {
+            Log::warning('[Goods Return] Post - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Return atau data sumber tidak ditemukan.',
+                'message' => __('goods_return_messages.source_not_found'),
             ], 404);
         } catch (\Throwable $e) {
             Log::error(
@@ -4404,7 +4484,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memposting Goods Return.',
+                'message' => __('goods_return_messages.post.failed'),
 
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
@@ -4432,7 +4512,7 @@ class GoodsReturnController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk membatalkan retur barang.',
+                    'message' => __('goods_return_messages.cancel.forbidden'),
                 ], 403);
             }
 
@@ -4487,7 +4567,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Goods Return berhasil dibatalkan.',
+                'message' => __('goods_return_messages.cancel.success'),
 
                 'data' => [
                     'id'
@@ -4526,14 +4606,26 @@ class GoodsReturnController extends Controller
                 'errors' => $e->errors(),
             ], 422);
         } catch (DecryptException $e) {
+            Log::warning('[Goods Return] Cancel - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Goods Return tidak valid.',
+                'message' => __('goods_return_messages.invalid_id'),
             ], 422);
         } catch (ModelNotFoundException $e) {
+            Log::warning('[Goods Return] Cancel - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Goods Return atau data sumber tidak ditemukan.',
+                'message' => __('goods_return_messages.source_not_found'),
             ], 404);
         } catch (\Throwable $e) {
             Log::error(
@@ -4558,7 +4650,7 @@ class GoodsReturnController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membatalkan Goods Return.',
+                'message' => __('goods_return_messages.cancel.failed'),
 
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
@@ -4586,7 +4678,7 @@ class GoodsReturnController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk membuat Goods Receipt.',
+                    'message' => __('goods_return_messages.replacement.forbidden'),
                     'data' => [],
                 ], 403);
             }
@@ -4603,7 +4695,7 @@ class GoodsReturnController extends Controller
             if (empty($departmentIds)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Department akun Anda belum tersedia.',
+                    'message' => __('goods_return_messages.replacement.department_unavailable'),
                     'data' => [],
                     'errors' => [
                         'department_id' => [
@@ -4671,7 +4763,7 @@ class GoodsReturnController extends Controller
             if ($goodsReturns->isEmpty()) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Tidak ada Goods Return yang membutuhkan replacement.',
+                    'message' => __('goods_return_messages.replacement.none_needed'),
                     'data' => [],
                 ], 200);
             }

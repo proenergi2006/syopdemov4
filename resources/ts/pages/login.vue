@@ -18,6 +18,7 @@ const loginLoading = ref(false)
 
 const username = ref('')
 const password = ref('')
+const remember = ref(false)
 
 const errors = ref<Record<'username' | 'password', string | undefined>>({
   username: undefined,
@@ -82,6 +83,7 @@ const login = async () => {
     const loginResponse = await axios.post('/auth/login', {
       username: username.value,
       password: password.value,
+      remember: remember.value,
     })
 
     const loginData = loginResponse.data
@@ -401,8 +403,30 @@ onMounted(() => {
 
           <VCol
             cols="12"
-            class="text-end mt-n2"
+            class="d-flex align-center justify-space-between flex-wrap gap-3 mt-n2"
           >
+            <button
+              type="button"
+              class="remember-toggle"
+              :class="{ 'remember-toggle--active': remember }"
+              role="switch"
+              :aria-checked="remember"
+              @click="remember = !remember"
+            >
+              <span class="remember-toggle-track">
+                <span class="remember-toggle-thumb">
+                  <VIcon
+                    :icon="remember ? 'mdi-check-bold' : 'mdi-lock-open-variant-outline'"
+                    size="11"
+                  />
+                </span>
+              </span>
+
+              <span class="remember-toggle-label">
+                {{ t('auth.login.rememberMeLabel') }}
+              </span>
+            </button>
+
             <RouterLink
               to="/forgot-password"
               class="text-primary text-body-2"
@@ -454,6 +478,91 @@ onMounted(() => {
     </VCardText>
   </div>
 </template>
+
+<style scoped>
+.remember-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember-toggle-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(var(--v-theme-on-surface), 0.22);
+  transition: background-color 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.remember-toggle-thumb {
+  position: absolute;
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-surface));
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.35s ease;
+}
+
+.remember-toggle-thumb .v-icon {
+  transition: opacity 0.2s ease;
+}
+
+.remember-toggle--active .remember-toggle-track {
+  background: rgb(var(--v-theme-primary));
+  box-shadow: 0 0 0 4px rgba(var(--v-theme-primary), 0.18);
+}
+
+.remember-toggle--active .remember-toggle-thumb {
+  transform: translateX(18px);
+  color: rgb(var(--v-theme-primary));
+  animation: remember-toggle-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.remember-toggle-label {
+  font-size: 0.8125rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  transition: color 0.25s ease;
+}
+
+.remember-toggle--active .remember-toggle-label {
+  color: rgb(var(--v-theme-on-surface));
+  font-weight: 500;
+}
+
+.remember-toggle:focus-visible .remember-toggle-track {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+@keyframes remember-toggle-pop {
+  0% {
+    transform: translateX(18px) scale(0.85);
+  }
+  60% {
+    transform: translateX(18px) scale(1.15);
+  }
+  100% {
+    transform: translateX(18px) scale(1);
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

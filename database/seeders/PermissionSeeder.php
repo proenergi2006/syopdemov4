@@ -93,6 +93,27 @@ class PermissionSeeder extends Seeder
                 'name' => 'Delete Purchase Requisition',
                 'description' => 'Menghapus atau membatalkan Purchase Requisition.',
             ],
+            [
+                'module' => 'purchase_request',
+                'action' => 'cancel',
+                'code' => 'purchase_request.cancel',
+                'name' => 'Cancel Purchase Requisition',
+                'description' => 'Membatalkan Purchase Requisition yang sudah approved.',
+            ],
+
+            /*
+            | Sama seperti purchase_order.export: tanpa scope. Isi file mengikuti
+            | visibility yang sudah berlaku pada daftar, jadi permission ini hanya
+            | menentukan boleh-tidaknya menarik data keluar.
+            */
+            [
+                'module' => 'purchase_request',
+                'action' => 'export',
+                'code' => 'purchase_request.export',
+                'name' => 'Export Purchase Requisition',
+                'description' => 'Export data Purchase Requisition ke Excel, sesuai data yang tampil pada daftar.',
+                'requires_scope' => false,
+            ],
 
             /*
             |--------------------------------------------------------------------------
@@ -133,6 +154,28 @@ class PermissionSeeder extends Seeder
                 'code' => 'purchase_order.delete',
                 'name' => 'Delete Purchase Order',
                 'description' => 'Menghapus atau membatalkan Purchase Order.',
+            ],
+            [
+                'module' => 'purchase_order',
+                'action' => 'cancel',
+                'code' => 'purchase_order.cancel',
+                'name' => 'Cancel Purchase Order',
+                'description' => 'Membatalkan Purchase Order yang sudah approved.',
+            ],
+
+            /*
+            | Permission export sengaja TIDAK memakai scope (requires_scope = false).
+            | Isi file selalu mengikuti visibility PO yang sudah berlaku pada daftar,
+            | jadi permission ini hanya menjawab "boleh menarik data keluar atau
+            | tidak" -- bukan "boleh melihat data siapa".
+            */
+            [
+                'module' => 'purchase_order',
+                'action' => 'export',
+                'code' => 'purchase_order.export',
+                'name' => 'Export Purchase Order',
+                'description' => 'Export data Purchase Order ke Excel, sesuai data yang tampil pada daftar.',
+                'requires_scope' => false,
             ],
 
             /*
@@ -175,6 +218,13 @@ class PermissionSeeder extends Seeder
                 'name' => 'Posting Goods Receipt',
                 'description' => 'Memposting penerimaan barang.',
             ],
+            [
+                'module' => 'goods_receive',
+                'action' => 'cancel',
+                'code' => 'goods_receive.cancel',
+                'name' => 'Cancel Goods Receipt',
+                'description' => 'Membatalkan Goods Receipt yang sudah posted.',
+            ],
         ];
 
         foreach ($permissions as $permission) {
@@ -182,27 +232,45 @@ class PermissionSeeder extends Seeder
                 ->where('code', $permission['code'])
                 ->first();
 
+            $payload = [
+                'module' => $permission['module'],
+                'action' => $permission['action'],
+                'name' => $permission['name'],
+                'description' => $permission['description'],
+                'is_active' => true,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Created at tidak berubah ketika seeder dijalankan ulang
+                |--------------------------------------------------------------------------
+                */
+                'created_at' => $existingPermission?->created_at
+                    ?? $now,
+
+                'updated_at' => $now,
+            ];
+
+            /*
+            |--------------------------------------------------------------------------
+            | requires_scope
+            |--------------------------------------------------------------------------
+            | Hanya ditulis saat permission BARU dibuat. Untuk permission yang sudah
+            | ada, nilainya dibiarkan apa adanya supaya pengaturan yang sudah diubah
+            | admin lewat menu Permission tidak tertimpa setiap seeder dijalankan.
+            |--------------------------------------------------------------------------
+            */
+            if (
+                !$existingPermission
+                && array_key_exists('requires_scope', $permission)
+            ) {
+                $payload['requires_scope'] = (bool) $permission['requires_scope'];
+            }
+
             DB::table('permissions')->updateOrInsert(
                 [
                     'code' => $permission['code'],
                 ],
-                [
-                    'module' => $permission['module'],
-                    'action' => $permission['action'],
-                    'name' => $permission['name'],
-                    'description' => $permission['description'],
-                    'is_active' => true,
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Created at tidak berubah ketika seeder dijalankan ulang
-                    |--------------------------------------------------------------------------
-                    */
-                    'created_at' => $existingPermission?->created_at
-                        ?? $now,
-
-                    'updated_at' => $now,
-                ],
+                $payload,
             );
         }
     }

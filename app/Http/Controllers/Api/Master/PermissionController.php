@@ -226,6 +226,7 @@ class PermissionController extends Controller
             'name' => $permission->name,
             'description' => $permission->description,
             'is_active' => (bool) $permission->is_active,
+            'requires_scope' => (bool) $permission->requires_scope,
 
             /*
         |--------------------------------------------------------------------------

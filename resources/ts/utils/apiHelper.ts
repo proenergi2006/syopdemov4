@@ -1,12 +1,14 @@
+import i18n from '@/plugins/i18n'
+
 export const getApiErrorMessage = (
   error: any,
-  fallback = 'Terjadi kesalahan pada server.',
+  fallback?: string,
 ): string => {
   const status = error?.response?.status
   const data = error?.response?.data
 
   if (!status)
-    return 'Tidak dapat terhubung ke server.'
+    return i18n.global.t('common.httpStatus.noConnection')
 
   /*
   |--------------------------------------------------------------------------
@@ -35,18 +37,18 @@ export const getApiErrorMessage = (
 
   switch (status) {
     case 400:
-      return 'Permintaan tidak valid.'
+      return i18n.global.t('common.httpStatus.badRequest')
     case 401:
-      return 'Sesi Anda telah berakhir. Silakan login kembali.'
+      return i18n.global.t('common.httpStatus.sessionExpired')
     case 403:
-      return 'Anda tidak memiliki akses.'
+      return i18n.global.t('common.httpStatus.forbidden')
     case 404:
-      return 'Data tidak ditemukan.'
+      return i18n.global.t('common.httpStatus.notFound')
     case 422:
-      return 'Data yang dikirim tidak valid.'
+      return i18n.global.t('common.httpStatus.validationError')
     case 500:
-      return 'Terjadi kesalahan pada server.'
+      return i18n.global.t('common.httpStatus.serverError')
     default:
-      return fallback
+      return fallback ?? i18n.global.t('common.httpStatus.serverError')
   }
 }

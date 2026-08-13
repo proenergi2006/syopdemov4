@@ -12,7 +12,7 @@
     | Route teknis tetap purchase_request
     |--------------------------------------------------------------------------
     */
-    $prUrl = $frontendUrl . '/non_trade/purchase_request';
+    $prUrl = $frontendUrl . '/non_stock/purchase_request';
 
     $logoUrl = 'https://syop.proenergi.com/proEnergi/libraries/themes/images/logo-proenergi.png';
 
@@ -23,34 +23,17 @@
     | Nama yang tampil ke user: Purchase Requisition
     |--------------------------------------------------------------------------
     */
-    $title = match ($currentMode) {
-        'final_approved' => 'Purchase Requisition Telah Disetujui',
-        'step_approved' => 'Update Approval Purchase Requisition',
-        'rejected' => 'Purchase Requisition Ditolak',
-        default => 'Approval Purchase Requisition',
-    };
+    $translationMode = in_array($currentMode, ['final_approved', 'step_approved', 'rejected'], true)
+        ? $currentMode
+        : 'default';
+
+    $title = __('mail.pr.title.' . $translationMode);
 
     $actorName = optional($actor)->name ?? '-';
 
-    $description = match ($currentMode) {
-        'final_approved' =>
-            'Purchase Requisition Anda telah mendapatkan final approval oleh '
-            . $actorName
-            . '.',
-
-        'step_approved' =>
-            'Purchase Requisition Anda telah disetujui oleh '
-            . $actorName
-            . ' dan masih menunggu approval berikutnya.',
-
-        'rejected' =>
-            'Purchase Requisition Anda telah ditolak oleh '
-            . $actorName
-            . '.',
-
-        default =>
-            'Terdapat Purchase Requisition yang membutuhkan approval Anda.',
-    };
+    $description = __('mail.pr.description.' . $translationMode, [
+        'actor_name' => $actorName,
+    ]);
 
     $displayStatus = match ($currentMode) {
         'approval_request' => 'IN PROGRESS',
@@ -168,7 +151,7 @@
                                 line-height: 1.6;
                                 color: #4b5563;
                             ">
-                                Dear
+                                {{ __('mail.greeting') }}
                                 <strong>
                                     {{ $recipientName }}
                                 </strong>,
@@ -196,7 +179,7 @@
                                         font-size: 13px;
                                         color: #6b7280;
                                     ">
-                                        No. PR
+                                        {{ __('mail.pr.field_no') }}
                                     </td>
 
                                     <td style="
@@ -217,7 +200,7 @@
                                         font-size: 13px;
                                         color: #6b7280;
                                     ">
-                                        Tanggal PR
+                                        {{ __('mail.pr.field_date') }}
                                     </td>
 
                                     <td style="
@@ -237,7 +220,7 @@
                                         font-size: 13px;
                                         color: #6b7280;
                                     ">
-                                        Total Nilai
+                                        {{ __('mail.pr.field_total') }}
                                     </td>
 
                                     <td style="
@@ -264,7 +247,7 @@
                                             font-size: 13px;
                                             color: #6b7280;
                                         ">
-                                            Tahap Approval
+                                            {{ __('mail.pr.field_step') }}
                                         </td>
 
                                         <td style="
@@ -272,7 +255,7 @@
                                             border: 1px solid #e5e7eb;
                                             font-size: 13px;
                                         ">
-                                            Tahap {{ $stepOrder }}
+                                            {{ __('mail.pr.field_step_value', ['step_order' => $stepOrder]) }}
 
                                             @if (!empty($stepLabel))
                                                 — {{ $stepLabel }}
@@ -289,7 +272,7 @@
                                         font-size: 13px;
                                         color: #6b7280;
                                     ">
-                                        Status
+                                        {{ __('mail.pr.field_status') }}
                                     </td>
 
                                     <td style="
@@ -321,7 +304,7 @@
                                             font-size: 13px;
                                             color: #6b7280;
                                         ">
-                                            Catatan Penolakan
+                                            {{ __('mail.pr.field_rejection_notes') }}
                                         </td>
 
                                         <td style="
@@ -343,8 +326,7 @@
                                 line-height: 1.6;
                                 color: #4b5563;
                             ">
-                                Silakan klik tombol berikut untuk membuka halaman
-                                Purchase Requisition di SYOP v4.
+                                {{ __('mail.pr.instruction') }}
                             </p>
 
                             <p style="margin: 24px 0;">
@@ -361,7 +343,7 @@
                                         font-size: 14px;
                                     "
                                 >
-                                    Buka Purchase Requisition
+                                    {{ __('mail.pr.button') }}
                                 </a>
                             </p>
 
@@ -370,8 +352,7 @@
                                 font-size: 13px;
                                 color: #6b7280;
                             ">
-                                Email ini dikirim otomatis oleh sistem SYOP v4.
-                                Mohon tidak membalas email ini.
+                                {{ __('mail.footer_notice') }}
                             </p>
                         </td>
                     </tr>
@@ -395,7 +376,7 @@
                                 Proenergi.com
                             </a>
 
-                            All Rights Reserved.
+                            {{ __('mail.footer_rights') }}
                         </td>
                     </tr>
                 </table>

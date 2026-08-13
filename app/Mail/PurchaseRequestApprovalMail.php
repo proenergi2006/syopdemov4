@@ -38,6 +38,16 @@ class PurchaseRequestApprovalMail extends Mailable implements ShouldQueue
         */
         $this->afterCommit();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Bahasa email mengikuti preferensi penerima
+        |--------------------------------------------------------------------------
+        | Wajib di-set di constructor -- lihat catatan yang sama di
+        | PurchaseOrderApprovalMail::__construct().
+        |--------------------------------------------------------------------------
+        */
+        $this->locale($recipient->locale ?? 'id');
+
         $this->pr->loadMissing('items');
 
         $this->totalAmount = $this->calculateTotalAmount();
@@ -53,7 +63,7 @@ class PurchaseRequestApprovalMail extends Mailable implements ShouldQueue
         |--------------------------------------------------------------------------
         */
         $this->approvalUrl = url(
-            '/non_trade/purchase_request'
+            '/non_stock/purchase_request'
                 . '?reference='
                 . urlencode($encryptedId),
         );
@@ -94,19 +104,14 @@ class PurchaseRequestApprovalMail extends Mailable implements ShouldQueue
     {
         $nomorPr = $this->pr->nomor_pr ?: '-';
 
-        return match ($this->mode) {
-            'step_approved' =>
-            'Tahap Approval Purchase Requisition Disetujui - ' . $nomorPr,
-
-            'final_approved' =>
-            'Purchase Requisition Disetujui - ' . $nomorPr,
-
-            'rejected' =>
-            'Purchase Requisition Ditolak - ' . $nomorPr,
-
-            default =>
-            'Permintaan Approval Purchase Requisition - ' . $nomorPr,
+        $subjectKey = match ($this->mode) {
+            'step_approved' => 'mail.pr.subject.step_approved',
+            'final_approved' => 'mail.pr.subject.final_approved',
+            'rejected' => 'mail.pr.subject.rejected',
+            default => 'mail.pr.subject.default',
         };
+
+        return __($subjectKey, ['nomor_pr' => $nomorPr]);
     }
 
     private function calculateTotalAmount(): float

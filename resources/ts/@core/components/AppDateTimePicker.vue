@@ -39,9 +39,22 @@ defineOptions({
 const attrs = useAttrs()
 
 const [rootAttrs, compAttrs] = filterInputAttrs(attrs)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const [{ modelValue: _, ...inputProps }] = filterInputProps(props)
-const [fieldProps] = filterFieldProps(props)
+
+/*
+ * filterInputProps/filterFieldProps memakai pick() dari Vuetify yang menyalin
+ * nilai prop satu kali (snapshot, bukan reactive). Kalau hasilnya dipakai
+ * langsung, prop seperti `label` akan beku pada nilai saat komponen di-mount --
+ * sehingga label yang diisi dari i18n tidak ikut berubah ketika user ganti
+ * bahasa. Dibungkus computed supaya di-evaluasi ulang setiap props berubah.
+ */
+const inputProps = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [{ modelValue: _, ...rest }] = filterInputProps(props)
+
+  return rest
+})
+
+const fieldProps = computed(() => filterFieldProps(props)[0])
 
 const refFlatPicker = ref()
 const { focused } = useFocus(refFlatPicker)

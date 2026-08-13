@@ -12,7 +12,11 @@ class Notification extends Model
         'user_id',
         'type',
         'title',
+        'title_key',
+        'title_params',
         'message',
+        'message_key',
+        'message_params',
         'module',
         'reference_type',
         'reference_id',
@@ -25,5 +29,7 @@ class Notification extends Model
     protected $casts = [
         'is_read' => 'boolean',
         'read_at' => 'datetime',
+        'title_params' => 'array',
+        'message_params' => 'array',
     ];
 }

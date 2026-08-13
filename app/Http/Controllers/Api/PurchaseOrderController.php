@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exports\PurchaseOrderExport;
 use App\Http\Controllers\Controller;
 use App\Models\ApprovalFlow;
 use App\Models\PoAttachment;
@@ -16,6 +17,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderNotificationService;
 use App\Services\NonTrade\PurchaseOrder\PurchaseOrderMailService;
@@ -250,193 +252,23 @@ class PurchaseOrderController extends Controller
                 ->orderByDesc('id');
 
             /*
-        |--------------------------------------------------------------------------
-        | Visibility berdasarkan permission dan keterlibatan approval
-        |--------------------------------------------------------------------------
-        |
-        | Sumber visibility:
-        | 1. Permission view scope.
-        | 2. User pernah menjadi approver langsung.
-        | 3. Role user pernah menjadi approver.
-        |--------------------------------------------------------------------------
-        */
-            $query->where(function (
-                $visibilityQuery
-            ) use (
+            |--------------------------------------------------------------------------
+            | Visibility berdasarkan permission dan keterlibatan approval
+            |--------------------------------------------------------------------------
+            | Dipakai bersama exportExcel(). Jangan diduplikasi di sana -- kalau
+            | keduanya sempat berbeda, user bisa mengekspor PO yang tidak boleh ia
+            | lihat pada daftar.
+            |--------------------------------------------------------------------------
+            */
+            $this->applyPurchaseOrderVisibilityScope(
+                $query,
                 $user,
-                $userRoleIds,
                 $canView,
                 $viewScope,
-                $userDepartmentIds,
+                $userRoleIds,
                 $userCabangIds,
-            ) {
-                /*
-            |--------------------------------------------------------------------------
-            | Visibility berdasarkan permission scope
-            |--------------------------------------------------------------------------
-            */
-                $visibilityQuery->where(function (
-                    $scopeQuery
-                ) use (
-                    $user,
-                    $canView,
-                    $viewScope,
-                    $userDepartmentIds,
-                    $userCabangIds,
-                ) {
-                    /*
-                |--------------------------------------------------------------------------
-                | Tidak memiliki permission view
-                |--------------------------------------------------------------------------
-                */
-                    if (
-                        !$canView
-                        || $viewScope === 'NONE'
-                    ) {
-                        $scopeQuery->whereRaw('1 = 0');
-
-                        return;
-                    }
-
-                    /*
-                |--------------------------------------------------------------------------
-                | Semua data
-                |--------------------------------------------------------------------------
-                */
-                    if ($viewScope === 'ALL') {
-                        $scopeQuery->whereRaw('1 = 1');
-
-                        return;
-                    }
-
-                    /*
-                |--------------------------------------------------------------------------
-                | Data yang dibuat/request oleh user login
-                |--------------------------------------------------------------------------
-                */
-                    if ($viewScope === 'OWN_DATA') {
-                        $scopeQuery->where(function ($q) use ($user) {
-                            $q
-                                ->where(
-                                    'created_by',
-                                    $user->id,
-                                )
-                                ->orWhere(
-                                    'requester_signed_by',
-                                    $user->id,
-                                );
-                        });
-
-                        return;
-                    }
-
-                    /*
-                |--------------------------------------------------------------------------
-                | Data department user login
-                |--------------------------------------------------------------------------
-                */
-                    if ($viewScope === 'OWN_DEPARTMENT') {
-                        if (empty($userDepartmentIds)) {
-                            $scopeQuery->whereRaw('1 = 0');
-
-                            return;
-                        }
-
-                        $scopeQuery->whereIn(
-                            'id_department',
-                            $userDepartmentIds,
-                        );
-
-                        return;
-                    }
-
-                    /*
-                |--------------------------------------------------------------------------
-                | Data cabang user login
-                |--------------------------------------------------------------------------
-                */
-                    if ($viewScope === 'OWN_CABANG') {
-                        if (empty($userCabangIds)) {
-                            $scopeQuery->whereRaw('1 = 0');
-
-                            return;
-                        }
-
-                        $scopeQuery->whereIn(
-                            'cabang',
-                            array_map('strval', $userCabangIds),
-                        );
-
-                        return;
-                    }
-
-                    $scopeQuery->whereRaw('1 = 0');
-                });
-
-                /*
-            |--------------------------------------------------------------------------
-            | Approver langsung USER
-            |--------------------------------------------------------------------------
-            | Tetap dapat melihat PO tempat dia terlibat meskipun di luar scope.
-            |--------------------------------------------------------------------------
-            */
-                $visibilityQuery->orWhereHas(
-                    'approvals',
-                    function ($q) use ($user) {
-                        $q
-                            ->whereRaw(
-                                'UPPER(TRIM(approver_type)) = ?',
-                                ['USER'],
-                            )
-                            ->where(
-                                'approver_id',
-                                $user->id,
-                            );
-                    },
-                );
-
-                /*
-            |--------------------------------------------------------------------------
-            | Approver berdasarkan ROLE
-            |--------------------------------------------------------------------------
-            */
-                if ($userRoleIds->isNotEmpty()) {
-                    $visibilityQuery->orWhereHas(
-                        'approvals',
-                        function ($q) use ($userRoleIds) {
-                            $q
-                                ->whereRaw(
-                                    'UPPER(TRIM(approver_type)) = ?',
-                                    ['ROLE'],
-                                )
-                                ->whereIn(
-                                    'approver_id',
-                                    $userRoleIds->all(),
-                                );
-                        },
-                    );
-                }
-
-                /*
-            |--------------------------------------------------------------------------
-            | Pembuat Purchase Requisition yang ditarik ke PO ini
-            |--------------------------------------------------------------------------
-            | User yang PR-nya dijadikan PO tetap dapat melihat PO tersebut
-            | meskipun cabang/department/scope PO di luar aksesnya. Satu PO
-            | bisa berisi banyak PR dari user berbeda-beda, jadi cukup salah
-            | satu PR di PO tersebut milik user login.
-            |--------------------------------------------------------------------------
-            */
-                $visibilityQuery->orWhereHas(
-                    'purchaseRequests',
-                    function ($q) use ($user) {
-                        $q->where(
-                            'purchase_requests.created_by',
-                            $user->id,
-                        );
-                    },
-                );
-            });
+                $userDepartmentIds,
+            );
 
             /*
         |--------------------------------------------------------------------------
@@ -517,83 +349,14 @@ class PurchaseOrderController extends Controller
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Search nomor PO
-        |--------------------------------------------------------------------------
-        */
-            if ($request->filled('search')) {
-                $search = trim(
-                    (string) $request->search,
-                );
-
-                if ($search !== '') {
-                    $query->where(function ($q) use ($search) {
-                        $q->where(
-                            'nomor_po',
-                            'ILIKE',
-                            "%{$search}%",
-                        );
-                    });
-                }
-            }
-
-            /*
-        |--------------------------------------------------------------------------
-        | Filter status
-        |--------------------------------------------------------------------------
-        */
-            $status = strtoupper(
-                trim((string) $request->status),
-            );
-
-            if (
-                $status !== ''
-                && $status !== 'ALL'
-                && $status !== 'SEMUA'
-            ) {
-                $query->whereRaw(
-                    'UPPER(TRIM(status)) = ?',
-                    [$status],
-                );
-            }
-
-            /*
-        |--------------------------------------------------------------------------
-        | Filter tanggal
-        |--------------------------------------------------------------------------
-        */
-            if ($request->filled('tanggal_mulai')) {
-                $query->whereDate(
-                    'tanggal_po',
-                    '>=',
-                    $request->tanggal_mulai,
-                );
-            }
-
-            if ($request->filled('tanggal_selesai')) {
-                $query->whereDate(
-                    'tanggal_po',
-                    '<=',
-                    $request->tanggal_selesai,
-                );
-            }
-
-            /*
-        |--------------------------------------------------------------------------
-        | Filter tahun
-        |--------------------------------------------------------------------------
-        */
-            $year = (int) (
-                $request->year
-                ?? now()->year
-            );
-
-            if ($year > 0) {
-                $query->whereYear(
-                    'tanggal_po',
-                    $year,
-                );
-            }
+            |--------------------------------------------------------------------------
+            | Filter daftar
+            |--------------------------------------------------------------------------
+            | Search, status, rentang tanggal, dan tahun. Dipakai bersama
+            | exportExcel() agar isi file sama dengan daftar yang dilihat user.
+            |--------------------------------------------------------------------------
+            */
+            $this->applyPurchaseOrderListFilters($query, $request);
 
 
             /*
@@ -1213,7 +976,7 @@ class PurchaseOrderController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk membuat Purchase Order.',
+                'message' => __('purchase_order_messages.store.forbidden'),
             ], 403);
         }
 
@@ -1375,7 +1138,7 @@ class PurchaseOrderController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses membuat Purchase Order untuk department tersebut.',
+                'message' => __('purchase_order_messages.store.department_forbidden'),
             ], 403);
         }
 
@@ -1449,7 +1212,7 @@ class PurchaseOrderController extends Controller
                 if ($amount < 0) {
                     throw ValidationException::withMessages([
                         $field => [
-                            'Harga unit tidak boleh kurang dari 0.',
+                            __('purchase_order_messages.item.unit_price_negative'),
                         ],
                     ]);
                 }
@@ -1462,7 +1225,7 @@ class PurchaseOrderController extends Controller
             if ($text === '') {
                 throw ValidationException::withMessages([
                     $field => [
-                        'Harga unit wajib diisi.',
+                        __('purchase_order_messages.item.unit_price_required'),
                     ],
                 ]);
             }
@@ -1517,7 +1280,7 @@ class PurchaseOrderController extends Controller
             if (!is_numeric($normalizedText)) {
                 throw ValidationException::withMessages([
                     $field => [
-                        'Harga unit hanya boleh berupa angka.',
+                        __('purchase_order_messages.item.unit_price_numeric'),
                     ],
                 ]);
             }
@@ -1527,7 +1290,7 @@ class PurchaseOrderController extends Controller
             if ($amount < 0) {
                 throw ValidationException::withMessages([
                     $field => [
-                        'Harga unit tidak boleh kurang dari 0.',
+                        __('purchase_order_messages.item.unit_price_negative'),
                     ],
                 ]);
             }
@@ -1590,7 +1353,7 @@ class PurchaseOrderController extends Controller
         ) {
             throw ValidationException::withMessages([
                 'purchase_request_ids' => [
-                    'Daftar Purchase Request tidak sesuai dengan item Purchase Order yang dipilih.',
+                    __('purchase_order_messages.purchase_request.mismatch_with_items'),
                 ],
             ]);
         }
@@ -1640,7 +1403,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'purchase_request_ids' => [
-                                'Terdapat Purchase Request yang tidak ditemukan.',
+                                __('purchase_order_messages.purchase_request.not_found'),
                             ],
                         ]);
                     }
@@ -1660,7 +1423,7 @@ class PurchaseOrderController extends Controller
                         if ($status !== 'APPROVED') {
                             throw ValidationException::withMessages([
                                 'purchase_request_ids' => [
-                                    "Purchase Request {$purchaseRequest->nomor_pr} belum berstatus APPROVED.",
+                                    __('purchase_order_messages.purchase_request.not_approved', ['nomor_pr' => $purchaseRequest->nomor_pr]),
                                 ],
                             ]);
                         }
@@ -1684,7 +1447,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 'purchase_request_ids' => [
-                                    "Purchase Request {$purchaseRequest->nomor_pr} sudah tidak dapat diproses menjadi PO.",
+                                    __('purchase_order_messages.purchase_request.no_longer_processable_create', ['nomor_pr' => $purchaseRequest->nomor_pr]),
                                 ],
                             ]);
                         }
@@ -1709,7 +1472,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'purchase_request_ids' => [
-                                'Seluruh Purchase Request dalam satu PO wajib berasal dari department yang sama.',
+                                __('purchase_order_messages.purchase_request.department_mismatch'),
                             ],
                         ]);
                     }
@@ -1729,7 +1492,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'id_department' => [
-                                'Department Purchase Order tidak sesuai dengan department Purchase Request.',
+                                __('purchase_order_messages.id_department_mismatch'),
                             ],
                         ]);
                     }
@@ -1769,7 +1532,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'purchase_request_ids' => [
-                                'Seluruh Purchase Request dalam satu PO wajib berasal dari cabang yang sama.',
+                                __('purchase_order_messages.purchase_request.cabang_mismatch'),
                             ],
                         ]);
                     }
@@ -1784,7 +1547,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'cabang' => [
-                                'Cabang Purchase Order tidak sesuai dengan cabang Purchase Request.',
+                                __('purchase_order_messages.cabang_mismatch'),
                             ],
                         ]);
                     }
@@ -1824,7 +1587,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'items' => [
-                                'Terdapat item Purchase Request yang tidak ditemukan atau sudah dihapus.',
+                                __('purchase_order_messages.purchase_request.items_not_found'),
                             ],
                         ]);
                     }
@@ -1855,7 +1618,7 @@ class PurchaseOrderController extends Controller
                         if (!$purchaseRequestItem) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_item_id" => [
-                                    'Item Purchase Request tidak ditemukan.',
+                                    __('purchase_order_messages.purchase_request.item_not_found'),
                                 ],
                             ]);
                         }
@@ -1872,7 +1635,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_item_id" => [
-                                    'Item tidak sesuai dengan Purchase Request yang dipilih.',
+                                    __('purchase_order_messages.purchase_request.item_mismatch'),
                                 ],
                             ]);
                         }
@@ -1884,7 +1647,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_id" => [
-                                    'Purchase Request item tidak terdapat dalam daftar Purchase Request PO.',
+                                    __('purchase_order_messages.purchase_request.item_not_in_pr_list'),
                                 ],
                             ]);
                         }
@@ -1922,7 +1685,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 "items.$index.qty" => [
-                                    "Qty PO item {$purchaseRequestItem->nama_item} melebihi qty outstanding.",
+                                    __('purchase_order_messages.item.qty_exceeds_outstanding', ['item_name' => $purchaseRequestItem->nama_item]),
                                 ],
                             ]);
                         }
@@ -1935,7 +1698,7 @@ class PurchaseOrderController extends Controller
                         if ($unitId <= 0) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_item_id" => [
-                                    "Satuan item {$purchaseRequestItem->nama_item} tidak valid.",
+                                    __('purchase_order_messages.item.unit_invalid', ['item_name' => $purchaseRequestItem->nama_item]),
                                 ],
                             ]);
                         }
@@ -2020,7 +1783,7 @@ class PurchaseOrderController extends Controller
                     if (!$vendorTable) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Table master vendor tidak ditemukan.',
+                                __('purchase_order_messages.vendor.master_table_not_found'),
                             ],
                         ]);
                     }
@@ -2033,7 +1796,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Kolom status PKP vendor tidak ditemukan.',
+                                __('purchase_order_messages.vendor.pkp_column_not_found'),
                             ],
                         ]);
                     }
@@ -2045,7 +1808,7 @@ class PurchaseOrderController extends Controller
                     if (!$vendorExists) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Vendor tidak ditemukan.',
+                                __('purchase_order_messages.vendor.not_found'),
                             ],
                         ]);
                     }
@@ -2062,7 +1825,7 @@ class PurchaseOrderController extends Controller
                     if (!$vendor) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Vendor tidak ditemukan.',
+                                __('purchase_order_messages.vendor.not_found'),
                             ],
                         ]);
                     }
@@ -2323,7 +2086,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Order berhasil disimpan.',
+                'message' => __('purchase_order_messages.store.success'),
                 'data' => [
                     'id' => (int) $po->id,
                     'public_id' => $po->encrypted_id,
@@ -2336,6 +2099,11 @@ class PurchaseOrderController extends Controller
             throw $e;
         } catch (AuthorizationException $e) {
             $this->deleteStoredAttachmentFiles($storedPaths);
+
+            Log::warning('[Purchase Order] Store - forbidden', [
+                'message' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+            ]);
 
             return response()->json([
                 'success' => false,
@@ -2357,7 +2125,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menyimpan Purchase Order.',
+                'message' => __('purchase_order_messages.store.failed'),
                 'error_code' => 'purchase_order.store_failed',
                 'error' => app()->environment('local')
                     ? $e->getMessage()
@@ -2375,8 +2143,17 @@ class PurchaseOrderController extends Controller
     private function deleteStoredAttachmentFiles(array $paths): void
     {
         foreach ($paths as $path) {
-            if ($path && Storage::disk('public')->exists($path)) {
-                Storage::disk('public')->delete($path);
+            try {
+                if ($path && Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            } catch (\Throwable $e) {
+                Log::error('[Purchase Order] Cleanup attachment file error', [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'path' => $path,
+                ]);
             }
         }
     }
@@ -2426,7 +2203,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Detail Purchase Order berhasil dimuat.',
+                'message' => __('purchase_order_messages.show.loaded'),
                 'data' => [
                     'id' => $po->id,
                     'public_id' => $po->encrypted_id,
@@ -2703,7 +2480,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat detail Purchase Order.',
+                'message' => __('purchase_order_messages.show.load_failed'),
                 'data' => null,
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
@@ -2729,7 +2506,7 @@ class PurchaseOrderController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk memperbarui Purchase Order.',
+                'message' => __('purchase_order_messages.update.forbidden'),
             ], 403);
         }
 
@@ -2743,9 +2520,15 @@ class PurchaseOrderController extends Controller
                 $publicId,
             );
         } catch (DecryptException $e) {
+            Log::warning('[Purchase Order] Update - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'ID Purchase Order tidak valid.',
+                'message' => __('purchase_order_messages.update.invalid_id'),
             ], 404);
         }
 
@@ -2914,7 +2697,7 @@ class PurchaseOrderController extends Controller
         if (count($existingAttachmentIds) + $newAttachmentCount < 1) {
             throw ValidationException::withMessages([
                 'lampiran_po' => [
-                    'Minimal 1 lampiran Purchase Order wajib diisi.',
+                    __('purchase_order_messages.lampiran.min_required'),
                 ],
             ]);
         }
@@ -2938,7 +2721,7 @@ class PurchaseOrderController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses memperbarui Purchase Order untuk department tersebut.',
+                'message' => __('purchase_order_messages.update.department_forbidden'),
             ], 403);
         }
 
@@ -2999,7 +2782,7 @@ class PurchaseOrderController extends Controller
                 if ($amount < 0) {
                     throw ValidationException::withMessages([
                         $field => [
-                            'Harga unit tidak boleh kurang dari 0.',
+                            __('purchase_order_messages.item.unit_price_negative'),
                         ],
                     ]);
                 }
@@ -3012,7 +2795,7 @@ class PurchaseOrderController extends Controller
             if ($text === '') {
                 throw ValidationException::withMessages([
                     $field => [
-                        'Harga unit wajib diisi.',
+                        __('purchase_order_messages.item.unit_price_required'),
                     ],
                 ]);
             }
@@ -3067,7 +2850,7 @@ class PurchaseOrderController extends Controller
             if (!is_numeric($normalizedText)) {
                 throw ValidationException::withMessages([
                     $field => [
-                        'Harga unit hanya boleh berupa angka.',
+                        __('purchase_order_messages.item.unit_price_numeric'),
                     ],
                 ]);
             }
@@ -3077,7 +2860,7 @@ class PurchaseOrderController extends Controller
             if ($amount < 0) {
                 throw ValidationException::withMessages([
                     $field => [
-                        'Harga unit tidak boleh kurang dari 0.',
+                        __('purchase_order_messages.item.unit_price_negative'),
                     ],
                 ]);
             }
@@ -3127,7 +2910,7 @@ class PurchaseOrderController extends Controller
         if ($normalizedHeaderPrIds !== $normalizedItemPrIds) {
             throw ValidationException::withMessages([
                 'purchase_request_ids' => [
-                    'Daftar Purchase Request tidak sesuai dengan item Purchase Order yang dipilih.',
+                    __('purchase_order_messages.purchase_request.mismatch_with_items'),
                 ],
             ]);
         }
@@ -3168,7 +2951,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'status' => [
-                                'Purchase Order hanya dapat diperbarui jika status masih Draft.',
+                                __('purchase_order_messages.update.only_draft_status'),
                             ],
                         ]);
                     }
@@ -3243,7 +3026,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'purchase_request_ids' => [
-                                'Terdapat Purchase Request yang tidak ditemukan.',
+                                __('purchase_order_messages.purchase_request.not_found'),
                             ],
                         ]);
                     }
@@ -3263,7 +3046,7 @@ class PurchaseOrderController extends Controller
                         if ($prStatus !== 'APPROVED') {
                             throw ValidationException::withMessages([
                                 'purchase_request_ids' => [
-                                    "Purchase Request {$purchaseRequest->nomor_pr} belum berstatus APPROVED.",
+                                    __('purchase_order_messages.purchase_request.not_approved', ['nomor_pr' => $purchaseRequest->nomor_pr]),
                                 ],
                             ]);
                         }
@@ -3301,7 +3084,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 'purchase_request_ids' => [
-                                    "Purchase Request {$purchaseRequest->nomor_pr} sudah tidak dapat digunakan untuk memperbarui PO.",
+                                    __('purchase_order_messages.purchase_request.no_longer_processable_update', ['nomor_pr' => $purchaseRequest->nomor_pr]),
                                 ],
                             ]);
                         }
@@ -3324,7 +3107,7 @@ class PurchaseOrderController extends Controller
                     if ($sourceDepartmentIds->count() !== 1) {
                         throw ValidationException::withMessages([
                             'purchase_request_ids' => [
-                                'Seluruh Purchase Request dalam satu Purchase Order wajib berasal dari department yang sama.',
+                                __('purchase_order_messages.purchase_request.department_mismatch'),
                             ],
                         ]);
                     }
@@ -3336,7 +3119,7 @@ class PurchaseOrderController extends Controller
                     if ($sourceDepartmentId !== $requestedDepartmentId) {
                         throw ValidationException::withMessages([
                             'id_department' => [
-                                'Department Purchase Order tidak sesuai dengan department Purchase Request.',
+                                __('purchase_order_messages.id_department_mismatch'),
                             ],
                         ]);
                     }
@@ -3366,7 +3149,7 @@ class PurchaseOrderController extends Controller
                     if ($sourceCabangIds->count() !== 1) {
                         throw ValidationException::withMessages([
                             'purchase_request_ids' => [
-                                'Seluruh Purchase Request dalam satu Purchase Order wajib berasal dari cabang yang sama.',
+                                __('purchase_order_messages.purchase_request.cabang_mismatch'),
                             ],
                         ]);
                     }
@@ -3378,7 +3161,7 @@ class PurchaseOrderController extends Controller
                     if ($sourceCabangId !== (int) $validated['cabang']) {
                         throw ValidationException::withMessages([
                             'cabang' => [
-                                'Cabang Purchase Order tidak sesuai dengan cabang Purchase Request.',
+                                __('purchase_order_messages.cabang_mismatch'),
                             ],
                         ]);
                     }
@@ -3414,7 +3197,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'items' => [
-                                'Terdapat item Purchase Request yang tidak ditemukan atau sudah dihapus.',
+                                __('purchase_order_messages.purchase_request.items_not_found'),
                             ],
                         ]);
                     }
@@ -3442,7 +3225,7 @@ class PurchaseOrderController extends Controller
                         if (!$purchaseRequestItem) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_item_id" => [
-                                    'Item Purchase Request tidak ditemukan.',
+                                    __('purchase_order_messages.purchase_request.item_not_found'),
                                 ],
                             ]);
                         }
@@ -3453,7 +3236,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_item_id" => [
-                                    'Item tidak sesuai dengan Purchase Request yang dipilih.',
+                                    __('purchase_order_messages.purchase_request.item_mismatch'),
                                 ],
                             ]);
                         }
@@ -3465,7 +3248,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_id" => [
-                                    'Purchase Request item tidak terdapat dalam daftar Purchase Request PO.',
+                                    __('purchase_order_messages.purchase_request.item_not_in_pr_list'),
                                 ],
                             ]);
                         }
@@ -3507,7 +3290,7 @@ class PurchaseOrderController extends Controller
                         ) {
                             throw ValidationException::withMessages([
                                 "items.$index.qty" => [
-                                    "Qty PO item {$purchaseRequestItem->nama_item} maksimal {$maxEditableQty}.",
+                                    __('purchase_order_messages.item.qty_exceeds_max_editable', ['item_name' => $purchaseRequestItem->nama_item, 'max_qty' => $maxEditableQty]),
                                 ],
                             ]);
                         }
@@ -3520,7 +3303,7 @@ class PurchaseOrderController extends Controller
                         if ($unitId <= 0) {
                             throw ValidationException::withMessages([
                                 "items.$index.purchase_request_item_id" => [
-                                    "Satuan item {$purchaseRequestItem->nama_item} tidak valid.",
+                                    __('purchase_order_messages.item.unit_invalid', ['item_name' => $purchaseRequestItem->nama_item]),
                                 ],
                             ]);
                         }
@@ -3571,7 +3354,7 @@ class PurchaseOrderController extends Controller
                     if (!DB::getSchemaBuilder()->hasTable($vendorTable)) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Table master_vendor tidak ditemukan.',
+                                __('purchase_order_messages.vendor.master_table_not_found'),
                             ],
                         ]);
                     }
@@ -3584,7 +3367,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Kolom status_pkp vendor tidak ditemukan.',
+                                __('purchase_order_messages.vendor.pkp_column_not_found'),
                             ],
                         ]);
                     }
@@ -3601,7 +3384,7 @@ class PurchaseOrderController extends Controller
                     if (!$vendor) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Vendor tidak ditemukan.',
+                                __('purchase_order_messages.vendor.not_found'),
                             ],
                         ]);
                     }
@@ -3726,7 +3509,7 @@ class PurchaseOrderController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'vendor_id' => [
-                                'Kolom vendor pada Purchase Order tidak ditemukan.',
+                                __('purchase_order_messages.vendor.column_not_found'),
                             ],
                         ]);
                     }
@@ -3935,7 +3718,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Order berhasil diperbarui.',
+                'message' => __('purchase_order_messages.update.success'),
                 'data' => [
                     'id' => (int) $po->id,
                     'public_id' => $po->encrypted_id,
@@ -3949,6 +3732,12 @@ class PurchaseOrderController extends Controller
         } catch (AuthorizationException $e) {
             $this->deleteStoredAttachmentFiles($storedPaths);
 
+            Log::warning('[Purchase Order] Update - forbidden', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -3956,9 +3745,15 @@ class PurchaseOrderController extends Controller
         } catch (ModelNotFoundException $e) {
             $this->deleteStoredAttachmentFiles($storedPaths);
 
+            Log::warning('[Purchase Order] Update - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Purchase Order tidak ditemukan.',
+                'message' => __('purchase_order_messages.update.not_found'),
             ], 404);
         } catch (\Throwable $e) {
             $this->deleteStoredAttachmentFiles($storedPaths);
@@ -3977,7 +3772,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memperbarui Purchase Order.',
+                'message' => __('purchase_order_messages.update.failed'),
                 'error_code' => 'purchase_order.update_failed',
                 'error' => app()->environment('local')
                     ? $e->getMessage()
@@ -3992,7 +3787,7 @@ class PurchaseOrderController extends Controller
         if (!$user || !$user->hasPermission('purchase_order.delete')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk menghapus Purchase Order.',
+                'message' => __('purchase_order_messages.destroy.forbidden'),
             ], 403);
         }
 
@@ -4011,7 +3806,7 @@ class PurchaseOrderController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Order hanya dapat dihapus jika status masih Draft.',
+                    'message' => __('purchase_order_messages.destroy.only_draft'),
                 ], 422);
             }
 
@@ -4044,7 +3839,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Order berhasil dihapus.',
+                'message' => __('purchase_order_messages.destroy.success'),
             ], 200);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -4058,8 +3853,110 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menghapus Purchase Order.',
+                'message' => __('purchase_order_messages.destroy.failed'),
                 'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    public function cancel(Request $request, string $publicId)
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->hasPermission('purchase_order.cancel')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.cancel.forbidden'),
+            ], 403);
+        }
+
+        try {
+            $validated = $request->validate([
+                'cancel_notes' => ['required', 'string', 'max:2000'],
+            ]);
+
+            $id = Crypt::decryptString($publicId);
+
+            $po = PurchaseOrder::with([
+                'items.purchaseRequestItem',
+                'goodsReceives',
+            ])->findOrFail($id);
+
+            $this->poRollbackService->cancel(
+                $po,
+                $user,
+                $validated['cancel_notes'],
+            );
+
+            $po->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => __('purchase_order_messages.cancel.success'),
+
+                'data' => [
+                    'id' => $po->id,
+                    'public_id' => $po->encrypted_id,
+                    'nomor_po' => $po->nomor_po,
+                    'status' => $po->status,
+                    'cancelled_by' => $po->cancelled_by,
+                    'cancelled_at' => $po->cancelled_at,
+                    'cancel_notes' => $po->cancel_notes,
+                ],
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? __('purchase_order_messages.cancel.failed'),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (DecryptException $e) {
+            Log::warning('[Purchase Order] Cancel - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.cancel.invalid_id'),
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            Log::warning('[Purchase Order] Cancel - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.cancel.not_found'),
+            ], 404);
+        } catch (\Exception $e) {
+            Log::warning('[Purchase Order] Cancel - invalid status', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Order] Cancel error', [
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.cancel.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -4180,7 +4077,7 @@ class PurchaseOrderController extends Controller
             ) {
                 throw ValidationException::withMessages([
                     'status' => [
-                        'Purchase Order hanya dapat disubmit jika status masih Draft.',
+                        __('purchase_order_messages.submit.only_draft_status'),
                     ],
                 ]);
             }
@@ -4193,7 +4090,7 @@ class PurchaseOrderController extends Controller
             if ($items->isEmpty()) {
                 throw ValidationException::withMessages([
                     'items' => [
-                        'Purchase Order tidak dapat disubmit karena item belum tersedia.',
+                        __('purchase_order_messages.submit.items_unavailable'),
                     ],
                 ]);
             }
@@ -4206,7 +4103,7 @@ class PurchaseOrderController extends Controller
             if ((float) ($po->total_nilai ?? 0) <= 0) {
                 throw ValidationException::withMessages([
                     'total_nilai' => [
-                        'Purchase Order tidak dapat disubmit karena total nilai masih 0.',
+                        __('purchase_order_messages.submit.zero_total'),
                     ],
                 ]);
             }
@@ -4224,7 +4121,7 @@ class PurchaseOrderController extends Controller
                 return response()->json([
                     'success' => false,
                     'need_signature' => true,
-                    'message' => 'Anda belum memiliki tanda tangan digital. Silakan registrasi tanda tangan terlebih dahulu.',
+                    'message' => __('purchase_order_messages.submit.signature_missing'),
                 ], 422);
             }
 
@@ -4304,7 +4201,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Order berhasil disubmit.',
+                'message' => __('purchase_order_messages.submit.success'),
                 'data' => [
                     'id' => $po->id,
                     'public_id' => $po->encrypted_id,
@@ -4359,7 +4256,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal submit Purchase Order.',
+                'message' => __('purchase_order_messages.submit.failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -4400,7 +4297,7 @@ class PurchaseOrderController extends Controller
             ) {
                 throw ValidationException::withMessages([
                     'status' => [
-                        'Purchase Order hanya dapat diapprove jika status masih In Progress.',
+                        __('purchase_order_messages.approve.only_in_progress_status'),
                     ],
                 ]);
             }
@@ -4413,7 +4310,7 @@ class PurchaseOrderController extends Controller
                 return response()->json([
                     'success' => false,
                     'need_signature' => true,
-                    'message' => 'Anda belum memiliki tanda tangan digital. Silakan registrasi tanda tangan terlebih dahulu.',
+                    'message' => __('purchase_order_messages.submit.signature_missing'),
                 ], 422);
             }
 
@@ -4446,13 +4343,13 @@ class PurchaseOrderController extends Controller
 
                     return response()->json([
                         'success' => false,
-                        'message' => 'Anda bukan approver pada tahap approval Purchase Order saat ini.',
+                        'message' => __('purchase_order_messages.approve.not_current_approver'),
                     ], 403);
                 }
 
                 throw ValidationException::withMessages([
                     'approval' => [
-                        'Tidak ada approval yang sedang menunggu untuk Purchase Order ini.',
+                        __('purchase_order_messages.approve.no_pending_approval'),
                     ],
                 ]);
             }
@@ -4504,6 +4401,7 @@ class PurchaseOrderController extends Controller
                     ->markPurchaseOrderApproved(
                         $po,
                         $user,
+                        $this->poRollbackService,
                     );
 
                 $po->refresh();
@@ -4688,7 +4586,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal approve Purchase Order.',
+                'message' => __('purchase_order_messages.approve.failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -4729,7 +4627,7 @@ class PurchaseOrderController extends Controller
             ) {
                 throw ValidationException::withMessages([
                     'status' => [
-                        'Purchase Order hanya dapat direject jika status masih In Progress.',
+                        __('purchase_order_messages.reject.only_in_progress_status'),
                     ],
                 ]);
             }
@@ -4761,13 +4659,13 @@ class PurchaseOrderController extends Controller
 
                     return response()->json([
                         'success' => false,
-                        'message' => 'Anda bukan approver pada tahap approval Purchase Order saat ini.',
+                        'message' => __('purchase_order_messages.reject.not_current_approver'),
                     ], 403);
                 }
 
                 throw ValidationException::withMessages([
                     'approval' => [
-                        'Tidak ada approval yang sedang menunggu untuk Purchase Order ini.',
+                        __('purchase_order_messages.reject.no_pending_approval'),
                     ],
                 ]);
             }
@@ -4859,7 +4757,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Order berhasil direject.',
+                'message' => __('purchase_order_messages.reject.success'),
                 'data' => [
                     'id' => $po->id,
                     'public_id' => $po->encrypted_id,
@@ -4906,7 +4804,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal reject Purchase Order.',
+                'message' => __('purchase_order_messages.reject.failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -4918,61 +4816,104 @@ class PurchaseOrderController extends Controller
         Request $request,
         string $publicId,
     ): JsonResponse {
-        $lang = strtolower(
-            trim(
-                (string) $request->query(
-                    'lang',
-                    'id',
+        try {
+            $lang = strtolower(
+                trim(
+                    (string) $request->query(
+                        'lang',
+                        'id',
+                    ),
                 ),
-            ),
-        );
+            );
 
-        if (!in_array($lang, ['id', 'en'], true)) {
-            $lang = 'id';
+            if (!in_array($lang, ['id', 'en'], true)) {
+                $lang = 'id';
+            }
+
+            $id = (int) Crypt::decryptString(
+                $publicId,
+            );
+
+            $po = PurchaseOrder::query()
+                ->findOrFail($id);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validasi permission print PO jika ada
+            |--------------------------------------------------------------------------
+            */
+            // abort_unless($userCanPrint, 403);
+
+            $relativeUrl = URL::temporarySignedRoute(
+                'transaction.purchase-order.print-signed',
+                now()->addMinutes(10),
+                [
+                    'publicId' => $publicId,
+                    'lang' => $lang,
+                ],
+                false,
+            );
+
+            $url = rtrim(config('app.url'), '/') . $relativeUrl;
+
+            return response()
+                ->json([
+                    'success' => true,
+                    'url' => $url,
+                ])
+                ->header('Content-Type', 'application/json; charset=UTF-8');
+        } catch (DecryptException | ModelNotFoundException $e) {
+            Log::warning('[Purchase Order] Generate print URL - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.print.not_found'),
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Order] Generate print URL error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.print.url_failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
         }
-
-        $id = (int) Crypt::decryptString(
-            $publicId,
-        );
-
-        $po = PurchaseOrder::query()
-            ->findOrFail($id);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validasi permission print PO jika ada
-        |--------------------------------------------------------------------------
-        */
-        // abort_unless($userCanPrint, 403);
-
-        $relativeUrl = URL::temporarySignedRoute(
-            'transaction.purchase-order.print-signed',
-            now()->addMinutes(10),
-            [
-                'publicId' => $publicId,
-                'lang' => $lang,
-            ],
-            false,
-        );
-
-        $url = rtrim(config('app.url'), '/') . $relativeUrl;
-
-        return response()
-            ->json([
-                'success' => true,
-                'url' => $url,
-            ])
-            ->header('Content-Type', 'application/json; charset=UTF-8');
     }
 
     public function printSigned(
         Request $request,
         string $publicId,
     ) {
-        return $this->print(
-            $request,
-            $publicId,
-        );
+        try {
+            return $this->print(
+                $request,
+                $publicId,
+            );
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Order] Print signed error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.print.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function print(
@@ -5159,6 +5100,12 @@ class PurchaseOrderController extends Controller
             DecryptException |
             ModelNotFoundException $e
         ) {
+            Log::warning('[Purchase Order] Print - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
 
@@ -5213,7 +5160,7 @@ class PurchaseOrderController extends Controller
             if (empty($departmentIds)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Department akun Anda belum tersedia.',
+                    'message' => __('purchase_order_messages.department_unavailable'),
                     'data' => [],
                     'errors' => [
                         'department_id' => [
@@ -5553,7 +5500,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Order berhasil dimuat.',
+                'message' => __('purchase_order_messages.index.loaded'),
                 'data' => $data,
             ], 200);
         } catch (\Throwable $e) {
@@ -5579,7 +5526,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat Purchase Order.',
+                'message' => __('purchase_order_messages.index.load_failed'),
                 'data' => [],
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
@@ -5594,9 +5541,15 @@ class PurchaseOrderController extends Controller
             try {
                 $poId = Crypt::decryptString($publicId);
             } catch (\Throwable $e) {
+                Log::warning('[Purchase Order] Receivable items - invalid id', [
+                    'message' => $e->getMessage(),
+                    'public_id' => $publicId,
+                    'user_id' => $request->user()?->id,
+                ]);
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'ID Purchase Order tidak valid.',
+                    'message' => __('purchase_order_messages.receivable.invalid_id'),
                     'data' => null,
                 ], 422);
             }
@@ -5638,7 +5591,7 @@ class PurchaseOrderController extends Controller
             if (!$purchaseOrder) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Order tidak ditemukan atau tidak tersedia untuk Goods Receive.',
+                    'message' => __('purchase_order_messages.receivable.not_found_or_unavailable'),
                     'data' => null,
                 ], 404);
             }
@@ -5698,7 +5651,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Item Purchase Order berhasil dimuat.',
+                'message' => __('purchase_order_messages.receivable.items_loaded'),
                 'data' => [
                     'id' => Crypt::encryptString((string) $purchaseOrder->id),
                     'public_id' => Crypt::encryptString((string) $purchaseOrder->id),
@@ -5749,7 +5702,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat item Purchase Order.',
+                'message' => __('purchase_order_messages.receivable.items_load_failed'),
                 'data' => null,
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
@@ -6131,4 +6084,464 @@ class PurchaseOrderController extends Controller
 
         return $draftNumber;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Visibility Scope Purchase Order
+    |--------------------------------------------------------------------------
+    | Dipakai bersama oleh index() dan exportExcel() supaya aturan visibilitas
+    | tidak punya dua salinan yang bisa berbeda.
+    |
+    | Sumber visibility:
+    | 1. Permission view scope.
+    | 2. User atau role-nya pernah menjadi approver.
+    | 3. User adalah pembuat PR yang ditarik ke PO tersebut.
+    |--------------------------------------------------------------------------
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filter daftar Purchase Order
+    |--------------------------------------------------------------------------
+    | Dipakai bersama index() dan exportExcel().
+    |
+    | Perhatikan filter tahun: bila parameter 'year' tidak dikirim, nilainya
+    | jatuh ke tahun berjalan -- bukan "semua tahun". Perilaku ini sengaja
+    | dipertahankan supaya isi file export sama dengan daftar.
+    |--------------------------------------------------------------------------
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Export Excel Purchase Order
+    |--------------------------------------------------------------------------
+    | Gerbang aksesnya adalah permission CREATE, bukan view.
+    |
+    | Alasannya: PO dapat terlihat oleh pihak di luar pembuatnya -- approver,
+    | dan pemilik PR yang ditarik ke PO tersebut. Mereka boleh membaca satu
+    | dokumen yang menyangkut dirinya, tetapi tidak boleh menarik keseluruhan
+    | data PO keluar sistem. Karena itu export dibatasi ke pihak yang memang
+    | berwenang membuat PO.
+    |
+    | Setelah gerbang itu lolos, isi file tetap dibatasi visibility scope yang
+    | sama dengan daftar, sehingga user hanya mengekspor yang memang terlihat
+    | olehnya.
+    |--------------------------------------------------------------------------
+    */
+    public function exportExcel(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('purchase_order_messages.department_unavailable'),
+                ], 401);
+            }
+
+            $lang = strtolower(trim((string) $request->query('lang', 'id')));
+
+            if (!in_array($lang, ['id', 'en'], true)) {
+                $lang = 'id';
+            }
+
+            app()->setLocale($lang);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Gerbang: permission export tersendiri
+            |--------------------------------------------------------------------------
+            | Permission ini tidak memakai scope. Yang menentukan ISI file adalah
+            | visibility PO yang sama persis dengan daftar -- termasuk jalur
+            | "user melihat PO karena ada PR miliknya di dalamnya". Jadi permission
+            | export hanya menjawab "boleh menarik data keluar atau tidak",
+            | bukan "boleh melihat data siapa".
+            |--------------------------------------------------------------------------
+            */
+            if (!$user->hasPermission('purchase_order.export')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('purchase_order_messages.export.forbidden'),
+                ], 403);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Visibility disamakan dengan index()
+            |--------------------------------------------------------------------------
+            | $canView sengaja tetap dibaca dari permission view. Bila user tidak
+            | punya view, blok scope menghasilkan nol baris, tetapi jalur approver
+            | dan pemilik PR tetap berlaku -- persis seperti yang ia lihat di daftar.
+            |--------------------------------------------------------------------------
+            */
+            $canView = $user->hasPermission('purchase_order.view');
+
+            $viewScope = strtoupper(
+                trim(
+                    (string) (
+                        $user->getPermissionScope('purchase_order.view') ?? 'NONE'
+                    ),
+                ),
+            );
+
+            $allowedScopes = [
+                'NONE',
+                'OWN_DATA',
+                'OWN_DEPARTMENT',
+                'OWN_CABANG',
+                'ALL',
+            ];
+
+            if (!in_array($viewScope, $allowedScopes, true)) {
+                $viewScope = 'NONE';
+            }
+
+            $userDepartmentIds = $user->accessibleDepartmentIds()->all();
+            $userCabangIds = $user->accessibleBranchIds()->all();
+
+            $userRoleIds = collect();
+
+            if ($user->getAttribute('role_id')) {
+                $userRoleIds->push((int) $user->getAttribute('role_id'));
+            }
+
+            if (method_exists($user, 'getActiveRoleId') && $user->getActiveRoleId()) {
+                $userRoleIds->push((int) $user->getActiveRoleId());
+            }
+
+            $userRoleIds = $userRoleIds
+                ->merge(
+                    DB::table('user_roles')
+                        ->where('user_id', $user->id)
+                        ->pluck('role_id'),
+                )
+                ->filter(fn($roleId) => $roleId !== null && (int) $roleId > 0)
+                ->map(fn($roleId) => (int) $roleId)
+                ->unique()
+                ->values();
+
+            $query = PurchaseOrder::query()
+                ->with([
+                    'vendor',
+                    'cabangData',
+                    'departmentData',
+                    'items.unit',
+                    'purchaseRequests',
+                ])
+                ->orderByDesc('id');
+
+            /*
+            |--------------------------------------------------------------------------
+            | Scope + filter yang sama persis dengan index()
+            |--------------------------------------------------------------------------
+            */
+            $this->applyPurchaseOrderVisibilityScope(
+                $query,
+                $user,
+                $canView,
+                $viewScope,
+                $userRoleIds,
+                $userCabangIds,
+                $userDepartmentIds,
+            );
+
+            $this->applyPurchaseOrderListFilters($query, $request);
+
+            $data = $query->get();
+
+            $fileName = __('purchase_order_messages.export.filename')
+                . '_' . now()->format('Ymd_His')
+                . '.xlsx';
+
+            return Excel::download(
+                new PurchaseOrderExport($data),
+                $fileName,
+            );
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Order] Export excel error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_order_messages.export.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    private function applyPurchaseOrderListFilters($query, Request $request): void
+    {
+        /*
+    |--------------------------------------------------------------------------
+    | Search nomor PO
+    |--------------------------------------------------------------------------
+    */
+        if ($request->filled('search')) {
+            $search = trim(
+                (string) $request->search,
+            );
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where(
+                        'nomor_po',
+                        'ILIKE',
+                        "%{$search}%",
+                    );
+                });
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Filter status
+    |--------------------------------------------------------------------------
+    */
+        $status = strtoupper(
+            trim((string) $request->status),
+        );
+
+        if (
+            $status !== ''
+            && $status !== 'ALL'
+            && $status !== 'SEMUA'
+        ) {
+            $query->whereRaw(
+                'UPPER(TRIM(status)) = ?',
+                [$status],
+            );
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Filter tanggal
+    |--------------------------------------------------------------------------
+    */
+        if ($request->filled('tanggal_mulai')) {
+            $query->whereDate(
+                'tanggal_po',
+                '>=',
+                $request->tanggal_mulai,
+            );
+        }
+
+        if ($request->filled('tanggal_selesai')) {
+            $query->whereDate(
+                'tanggal_po',
+                '<=',
+                $request->tanggal_selesai,
+            );
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Filter tahun
+    |--------------------------------------------------------------------------
+    */
+        $year = (int) (
+            $request->year
+            ?? now()->year
+        );
+
+        if ($year > 0) {
+            $query->whereYear(
+                'tanggal_po',
+                $year,
+            );
+        }
+    }
+
+    private function applyPurchaseOrderVisibilityScope(
+        $query,
+        $user,
+        bool $canView,
+        string $viewScope,
+        $userRoleIds,
+        $userCabangIds,
+        $userDepartmentIds,
+    ): void {
+        $query->where(function (
+            $visibilityQuery
+        ) use (
+            $user,
+            $userRoleIds,
+            $canView,
+            $viewScope,
+            $userDepartmentIds,
+            $userCabangIds,
+        ) {
+            /*
+        |--------------------------------------------------------------------------
+        | Visibility berdasarkan permission scope
+        |--------------------------------------------------------------------------
+        */
+            $visibilityQuery->where(function (
+                $scopeQuery
+            ) use (
+                $user,
+                $canView,
+                $viewScope,
+                $userDepartmentIds,
+                $userCabangIds,
+            ) {
+                /*
+            |--------------------------------------------------------------------------
+            | Tidak memiliki permission view
+            |--------------------------------------------------------------------------
+            */
+                if (
+                    !$canView
+                    || $viewScope === 'NONE'
+                ) {
+                    $scopeQuery->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                /*
+            |--------------------------------------------------------------------------
+            | Semua data
+            |--------------------------------------------------------------------------
+            */
+                if ($viewScope === 'ALL') {
+                    $scopeQuery->whereRaw('1 = 1');
+
+                    return;
+                }
+
+                /*
+            |--------------------------------------------------------------------------
+            | Data yang dibuat/request oleh user login
+            |--------------------------------------------------------------------------
+            */
+                if ($viewScope === 'OWN_DATA') {
+                    $scopeQuery->where(function ($q) use ($user) {
+                        $q
+                            ->where(
+                                'created_by',
+                                $user->id,
+                            )
+                            ->orWhere(
+                                'requester_signed_by',
+                                $user->id,
+                            );
+                    });
+
+                    return;
+                }
+
+                /*
+            |--------------------------------------------------------------------------
+            | Data department user login
+            |--------------------------------------------------------------------------
+            */
+                if ($viewScope === 'OWN_DEPARTMENT') {
+                    if (empty($userDepartmentIds)) {
+                        $scopeQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $scopeQuery->whereIn(
+                        'id_department',
+                        $userDepartmentIds,
+                    );
+
+                    return;
+                }
+
+                /*
+            |--------------------------------------------------------------------------
+            | Data cabang user login
+            |--------------------------------------------------------------------------
+            */
+                if ($viewScope === 'OWN_CABANG') {
+                    if (empty($userCabangIds)) {
+                        $scopeQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $scopeQuery->whereIn(
+                        'cabang',
+                        array_map('strval', $userCabangIds),
+                    );
+
+                    return;
+                }
+
+                $scopeQuery->whereRaw('1 = 0');
+            });
+
+            /*
+        |--------------------------------------------------------------------------
+        | Approver langsung USER
+        |--------------------------------------------------------------------------
+        | Tetap dapat melihat PO tempat dia terlibat meskipun di luar scope.
+        |--------------------------------------------------------------------------
+        */
+            $visibilityQuery->orWhereHas(
+                'approvals',
+                function ($q) use ($user) {
+                    $q
+                        ->whereRaw(
+                            'UPPER(TRIM(approver_type)) = ?',
+                            ['USER'],
+                        )
+                        ->where(
+                            'approver_id',
+                            $user->id,
+                        );
+                },
+            );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Approver berdasarkan ROLE
+        |--------------------------------------------------------------------------
+        */
+            if ($userRoleIds->isNotEmpty()) {
+                $visibilityQuery->orWhereHas(
+                    'approvals',
+                    function ($q) use ($userRoleIds) {
+                        $q
+                            ->whereRaw(
+                                'UPPER(TRIM(approver_type)) = ?',
+                                ['ROLE'],
+                            )
+                            ->whereIn(
+                                'approver_id',
+                                $userRoleIds->all(),
+                            );
+                    },
+                );
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Pembuat Purchase Requisition yang ditarik ke PO ini
+        |--------------------------------------------------------------------------
+        | User yang PR-nya dijadikan PO tetap dapat melihat PO tersebut
+        | meskipun cabang/department/scope PO di luar aksesnya. Satu PO
+        | bisa berisi banyak PR dari user berbeda-beda, jadi cukup salah
+        | satu PR di PO tersebut milik user login.
+        |--------------------------------------------------------------------------
+        */
+            $visibilityQuery->orWhereHas(
+                'purchaseRequests',
+                function ($q) use ($user) {
+                    $q->where(
+                        'purchase_requests.created_by',
+                        $user->id,
+                    );
+                },
+            );
+        });
+    }
+
 }

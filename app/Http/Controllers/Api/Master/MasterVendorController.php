@@ -1254,6 +1254,18 @@ class MasterVendorController extends Controller
             $vendorId = (int) Crypt::decryptString($publicId);
 
             $vendor = MasterVendor::findOrFail($vendorId);
+
+            $deleteScope = $user->getPermissionScope('vendor.delete');
+
+            if (!$this->userCanAccessVendorByScope($user, $vendor, $deleteScope)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk menghapus vendor ini.',
+                ], 403);
+            }
+
             $vendorName = $vendor->nama_vendor;
 
             // Ambil semua dokumen vendor untuk hapus file fisik
@@ -1316,6 +1328,15 @@ class MasterVendorController extends Controller
 
     public function updateStatus(Request $request, string $publicId)
     {
+        $user = $request->user();
+
+        if (!$user || !$user->hasPermission('vendor.update')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses untuk mengubah status Master Vendor.',
+            ], 403);
+        }
+
         $request->validate([
             'is_active' => ['required', 'boolean'],
         ]);
@@ -1326,6 +1347,17 @@ class MasterVendorController extends Controller
             $vendorId = (int) Crypt::decryptString($publicId);
 
             $vendor = MasterVendor::findOrFail($vendorId);
+
+            $statusScope = $user->getPermissionScope('vendor.update');
+
+            if (!$this->userCanAccessVendorByScope($user, $vendor, $statusScope)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk mengubah status vendor ini.',
+                ], 403);
+            }
 
             $vendor->update([
                 'is_active' => $request->boolean('is_active'),
@@ -2041,6 +2073,17 @@ class MasterVendorController extends Controller
             $vendorId = (int) Crypt::decryptString($publicId);
             $vendor = MasterVendor::findOrFail($vendorId);
 
+            $updateScope = $user->getPermissionScope('vendor.update');
+
+            if (!$this->userCanAccessVendorByScope($user, $vendor, $updateScope)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk mengubah vendor ini.',
+                ], 403);
+            }
+
             $vendor->update([
                 'nama_vendor' => $clean($request->nama_vendor),
                 'inisial_vendor' => $clean($request->inisial_vendor),
@@ -2615,6 +2658,15 @@ class MasterVendorController extends Controller
                 ], 401);
             }
 
+            if (!$user->hasPermission('vendor.submit')) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk submit Master Vendor.',
+                ], 403);
+            }
+
             /*
         |--------------------------------------------------------------------------
         | Decrypt dan lock vendor
@@ -2625,6 +2677,17 @@ class MasterVendorController extends Controller
             $vendor = MasterVendor::query()
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            $submitScope = $user->getPermissionScope('vendor.submit');
+
+            if (!$this->userCanAccessVendorByScope($user, $vendor, $submitScope)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk submit vendor ini.',
+                ], 403);
+            }
 
             /*
         |--------------------------------------------------------------------------
@@ -2718,6 +2781,11 @@ class MasterVendorController extends Controller
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
+
+            Log::warning('Public ID vendor tidak valid saat submit', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
 
             return response()->json([
                 'success' => false,
@@ -3027,6 +3095,11 @@ class MasterVendorController extends Controller
                 DB::rollBack();
             }
 
+            Log::warning('Public ID vendor tidak valid saat approve', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'ID Master Vendor tidak valid.',
@@ -3035,6 +3108,11 @@ class MasterVendorController extends Controller
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
+
+            Log::warning('Vendor tidak ditemukan saat approve', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
 
             return response()->json([
                 'success' => false,
@@ -3275,6 +3353,11 @@ class MasterVendorController extends Controller
                 DB::rollBack();
             }
 
+            Log::warning('Public ID vendor tidak valid saat reject', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'ID Master Vendor tidak valid.',
@@ -3283,6 +3366,11 @@ class MasterVendorController extends Controller
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
+
+            Log::warning('Vendor tidak ditemukan saat reject', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
 
             return response()->json([
                 'success' => false,

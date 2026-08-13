@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             MasterDokumenPendukungSeeder::class,
             UnitsSeeder::class,
             MasterKeteranganTransaksiSeeder::class,
+            MasterMaterialGroupSeeder::class,
 
             /*
             |--------------------------------------------------------------------------

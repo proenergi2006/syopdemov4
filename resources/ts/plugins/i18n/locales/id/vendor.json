@@ -1,0 +1,74 @@
+{
+  "list": {
+    "filters": {
+      "title": "Filters",
+      "searchLabel": "Cari (kode/nama/inisial)",
+      "searchPlaceholder": "Cari vendor...",
+      "statusLabel": "Status",
+      "statusAll": "Semua",
+      "statusActive": "Aktif",
+      "statusInactive": "Nonaktif",
+      "resetButton": "Reset Filter"
+    },
+    "buttons": {
+      "createButton": "Tambah Vendor",
+      "loadingText": "Loading...",
+      "reloadData": "Reload Data"
+    },
+    "table": {
+      "headers": {
+        "no": "No",
+        "code": "Kode",
+        "name": "Nama Vendor",
+        "initial": "Inisial",
+        "status": "Status",
+        "submissionStatus": "Status Pengajuan",
+        "actions": "Actions"
+      },
+      "waitingApprovalBadge": "Menunggu Approval Anda",
+      "statusActive": "Aktif",
+      "statusInactive": "Tidak Aktif",
+      "noDataAvailable": "No data available"
+    },
+    "menu": {
+      "viewDetail": "Lihat Detail",
+      "approvalHistory": "History Approval",
+      "edit": "Edit",
+      "submit": "Submit",
+      "delete": "Delete",
+      "deactivate": "Nonaktifkan",
+      "activate": "Aktifkan",
+      "approve": "Approve",
+      "reject": "Reject"
+    },
+    "pagination": {
+      "rowsPerPage": "Rows per page:"
+    }
+  },
+  "statusDialog": {
+    "title": "Update Status Vendor",
+    "cancelButton": "Batal",
+    "confirmButton": "Ya, Ubah"
+  },
+  "rejectDialog": {
+    "title": "Reject Master Vendor",
+    "notesLabel": "Catatan reject *",
+    "notesPlaceholder": "Masukkan alasan penolakan Vendor",
+    "notesHelp": "Catatan wajib diisi agar pembuat Vendor mengetahui alasan penolakan.",
+    "notesError": "Catatan penolakan wajib diisi",
+    "cancelButton": "Batal",
+    "saveNotesButton": "Simpan Catatan"
+  },
+  "toast": {
+    "approveLoadingText": "Approve Vendor...",
+    "rejectLoadingText": "Reject Vendor...",
+    "deleteLoadingText": "Menghapus vendor...",
+    "submitLoadingText": "Submit Vendor...",
+    "approveNotApprover": "Akses Ditolak",
+    "approveNotApproverText": "Anda bukan approver aktif untuk Vendor ini.",
+    "invalidVendor": "Data Tidak Valid",
+    "invalidVendorText": "Public ID vendor tidak ditemukan.",
+    "loadingHistory": "Memuat history approval...",
+    "loadingHistorySubtitle": "Mohon tunggu sebentar"
+  }
+}

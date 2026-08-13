@@ -466,7 +466,7 @@ const canGR = computed(() => {
 
 //   if (success) {
 //     await router.replace({
-//       path: '/non_trade/purchase_order',
+//       path: '/non_stock/purchase_order',
 //       query: {},
 //     })
 

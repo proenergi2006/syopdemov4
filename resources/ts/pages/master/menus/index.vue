@@ -224,7 +224,7 @@ const parentOptions = computed(() => {
       title: 'Top Level',
       value: null,
       name: 'Top Level',
-      subtitle: 'Menu utama, sejajar dengan Dashboard / Master / Non Trade',
+      subtitle: 'Menu utama, sejajar dengan Dashboard / Master / Non Stock',
       level: 0,
       type: 'TOP_LEVEL',
       icon: 'tabler-layout-sidebar',

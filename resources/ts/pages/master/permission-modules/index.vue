@@ -40,6 +40,7 @@ interface PermissionItem {
   name: string
   description: string | null
   is_active: boolean
+  requires_scope: boolean
   created_at: string | null
   updated_at: string | null
 }
@@ -57,6 +58,7 @@ interface PermissionForm {
   name: string
   description: string
   is_active: boolean
+  requires_scope: boolean
 }
 
 interface FieldErrors {
@@ -125,6 +127,7 @@ const createPermissionForm = reactive<PermissionForm>({
   name: '',
   description: '',
   is_active: true,
+  requires_scope: true,
 })
 
 const editPermissionForm = reactive<PermissionForm>({
@@ -132,6 +135,7 @@ const editPermissionForm = reactive<PermissionForm>({
   name: '',
   description: '',
   is_active: true,
+  requires_scope: true,
 })
 
 const fieldErrors = ref<FieldErrors>({})
@@ -256,6 +260,7 @@ function resetCreatePermissionForm() {
   createPermissionForm.name = ''
   createPermissionForm.description = ''
   createPermissionForm.is_active = true
+  createPermissionForm.requires_scope = true
 
   permissionFieldErrors.value = {}
   createPermissionFormRef.value?.resetValidation()
@@ -266,6 +271,7 @@ function resetEditPermissionForm() {
   editPermissionForm.name = ''
   editPermissionForm.description = ''
   editPermissionForm.is_active = true
+  editPermissionForm.requires_scope = true
 
   selectedPermission.value = null
   editPermissionFieldErrors.value = {}
@@ -295,6 +301,7 @@ function openEditPermissionDialog(permission: PermissionItem) {
   editPermissionForm.name = permission.name ?? ''
   editPermissionForm.description = permission.description ?? ''
   editPermissionForm.is_active = Boolean(permission.is_active)
+  editPermissionForm.requires_scope = Boolean(permission.requires_scope)
 
   editPermissionFieldErrors.value = {}
   editPermissionFormRef.value?.resetValidation()
@@ -579,6 +586,7 @@ async function submitCreatePermission() {
         description:
           createPermissionForm.description.trim() || null,
         is_active: createPermissionForm.is_active,
+        requires_scope: createPermissionForm.requires_scope,
       },
       {
         headers: {
@@ -671,6 +679,7 @@ async function submitUpdatePermission() {
         description:
           editPermissionForm.description.trim() || null,
         is_active: editPermissionForm.is_active,
+        requires_scope: editPermissionForm.requires_scope,
       },
       {
         headers: {
@@ -1949,6 +1958,16 @@ onBeforeUnmount(() => {
                   hide-details="auto"
                 />
               </VCol>
+
+              <VCol cols="12">
+                <VSwitch
+                  v-model="createPermissionForm.requires_scope"
+                  label="Requires Scope (permission ini bisa punya scope per-role)"
+                  color="primary"
+                  inset
+                  hide-details="auto"
+                />
+              </VCol>
             </VRow>
           </VCardText>
 
@@ -2068,6 +2087,16 @@ onBeforeUnmount(() => {
                   color="success"
                   inset
                   :error-messages="editPermissionFieldErrors.is_active"
+                  hide-details="auto"
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <VSwitch
+                  v-model="editPermissionForm.requires_scope"
+                  label="Requires Scope (permission ini bisa punya scope per-role)"
+                  color="primary"
+                  inset
                   hide-details="auto"
                 />
               </VCol>

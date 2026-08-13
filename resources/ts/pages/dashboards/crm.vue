@@ -283,8 +283,8 @@ function approvalNotificationFor(
  * mengarah ke halaman analitik, bukan ke daftar approval.
  */
 const approvalListRouteByModuleCode: Record<string, string> = {
-  PURCHASE_REQUISITION: '/non_trade/purchase_request',
-  PURCHASE_ORDER: '/non_trade/purchase_order',
+  PURCHASE_REQUISITION: '/non_stock/purchase_request',
+  PURCHASE_ORDER: '/non_stock/purchase_order',
 }
 
 async function openApprovalList(

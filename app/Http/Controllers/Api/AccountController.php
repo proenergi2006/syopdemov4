@@ -28,11 +28,11 @@ class AccountController extends Controller
                     'regex:/[^A-Za-z0-9]/',
                 ],
             ], [
-                'current_password.required' => 'Current password wajib diisi.',
-                'password.required' => 'Password baru wajib diisi.',
-                'password.min' => 'Password baru minimal 8 karakter.',
-                'password.confirmed' => 'Konfirmasi password baru tidak sesuai.',
-                'password.regex' => 'Password baru wajib memiliki huruf besar, huruf kecil, angka, dan simbol.',
+                'current_password.required' => __('account_messages.current_password_required'),
+                'password.required' => __('account_messages.new_password_required'),
+                'password.min' => __('account_messages.new_password_min'),
+                'password.confirmed' => __('account_messages.new_password_confirmed'),
+                'password.regex' => __('account_messages.new_password_regex'),
             ]);
 
             $user = $request->user();
@@ -40,19 +40,19 @@ class AccountController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak ditemukan.',
+                    'message' => __('account_messages.user_not_found'),
                 ], 401);
             }
 
             if (!Hash::check($validated['current_password'], $user->password)) {
                 throw ValidationException::withMessages([
-                    'current_password' => ['Password lama tidak sesuai.'],
+                    'current_password' => [__('account_messages.current_password_incorrect')],
                 ]);
             }
 
             if (Hash::check($validated['password'], $user->password)) {
                 throw ValidationException::withMessages([
-                    'password' => ['Password baru tidak boleh sama dengan password lama.'],
+                    'password' => [__('account_messages.new_password_same_as_old')],
                 ]);
             }
 
@@ -61,7 +61,7 @@ class AccountController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Password berhasil diubah.',
+                'message' => __('account_messages.password_changed'),
             ]);
         } catch (ValidationException $e) {
             throw $e;
@@ -75,7 +75,60 @@ class AccountController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengubah password.',
+                'message' => __('account_messages.password_change_failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update Preferensi Bahasa
+    |--------------------------------------------------------------------------
+    | Dipanggil dari language switcher FE supaya backend tahu bahasa pilihan
+    | user -- dibutuhkan untuk notifikasi/email yang dikirim ke user tersebut
+    | secara async (bukan hanya untuk request yang sedang berjalan).
+    |--------------------------------------------------------------------------
+    */
+    public function updateLocale(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'locale' => ['required', 'string', 'in:id,en'],
+            ]);
+
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('account_messages.user_not_found'),
+                ], 401);
+            }
+
+            $user->locale = $validated['locale'];
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => __('account_messages.locale_updated'),
+                'data' => [
+                    'locale' => $user->locale,
+                ],
+            ]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('[Account] Update locale error', [
+                'user_id' => $request->user()?->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('account_messages.locale_update_failed'),
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
@@ -88,7 +141,7 @@ class AccountController extends Controller
         if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'User tidak terautentikasi.',
+                'message' => __('account_messages.user_not_authenticated'),
                 'data' => [
                     'assignments' => [],
                     'branches' => [],
@@ -239,7 +292,7 @@ class AccountController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'User access assignments loaded successfully.',
+            'message' => __('account_messages.access_assignments_loaded'),
             'data' => [
                 'assignments' => $formattedAssignments,
                 'branches' => $branches,

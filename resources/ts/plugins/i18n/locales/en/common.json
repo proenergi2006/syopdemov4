@@ -2,7 +2,10 @@
   "actions": {
     "reset": "Reset",
     "apply": "Apply",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "confirm": "Yes",
+    "cancel": "Cancel",
+    "delete": "Delete"
   },
   "attachment": {
     "title": "Attachment",
@@ -12,5 +15,47 @@
     "invalidTitle": "Invalid file",
     "invalidType": "\"{file}\" is not a PDF/JPG/JPEG/PNG file.",
     "tooLarge": "\"{file}\" is larger than 3MB."
+  },
+  "alert": {
+    "success": "Success",
+    "error": "Failed",
+    "errorGeneric": "An error occurred.",
+    "warning": "Warning",
+    "processing": "Processing...",
+    "pleaseWait": "Please wait a moment",
+    "deleteConfirmTitle": "Delete data?",
+    "deleteConfirmText": "{item} will be permanently deleted.",
+    "deleteConfirmButton": "Yes, delete",
+    "defaultItemName": "this data"
+  },
+  "itemTable": {
+    "no": "No",
+    "namaItem": "Item Name",
+    "keterangan": "Notes",
+    "satuan": "Unit",
+    "qty": "Qty",
+    "qtyPo": "PO Qty",
+    "outstanding": "Outstanding",
+    "hargaUnit": "Unit Price",
+    "subtotal": "Subtotal"
+  },
+  "notifications": {
+    "toastTitle": "New notification",
+    "toastText": "You have a new notification.",
+    "header": "Notifications",
+    "newChip": "{count} New",
+    "viewButton": "View",
+    "emptyTitle": "No notifications yet",
+    "emptySubtitle": "New notifications will appear here.",
+    "readAllButton": "READ ALL NOTIFICATIONS"
+  },
+  "httpStatus": {
+    "noConnection": "Unable to connect to the server.",
+    "badRequest": "Invalid request.",
+    "sessionExpired": "Your session has expired. Please log in again.",
+    "forbidden": "You do not have access.",
+    "notFound": "Data not found.",
+    "validationError": "The submitted data is invalid.",
+    "serverError": "A server error occurred."
   }
 }

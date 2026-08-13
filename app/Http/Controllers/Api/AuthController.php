@@ -24,9 +24,10 @@ class AuthController extends Controller
             $validated = $request->validate([
                 'username' => ['required', 'string'],
                 'password' => ['required', 'string'],
+                'remember' => ['sometimes', 'boolean'],
             ], [
-                'username.required' => 'Username wajib diisi.',
-                'password.required' => 'Password wajib diisi.',
+                'username.required' => __('auth_messages.login.username_required'),
+                'password.required' => __('auth_messages.login.password_required'),
             ]);
 
             $username = trim($validated['username']);
@@ -48,7 +49,7 @@ class AuthController extends Controller
                 return response()->json([
                     'success' => false,
                     'field' => 'username',
-                    'message' => 'Username tidak ditemukan.',
+                    'message' => __('auth_messages.login.username_not_found'),
                 ], 422);
             }
 
@@ -66,7 +67,7 @@ class AuthController extends Controller
                 return response()->json([
                     'success' => false,
                     'field' => 'password',
-                    'message' => 'Password salah.',
+                    'message' => __('auth_messages.login.password_incorrect'),
                 ], 422);
             }
 
@@ -83,7 +84,7 @@ class AuthController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'User nonaktif.',
+                    'message' => __('auth_messages.login.account_inactive'),
                 ], 403);
             }
 
@@ -91,23 +92,46 @@ class AuthController extends Controller
                 'last_login_at' => now(),
             ])->save();
 
-            $expiresAt = now()->addMinutes(
-                (int) config('auth_session.absolute_timeout_minutes', 720),
-            );
+            $remember = $request->boolean('remember');
+
+            /*
+            |--------------------------------------------------------------------------
+            | Remember Me
+            |--------------------------------------------------------------------------
+            | Token tetap punya batas kadaluwarsa absolut (default 30 hari, lihat
+            | config/auth_session.php) supaya tidak login selamanya, tapi ability
+            | 'remember-me' dipakai sebagai penanda agar EnsureSanctumTokenIsNotIdle
+            | melewati pengecekan idle timeout untuk token ini. Sesi baru hilang saat
+            | user logout manual (token dihapus) atau saat 30 hari itu terlewati.
+            |--------------------------------------------------------------------------
+            */
+            if ($remember) {
+                $expiresAt = now()->addMinutes(
+                    (int) config('auth_session.remember_me_minutes', 60 * 24 * 30),
+                );
+                $abilities = ['*', 'remember-me'];
+            } else {
+                $expiresAt = now()->addMinutes(
+                    (int) config('auth_session.absolute_timeout_minutes', 720),
+                );
+                $abilities = ['*'];
+            }
 
             $newToken = $user->createToken(
                 'syop-v4',
-                ['*'],
+                $abilities,
                 $expiresAt,
             );
 
-            Cache::put(
-                'auth:last_activity:' . $newToken->accessToken->id,
-                now()->toIso8601String(),
-                now()->addMinutes(
-                    (int) config('auth_session.absolute_timeout_minutes', 720) + 60,
-                ),
-            );
+            if (!$remember) {
+                Cache::put(
+                    'auth:last_activity:' . $newToken->accessToken->id,
+                    now()->toIso8601String(),
+                    now()->addMinutes(
+                        (int) config('auth_session.absolute_timeout_minutes', 720) + 60,
+                    ),
+                );
+            }
 
             $token = $newToken->plainTextToken;
 
@@ -123,7 +147,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Login berhasil.',
+                'message' => __('auth_messages.login.success'),
                 'token' => $token,
                 'user' => [
                     'id' => $user->id,
@@ -135,7 +159,7 @@ class AuthController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validasi gagal.',
+                'message' => __('auth_messages.login.validation_failed'),
                 'errors' => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
@@ -148,7 +172,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat login.',
+                'message' => __('auth_messages.login.generic_error'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -211,7 +235,7 @@ class AuthController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('auth_messages.permissions.user_not_authenticated'),
                 ], 401);
             }
 
@@ -231,7 +255,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Permission user berhasil dimuat.',
+                'message' => __('auth_messages.permissions.loaded'),
                 'data' => [
                     'user' => [
                         'id' => $user->id,
@@ -250,7 +274,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat permission user.',
+                'message' => __('auth_messages.permissions.load_failed'),
             ], 500);
         }
     }
@@ -264,7 +288,7 @@ class AuthController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak ditemukan.',
+                    'message' => __('auth_messages.logout.user_not_found'),
                 ], 401);
             }
 
@@ -289,7 +313,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Logout berhasil.',
+                'message' => __('auth_messages.logout.success'),
             ], 200);
         } catch (\Throwable $e) {
             Log::error('[Auth] Logout error', [
@@ -300,7 +324,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal logout.',
+                'message' => __('auth_messages.logout.failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -314,8 +338,8 @@ class AuthController extends Controller
             $validated = $request->validate([
                 'email' => ['required', 'string', 'email'],
             ], [
-                'email.required' => 'Email wajib diisi.',
-                'email.email' => 'Format email tidak valid.',
+                'email.required' => __('auth_messages.forgot_password.email_required'),
+                'email.email' => __('auth_messages.forgot_password.email_invalid'),
             ]);
 
             $email = trim($validated['email']);
@@ -333,7 +357,7 @@ class AuthController extends Controller
                 return response()->json([
                     'success' => false,
                     'field' => 'email',
-                    'message' => 'Email tidak terdaftar.',
+                    'message' => __('auth_messages.forgot_password.email_not_registered'),
                 ], 422);
             }
 
@@ -354,7 +378,7 @@ class AuthController extends Controller
                 return response()->json([
                     'success' => false,
                     'throttled' => true,
-                    'message' => 'Silakan tunggu beberapa saat sebelum mengirim ulang link reset password.',
+                    'message' => __('auth_messages.forgot_password.throttled'),
                 ], 429);
             }
 
@@ -366,13 +390,13 @@ class AuthController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Gagal mengirim link reset password. Silakan coba lagi.',
+                    'message' => __('auth_messages.forgot_password.send_failed'),
                 ], 500);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Link reset password telah dikirim ke email Anda.',
+                'message' => __('auth_messages.forgot_password.sent'),
             ]);
         } catch (ValidationException $e) {
             throw $e;
@@ -386,7 +410,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat memproses permintaan.',
+                'message' => __('auth_messages.forgot_password.generic_error'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -406,9 +430,9 @@ class AuthController extends Controller
                 'token' => ['required', 'string'],
                 'email' => ['required', 'string', 'email'],
             ], [
-                'token.required' => 'Token reset password tidak valid.',
-                'email.required' => 'Email wajib diisi.',
-                'email.email' => 'Format email tidak valid.',
+                'token.required' => __('auth_messages.verify_reset_token.token_invalid'),
+                'email.required' => __('auth_messages.verify_reset_token.email_required'),
+                'email.email' => __('auth_messages.verify_reset_token.email_invalid'),
             ]);
 
             $user = User::query()
@@ -436,7 +460,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'valid' => false,
-                'message' => 'Terjadi kesalahan saat memeriksa link reset password.',
+                'message' => __('auth_messages.verify_reset_token.generic_error'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -461,13 +485,13 @@ class AuthController extends Controller
                     'regex:/[^A-Za-z0-9]/',
                 ],
             ], [
-                'token.required' => 'Token reset password tidak valid.',
-                'email.required' => 'Email wajib diisi.',
-                'email.email' => 'Format email tidak valid.',
-                'password.required' => 'Password baru wajib diisi.',
-                'password.min' => 'Password baru minimal 8 karakter.',
-                'password.confirmed' => 'Konfirmasi password baru tidak sesuai.',
-                'password.regex' => 'Password baru wajib memiliki huruf besar, huruf kecil, angka, dan simbol.',
+                'token.required' => __('auth_messages.reset_password.token_invalid'),
+                'email.required' => __('auth_messages.reset_password.email_required'),
+                'email.email' => __('auth_messages.reset_password.email_invalid'),
+                'password.required' => __('auth_messages.reset_password.password_required'),
+                'password.min' => __('auth_messages.reset_password.password_min'),
+                'password.confirmed' => __('auth_messages.reset_password.password_confirmed'),
+                'password.regex' => __('auth_messages.reset_password.password_regex'),
             ]);
 
             $status = Password::reset(
@@ -494,7 +518,7 @@ class AuthController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Link reset password tidak valid atau sudah kedaluwarsa.',
+                    'message' => __('auth_messages.reset_password.link_invalid'),
                 ], 422);
             }
 
@@ -506,13 +530,13 @@ class AuthController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Gagal mereset password. Silakan coba lagi.',
+                    'message' => __('auth_messages.reset_password.failed'),
                 ], 500);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Password berhasil direset. Silakan login dengan password baru Anda.',
+                'message' => __('auth_messages.reset_password.success'),
             ]);
         } catch (ValidationException $e) {
             throw $e;
@@ -526,7 +550,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat mereset password.',
+                'message' => __('auth_messages.reset_password.generic_error'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -563,7 +587,7 @@ class AuthController extends Controller
             );
 
             return response()->json([
-                'message' => 'Token SSO tidak valid.',
+                'message' => __('auth_messages.sso.token_invalid'),
             ], 401);
         }
 
@@ -605,7 +629,7 @@ class AuthController extends Controller
             || $nonce === ''
         ) {
             return response()->json([
-                'message' => 'Payload SSO tidak lengkap.',
+                'message' => __('auth_messages.sso.payload_incomplete'),
             ], 401);
         }
 
@@ -622,7 +646,7 @@ class AuthController extends Controller
             || ($expiresAt - $issuedAt) > 120
         ) {
             return response()->json([
-                'message' => 'Token SSO sudah kedaluwarsa.',
+                'message' => __('auth_messages.sso.token_expired'),
             ], 401);
         }
 
@@ -647,7 +671,7 @@ class AuthController extends Controller
 
         if (!$nonceRegistered) {
             return response()->json([
-                'message' => 'Token SSO sudah pernah digunakan.',
+                'message' => __('auth_messages.sso.token_reused'),
             ], 409);
         }
 
@@ -673,7 +697,7 @@ class AuthController extends Controller
 
         if (!$cabangExists) {
             return response()->json([
-                'message' => 'Cabang tidak ditemukan.',
+                'message' => __('auth_messages.sso.branch_not_found'),
             ], 404);
         }
 
@@ -719,7 +743,7 @@ class AuthController extends Controller
 
         if ($exactUsers->count() > 1) {
             return response()->json([
-                'message' => 'Terdapat user duplikat pada email dan cabang yang sama.',
+                'message' => __('auth_messages.sso.duplicate_user_same_branch'),
             ], 409);
         }
 
@@ -745,7 +769,7 @@ class AuthController extends Controller
 
             if ($emailUsers->isEmpty()) {
                 return response()->json([
-                    'message' => 'User belum terdaftar di SYOP v4.',
+                    'message' => __('auth_messages.sso.user_not_registered'),
                 ], 404);
             }
 
@@ -755,7 +779,7 @@ class AuthController extends Controller
             */
             if ($emailUsers->count() > 1) {
                 return response()->json([
-                    'message' => 'Terdapat lebih dari satu akun SYOP v4 dengan email yang sama. Hubungi tim IT.',
+                    'message' => __('auth_messages.sso.duplicate_user_same_email'),
                 ], 409);
             }
 

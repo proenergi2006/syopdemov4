@@ -145,20 +145,25 @@ class PurchaseRequestNotificationService
                 continue;
             }
 
+            [$messageKey, $messageParams] = $this->buildApprovalMessageKey(
+                $purchaseRequest,
+                (int) $currentStepOrder,
+                $stepLabel,
+            );
+
             Notification::create([
                 'user_id' => $user->id,
                 'type' => 'purchase_request_approval',
-                'title' => 'Approval Purchase Requisition',
-                'message' => $this->buildApprovalMessage(
-                    $purchaseRequest,
-                    (int) $currentStepOrder,
-                    $stepLabel,
-                ),
+                'title' => __('notification_messages.purchase_request.approval_request.title'),
+                'title_key' => 'notification_messages.purchase_request.approval_request.title',
+                'message' => __($messageKey, $messageParams),
+                'message_key' => $messageKey,
+                'message_params' => $messageParams,
                 'module' => 'purchase_request',
                 'reference_type' => PurchaseRequest::class,
                 'reference_id' => $purchaseRequest->id,
                 'reference_public_id' => $purchaseRequest->encrypted_id,
-                'url' => '/non_trade/purchase_request',
+                'url' => '/non_stock/purchase_request',
             ]);
 
             Log::info(
@@ -203,6 +208,19 @@ class PurchaseRequestNotificationService
             return;
         }
 
+        $translationGroup = $hasPendingApproval
+            ? 'approval_step_pending'
+            : 'approval_step_final';
+
+        $messageParams = [
+            'nomor_pr' => $purchaseRequest->nomor_pr,
+            'approver_name' => $approver->name ?? '-',
+            'step_order' => $approval->step_order,
+        ];
+
+        $titleKey = "notification_messages.purchase_request.{$translationGroup}.title";
+        $messageKey = "notification_messages.purchase_request.{$translationGroup}.message";
+
         Notification::create([
             'user_id' => $requesterId,
 
@@ -210,29 +228,18 @@ class PurchaseRequestNotificationService
                 ? 'purchase_request_approval_step_approved'
                 : 'purchase_request_approved',
 
-            'title' => $hasPendingApproval
-                ? 'Tahap Approval PR Disetujui'
-                : 'Purchase Requisition Disetujui',
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
 
-            'message' => $hasPendingApproval
-                ? 'Purchase Requisition '
-                . $purchaseRequest->nomor_pr
-                . ' telah disetujui oleh '
-                . ($approver->name ?? '-')
-                . ' pada tahap '
-                . $approval->step_order
-                . ' dan masih menunggu approval berikutnya.'
-                : 'Purchase Requisition '
-                . $purchaseRequest->nomor_pr
-                . ' telah final disetujui oleh '
-                . ($approver->name ?? '-')
-                . '.',
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
 
             'module' => 'purchase_request',
             'reference_type' => PurchaseRequest::class,
             'reference_id' => $purchaseRequest->id,
             'reference_public_id' => $purchaseRequest->encrypted_id,
-            'url' => '/non_trade/purchase_request',
+            'url' => '/non_stock/purchase_request',
         ]);
     }
 
@@ -255,20 +262,24 @@ class PurchaseRequestNotificationService
             return;
         }
 
+        $messageParams = [
+            'nomor_pr' => $purchaseRequest->nomor_pr,
+            'rejecter_name' => $rejecter->name ?? '-',
+        ];
+
         Notification::create([
             'user_id' => $requesterId,
             'type' => 'purchase_request_rejected',
-            'title' => 'Purchase Requisition Ditolak',
-            'message' => 'Purchase Requisition '
-                . $purchaseRequest->nomor_pr
-                . ' telah ditolak oleh '
-                . ($rejecter->name ?? '-')
-                . '.',
+            'title' => __('notification_messages.purchase_request.rejected.title'),
+            'title_key' => 'notification_messages.purchase_request.rejected.title',
+            'message' => __('notification_messages.purchase_request.rejected.message', $messageParams),
+            'message_key' => 'notification_messages.purchase_request.rejected.message',
+            'message_params' => $messageParams,
             'module' => 'purchase_request',
             'reference_type' => PurchaseRequest::class,
             'reference_id' => $purchaseRequest->id,
             'reference_public_id' => $purchaseRequest->encrypted_id,
-            'url' => '/non_trade/purchase_request',
+            'url' => '/non_stock/purchase_request',
         ]);
     }
 
@@ -419,20 +430,31 @@ class PurchaseRequestNotificationService
             : null;
     }
 
-    private function buildApprovalMessage(
+    /**
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    private function buildApprovalMessageKey(
         PurchaseRequest $purchaseRequest,
         int $stepOrder,
         ?string $stepLabel,
-    ): string {
-        $message = 'Purchase Requisition '
-            . $purchaseRequest->nomor_pr
-            . ' menunggu approval Anda pada tahap '
-            . $stepOrder;
+    ): array {
+        $params = [
+            'nomor_pr' => $purchaseRequest->nomor_pr,
+            'step_order' => $stepOrder,
+        ];
 
         if ($stepLabel) {
-            $message .= ' (' . $stepLabel . ')';
+            $params['step_label'] = $stepLabel;
+
+            return [
+                'notification_messages.purchase_request.approval_request.message_with_label',
+                $params,
+            ];
         }
 
-        return $message . '.';
+        return [
+            'notification_messages.purchase_request.approval_request.message_without_label',
+            $params,
+        ];
     }
 }

@@ -290,6 +290,7 @@ class PermissionModuleController extends Controller
                                 'name' => $permission->name,
                                 'description' => $permission->description,
                                 'is_active' => (bool) $permission->is_active,
+                                'requires_scope' => (bool) $permission->requires_scope,
                                 'created_at' => $permission->created_at,
                                 'updated_at' => $permission->updated_at,
                             ];
@@ -692,6 +693,11 @@ class PermissionModuleController extends Controller
                 'nullable',
                 'boolean',
             ],
+
+            'requires_scope' => [
+                'nullable',
+                'boolean',
+            ],
         ]);
 
         /*
@@ -815,6 +821,11 @@ class PermissionModuleController extends Controller
                             $validated['is_active']
                             ?? true
                         ),
+
+                        'requires_scope' => (bool) (
+                            $validated['requires_scope']
+                            ?? (strtolower($normalizedAction) !== 'create')
+                        ),
                     ]);
                 },
             );
@@ -831,6 +842,7 @@ class PermissionModuleController extends Controller
                     'name' => $permission->name,
                     'description' => $permission->description,
                     'is_active' => (bool) $permission->is_active,
+                    'requires_scope' => (bool) $permission->requires_scope,
                     'created_at' => $permission->created_at,
                     'updated_at' => $permission->updated_at,
                 ],
@@ -1162,6 +1174,11 @@ class PermissionModuleController extends Controller
                 'required',
                 'boolean',
             ],
+
+            'requires_scope' => [
+                'required',
+                'boolean',
+            ],
         ]);
 
         /*
@@ -1201,6 +1218,7 @@ class PermissionModuleController extends Controller
         }
 
         $willBeActive = (bool) $validated['is_active'];
+        $willRequireScope = (bool) $validated['requires_scope'];
 
         try {
             DB::transaction(
@@ -1208,6 +1226,7 @@ class PermissionModuleController extends Controller
                     $permission,
                     $validated,
                     $willBeActive,
+                    $willRequireScope,
                 ): void {
                     $permission->update([
                         'name' => trim(
@@ -1223,6 +1242,7 @@ class PermissionModuleController extends Controller
                             : null,
 
                         'is_active' => $willBeActive,
+                        'requires_scope' => $willRequireScope,
                     ]);
                 },
             );
@@ -1241,6 +1261,7 @@ class PermissionModuleController extends Controller
                     'name' => $permission->name,
                     'description' => $permission->description,
                     'is_active' => (bool) $permission->is_active,
+                    'requires_scope' => (bool) $permission->requires_scope,
                     'created_at' => $permission->created_at,
                     'updated_at' => $permission->updated_at,
                 ],

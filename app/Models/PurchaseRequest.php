@@ -46,6 +46,10 @@ class PurchaseRequest extends Model
         'rejected_by',
         'rejected_notes',
 
+        'cancelled_by',
+        'cancelled_at',
+        'cancel_notes',
+
         'created_by',
         'updated_by',
 
@@ -68,6 +72,7 @@ class PurchaseRequest extends Model
         'submitted_at' => 'datetime',
         'requester_signed_at' => 'datetime',
         'requester_role_id' => 'integer',
+        'cancelled_at' => 'datetime',
     ];
 
     public const HO_CABANG_ID = 1;
@@ -243,6 +248,11 @@ class PurchaseRequest extends Model
         return $this->belongsTo(User::class, 'rejected_by');
     }
 
+    public function canceller()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
     public function approvals()
     {
         return $this->hasMany(PurchaseRequestApproval::class, 'purchase_request_id')
@@ -287,6 +297,7 @@ class PurchaseRequest extends Model
     const STATUS_IN_PROGRESS = 'IN PROGRESS';
     const STATUS_APPROVED = 'APPROVED';
     const STATUS_REJECTED = 'REJECTED';
+    const STATUS_CANCELLED = 'CANCELLED';
 
     // Status PO
     const STATUS_PO_OPEN = 'OPEN';

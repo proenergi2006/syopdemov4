@@ -1,10 +1,9 @@
 {
   "Dashboard": "Dashboard",
   "Master": "Master",
-  "Non Trade": "Non Trade",
+  "Non Stock": "Non Stock",
   "Auth": "Autentikasi",
   "Monitoring": "Monitoring",
-
   "Regional": "Regional",
   "Produk": "Produk",
   "PBBKB": "PBBKB",
@@ -22,29 +21,24 @@
   "Menu Management": "Manajemen Menu",
   "Dashboard Module Management": "Manajemen Dashboard Module",
   "Activity Log": "Log Aktivitas",
-
   "Purchase Requisition": "Purchase Requisition",
   "Purchase Order": "Purchase Order",
   "Goods Receipt": "Goods Receipt",
   "Goods Return": "Goods Return",
-
   "Users": "Pengguna",
   "Roles": "Peran",
   "Role Menu": "Menu Peran",
   "Role Permissions": "Izin Peran",
   "User Permission": "Izin Pengguna",
   "Permission Modules": "Modul Izin",
-
   "Provinsi": "Provinsi",
   "Kabupaten": "Kabupaten",
   "Wilayah": "Wilayah",
   "Area": "Area",
   "Contoh": "Contoh",
-
   "Transportir": "Transportir",
   "Sopir": "Sopir",
   "Mobil": "Mobil",
   "Ongkos Angkut": "Ongkos Angkut",
-
   "Log Viewer": "Log Viewer"
 }

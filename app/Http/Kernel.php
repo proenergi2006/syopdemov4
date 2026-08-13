@@ -21,6 +21,7 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+        \App\Http\Middleware\SetRequestLocale::class,
     ];
 
     /**
@@ -65,5 +66,6 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'auth.token.idle' => \App\Http\Middleware\EnsureSanctumTokenIsNotIdle::class,
         'log.activity' => \App\Http\Middleware\LogUserActivity::class,
+        'set.locale' => \App\Http\Middleware\SetRequestLocale::class,
     ];
 }

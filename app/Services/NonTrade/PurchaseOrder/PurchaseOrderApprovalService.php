@@ -4,8 +4,6 @@ namespace App\Services\NonTrade\PurchaseOrder;
 
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderApproval;
-use App\Models\PurchaseRequest;
-use App\Models\PurchaseRequestItem;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -527,6 +525,7 @@ class PurchaseOrderApprovalService
     public function markPurchaseOrderApproved(
         PurchaseOrder $purchaseOrder,
         User $user,
+        PurchaseOrderRollbackService $rollbackService,
     ): void {
         $purchaseOrder->update([
             'status' => 'APPROVED',
@@ -554,8 +553,8 @@ class PurchaseOrderApprovalService
     |--------------------------------------------------------------------------
     | Refresh status_po PR setelah PO final approved
     |--------------------------------------------------------------------------
-    | Saat create/update draft PO, PR tidak boleh langsung COMPLETED.
-    | PR baru boleh COMPLETED ketika PO sudah final approved.
+    | Saat create/update draft PO, PR tidak boleh langsung PARTIAL/COMPLETED.
+    | PR baru boleh PARTIAL/COMPLETED ketika PO sudah final approved.
     |--------------------------------------------------------------------------
     */
         $purchaseRequestIds = $this->getPurchaseRequestIdsByPurchaseOrder(
@@ -563,7 +562,7 @@ class PurchaseOrderApprovalService
         );
 
         foreach ($purchaseRequestIds as $purchaseRequestId) {
-            $this->refreshPurchaseRequestPOStatusAfterApproval(
+            $rollbackService->refreshPurchaseRequestPOStatus(
                 (int) $purchaseRequestId,
             );
         }
@@ -618,53 +617,6 @@ class PurchaseOrderApprovalService
         }
 
         return collect();
-    }
-
-    private function refreshPurchaseRequestPOStatusAfterApproval(
-        int $purchaseRequestId,
-    ): void {
-        $pr = PurchaseRequest::query()
-            ->where('id', $purchaseRequestId)
-            ->lockForUpdate()
-            ->first();
-
-        if (!$pr) {
-            return;
-        }
-
-        $summary = PurchaseRequestItem::query()
-            ->where('purchase_request_id', $purchaseRequestId)
-            ->whereNull('deleted_at')
-            ->selectRaw('
-            COALESCE(SUM(qty), 0) as total_qty_request,
-            COALESCE(SUM(qty_po), 0) as total_qty_po,
-            COALESCE(SUM(qty_outstanding), 0) as total_qty_outstanding
-        ')
-            ->first();
-
-        $totalQtyRequest = (float) ($summary->total_qty_request ?? 0);
-        $totalQtyPo = (float) ($summary->total_qty_po ?? 0);
-        $totalQtyOutstanding = (float) ($summary->total_qty_outstanding ?? 0);
-
-        if ($totalQtyPo <= 0) {
-            $statusPo = 'OPEN';
-        } elseif (
-            $totalQtyOutstanding > 0
-            && $totalQtyPo < $totalQtyRequest
-        ) {
-            $statusPo = 'PARTIAL';
-        } else {
-            /*
-        |--------------------------------------------------------------------------
-        | PO sudah final approved dan seluruh qty PR sudah dibuatkan PO.
-        |--------------------------------------------------------------------------
-        */
-            $statusPo = 'COMPLETED';
-        }
-
-        $pr->update([
-            'status_po' => $statusPo,
-        ]);
     }
 
     /*

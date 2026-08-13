@@ -17,10 +17,12 @@ class Permission extends Model
         'description',
         'route_prefix',
         'is_active',
+        'requires_scope',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'requires_scope' => 'boolean',
     ];
 
     public function roles()

@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\Master\CustomerController;
 use App\Http\Controllers\Api\Master\GroupCabangController;
 use App\Http\Controllers\Api\Master\MasterDokumenPendukungController;
 use App\Http\Controllers\Api\Master\MasterKeteranganTransaksiController;
+use App\Http\Controllers\Api\Master\MasterMaterialGroupController;
 use App\Http\Controllers\Api\Master\MasterVendorController;
 use App\Http\Controllers\Api\OngkosAngkutKapalController;
 use App\Http\Controllers\Api\Master\PermissionController;
@@ -76,11 +77,12 @@ Route::post(
 
 Route::get('/auth/reset-password/verify', [AuthController::class, 'verifyResetToken']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
-Route::middleware(['auth:sanctum', 'auth.token.idle', 'log.activity'])->group(function () {
+Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activity'])->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/auth/me/permissions', [AuthController::class, 'permissions']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::put('/account/change-password', [AccountController::class, 'changePassword']);
+    Route::put('/account/locale', [AccountController::class, 'updateLocale']);
     Route::get('/account/access-assignments', [AccountController::class, 'accessAssignments']);
     Route::get(
         'master/cabang/options',
@@ -148,6 +150,11 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'log.activity'])->group(fu
 
     Route::get('/units/dropdown-select', [UnitController::class, 'dropdownSelect']);
     Route::apiResource('/units', UnitController::class);
+
+    Route::get(
+        '/material-groups/dropdown-select',
+        [MasterMaterialGroupController::class, 'dropdownSelect']
+    );
 
     /*
     |--------------------------------------------------------------------------
@@ -390,6 +397,15 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'log.activity'])->group(fu
                 [PurchaseRequestController::class, 'dropdownApproved'],
             );
 
+            /*
+            | Harus didaftarkan sebelum route 'purchase-request/{publicId}',
+            | kalau tidak "export-excel" akan tertangkap sebagai publicId.
+            */
+            Route::get(
+                'purchase-request/export-excel',
+                [PurchaseRequestController::class, 'exportExcel'],
+            );
+
             Route::get(
                 'purchase-request/{publicId}/edit',
                 [PurchaseRequestController::class, 'edit'],
@@ -415,6 +431,11 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'log.activity'])->group(fu
                 [PurchaseRequestController::class, 'reject'],
             );
 
+            Route::patch(
+                'purchase-request/{publicId}/cancel',
+                [PurchaseRequestController::class, 'cancel'],
+            );
+
             Route::apiResource(
                 'purchase-request',
                 PurchaseRequestController::class,
@@ -436,6 +457,15 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'log.activity'])->group(fu
             Route::get(
                 'purchase-order/dropdown-receivable',
                 [PurchaseOrderController::class, 'dropdownReceivable'],
+            );
+
+            /*
+            | Harus didaftarkan sebelum route 'purchase-order/{publicId}',
+            | kalau tidak "export-excel" akan tertangkap sebagai publicId.
+            */
+            Route::get(
+                'purchase-order/export-excel',
+                [PurchaseOrderController::class, 'exportExcel'],
             );
 
             Route::get(
@@ -466,6 +496,11 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'log.activity'])->group(fu
             Route::patch(
                 'purchase-order/{publicId}/reject',
                 [PurchaseOrderController::class, 'reject'],
+            );
+
+            Route::patch(
+                'purchase-order/{publicId}/cancel',
+                [PurchaseOrderController::class, 'cancel'],
             );
 
             Route::apiResource(

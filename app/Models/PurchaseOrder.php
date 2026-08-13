@@ -29,6 +29,13 @@ class PurchaseOrder extends Model
         'requester_signature_path',
         'requester_signed_at',
         'requester_signed_by',
+        'cancelled_by',
+        'cancelled_at',
+        'cancel_notes',
+    ];
+
+    protected $casts = [
+        'cancelled_at' => 'datetime',
     ];
 
     /* ===============================
@@ -119,6 +126,11 @@ class PurchaseOrder extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function canceller()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function requesterSigner()

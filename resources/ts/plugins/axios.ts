@@ -25,15 +25,30 @@ axiosIns.interceptors.request.use(
   config => {
     const token = localStorage.getItem('accessToken')
 
+    config.headers = config.headers ?? {}
+
     if (token) {
       /*
       |--------------------------------------------------------------------------
       | Pastikan headers tidak undefined
       |--------------------------------------------------------------------------
       */
-      config.headers = config.headers ?? {}
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Kirim bahasa aktif ke backend
+    |--------------------------------------------------------------------------
+    | Dipakai backend (SetRequestLocale middleware) sebagai fallback untuk
+    | guest request (belum login) -- kalau sudah login, preferensi bahasa
+    | yang tersimpan di akun user tetap lebih diutamakan.
+    |--------------------------------------------------------------------------
+    */
+    const locale = localStorage.getItem('app-locale')
+
+    if (locale)
+      config.headers['X-App-Locale'] = locale
 
     return config
   },

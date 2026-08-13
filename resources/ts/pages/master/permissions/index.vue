@@ -50,6 +50,7 @@ interface PermissionItem {
   name: string
   description?: string | null
   is_active: boolean
+  requires_scope: boolean
 }
 
 type PermissionScope
@@ -76,6 +77,7 @@ interface PermissionFormRow {
   name: string
   description?: string | null
   is_permission_active: boolean
+  requires_scope: boolean
 
   is_checked: boolean
   scope: PermissionScope
@@ -403,6 +405,10 @@ const normalizePermissionItems = (
       is_active: normalizeBoolean(
         item.is_active ?? true,
       ),
+
+      requires_scope: normalizeBoolean(
+        item.requires_scope ?? true,
+      ),
     }))
     .filter(item => item.id > 0)
 }
@@ -543,20 +549,16 @@ const getActionColor = (
 |--------------------------------------------------------------------------
 */
 
-const isViewPermission = (
+const supportsScope = (
   row: PermissionFormRow,
 ): boolean => {
-  return String(
-    row.action || '',
-  ).toLowerCase() === 'view'
+  return Boolean(row.requires_scope)
 }
 
 const getDefaultScope = (
   permission: PermissionItem,
 ): PermissionScope => {
-  return String(
-    permission.action || '',
-  ).toLowerCase() === 'view'
+  return permission.requires_scope
     ? 'OWN_DEPARTMENT'
     : 'NONE'
 }
@@ -584,6 +586,9 @@ const buildEmptyPermissionRows = (): void => {
 
       is_permission_active:
         permission.is_active,
+
+      requires_scope:
+        permission.requires_scope,
 
       is_checked: false,
 
@@ -643,6 +648,9 @@ const buildRowsFromRolePermissions = (
         is_permission_active:
           permission.is_active,
 
+        requires_scope:
+          permission.requires_scope,
+
         is_checked:
           isChecked,
 
@@ -695,7 +703,7 @@ const buildPayload = (): BulkRolePermissionPayload => {
       is_active: Boolean(item.is_checked),
       is_allowed: Boolean(item.is_checked),
 
-      scope: item.action === 'view'
+      scope: item.requires_scope
         ? (
             item.is_checked
               ? item.scope
@@ -923,13 +931,13 @@ const onTogglePermission = (
   }
 
   if (
-    isViewPermission(row)
+    supportsScope(row)
     && row.scope === 'NONE'
   ) {
     row.scope = 'OWN_DEPARTMENT'
   }
 
-  if (!isViewPermission(row))
+  if (!supportsScope(row))
     row.scope = 'NONE'
 }
 
@@ -945,13 +953,13 @@ const checkAllVisible = (): void => {
     row.is_checked = true
 
     if (
-      isViewPermission(row)
+      supportsScope(row)
       && row.scope === 'NONE'
     ) {
       row.scope = 'OWN_DEPARTMENT'
     }
 
-    if (!isViewPermission(row))
+    if (!supportsScope(row))
       row.scope = 'NONE'
   })
 }
@@ -1540,7 +1548,7 @@ onMounted(async () => {
                       Action
                     </th>
                     <th style="width: 230px;" class="text-none">
-                      Scope View
+                      Scope
                     </th>
                     <th style="width: 160px;" class="text-none">
                       Status
@@ -1589,7 +1597,7 @@ onMounted(async () => {
 
                     <td>
                       <VSelect
-                        v-if="isViewPermission(row)"
+                        v-if="supportsScope(row)"
                         v-model="row.scope"
                         :items="scopeOptions"
                         item-title="title"

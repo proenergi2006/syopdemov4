@@ -1,0 +1,74 @@
+{
+  "list": {
+    "filters": {
+      "title": "Filters",
+      "searchLabel": "Search (code/name/initial)",
+      "searchPlaceholder": "Search vendor...",
+      "statusLabel": "Status",
+      "statusAll": "All",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "resetButton": "Reset Filter"
+    },
+    "buttons": {
+      "createButton": "Add Vendor",
+      "loadingText": "Loading...",
+      "reloadData": "Reload Data"
+    },
+    "table": {
+      "headers": {
+        "no": "No",
+        "code": "Code",
+        "name": "Vendor Name",
+        "initial": "Initial",
+        "status": "Status",
+        "submissionStatus": "Submission Status",
+        "actions": "Actions"
+      },
+      "waitingApprovalBadge": "Waiting for Your Approval",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "noDataAvailable": "No data available"
+    },
+    "menu": {
+      "viewDetail": "View Detail",
+      "approvalHistory": "Approval History",
+      "edit": "Edit",
+      "submit": "Submit",
+      "delete": "Delete",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "approve": "Approve",
+      "reject": "Reject"
+    },
+    "pagination": {
+      "rowsPerPage": "Rows per page:"
+    }
+  },
+  "statusDialog": {
+    "title": "Update Vendor Status",
+    "cancelButton": "Cancel",
+    "confirmButton": "Yes, Change"
+  },
+  "rejectDialog": {
+    "title": "Reject Master Vendor",
+    "notesLabel": "Reject Notes *",
+    "notesPlaceholder": "Enter the reason for rejecting the Vendor",
+    "notesHelp": "Notes must be filled in so that the Vendor creator knows the reason for rejection.",
+    "notesError": "Rejection notes must be filled in",
+    "cancelButton": "Cancel",
+    "saveNotesButton": "Save Notes"
+  },
+  "toast": {
+    "approveLoadingText": "Approving Vendor...",
+    "rejectLoadingText": "Rejecting Vendor...",
+    "deleteLoadingText": "Deleting vendor...",
+    "submitLoadingText": "Submitting Vendor...",
+    "approveNotApprover": "Access Denied",
+    "approveNotApproverText": "You are not the active approver for this Vendor.",
+    "invalidVendor": "Invalid Data",
+    "invalidVendorText": "Vendor Public ID not found.",
+    "loadingHistory": "Loading approval history...",
+    "loadingHistorySubtitle": "Please wait a moment"
+  }
+}

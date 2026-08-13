@@ -7,8 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\ApprovalHistoryPR;
 use App\Models\ApprovalMatrix;
 use App\Models\ApprovalMatrixPR;
+use App\Models\MasterMaterialGroup;
 use App\Models\PrAttachment;
 use Illuminate\Http\Request;
+use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestHistoryApproval;
 use App\Models\PurchaseRequestItem;
@@ -27,6 +29,7 @@ use App\Services\NonTrade\PurchaseRequest\PurchaseRequestApprovalGeneratorServic
 use App\Services\NonTrade\PurchaseRequest\PurchaseRequestApprovalService;
 use App\Services\NonTrade\PurchaseRequest\PurchaseRequestNotificationService;
 use App\Services\NonTrade\PurchaseRequest\PurchaseRequestMailService;
+use App\Services\NonTrade\PurchaseRequest\PurchaseRequestRollbackService;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -49,7 +52,7 @@ class PurchaseRequestController extends Controller
         if ($totalAmount < self::MINIMUM_PR_AMOUNT) {
             throw ValidationException::withMessages([
                 'total_amount' => [
-                    'Minimal nilai Purchase Requisition adalah Rp 1.000.000.',
+                    __('purchase_request_messages.minimum_amount'),
                 ],
             ]);
         }
@@ -112,7 +115,7 @@ class PurchaseRequestController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('purchase_request_messages.user_not_authenticated'),
                     'data' => [],
                     'meta' => [
                         'current_page' => 1,
@@ -208,19 +211,6 @@ class PurchaseRequestController extends Controller
                 'waiting_my_approval',
             );
 
-            Log::info('[PR INDEX PERMISSION DEBUG]', [
-                'user_id' => $user->id,
-                'raw_role_id' => $user->getAttribute('role_id'),
-                'active_role_id' => $activeRoleId,
-                'all_role_ids' => $userRoleIds->all(),
-                'permission' => 'purchase_request.view',
-                'has_permission' => $user->hasPermission(
-                    'purchase_request.view',
-                ),
-                'scope' => $scope,
-                'waiting_my_approval' => $waitingMyApproval,
-            ]);
-
             $canSubmit = $user->hasPermission(
                 'purchase_request.submit',
             );
@@ -269,6 +259,11 @@ class PurchaseRequestController extends Controller
                             ->orderBy('step_order')
                             ->orderBy('id');
                     },
+
+                    'purchaseOrders' => function ($purchaseOrderQuery) {
+                        $purchaseOrderQuery
+                            ->orderByDesc('purchase_orders.id');
+                    },
                 ]);
 
             /*
@@ -310,155 +305,19 @@ class PurchaseRequestController extends Controller
             |--------------------------------------------------------------------------
             | Apply Visibility Scope
             |--------------------------------------------------------------------------
+            | Logika scope dipakai bersama dengan exportExcel(). Jangan diduplikasi di
+            | sana -- kalau keduanya berbeda, user bisa mengekspor data yang tidak boleh
+            | dilihatnya lewat daftar.
+            |--------------------------------------------------------------------------
             */
-            if ($scope !== 'ALL') {
-                $query->where(function ($visibilityQuery) use (
-                    $scope,
-                    $user,
-                    $userRoleIds,
-                    $userAccessAssignments,
-                    $userAccessibleBranchIds,
-                    $userAccessibleDepartmentIds,
-                ) {
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Scope data normal
-                    |--------------------------------------------------------------------------
-                    */
-                    $visibilityQuery->where(function ($scopeQuery) use (
-                        $scope,
-                        $user,
-                        $userAccessAssignments,
-                        $userAccessibleBranchIds,
-                        $userAccessibleDepartmentIds,
-                    ) {
-                        /*
-                        |--------------------------------------------------------------------------
-                        | OWN_DATA
-                        |--------------------------------------------------------------------------
-                        | Tetap berdasarkan creator.
-                        |--------------------------------------------------------------------------
-                        */
-                        if ($scope === 'OWN_DATA') {
-                            if ($user->id) {
-                                $scopeQuery->where(
-                                    'purchase_requests.created_by',
-                                    $user->id,
-                                );
-                            } else {
-                                $scopeQuery->whereRaw('1 = 0');
-                            }
-
-                            return;
-                        }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | OWN_DEPARTMENT
-                        |--------------------------------------------------------------------------
-                        | Scope department berarti user bisa melihat seluruh PR dari department
-                        | yang sama, lintas semua cabang.
-                        |
-                        | Department diambil dari master user + access assignment tambahan.
-                        |--------------------------------------------------------------------------
-                        */
-                        if ($scope === 'OWN_DEPARTMENT') {
-                            if ($userAccessibleDepartmentIds->isEmpty()) {
-                                $scopeQuery->whereRaw('1 = 0');
-
-                                return;
-                            }
-
-                            $scopeQuery->whereIn(
-                                'purchase_requests.id_department',
-                                $userAccessibleDepartmentIds->all(),
-                            );
-
-                            return;
-                        }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | OWN_CABANG
-                        |--------------------------------------------------------------------------
-                        | Sekarang berdasarkan semua branch dari assignment user.
-                        |--------------------------------------------------------------------------
-                        */
-                        if ($scope === 'OWN_CABANG') {
-                            if ($userAccessibleBranchIds->isEmpty()) {
-                                $scopeQuery->whereRaw('1 = 0');
-
-                                return;
-                            }
-
-                            $scopeQuery->whereIn(
-                                'purchase_requests.cabang',
-                                $userAccessibleBranchIds
-                                    ->map(fn($id) => (string) $id)
-                                    ->all(),
-                            );
-
-                            return;
-                        }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | NONE / scope tidak valid
-                        |--------------------------------------------------------------------------
-                        */
-                        $scopeQuery->whereRaw('1 = 0');
-                    });
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Dokumen yang terkait dengan approval user
-                    |--------------------------------------------------------------------------
-                    | Tetap dipertahankan agar approver masih bisa melihat dokumen yang
-                    | ada dalam flow approval dirinya.
-                    |--------------------------------------------------------------------------
-                    */
-                    $visibilityQuery->orWhereHas(
-                        'approvals',
-                        function ($approvalQuery) use (
-                            $user,
-                            $userRoleIds,
-                        ) {
-                            $approvalQuery->where(function ($approverQuery) use (
-                                $user,
-                                $userRoleIds,
-                            ) {
-                                $approverQuery->where(function ($userQuery) use ($user) {
-                                    $userQuery
-                                        ->where(
-                                            'purchase_request_approvals.approver_type',
-                                            PurchaseRequestApproval::APPROVER_TYPE_USER,
-                                        )
-                                        ->where(
-                                            'purchase_request_approvals.approver_id',
-                                            $user->id,
-                                        );
-                                });
-
-                                if ($userRoleIds->isNotEmpty()) {
-                                    $approverQuery->orWhere(function ($roleQuery) use (
-                                        $userRoleIds,
-                                    ) {
-                                        $roleQuery
-                                            ->where(
-                                                'purchase_request_approvals.approver_type',
-                                                PurchaseRequestApproval::APPROVER_TYPE_ROLE,
-                                            )
-                                            ->whereIn(
-                                                'purchase_request_approvals.approver_id',
-                                                $userRoleIds->all(),
-                                            );
-                                    });
-                                }
-                            });
-                        },
-                    );
-                });
-            }
+            $this->applyPurchaseRequestVisibilityScope(
+                $query,
+                $user,
+                $scope,
+                $userRoleIds,
+                $userAccessibleBranchIds,
+                $userAccessibleDepartmentIds,
+            );
 
             /*
             |--------------------------------------------------------------------------
@@ -527,175 +386,14 @@ class PurchaseRequestController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | Filter Search
+            | Filter daftar
             |--------------------------------------------------------------------------
-            | Jangan pakai orWhereHas cabangData karena purchase_requests.cabang
-            | bertipe varchar sedangkan cabang.id bigint.
-            |--------------------------------------------------------------------------
-            */
-            if ($request->filled('search')) {
-                $search = trim(
-                    (string) $request->input('search'),
-                );
-
-                if ($search !== '') {
-                    $searchLike = "%{$search}%";
-
-                    $query->where(function ($q) use ($searchLike) {
-                        $q->where(
-                            'purchase_requests.nomor_pr',
-                            'ILIKE',
-                            $searchLike,
-                        )
-                            ->orWhere(
-                                'purchase_requests.kategori',
-                                'ILIKE',
-                                $searchLike,
-                            )
-                            ->orWhere(
-                                'purchase_requests.notes',
-                                'ILIKE',
-                                $searchLike,
-                            )
-                            ->orWhereHas(
-                                'departmentData',
-                                function ($departmentQuery) use ($searchLike) {
-                                    $departmentQuery
-                                        ->where(
-                                            'kode',
-                                            'ILIKE',
-                                            $searchLike,
-                                        )
-                                        ->orWhere(
-                                            'nama',
-                                            'ILIKE',
-                                            $searchLike,
-                                        );
-                                },
-                            )
-                            ->orWhereExists(function ($cabangQuery) use ($searchLike) {
-                                $cabangQuery
-                                    ->select(DB::raw(1))
-                                    ->from('cabang')
-                                    ->whereRaw(
-                                        'CAST(cabang.id AS VARCHAR) = purchase_requests.cabang',
-                                    )
-                                    ->where(function ($subQuery) use ($searchLike) {
-                                        $subQuery
-                                            ->where(
-                                                'cabang.nama_cabang',
-                                                'ILIKE',
-                                                $searchLike,
-                                            )
-                                            ->orWhere(
-                                                'cabang.inisial_cabang',
-                                                'ILIKE',
-                                                $searchLike,
-                                            );
-                                    });
-                            });
-                    });
-                }
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Filter Tanggal
+            | Search, rentang tanggal, status, status PO, department, dan cabang.
+            | Dipakai bersama exportExcel() agar isi file selalu sama dengan daftar
+            | yang sedang dilihat user.
             |--------------------------------------------------------------------------
             */
-            if ($request->filled('tanggal_mulai')) {
-                $query->whereDate(
-                    'purchase_requests.tanggal_pr',
-                    '>=',
-                    $request->input('tanggal_mulai'),
-                );
-            }
-
-            if ($request->filled('tanggal_selesai')) {
-                $query->whereDate(
-                    'purchase_requests.tanggal_pr',
-                    '<=',
-                    $request->input('tanggal_selesai'),
-                );
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Filter Status Approval
-            |--------------------------------------------------------------------------
-            */
-            if ($request->filled('status')) {
-                $status = strtoupper(
-                    trim(
-                        (string) $request->input('status'),
-                    ),
-                );
-
-                if (
-                    $status !== ''
-                    && !in_array($status, ['ALL', 'SEMUA'], true)
-                ) {
-                    $query->where(
-                        'purchase_requests.status',
-                        $status,
-                    );
-                }
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Filter Status PO
-            |--------------------------------------------------------------------------
-            */
-            if ($request->filled('status_po')) {
-                $statusPo = strtoupper(
-                    trim(
-                        (string) $request->input('status_po'),
-                    ),
-                );
-
-                if (
-                    $statusPo !== ''
-                    && !in_array($statusPo, ['ALL', 'SEMUA'], true)
-                ) {
-                    if (
-                        in_array($statusPo, ['NULL', 'NONE', 'BELUM_PO', 'BELUM PO'], true)
-                    ) {
-                        $query->whereNull(
-                            'purchase_requests.status_po',
-                        );
-                    } else {
-                        $query->where(
-                            'purchase_requests.status_po',
-                            $statusPo,
-                        );
-                    }
-                }
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Optional filter department/cabang dari FE
-            |--------------------------------------------------------------------------
-            */
-            if ($request->filled('id_department')) {
-                $query->where(
-                    'purchase_requests.id_department',
-                    (int) $request->input('id_department'),
-                );
-            }
-
-            if ($request->filled('cabang')) {
-                /*
-                |--------------------------------------------------------------------------
-                | purchase_requests.cabang bertipe varchar di database tertentu.
-                |--------------------------------------------------------------------------
-                */
-                $query->where(
-                    'purchase_requests.cabang',
-                    (string) $request->input('cabang'),
-                );
-            }
+            $this->applyPurchaseRequestListFilters($query, $request);
 
 
             /*
@@ -889,6 +587,16 @@ class PurchaseRequestController extends Controller
                         'status' => $pr->status,
                         'status_po' => $pr->status_po,
 
+                        'purchase_orders' => $pr->purchaseOrders
+                            ->map(function (PurchaseOrder $po): array {
+                                return [
+                                    'public_id' => $po->encrypted_id,
+                                    'nomor_po' => $po->nomor_po,
+                                    'status' => $po->status,
+                                ];
+                            })
+                            ->values(),
+
                         'can_submit' => $rowCanSubmit,
                         'can_approve' => $currentApproval !== null,
 
@@ -944,6 +652,16 @@ class PurchaseRequestController extends Controller
                                 return [
                                     'id' => $item->id,
                                     'nama_item' => $item->nama_item,
+
+                                    'master_material_group_id'
+                                    => $item->master_material_group_id,
+
+                                    'material_group' => [
+                                        'id' => $item->materialGroup?->id,
+                                        'code' => $item->materialGroup?->code ?? '-',
+                                        'name' => $item->materialGroup?->name ?? '-',
+                                    ],
+
                                     'qty' => $item->qty,
                                     'satuan' => $item->satuan,
                                     'spesifikasi' => $item->spesifikasi,
@@ -959,7 +677,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data Purchase Requisition berhasil dimuat.',
+                'message' => __('purchase_request_messages.index.loaded'),
                 'data' => $prs->items(),
                 'meta' => [
                     'current_page' => $prs->currentPage(),
@@ -980,7 +698,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat data Purchase Requisition.',
+                'message' => __('purchase_request_messages.index.load_failed'),
                 'data' => [],
                 'meta' => [
                     'current_page' => 1,
@@ -1016,7 +734,7 @@ class PurchaseRequestController extends Controller
         if (!$user) {
             throw ValidationException::withMessages([
                 'user' => [
-                    'User tidak terautentikasi.',
+                    __('purchase_request_messages.user_not_authenticated'),
                 ],
             ]);
         }
@@ -1027,7 +745,7 @@ class PurchaseRequestController extends Controller
         if ($branchId <= 0 || $departmentId <= 0) {
             throw ValidationException::withMessages([
                 'access_assignment' => [
-                    'Cabang dan department wajib dipilih.',
+                    __('purchase_request_messages.access_assignment.branch_department_required'),
                 ],
             ]);
         }
@@ -1062,7 +780,7 @@ class PurchaseRequestController extends Controller
 
             throw ValidationException::withMessages([
                 'access_assignment' => [
-                    'Anda tidak memiliki akses untuk cabang dan department tersebut.',
+                    __('purchase_request_messages.access_assignment.no_access_branch_department'),
                 ],
             ]);
         }
@@ -1082,7 +800,7 @@ class PurchaseRequestController extends Controller
         if (!$hasSelectedAssignment) {
             throw ValidationException::withMessages([
                 'access_assignment' => [
-                    'Anda tidak memiliki akses membuat Purchase Requisition untuk cabang dan department tersebut.',
+                    __('purchase_request_messages.access_assignment.no_access_create'),
                 ],
             ]);
         }
@@ -1161,7 +879,7 @@ class PurchaseRequestController extends Controller
         if (!$user || !$user->hasPermission('purchase_request.create')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk membuat Purchase Requisition.',
+                'message' => __('purchase_request_messages.store.forbidden'),
             ], 403);
         }
 
@@ -1255,6 +973,10 @@ class PurchaseRequestController extends Controller
                     throw new \Exception('Nama item wajib diisi.');
                 }
 
+                if (empty($item['master_material_group_id'])) {
+                    throw new \Exception('Material Group item wajib dipilih.');
+                }
+
                 if (empty($item['qty']) || (float) $item['qty'] <= 0) {
                     throw new \Exception('Qty item wajib diisi.');
                 }
@@ -1267,6 +989,15 @@ class PurchaseRequestController extends Controller
                     throw new \Exception('Harga satuan item wajib diisi.');
                 }
             }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Pastikan Material Group benar-benar ada dan masih aktif
+        |--------------------------------------------------------------------------
+        | Dicek kolektif dalam satu query agar tidak menembak DB per item.
+        |--------------------------------------------------------------------------
+        */
+            $this->assertMaterialGroupsAreValid($items);
 
             /*
         |--------------------------------------------------------------------------
@@ -1457,6 +1188,8 @@ class PurchaseRequestController extends Controller
                 PurchaseRequestItem::create([
                     'purchase_request_id' => $pr->id,
                     'nama_item'           => $clean($item['nama_item'] ?? ''),
+                    'master_material_group_id'
+                    => (int) $item['master_material_group_id'],
                     'qty'                 => $qty,
                     'qty_outstanding'     => $qty,
                     'satuan'              => $item['satuan'] ?? '',
@@ -1471,7 +1204,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success'  => true,
-                'message'  => 'Purchase Requisition berhasil disimpan.',
+                'message'  => __('purchase_request_messages.store.success'),
                 'nomor_pr' => $nomorPr,
                 'data'     => [
                     'id'        => $pr->id,
@@ -1513,7 +1246,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menyimpan Purchase Requisition. Silakan periksa data atau hubungi IT.',
+                'message' => __('purchase_request_messages.store.failed'),
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
@@ -1533,6 +1266,7 @@ class PurchaseRequestController extends Controller
                 'recommendedVendor:id,nama_vendor,status_pkp,jenis_pembayaran,top',
                 'purchaseOrders:id,nomor_po,tanggal_po,status,total_nilai',
                 'items.unit:id,kode,nama',
+                'items.materialGroup:id,code,name',
                 'attachments',
                 'approvalHistories',
                 'creator',
@@ -1783,7 +1517,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Detail Purchase Requisition berhasil dimuat.',
+                'message' => __('purchase_request_messages.show.loaded'),
 
                 'data' => [
                     'id' => $pr->id,
@@ -1861,7 +1595,19 @@ class PurchaseRequestController extends Controller
                 | Purchase Order terkait
                 |--------------------------------------------------------------------------
                 */
-                    'purchase_orders' => $validPurchaseOrders
+                    /*
+                |--------------------------------------------------------------------------
+                | Purchase Order Terkait (tampilan)
+                |--------------------------------------------------------------------------
+                | Beda dengan $validPurchaseOrders yang dipakai untuk perhitungan
+                | total_po/outstanding di atas. Untuk tampilan, seluruh PO yang
+                | pernah terhubung ke PR ini ditampilkan apa adanya (termasuk
+                | DRAFT, REJECTED, CANCELLED) supaya user bisa melihat riwayat
+                | lengkapnya, masing-masing dengan status aslinya.
+                |--------------------------------------------------------------------------
+                */
+                    'purchase_orders' => $pr->purchaseOrders
+                        ->sortByDesc('id')
                         ->map(function ($po) {
                             return [
                                 'id' => $po->id,
@@ -1945,6 +1691,16 @@ class PurchaseRequestController extends Controller
                             return [
                                 'id' => $item->id,
                                 'nama_item' => $item->nama_item,
+
+                                'master_material_group_id'
+                                => $item->master_material_group_id,
+
+                                'material_group' => [
+                                    'id' => $item->materialGroup?->id,
+                                    'code' => $item->materialGroup?->code ?? '-',
+                                    'name' => $item->materialGroup?->name ?? '-',
+                                ],
+
                                 'qty' => $item->qty,
                                 'qty_po' => $item->qty_po,
                                 'qty_outstanding' => $item->qty_outstanding,
@@ -2110,7 +1866,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat detail Purchase Requisition.',
+                'message' => __('purchase_request_messages.show.load_failed'),
                 'data' => null,
 
                 'debug' => app()->environment('local')
@@ -2128,7 +1884,7 @@ class PurchaseRequestController extends Controller
         if (!$user || !$user->hasPermission('purchase_request.update')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk mengubah Purchase Requisition.',
+                'message' => __('purchase_request_messages.update.forbidden'),
             ], 403);
         }
 
@@ -2212,7 +1968,7 @@ class PurchaseRequestController extends Controller
             if ($pr->status === PurchaseRequest::STATUS_APPROVED) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition sudah diapprove. Tidak dapat diperbarui.',
+                    'message' => __('purchase_request_messages.update.already_approved'),
                 ], 403);
             }
 
@@ -2232,6 +1988,10 @@ class PurchaseRequestController extends Controller
                     throw new \Exception('Nama item wajib diisi.');
                 }
 
+                if (empty($item['master_material_group_id'])) {
+                    throw new \Exception('Material Group item wajib dipilih.');
+                }
+
                 if (empty($item['qty']) || (float) $item['qty'] <= 0) {
                     throw new \Exception('Qty item wajib diisi.');
                 }
@@ -2244,6 +2004,15 @@ class PurchaseRequestController extends Controller
                     throw new \Exception('Harga satuan item wajib diisi.');
                 }
             }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Pastikan Material Group benar-benar ada dan masih aktif
+        |--------------------------------------------------------------------------
+        | Dicek kolektif dalam satu query agar tidak menembak DB per item.
+        |--------------------------------------------------------------------------
+        */
+            $this->assertMaterialGroupsAreValid($items);
 
             /*
         |--------------------------------------------------------------------------
@@ -2372,6 +2141,8 @@ class PurchaseRequestController extends Controller
                 PurchaseRequestItem::create([
                     'purchase_request_id' => $pr->id,
                     'nama_item'           => $clean($item['nama_item'] ?? ''),
+                    'master_material_group_id'
+                    => (int) $item['master_material_group_id'],
                     'qty'                 => $qty,
                     'qty_outstanding'     => $qty,
                     'satuan'              => $clean($item['satuan'] ?? ''),
@@ -2483,7 +2254,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Requisition berhasil diperbarui.',
+                'message' => __('purchase_request_messages.update.success'),
                 'data' => [
                     'id' => $pr->id,
                     'public_id' => $pr->encrypted_id ?? null,
@@ -2524,7 +2295,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update Purchase Requisition. Silakan periksa data atau hubungi IT.',
+                'message' => __('purchase_request_messages.update.failed'),
                 'error'   => config('app.debug') ? $e->getMessage() : null,
                 'line'    => config('app.debug') ? $e->getLine() : null,
             ], 500);
@@ -2543,7 +2314,7 @@ class PurchaseRequestController extends Controller
         if (!$user || !$user->hasPermission('purchase_request.delete')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk menghapus Purchase Requisition.',
+                'message' => __('purchase_request_messages.destroy.forbidden'),
             ], 403);
         }
 
@@ -2563,7 +2334,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition tidak ditemukan.',
+                    'message' => __('purchase_request_messages.not_found'),
                 ], 404);
             }
 
@@ -2572,7 +2343,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition hanya dapat dihapus jika status masih Draft.',
+                    'message' => __('purchase_request_messages.destroy.only_draft'),
                 ], 422);
             }
 
@@ -2618,7 +2389,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Requisition berhasil dihapus.',
+                'message' => __('purchase_request_messages.destroy.success'),
             ], 200);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -2632,51 +2403,132 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menghapus Purchase Requisition.',
+                'message' => __('purchase_request_messages.destroy.failed'),
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Export Excel Purchase Requisition
+    |--------------------------------------------------------------------------
+    | Menerima parameter filter yang sama dengan index() sehingga isi file
+    | selalu sama dengan daftar yang sedang dilihat user, termasuk batasan
+    | visibility scope-nya.
+    |
+    | Judul kolom mengikuti ?lang=id|en, mengikuti pola yang dipakai print.
+    |--------------------------------------------------------------------------
+    */
     public function exportExcel(Request $request)
     {
-        $query = PurchaseRequest::with([
-            "vendors.vendor",
-            "vendors.items",
-        ]);
+        try {
+            $user = $request->user();
 
-        // ===============================
-        // FILTER FIELD
-        // ===============================
-        if ($request->field && $request->value && $request->type !== null) {
-
-            $field = $request->field;
-            $type  = $request->type;
-            $value = $request->value;
-
-            if ($type === "like") {
-                $query->where($field, "ILIKE", "%$value%");
-            } else {
-                $query->where($field, $type, $value);
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('purchase_request_messages.user_not_authenticated'),
+                ], 401);
             }
-        }
 
-        // ===============================
-        // FILTER RANGE TANGGAL
-        // ===============================
-        if ($request->dateStart && $request->dateEnd) {
-            $query->whereBetween('tanggal_pr', [
-                $request->dateStart,
-                $request->dateEnd
+            /*
+            |--------------------------------------------------------------------------
+            | Bahasa file export
+            |--------------------------------------------------------------------------
+            */
+            $lang = strtolower(trim((string) $request->query('lang', 'id')));
+
+            if (!in_array($lang, ['id', 'en'], true)) {
+                $lang = 'id';
+            }
+
+            app()->setLocale($lang);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Gerbang: permission export tersendiri
+            |--------------------------------------------------------------------------
+            | Permission ini tidak memakai scope. Yang menentukan ISI file adalah
+            | visibility PR yang sama persis dengan daftar. Jadi permission export
+            | hanya menjawab "boleh menarik data keluar atau tidak", bukan "boleh
+            | melihat data siapa".
+            |--------------------------------------------------------------------------
+            */
+            if (!$user->hasPermission('purchase_request.export')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('purchase_request_messages.export.forbidden'),
+                ], 403);
+            }
+
+            $context = $this->resolvePurchaseRequestViewContext($user);
+
+            /*
+            | Scope NONE berarti tidak ada satu pun PR yang terlihat olehnya,
+            | sehingga export pun tidak ada isinya.
+            */
+            if ($context['scope'] === 'NONE') {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('purchase_request_messages.export.forbidden'),
+                ], 403);
+            }
+
+            $query = PurchaseRequest::query()
+                ->with([
+                    'cabangData',
+                    'departmentData',
+                    'items.unit',
+
+                    'purchaseOrders' => function ($purchaseOrderQuery) {
+                        $purchaseOrderQuery->orderByDesc('purchase_orders.id');
+                    },
+                ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Scope + filter yang sama persis dengan index()
+            |--------------------------------------------------------------------------
+            */
+            $this->applyPurchaseRequestVisibilityScope(
+                $query,
+                $user,
+                $context['scope'],
+                $context['userRoleIds'],
+                $context['userAccessibleBranchIds'],
+                $context['userAccessibleDepartmentIds'],
+            );
+
+            $this->applyPurchaseRequestListFilters($query, $request);
+
+            $data = $query
+                ->orderByDesc('purchase_requests.id')
+                ->get();
+
+            $fileName = __('purchase_request_messages.export.filename')
+                . '_' . now()->format('Ymd_His')
+                . '.xlsx';
+
+            return Excel::download(
+                new PurchaseRequestExport($data),
+                $fileName,
+            );
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Requisition] Export excel error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request' => $request->all(),
+                'user_id' => $request->user()?->id,
             ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.export.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
         }
-
-        $data = $query->orderBy("id", "desc")->get();
-
-        return Excel::download(
-            new PurchaseRequestExport($data),
-            "purchase_request.xlsx"
-        );
     }
 
     public function edit(Request $request, $publicId)
@@ -2687,7 +2539,7 @@ class PurchaseRequestController extends Controller
         if (!$user || !$user->hasPermission('purchase_request.update')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk mengubah Purchase Requisition.',
+                'message' => __('purchase_request_messages.edit.forbidden'),
             ], 403);
         }
 
@@ -2699,20 +2551,21 @@ class PurchaseRequestController extends Controller
                 'departmentData',
                 'recommendedVendor',
                 'items.unit',
+                'items.materialGroup',
                 'attachments',
             ])->findOrFail($id);
 
             if (!$pr) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition tidak ditemukan.',
+                    'message' => __('purchase_request_messages.not_found'),
                     'data' => null,
                 ], 404);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data edit Purchase Requisition berhasil dimuat.',
+                'message' => __('purchase_request_messages.edit.loaded'),
                 'data' => [
                     'id' => $pr->id,
                     'public_id' => $pr->encrypted_id,
@@ -2746,6 +2599,16 @@ class PurchaseRequestController extends Controller
                         return [
                             'id' => $item->id,
                             'nama_item' => $item->nama_item,
+
+                            'master_material_group_id'
+                            => $item->master_material_group_id,
+
+                            'material_group' => [
+                                'id' => $item->materialGroup?->id,
+                                'code' => $item->materialGroup?->code ?? '-',
+                                'name' => $item->materialGroup?->name ?? '-',
+                            ],
+
                             'qty' => $item->qty,
 
                             'satuan_id' => $item->satuan,
@@ -2784,7 +2647,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat data edit Purchase Requisition.',
+                'message' => __('purchase_request_messages.edit.load_failed'),
                 'data' => null,
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
@@ -2801,14 +2664,14 @@ class PurchaseRequestController extends Controller
             $pr = PurchaseRequest::find($attachment->purchase_request_id);
             if (!$pr) {
                 return response()->json([
-                    'message' => 'Purchase Requisition tidak ditemukan.'
+                    'message' => __('purchase_request_messages.not_found')
                 ], 404);
             }
 
             // 3️⃣ Proteksi status
             if (in_array($pr->status, ['APPROVED', 'IN PROGRESS'])) {
                 return response()->json([
-                    'message' => 'PR sudah diapprove atau sedang tahap approval. Lampiran tidak dapat dihapus.'
+                    'message' => __('purchase_request_messages.attachment.already_approved')
                 ], 403);
             }
 
@@ -2824,15 +2687,29 @@ class PurchaseRequestController extends Controller
             $attachment->delete();
 
             return response()->json([
-                'message' => 'Lampiran berhasil dihapus.'
+                'message' => __('purchase_request_messages.attachment.deleted')
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::warning('[Purchase Requisition] Delete attachment - not found', [
+                'message' => $e->getMessage(),
+                'attachment_id' => $id,
+                'user_id' => auth()->id(),
+            ]);
+
             return response()->json([
-                'message' => 'Lampiran tidak ditemukan.'
+                'message' => __('purchase_request_messages.attachment.not_found')
             ], 404);
         } catch (\Exception $e) {
+            Log::error('[Purchase Requisition] Delete attachment error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'attachment_id' => $id,
+                'user_id' => auth()->id(),
+            ]);
+
             return response()->json([
-                'message' => 'Gagal menghapus lampiran.',
+                'message' => __('purchase_request_messages.attachment.delete_failed'),
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -2863,7 +2740,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('purchase_request_messages.user_not_authenticated'),
                 ], 401);
             }
 
@@ -2881,7 +2758,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition tidak sedang dalam proses approval.',
+                    'message' => __('purchase_request_messages.approve.not_in_progress'),
                 ], 422);
             }
 
@@ -3015,7 +2892,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal approve Purchase Requisition.',
+                'message' => __('purchase_request_messages.approve.failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -3048,7 +2925,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('purchase_request_messages.user_not_authenticated'),
                 ], 401);
             }
 
@@ -3066,7 +2943,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition tidak sedang dalam proses approval.',
+                    'message' => __('purchase_request_messages.reject.not_in_progress'),
                 ], 422);
             }
 
@@ -3103,7 +2980,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Requisition berhasil ditolak.',
+                'message' => __('purchase_request_messages.reject.success'),
                 'data' => [
                     'id' => $purchaseRequest->id,
                     'public_id' => $purchaseRequest->encrypted_id,
@@ -3137,7 +3014,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal reject Purchase Requisition.',
+                'message' => __('purchase_request_messages.reject.failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -3162,7 +3039,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak terautentikasi.',
+                    'message' => __('purchase_request_messages.user_not_authenticated'),
                 ], 401);
             }
 
@@ -3179,7 +3056,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition hanya bisa disubmit dari status Draft.',
+                    'message' => __('purchase_request_messages.submit.only_draft'),
                 ], 422);
             }
 
@@ -3188,7 +3065,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Purchase Requisition tidak dapat disubmit karena item belum tersedia.',
+                    'message' => __('purchase_request_messages.submit.items_unavailable'),
                 ], 422);
             }
 
@@ -3209,7 +3086,7 @@ class PurchaseRequestController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Tanda tangan requester belum tersedia. Silakan lengkapi tanda tangan terlebih dahulu.',
+                    'message' => __('purchase_request_messages.submit.signature_missing'),
                 ], 422);
             }
 
@@ -3290,7 +3167,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Requisition berhasil disubmit.',
+                'message' => __('purchase_request_messages.submit.success'),
                 'data' => [
                     'id' => $pr->id,
                     'public_id' => $pr->encrypted_id
@@ -3330,7 +3207,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal submit Purchase Requisition.',
+                'message' => __('purchase_request_messages.submit.failed'),
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
@@ -3342,61 +3219,104 @@ class PurchaseRequestController extends Controller
         Request $request,
         string $publicId,
     ): JsonResponse {
-        $lang = strtolower(
-            trim(
-                (string) $request->query(
-                    'lang',
-                    'id',
+        try {
+            $lang = strtolower(
+                trim(
+                    (string) $request->query(
+                        'lang',
+                        'id',
+                    ),
                 ),
-            ),
-        );
+            );
 
-        if (!in_array($lang, ['id', 'en'], true)) {
-            $lang = 'id';
+            if (!in_array($lang, ['id', 'en'], true)) {
+                $lang = 'id';
+            }
+
+            $id = (int) Crypt::decryptString(
+                $publicId,
+            );
+
+            $pr = PurchaseRequest::query()
+                ->findOrFail($id);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validasi permission print PR jika ada
+            |--------------------------------------------------------------------------
+            */
+            // abort_unless($userCanPrint, 403);
+
+            $relativeUrl = URL::temporarySignedRoute(
+                'transaction.purchase-request.print-signed',
+                now()->addMinutes(10),
+                [
+                    'publicId' => $publicId,
+                    'lang' => $lang,
+                ],
+                false,
+            );
+
+            $url = rtrim(config('app.url'), '/') . $relativeUrl;
+
+            return response()
+                ->json([
+                    'success' => true,
+                    'url' => $url,
+                ])
+                ->header('Content-Type', 'application/json; charset=UTF-8');
+        } catch (DecryptException | ModelNotFoundException $e) {
+            Log::warning('[Purchase Requisition] Generate print URL - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.print.not_found'),
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Requisition] Generate print URL error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.print.url_failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
         }
-
-        $id = (int) Crypt::decryptString(
-            $publicId,
-        );
-
-        $pr = PurchaseRequest::query()
-            ->findOrFail($id);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validasi permission print PR jika ada
-        |--------------------------------------------------------------------------
-        */
-        // abort_unless($userCanPrint, 403);
-
-        $relativeUrl = URL::temporarySignedRoute(
-            'transaction.purchase-request.print-signed',
-            now()->addMinutes(10),
-            [
-                'publicId' => $publicId,
-                'lang' => $lang,
-            ],
-            false,
-        );
-
-        $url = rtrim(config('app.url'), '/') . $relativeUrl;
-
-        return response()
-            ->json([
-                'success' => true,
-                'url' => $url,
-            ])
-            ->header('Content-Type', 'application/json; charset=UTF-8');
     }
 
     public function printSigned(
         Request $request,
         string $publicId,
     ) {
-        return $this->print(
-            $request,
-            $publicId,
-        );
+        try {
+            return $this->print(
+                $request,
+                $publicId,
+            );
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Requisition] Print signed error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.print.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function print(
@@ -3445,6 +3365,8 @@ class PurchaseRequestController extends Controller
                 'items',
 
                 'items.unit:id,kode,nama',
+
+                'items.materialGroup:id,code,name',
 
                 'creator:id,name',
 
@@ -3732,6 +3654,12 @@ class PurchaseRequestController extends Controller
             DecryptException |
             ModelNotFoundException $e
         ) {
+            Log::warning('[Purchase Requisition] Print - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+            ]);
+
             return response()->json([
                 'success' => false,
 
@@ -3905,6 +3833,402 @@ class PurchaseRequestController extends Controller
         return '';
     }
 
+    /**
+     * Pastikan seluruh master_material_group_id pada item benar-benar ada
+     * dan masih aktif.
+     *
+     * Dijalankan sebagai satu query untuk semua item agar jumlah item yang
+     * banyak tidak menimbulkan query N+1. Nilai yang sudah tidak aktif ikut
+     * ditolak supaya PR baru tidak bisa memakai grup yang telah dinonaktifkan.
+     */
+    private function assertMaterialGroupsAreValid(array $items): void
+    {
+        $materialGroupIds = collect($items)
+            ->pluck('master_material_group_id')
+            ->filter()
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($materialGroupIds->isEmpty()) {
+            return;
+        }
+
+        $validIds = MasterMaterialGroup::query()
+            ->whereIn('id', $materialGroupIds)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->map(fn($id) => (int) $id);
+
+        $invalidIds = $materialGroupIds->diff($validIds);
+
+        if ($invalidIds->isNotEmpty()) {
+            throw new \Exception(
+                'Material Group tidak valid atau sudah tidak aktif.'
+            );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Visibility Scope Purchase Requisition
+    |--------------------------------------------------------------------------
+    | Dipakai bersama oleh index() dan exportExcel().
+    |
+    | Sengaja diekstrak agar tidak ada dua salinan aturan visibilitas. Kalau
+    | keduanya sempat berbeda, user bisa mengekspor PR yang tidak boleh ia
+    | lihat pada daftar -- kebocoran data yang sulit terdeteksi.
+    |--------------------------------------------------------------------------
+    */
+    private function applyPurchaseRequestVisibilityScope(
+        $query,
+        $user,
+        string $scope,
+        $userRoleIds,
+        $userAccessibleBranchIds,
+        $userAccessibleDepartmentIds,
+    ): void {
+        if ($scope !== 'ALL') {
+            $query->where(function ($visibilityQuery) use (
+                $scope,
+                $user,
+                $userRoleIds,
+                $userAccessibleBranchIds,
+                $userAccessibleDepartmentIds,
+            ) {
+                /*
+                |--------------------------------------------------------------------------
+                | Scope data normal
+                |--------------------------------------------------------------------------
+                */
+                $visibilityQuery->where(function ($scopeQuery) use (
+                    $scope,
+                    $user,
+                    $userAccessibleBranchIds,
+                    $userAccessibleDepartmentIds,
+                ) {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | OWN_DATA
+                    |--------------------------------------------------------------------------
+                    | Tetap berdasarkan creator.
+                    |--------------------------------------------------------------------------
+                    */
+                    if ($scope === 'OWN_DATA') {
+                        if ($user->id) {
+                            $scopeQuery->where(
+                                'purchase_requests.created_by',
+                                $user->id,
+                            );
+                        } else {
+                            $scopeQuery->whereRaw('1 = 0');
+                        }
+
+                        return;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | OWN_DEPARTMENT
+                    |--------------------------------------------------------------------------
+                    | Scope department berarti user bisa melihat seluruh PR dari department
+                    | yang sama, lintas semua cabang.
+                    |
+                    | Department diambil dari master user + access assignment tambahan.
+                    |--------------------------------------------------------------------------
+                    */
+                    if ($scope === 'OWN_DEPARTMENT') {
+                        if ($userAccessibleDepartmentIds->isEmpty()) {
+                            $scopeQuery->whereRaw('1 = 0');
+
+                            return;
+                        }
+
+                        $scopeQuery->whereIn(
+                            'purchase_requests.id_department',
+                            $userAccessibleDepartmentIds->all(),
+                        );
+
+                        return;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | OWN_CABANG
+                    |--------------------------------------------------------------------------
+                    | Sekarang berdasarkan semua branch dari assignment user.
+                    |--------------------------------------------------------------------------
+                    */
+                    if ($scope === 'OWN_CABANG') {
+                        if ($userAccessibleBranchIds->isEmpty()) {
+                            $scopeQuery->whereRaw('1 = 0');
+
+                            return;
+                        }
+
+                        $scopeQuery->whereIn(
+                            'purchase_requests.cabang',
+                            $userAccessibleBranchIds
+                                ->map(fn($id) => (string) $id)
+                                ->all(),
+                        );
+
+                        return;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | NONE / scope tidak valid
+                    |--------------------------------------------------------------------------
+                    */
+                    $scopeQuery->whereRaw('1 = 0');
+                });
+
+                /*
+                |--------------------------------------------------------------------------
+                | Dokumen yang terkait dengan approval user
+                |--------------------------------------------------------------------------
+                | Tetap dipertahankan agar approver masih bisa melihat dokumen yang
+                | ada dalam flow approval dirinya.
+                |--------------------------------------------------------------------------
+                */
+                $visibilityQuery->orWhereHas(
+                    'approvals',
+                    function ($approvalQuery) use (
+                        $user,
+                        $userRoleIds,
+                    ) {
+                        $approvalQuery->where(function ($approverQuery) use (
+                            $user,
+                            $userRoleIds,
+                        ) {
+                            $approverQuery->where(function ($userQuery) use ($user) {
+                                $userQuery
+                                    ->where(
+                                        'purchase_request_approvals.approver_type',
+                                        PurchaseRequestApproval::APPROVER_TYPE_USER,
+                                    )
+                                    ->where(
+                                        'purchase_request_approvals.approver_id',
+                                        $user->id,
+                                    );
+                            });
+
+                            if ($userRoleIds->isNotEmpty()) {
+                                $approverQuery->orWhere(function ($roleQuery) use (
+                                    $userRoleIds,
+                                ) {
+                                    $roleQuery
+                                        ->where(
+                                            'purchase_request_approvals.approver_type',
+                                            PurchaseRequestApproval::APPROVER_TYPE_ROLE,
+                                        )
+                                        ->whereIn(
+                                            'purchase_request_approvals.approver_id',
+                                            $userRoleIds->all(),
+                                        );
+                                });
+                            }
+                        });
+                    },
+                );
+            });
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Konteks visibilitas user
+    |--------------------------------------------------------------------------
+    | Mengembalikan scope permission beserta role dan cabang/department yang
+    | boleh diakses user. Dipakai bersama index() dan exportExcel().
+    |--------------------------------------------------------------------------
+    */
+    private function resolvePurchaseRequestViewContext($user): array
+    {
+        $scope = strtoupper(
+            trim(
+                (string) (
+                    $user->getPermissionScope(
+                        'purchase_request.view',
+                    ) ?? 'NONE'
+                ),
+            ),
+        );
+
+        $allowedScopes = [
+            'NONE',
+            'OWN_DATA',
+            'OWN_DEPARTMENT',
+            'OWN_CABANG',
+            'ALL',
+        ];
+
+        if (!in_array($scope, $allowedScopes, true)) {
+            $scope = 'NONE';
+        }
+
+        $userRoleIds = collect();
+
+        if ($user->getAttribute('role_id')) {
+            $userRoleIds->push(
+                (int) $user->getAttribute('role_id'),
+            );
+        }
+
+        $activeRoleId = $user->getActiveRoleId();
+
+        if ($activeRoleId) {
+            $userRoleIds->push(
+                (int) $activeRoleId,
+            );
+        }
+
+        $pivotRoleIds = DB::table('user_roles')
+            ->where('user_id', $user->id)
+            ->pluck('role_id');
+
+        $userRoleIds = $userRoleIds
+            ->merge($pivotRoleIds)
+            ->filter(
+                fn($roleId) =>
+                $roleId !== null
+                    && (int) $roleId > 0,
+            )
+            ->map(
+                fn($roleId) => (int) $roleId,
+            )
+            ->unique()
+            ->values();
+
+        $userAccessAssignments = $this->getActiveUserAccessAssignments(
+            $user,
+        );
+
+        $userAccessibleBranchIds = collect([
+            (int) ($user->cabang_id ?? 0),
+        ])
+            ->merge(
+                $userAccessAssignments
+                    ->pluck('branch_id')
+                    ->map(fn($id) => (int) $id),
+            )
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $userAccessibleDepartmentIds = collect([
+            (int) ($user->departemen_id ?? 0),
+        ])
+            ->merge(
+                $userAccessAssignments
+                    ->pluck('department_id')
+                    ->map(fn($id) => (int) $id),
+            )
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        return [
+            'scope' => $scope,
+            'userRoleIds' => $userRoleIds,
+            'userAccessibleBranchIds' => $userAccessibleBranchIds,
+            'userAccessibleDepartmentIds' => $userAccessibleDepartmentIds,
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filter daftar Purchase Requisition
+    |--------------------------------------------------------------------------
+    | Dipakai bersama index() dan exportExcel() supaya hasil export selalu
+    | sama persis dengan apa yang sedang dilihat user pada daftar.
+    |--------------------------------------------------------------------------
+    */
+    private function applyPurchaseRequestListFilters($query, Request $request): void
+    {
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+
+            if ($search !== '') {
+                $searchLike = "%{$search}%";
+
+                $query->where(function ($q) use ($searchLike) {
+                    $q->where('purchase_requests.nomor_pr', 'ILIKE', $searchLike)
+                        ->orWhere('purchase_requests.kategori', 'ILIKE', $searchLike)
+                        ->orWhere('purchase_requests.notes', 'ILIKE', $searchLike)
+                        ->orWhereHas('purchaseOrders', function ($poQuery) use ($searchLike) {
+                            $poQuery->where('purchase_orders.nomor_po', 'ILIKE', $searchLike);
+                        })
+                        ->orWhereHas('departmentData', function ($deptQuery) use ($searchLike) {
+                            $deptQuery->where('kode', 'ILIKE', $searchLike)
+                                ->orWhere('nama', 'ILIKE', $searchLike);
+                        })
+                        ->orWhereExists(function ($cabangQuery) use ($searchLike) {
+                            $cabangQuery->select(DB::raw(1))
+                                ->from('cabang')
+                                ->whereRaw('CAST(cabang.id AS VARCHAR) = purchase_requests.cabang')
+                                ->where(function ($sub) use ($searchLike) {
+                                    $sub->where('cabang.nama_cabang', 'ILIKE', $searchLike)
+                                        ->orWhere('cabang.inisial_cabang', 'ILIKE', $searchLike);
+                                });
+                        });
+                });
+            }
+        }
+
+        if ($request->filled('tanggal_mulai')) {
+            $query->whereDate(
+                'purchase_requests.tanggal_pr',
+                '>=',
+                $request->input('tanggal_mulai'),
+            );
+        }
+
+        if ($request->filled('tanggal_selesai')) {
+            $query->whereDate(
+                'purchase_requests.tanggal_pr',
+                '<=',
+                $request->input('tanggal_selesai'),
+            );
+        }
+
+        if ($request->filled('status')) {
+            $status = strtoupper(trim((string) $request->input('status')));
+
+            if ($status !== '' && !in_array($status, ['ALL', 'SEMUA'], true)) {
+                $query->where('purchase_requests.status', $status);
+            }
+        }
+
+        if ($request->filled('status_po')) {
+            $statusPo = strtoupper(trim((string) $request->input('status_po')));
+
+            if ($statusPo !== '' && !in_array($statusPo, ['ALL', 'SEMUA'], true)) {
+                if (in_array($statusPo, ['NULL', 'NONE', 'BELUM_PO', 'BELUM PO'], true)) {
+                    $query->whereNull('purchase_requests.status_po');
+                } else {
+                    $query->where('purchase_requests.status_po', $statusPo);
+                }
+            }
+        }
+
+        if ($request->filled('id_department')) {
+            $query->where(
+                'purchase_requests.id_department',
+                (int) $request->input('id_department'),
+            );
+        }
+
+        if ($request->filled('cabang')) {
+            $query->where(
+                'purchase_requests.cabang',
+                (string) $request->input('cabang'),
+            );
+        }
+    }
+
     private function terbilangRupiah(float $angka): string
     {
         return trim(preg_replace('/\s+/', ' ', $this->terbilang($angka))) . ' Rupiah';
@@ -3952,49 +4276,64 @@ class PurchaseRequestController extends Controller
 
     public function prByVendor($vendorId)
     {
-        $prs = PurchaseRequest::where('status', 'APPROVED')
-            ->whereHas('vendors', function ($q) use ($vendorId) {
-                $q->where('vendor_id', $vendorId);
-            })
-            ->with([
-                'vendors' => function ($q) use ($vendorId) {
-                    $q->where('vendor_id', $vendorId)
-                        ->select(
-                            'id',
-                            'purchase_request_id',
-                            'vendor_id',
-                            'is_selected',
-                            'dpp',
-                            'ppn',
-                            'price_offer'
-                        )
-                        ->with([
-                            'items' => function ($qi) {
-                                $qi->select(
-                                    'id',
-                                    'pr_vendor_id',
-                                    'nama_item',
-                                    'qty',
-                                    'satuan',
-                                    'keterangan',
-                                    'harga_unit',
-                                    'subtotal'
-                                );
-                            }
-                        ]);
-                }
-            ])
-            ->orderBy('created_at', 'desc')
-            ->get([
-                'id',
-                'nomor_pr',
-                'tanggal_pr',
-                'cabang',
-                'id_department',
-                'total_amount'
+        try {
+            $prs = PurchaseRequest::where('status', 'APPROVED')
+                ->whereHas('vendors', function ($q) use ($vendorId) {
+                    $q->where('vendor_id', $vendorId);
+                })
+                ->with([
+                    'vendors' => function ($q) use ($vendorId) {
+                        $q->where('vendor_id', $vendorId)
+                            ->select(
+                                'id',
+                                'purchase_request_id',
+                                'vendor_id',
+                                'is_selected',
+                                'dpp',
+                                'ppn',
+                                'price_offer'
+                            )
+                            ->with([
+                                'items' => function ($qi) {
+                                    $qi->select(
+                                        'id',
+                                        'pr_vendor_id',
+                                        'nama_item',
+                                        'qty',
+                                        'satuan',
+                                        'keterangan',
+                                        'harga_unit',
+                                        'subtotal'
+                                    );
+                                }
+                            ]);
+                    }
+                ])
+                ->orderBy('created_at', 'desc')
+                ->get([
+                    'id',
+                    'nomor_pr',
+                    'tanggal_pr',
+                    'cabang',
+                    'id_department',
+                    'total_amount'
+                ]);
+
+            return response()->json($prs);
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Requisition] PR by vendor error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'vendor_id' => $vendorId,
             ]);
 
-        return response()->json($prs);
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.vendor.load_failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function dropdownApproved(
@@ -4016,7 +4355,7 @@ class PurchaseRequestController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk membuat Purchase Order.',
+                    'message' => __('purchase_request_messages.dropdown_approved.forbidden'),
                     'data' => [],
                 ], 403);
             }
@@ -4059,7 +4398,7 @@ class PurchaseRequestController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Anda tidak memiliki akses membuat Purchase Order untuk department tersebut.',
+                    'message' => __('purchase_request_messages.dropdown_approved.department_forbidden'),
                     'data' => [],
                 ], 403);
             }
@@ -4357,7 +4696,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Purchase Requisition berhasil dimuat.',
+                'message' => __('purchase_request_messages.dropdown_approved.loaded'),
                 'data' => $data,
             ], 200);
         } catch (ValidationException $e) {
@@ -4376,11 +4715,113 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat Purchase Requisition.',
+                'message' => __('purchase_request_messages.dropdown_approved.load_failed'),
                 'data' => [],
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
+            ], 500);
+        }
+    }
+
+    public function cancel(
+        Request $request,
+        string $publicId,
+        PurchaseRequestRollbackService $rollbackService,
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (!$user || !$user->hasPermission('purchase_request.cancel')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.cancel.forbidden'),
+            ], 403);
+        }
+
+        try {
+            $validated = $request->validate([
+                'cancel_notes' => ['required', 'string', 'max:2000'],
+            ]);
+
+            $id = Crypt::decryptString($publicId);
+
+            $pr = PurchaseRequest::with(['purchaseOrders'])->findOrFail($id);
+
+            $rollbackService->cancel(
+                $pr,
+                $user,
+                $validated['cancel_notes'],
+            );
+
+            $pr->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => __('purchase_request_messages.cancel.success'),
+
+                'data' => [
+                    'id' => $pr->id,
+                    'public_id' => $pr->encrypted_id,
+                    'nomor_pr' => $pr->nomor_pr,
+                    'status' => $pr->status,
+                    'cancelled_by' => $pr->cancelled_by,
+                    'cancelled_at' => $pr->cancelled_at,
+                    'cancel_notes' => $pr->cancel_notes,
+                ],
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? __('purchase_request_messages.cancel.failed'),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (DecryptException $e) {
+            Log::warning('[Purchase Requisition] Cancel - invalid id', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.cancel.invalid_id'),
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            Log::warning('[Purchase Requisition] Cancel - not found', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.cancel.not_found'),
+            ], 404);
+        } catch (\Exception $e) {
+            Log::warning('[Purchase Requisition] Cancel - invalid status', [
+                'message' => $e->getMessage(),
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('[Purchase Requisition] Cancel error', [
+                'public_id' => $publicId,
+                'user_id' => $user->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('purchase_request_messages.cancel.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
     }

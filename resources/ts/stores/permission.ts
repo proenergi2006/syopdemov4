@@ -424,8 +424,8 @@ export const usePermissionStore = defineStore(
           |
           | Contoh:
           |
-          | /non_trade/purchase_request
-          | /non_trade/purchase_request/report
+          | /non_stock/purchase_request
+          | /non_stock/purchase_request/report
           |
           | Prefix yang lebih panjang harus didahulukan.
           |--------------------------------------------------------------------------

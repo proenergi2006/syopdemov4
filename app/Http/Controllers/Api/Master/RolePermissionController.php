@@ -65,6 +65,7 @@ class RolePermissionController extends Controller
                         'name' => $permission->name,
                         'description' => $permission->description,
                         'is_active' => (bool) $permission->is_active,
+                        'requires_scope' => (bool) $permission->requires_scope,
                     ],
                 ];
             })->values();
@@ -371,20 +372,16 @@ class RolePermissionController extends Controller
 
                         /*
                     |--------------------------------------------------------------------------
-                    | Scope hanya untuk action VIEW
+                    | Scope hanya berlaku untuk permission yang requires_scope
                     |--------------------------------------------------------------------------
                     |
-                    | CREATE / UPDATE / DELETE / APPROVE:
-                    | scope selalu NONE.
+                    | Dulu ini hardcode berdasarkan nama action (create tidak
+                    | dapat scope, selain itu dapat). Sekarang dibaca dari
+                    | flag requires_scope per-permission, yang diatur admin
+                    | lewat halaman Permission Modules.
                     |--------------------------------------------------------------------------
                     */
-                        if (
-                            strtolower(
-                                trim(
-                                    (string) $permission->action,
-                                ),
-                            ) !== 'view'
-                        ) {
+                        if (!$permission->requires_scope) {
                             $scope = 'NONE';
                         }
 

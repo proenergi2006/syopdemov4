@@ -36,6 +36,7 @@ class User extends Authenticatable
         'username',
         'last_login_at',
         'last_logout_at',
+        'locale',
     ];
 
     protected $hidden = [
