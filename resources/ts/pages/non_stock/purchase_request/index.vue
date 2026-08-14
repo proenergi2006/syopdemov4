@@ -3682,6 +3682,27 @@ onBeforeUnmount(() => {
                           <div class="item-title">
                             {{ toTitleCase(item.nama_item) || '-' }}
                           </div>
+
+                          <!--
+                            Material group ditampilkan di bawah nama item.
+                            Item lama yang belum punya grup tidak menampilkan
+                            apa pun, bukan tanda hubung, agar tidak berisik.
+                          -->
+                          <VChip
+                            v-if="item.material_group?.name && item.material_group.name !== '-'"
+                            size="x-small"
+                            color="primary"
+                            variant="tonal"
+                            class="mt-1"
+                          >
+                            <VIcon
+                              icon="tabler-category"
+                              size="12"
+                              start
+                            />
+                            {{ item.material_group.name }}
+                          </VChip>
+
                           <div
                             v-if="item.spesifikasi"
                             class="item-subtitle"

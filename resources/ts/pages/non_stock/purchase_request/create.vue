@@ -47,9 +47,17 @@ interface PurchaseRequestForm {
   recommended_vendor_id: number | null
   kategori: string | null
   pr_type: string | null
+  special_document_type_id: number | null
   notes: string
   lampiran_requests: File[]
   items: PrItem[]
+}
+
+interface SpecialDocumentTypeOption {
+  id: number
+  code: string
+  name: string
+  title: string
 }
 
 interface PurchaseRequestErrors {
@@ -142,6 +150,13 @@ const isLoadingUnits = ref(false)
 const materialGroups = ref<MaterialGroupOption[]>([])
 const isLoadingMaterialGroups = ref(false)
 
+/*
+ * Tipe Dokumen Khusus hanya tersedia untuk department tertentu. Backend
+ * mengembalikan daftar kosong bagi department yang tidak berhak, sehingga
+ * field-nya tidak muncul sama sekali dan form berperilaku seperti semula.
+ */
+const specialDocumentTypes = ref<SpecialDocumentTypeOption[]>([])
+
 const itemDialog = ref(false)
 const confirmCloseItemDialog = ref(false)
 const itemDialogSaved = ref(false)
@@ -169,6 +184,7 @@ const form = reactive<PurchaseRequestForm>({
   recommended_vendor_id: null,
   kategori: null,
   pr_type: null,
+  special_document_type_id: null,
   notes: '',
   lampiran_requests: [],
   items: [createEmptyItem()],
@@ -529,6 +545,33 @@ const loadMaterialGroups = async (showAlert = true): Promise<void> => {
     }
   } finally {
     isLoadingMaterialGroups.value = false
+  }
+}
+
+const loadSpecialDocumentTypes = async (): Promise<void> => {
+  try {
+    const response = await axios.get('/special-document-types/dropdown-select', {
+      headers: { Accept: 'application/json' },
+    })
+
+    const data = Array.isArray(response?.data?.data)
+      ? response.data.data
+      : []
+
+    specialDocumentTypes.value = data.map((item: any) => ({
+      id: Number(item.id),
+      code: item.code || '',
+      name: item.name || '-',
+      title: item.title || item.name || '-',
+    }))
+  } catch (error: unknown) {
+    /*
+     * Kegagalan di sini tidak diberitahukan lewat toast: field ini opsional
+     * dan hanya relevan bagi sebagian department. Memunculkan error untuk
+     * semua orang justru membingungkan.
+     */
+    console.error('[Special Document Types] FETCH ERROR:', error)
+    specialDocumentTypes.value = []
   }
 }
 
@@ -904,6 +947,17 @@ const buildFormData = (): FormData => {
   formData.append('recommended_vendor_id', form.recommended_vendor_id ? String(form.recommended_vendor_id) : '')
   formData.append('kategori', String(form.kategori || ''))
   formData.append('pr_type', String(form.pr_type || ''))
+
+  /*
+   * Dikirim hanya bila terisi. Dokumen biasa tidak mengirim field ini sama
+   * sekali sehingga backend memperlakukannya sebagai NULL.
+   */
+  if (form.special_document_type_id) {
+    formData.append(
+      'special_document_type_id',
+      String(form.special_document_type_id),
+    )
+  }
   formData.append('notes', String(form.notes || ''))
   formData.append('status_pkp', selectedRecommendedVendor.value ? normalizeVendorStatusPkp(selectedRecommendedVendor.value.status_pkp) : 'NON_PKP')
   formData.append('jenis_pembayaran', String(selectedRecommendedVendor.value?.jenis_pembayaran || ''))
@@ -1134,6 +1188,7 @@ onMounted(async () => {
 
   await loadUnits(false)
   await loadMaterialGroups(false)
+  await loadSpecialDocumentTypes()
   await fetchCabangList(false)
   await setUserDefaultBranchAndDepartment()
 })
@@ -1336,6 +1391,42 @@ onMounted(async () => {
                 :no-data-text="t('purchaseRequest.create.noData.tipePr')"
                 :placeholder="t('purchaseRequest.create.placeholders.tipePr')"
               />
+            </VCol>
+
+            <!--
+              Hanya muncul bila department pembuat memang punya tipe dokumen
+              khusus. Department lain tidak melihat field ini sama sekali.
+            -->
+            <VCol
+              v-if="specialDocumentTypes.length"
+              cols="12"
+              md="4"
+            >
+              <VAutocomplete
+                v-model="form.special_document_type_id"
+                :label="t('purchaseRequest.create.fields.specialDocumentType')"
+                :items="specialDocumentTypes"
+                item-title="title"
+                item-value="id"
+                clearable
+                density="comfortable"
+                :menu-props="{
+                  location: 'bottom',
+                  offset: 8,
+                  maxHeight: 300,
+                }"
+                :placeholder="t('purchaseRequest.create.placeholders.specialDocumentType')"
+                :hint="t('purchaseRequest.create.fields.specialDocumentTypeHint')"
+                persistent-hint
+              >
+                <template #prepend-inner>
+                  <VIcon
+                    icon="tabler-ship"
+                    size="18"
+                    class="text-medium-emphasis"
+                  />
+                </template>
+              </VAutocomplete>
             </VCol>
           </VRow>
           <VRow>

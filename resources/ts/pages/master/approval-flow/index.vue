@@ -37,6 +37,27 @@ interface ApprovalStep {
   is_required?: boolean
   approval_mode?: 'ANY' | 'ALL' | string
   approver_scope: 'GLOBAL' | 'SAME_BRANCH'
+
+  /*
+   * Approver pengganti bila dokumennya bertipe khusus. Kosong untuk step
+   * biasa, sehingga tampilan flow lama tidak berubah.
+   */
+  special_approvers?: SpecialApproverItem[]
+
+  /*
+   * Diisi saat menyusun alur efektif PO: menandai step yang dipinjam dari
+   * flow nominal lain agar tidak disalahpahami sebagai milik flow ini.
+   */
+  source_flow_name?: string
+  is_from_other_flow?: boolean
+}
+
+interface SpecialApproverItem {
+  special_document_type_id: number
+  special_document_type_name?: string | null
+  approver_type: string
+  approver_id: number
+  approver_name?: string | null
 }
 
 interface ApprovalFlowItem {
@@ -816,45 +837,17 @@ const getComparableMinAmount = (item: ApprovalFlowItem): number => {
   }
 
   /**
-   * Logic cumulative approval PO tetap dipertahankan.
+   * Setiap flow berdiri sendiri.
    *
-   * Contoh:
-   * - Semua Nilai       = GM
-   * - 10–50 juta        = GM -> CFO
-   * - Lebih dari 50 juta = GM -> CFO -> CEO
+   * Sebelumnya PO memakai konsep akumulatif sehingga daftar menggabungkan
+   * step dari flow nominal di bawahnya. Konsep itu sudah diganti menjadi
+   * "satu flow menang" pada generator, sehingga penggabungan di sini justru
+   * akan menampilkan rantai approval yang tidak pernah terjadi.
    *
-   * Beberapa approver dengan step_order yang sama harus tetap
-   * berada dalam satu logical step.
+   * Beberapa approver dengan step_order yang sama tetap berada dalam satu
+   * logical step.
    */
-  const currentDocumentType = String(
-    currentFlow.document_type || '',
-  ).toUpperCase()
-
-  const currentMinAmount = getComparableMinAmount(
-    currentFlow,
-  )
-
-  const relatedFlows = approvalFlows.value
-    .filter(flow => {
-      return String(
-        flow.document_type || '',
-      ).toUpperCase() === currentDocumentType
-    })
-    .filter(flow => isFlowActive(flow))
-    .filter(flow => {
-      if (isBaseAllAmountFlow(flow))
-        return true
-
-      const flowMinAmount = getComparableMinAmount(flow)
-
-      return flowMinAmount <= currentMinAmount
-    })
-    .sort((a, b) => {
-      const aMinAmount = getComparableMinAmount(a)
-      const bMinAmount = getComparableMinAmount(b)
-
-      return aMinAmount - bMinAmount
-    })
+  const relatedFlows = [currentFlow]
 
   const mergedSteps: ApprovalStep[] = []
   const usedApproverKeys = new Set<string>()
@@ -937,6 +930,17 @@ const getComparableMinAmount = (item: ApprovalFlowItem): number => {
             ...step,
             step_order: effectiveStepOrder,
             sequence: effectiveStepOrder,
+
+            /*
+             * Menandai step yang DIPINJAM dari flow nominal lain.
+             *
+             * Tanpa penanda ini, daftar terlihat menampilkan step yang tidak
+             * ada di halaman edit flow tersebut -- mudah disalahpahami sebagai
+             * data yang ikut berubah, padahal hanya alur efektifnya.
+             */
+            source_flow_name: flow.name || flow.approval_name || '',
+            is_from_other_flow: String(flow.public_id || '')
+              !== String(currentFlow.public_id || ''),
           })
         })
       })
@@ -963,11 +967,50 @@ const getGroupedApprovalSteps = (item: ApprovalFlowItem) => {
     approval_mode: approvers[0]?.approval_mode || 'ANY',
     label: approvers[0]?.label || `Step ${stepOrder}`,
     approvers,
+
+    /*
+     * Step dianggap "dipinjam" bila seluruh approver di dalamnya berasal dari
+     * flow nominal lain. Ditampilkan sebagai keterangan agar admin tahu step
+     * ini tidak akan ditemukan di halaman edit flow yang sedang dilihat.
+     */
+    is_from_other_flow: approvers.length > 0
+      && approvers.every(approver => approver.is_from_other_flow === true),
+
+    source_flow_name: approvers[0]?.source_flow_name || '',
   }))
 }
 
 const getEffectiveStepCount = (item: ApprovalFlowItem): number => {
   return getGroupedApprovalSteps(item).length
+}
+
+/*
+ * Mengumpulkan approver pengganti dari seluruh approver dalam satu logical
+ * step, lalu membuang duplikat.
+ *
+ * Duplikat mungkin terjadi karena satu logical step bisa berisi beberapa
+ * approver, dan pengaturan pengganti bisa saja diisi sama pada lebih dari
+ * satu di antaranya.
+ */
+const getStepSpecialApprovers = (stepGroup: {
+  approvers: ApprovalStep[]
+}): SpecialApproverItem[] => {
+  const seen = new Set<string>()
+  const result: SpecialApproverItem[] = []
+
+  stepGroup.approvers.forEach(approver => {
+    (approver.special_approvers || []).forEach(special => {
+      const key = `${special.special_document_type_id}-${special.approver_type}-${special.approver_id}`
+
+      if (seen.has(key))
+        return
+
+      seen.add(key)
+      result.push(special)
+    })
+  })
+
+  return result
 }
 
 const buildParams = (): Record<string, any> => {
@@ -1772,6 +1815,33 @@ onMounted(async () => {
                                 variant="tonal"
                               >
                                 {{ getStepName(approver) }}
+                              </VChip>
+                            </div>
+
+                            <!--
+                              Approver pengganti untuk dokumen khusus.
+                              Hanya muncul bila step ini memang diatur, sehingga
+                              tampilan flow biasa tidak berubah.
+                            -->
+                            <div
+                              v-if="getStepSpecialApprovers(stepGroup).length"
+                              class="d-flex flex-wrap gap-1 mt-1"
+                            >
+                              <VChip
+                                v-for="(special, specialIndex) in getStepSpecialApprovers(stepGroup)"
+                                :key="`special-${stepGroup.step_order}-${specialIndex}`"
+                                size="x-small"
+                                color="warning"
+                                variant="tonal"
+                              >
+                                <VIcon
+                                  icon="tabler-replace"
+                                  size="12"
+                                  start
+                                />
+                                {{ special.special_document_type_name || 'Dokumen Khusus' }}
+                                &nbsp;&rarr;&nbsp;
+                                <strong>{{ special.approver_name || '-' }}</strong>
                               </VChip>
                             </div>
                           </div>

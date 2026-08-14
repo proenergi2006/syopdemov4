@@ -88,6 +88,10 @@ return [
         'load_failed' => 'Failed to load Purchase Requisitions.',
     ],
 
+    'special_document_type' => [
+        'not_allowed' => 'That special document type is not available for your department.',
+    ],
+
     'export' => [
         'failed' => 'Failed to export Purchase Requisition data.',
         'forbidden' => 'You do not have access to export Purchase Requisitions.',

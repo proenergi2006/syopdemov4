@@ -9,6 +9,7 @@ use App\Models\ApprovalMatrix;
 use App\Models\ApprovalMatrixPR;
 use App\Models\MasterMaterialGroup;
 use App\Models\PrAttachment;
+use App\Models\SpecialDocumentType;
 use Illuminate\Http\Request;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
@@ -253,6 +254,7 @@ class PurchaseRequestController extends Controller
                     'departmentData',
                     'recommendedVendor',
                     'items',
+                    'specialDocumentType:id,code,name',
 
                     'approvals' => function ($approvalQuery) {
                         $approvalQuery
@@ -582,6 +584,14 @@ class PurchaseRequestController extends Controller
                         'kategori' => $pr->kategori,
 
                         'pr_type' => $pr->pr_type,
+                        'special_document_type_id' => $pr->special_document_type_id,
+                        'special_document_type' => $pr->specialDocumentType
+                            ? [
+                                'id' => $pr->specialDocumentType->id,
+                                'code' => $pr->specialDocumentType->code,
+                                'name' => $pr->specialDocumentType->name,
+                            ]
+                            : null,
 
                         'notes' => $pr->notes,
                         'status' => $pr->status,
@@ -940,6 +950,12 @@ class PurchaseRequestController extends Controller
                 'recommended_vendor_id'  => ['nullable', 'integer', 'exists:master_vendor,id'],
                 'kategori'               => ['nullable', 'string'],
                 'pr_type'                => ['required', 'string', 'max:50', 'in:Rutin,Non Rutin'],
+
+                /*
+                | NULL = dokumen biasa. Keabsahan tipe terhadap department pembuat
+                | diperiksa terpisah lewat assertSpecialDocumentTypeAllowed().
+                */
+                'special_document_type_id' => ['nullable', 'integer'],
                 'items'                  => ['required', 'string'],
                 'lampiran_request.*'     => ['sometimes', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:3000'],
             ]);
@@ -1106,6 +1122,17 @@ class PurchaseRequestController extends Controller
                 'recommended_vendor_id' => $recommendedVendorId,
                 'kategori'              => $request->kategori,
                 'pr_type'               => $request->pr_type,
+
+                /*
+                | NULL untuk dokumen biasa. Helper menolak bila department
+                | pembuat tidak berhak memakai tipe tersebut.
+                */
+                'special_document_type_id'
+                => $this->assertSpecialDocumentTypeAllowed(
+                    $request->input('special_document_type_id'),
+                    (int) $request->id_department,
+                ),
+
                 'notes'                 => $clean($request->notes),
                 'status'                => PurchaseRequest::STATUS_DRAFT,
                 'total_amount'          => $totalAmount,
@@ -1267,6 +1294,7 @@ class PurchaseRequestController extends Controller
                 'purchaseOrders:id,nomor_po,tanggal_po,status,total_nilai',
                 'items.unit:id,kode,nama',
                 'items.materialGroup:id,code,name',
+                'specialDocumentType:id,code,name',
                 'attachments',
                 'approvalHistories',
                 'creator',
@@ -1586,6 +1614,14 @@ class PurchaseRequestController extends Controller
 
                     'kategori' => $pr->kategori,
                     'pr_type' => $pr->pr_type,
+                    'special_document_type_id' => $pr->special_document_type_id,
+                    'special_document_type' => $pr->specialDocumentType
+                        ? [
+                            'id' => $pr->specialDocumentType->id,
+                            'code' => $pr->specialDocumentType->code,
+                            'name' => $pr->specialDocumentType->name,
+                        ]
+                        : null,
                     'notes' => $pr->notes,
                     'status' => $pr->status,
                     'status_po' => $pr->status_po,
@@ -1946,6 +1982,12 @@ class PurchaseRequestController extends Controller
                 'recommended_vendor_id'  => ['nullable', 'integer', 'exists:master_vendor,id'],
                 'kategori'               => ['nullable', 'string'],
                 'pr_type'                => ['required', 'string', 'max:50', 'in:Rutin,Non Rutin'],
+
+                /*
+                | NULL = dokumen biasa. Keabsahan tipe terhadap department pembuat
+                | diperiksa terpisah lewat assertSpecialDocumentTypeAllowed().
+                */
+                'special_document_type_id' => ['nullable', 'integer'],
                 'items'                  => ['required', 'string'],
                 'existing_attachment_ids' => ['nullable', 'string'],
                 'lampiran_requests.*'    => ['sometimes', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:3000'],
@@ -2115,6 +2157,17 @@ class PurchaseRequestController extends Controller
                 'recommended_vendor_id' => $recommendedVendorId,
                 'kategori'              => $request->kategori,
                 'pr_type'               => $request->pr_type,
+
+                /*
+                | NULL untuk dokumen biasa. Helper menolak bila department
+                | pembuat tidak berhak memakai tipe tersebut.
+                */
+                'special_document_type_id'
+                => $this->assertSpecialDocumentTypeAllowed(
+                    $request->input('special_document_type_id'),
+                    (int) $request->id_department,
+                ),
+
                 'notes'                 => $clean($request->notes),
                 'total_amount'          => $totalAmount,
                 'status_pkp'            => $statusPkpSnapshot,
@@ -2552,6 +2605,7 @@ class PurchaseRequestController extends Controller
                 'recommendedVendor',
                 'items.unit',
                 'items.materialGroup',
+                'specialDocumentType',
                 'attachments',
             ])->findOrFail($id);
 
@@ -2591,6 +2645,14 @@ class PurchaseRequestController extends Controller
 
                     'kategori' => $pr->kategori,
                     'pr_type' => $pr->pr_type,
+                    'special_document_type_id' => $pr->special_document_type_id,
+                    'special_document_type' => $pr->specialDocumentType
+                        ? [
+                            'id' => $pr->specialDocumentType->id,
+                            'code' => $pr->specialDocumentType->code,
+                            'name' => $pr->specialDocumentType->name,
+                        ]
+                        : null,
                     'notes' => $pr->notes,
                     'status' => $pr->status,
                     'total_amount' => $pr->total_amount,
@@ -3367,6 +3429,7 @@ class PurchaseRequestController extends Controller
                 'items.unit:id,kode,nama',
 
                 'items.materialGroup:id,code,name',
+                'specialDocumentType:id,code,name',
 
                 'creator:id,name',
 
@@ -3841,6 +3904,42 @@ class PurchaseRequestController extends Controller
      * banyak tidak menimbulkan query N+1. Nilai yang sudah tidak aktif ikut
      * ditolak supaya PR baru tidak bisa memakai grup yang telah dinonaktifkan.
      */
+    /*
+    |--------------------------------------------------------------------------
+    | Tipe Dokumen Khusus hanya boleh dipakai department yang berhak
+    |--------------------------------------------------------------------------
+    | Pembatasan di UI (pilihan tidak dimunculkan) hanya soal tampilan.
+    | Pemeriksaan di sini yang menjadi penjaga sebenarnya, agar tipe tidak bisa
+    | dipasang lewat pemanggilan API langsung oleh department yang tidak berhak.
+    |
+    | Mengembalikan ID yang sudah tervalidasi, atau NULL untuk dokumen biasa.
+    |--------------------------------------------------------------------------
+    */
+    private function assertSpecialDocumentTypeAllowed(
+        $specialDocumentTypeId,
+        ?int $departmentId,
+    ): ?int {
+        $typeId = (int) ($specialDocumentTypeId ?? 0);
+
+        if ($typeId <= 0) {
+            return null;
+        }
+
+        $type = SpecialDocumentType::query()
+            ->whereKey($typeId)
+            ->first();
+
+        if (!$type || !$type->isUsableByDepartment($departmentId)) {
+            throw ValidationException::withMessages([
+                'special_document_type_id' => [
+                    __('purchase_request_messages.special_document_type.not_allowed'),
+                ],
+            ]);
+        }
+
+        return $type->id;
+    }
+
     private function assertMaterialGroupsAreValid(array $items): void
     {
         $materialGroupIds = collect($items)

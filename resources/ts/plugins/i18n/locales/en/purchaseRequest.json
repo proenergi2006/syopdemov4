@@ -9,7 +9,9 @@
       "vendorRecommended": "Recommended Vendor",
       "notes": "Notes",
       "materialGroup": "Material Group",
-      "materialGroupPlaceholder": "Select material group"
+      "materialGroupPlaceholder": "Select material group",
+      "specialDocumentType": "Special Document Type",
+      "specialDocumentTypeHint": "Leave empty for a regular document. Special types use their own approval path."
     },
     "toast": {
       "loadAccessFailed": "Failed to load branch and department access.",
@@ -57,7 +59,8 @@
       "qty": "Qty",
       "satuan": "Unit",
       "hargaSatuan": "Unit price",
-      "keterangan": "Notes / Specification"
+      "keterangan": "Notes / Specification",
+      "specialDocumentType": "Select special document type"
     },
     "noData": {
       "cabang": "Branch not found",

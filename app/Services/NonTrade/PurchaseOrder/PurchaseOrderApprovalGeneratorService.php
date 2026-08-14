@@ -100,8 +100,22 @@ class PurchaseOrderApprovalGeneratorService
         $effectiveStepOrder = 0;
         $createdApprovals = 0;
 
+        /*
+        |--------------------------------------------------------------------------
+        | Tipe Dokumen Khusus PO
+        |--------------------------------------------------------------------------
+        | Diturunkan dari PR yang ditarik ke PO ini, tidak disimpan ulang di
+        | tabel PO, sehingga tidak mungkin ada data PO dan PR yang bertentangan.
+        |
+        | Pencampuran PR beda tipe sudah ditolak saat pembuatan PO, jadi di sini
+        | cukup mengambil tipe pertama yang ditemukan.
+        |--------------------------------------------------------------------------
+        */
+        $specialTypeId = $this->resolveSpecialDocumentTypeId($purchaseOrder);
+
         foreach ($approvalFlows as $approvalFlow) {
             $flowSteps = ApprovalFlowStep::query()
+                ->with('specialApprovers')
                 ->where(
                     'approval_flow_id',
                     $approvalFlow->id,
@@ -109,6 +123,28 @@ class PurchaseOrderApprovalGeneratorService
                 ->orderBy('step_order')
                 ->orderBy('id')
                 ->get();
+
+            /*
+            | Dokumen biasa bernilai NULL -> tidak ada step yang tersentuh,
+            | sehingga flow department lain berperilaku sama persis.
+            */
+            if ($specialTypeId) {
+                foreach ($flowSteps as $flowStep) {
+                    if ($flowStep->applySpecialDocumentApprover($specialTypeId)) {
+                        Log::info(
+                            '[PO Approval Generator] Substitusi approver dokumen khusus',
+                            [
+                                'purchase_order_id' => $purchaseOrder->id,
+                                'special_document_type_id' => $specialTypeId,
+                                'approval_flow_step_id' => $flowStep->id,
+                                'label' => $flowStep->label,
+                                'approver_type' => $flowStep->approver_type,
+                                'approver_id' => $flowStep->approver_id,
+                            ],
+                        );
+                    }
+                }
+            }
 
             if ($flowSteps->isEmpty()) {
                 Log::warning(
@@ -297,15 +333,22 @@ class PurchaseOrderApprovalGeneratorService
 
         /*
         |--------------------------------------------------------------------------
-        | Konsep cumulative threshold:
+        | Satu flow menang
         |--------------------------------------------------------------------------
-        | - Flow dengan min_amount null / 0 = base flow / semua nilai.
-        | - Flow dengan min_amount <= total PO ikut masuk.
-        | - max_amount tidak dipakai sebagai pembatas untuk cumulative PO,
-        |   karena flow 10-50 juta tetap harus ikut pada PO > 50 juta.
+        | Flow dipilih berdasarkan rentang nominal: min_amount <= total <= max_amount.
+        | HANYA SATU flow yang dipakai, dan flow tersebut harus memuat seluruh
+        | step approval-nya sendiri secara lengkap.
+        |
+        | Sebelumnya PO memakai konsep akumulatif -- seluruh flow dengan
+        | min_amount <= total ikut menumpuk. Diubah agar tiap flow berdiri
+        | sendiri dan mudah dibaca, mengikuti pola yang sudah dipakai PR.
+        |
+        | Konsekuensinya: flow "semua nilai" tidak lagi otomatis menempel pada
+        | flow nominal di atasnya. Setiap flow wajib mendefinisikan rantai
+        | approval-nya secara utuh.
         |--------------------------------------------------------------------------
         */
-        $flows = ApprovalFlow::query()
+        $flow = ApprovalFlow::query()
             ->whereNull('deleted_at')
             ->where('is_active', true)
             ->whereRaw(
@@ -322,28 +365,52 @@ class PurchaseOrderApprovalGeneratorService
                         $totalAmount,
                     );
             })
-            ->orderByRaw(
-                'COALESCE(min_amount, 0) ASC',
-            )
-            ->orderByRaw(
-                'COALESCE(max_amount, 0) ASC',
-            )
-            ->orderBy('id')
-            ->get();
+
+            /*
+            | max_amount null atau 0 berarti tanpa batas atas.
+            */
+            ->where(function ($query) use ($totalAmount) {
+                $query
+                    ->whereNull('max_amount')
+                    ->orWhere('max_amount', 0)
+                    ->orWhere(
+                        'max_amount',
+                        '>=',
+                        $totalAmount,
+                    );
+            })
+
+            /*
+            | Bila beberapa rentang saling tumpang tindih, yang paling spesifik
+            | menang -- yaitu batas bawah tertinggi.
+            |
+            | COALESCE wajib: pada PostgreSQL, ORDER BY ... DESC menaruh NULL
+            | paling depan. Tanpa ini, flow "semua nilai" (min_amount NULL)
+            | selalu menang dan flow bertingkat nominal tidak pernah terpakai.
+            */
+            ->orderByRaw('COALESCE(min_amount, 0) DESC')
+            ->orderByRaw('COALESCE(max_amount, 999999999999999999) ASC')
+            ->orderByDesc('id')
+            ->first();
+
+        /*
+        | Tetap dikembalikan sebagai koleksi (berisi 0 atau 1 flow) agar
+        | pemanggil di atasnya tidak perlu diubah.
+        */
+        $flows = new EloquentCollection(
+            $flow ? [$flow] : [],
+        );
 
         Log::info(
-            '[PO Approval Generator] Cumulative flow result',
+            '[PO Approval Generator] Matching flow result',
             [
                 'purchase_order_id' => $purchaseOrder->id,
                 'nomor_po' => $purchaseOrder->nomor_po,
-                'flow_ids' => $flows
-                    ->pluck('id')
-                    ->values()
-                    ->all(),
-                'flow_names' => $flows
-                    ->pluck('name')
-                    ->values()
-                    ->all(),
+                'total_amount' => $totalAmount,
+                'approval_flow_id' => $flow?->id,
+                'approval_flow_name' => $flow?->name,
+                'min_amount' => $flow?->min_amount,
+                'max_amount' => $flow?->max_amount,
             ],
         );
 
@@ -446,6 +513,26 @@ class PurchaseOrderApprovalGeneratorService
         }
 
         return $approvalMode;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tipe Dokumen Khusus dari PR yang tertaut
+    |--------------------------------------------------------------------------
+    | Mengembalikan NULL untuk PO biasa. Pencampuran PR beda tipe sudah ditolak
+    | saat pembuatan PO, sehingga nilai pertama yang ditemukan mewakili
+    | keseluruhan PO.
+    |--------------------------------------------------------------------------
+    */
+    private function resolveSpecialDocumentTypeId(
+        PurchaseOrder $purchaseOrder,
+    ): ?int {
+        $typeId = $purchaseOrder
+            ->purchaseRequests()
+            ->whereNotNull('special_document_type_id')
+            ->value('purchase_requests.special_document_type_id');
+
+        return $typeId ? (int) $typeId : null;
     }
 
     /*

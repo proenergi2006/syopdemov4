@@ -88,6 +88,10 @@ return [
         'load_failed' => 'Gagal memuat Purchase Requisition.',
     ],
 
+    'special_document_type' => [
+        'not_allowed' => 'Tipe dokumen khusus tersebut tidak tersedia untuk department Anda.',
+    ],
+
     'export' => [
         'failed' => 'Gagal export data Purchase Requisition.',
         'forbidden' => 'Anda tidak memiliki akses untuk export Purchase Requisition.',

@@ -95,6 +95,7 @@ return [
         'no_longer_processable_update' => 'Purchase Request :nomor_pr sudah tidak dapat digunakan untuk memperbarui PO.',
         'department_mismatch' => 'Seluruh Purchase Request dalam satu Purchase Order wajib berasal dari department yang sama.',
         'cabang_mismatch' => 'Seluruh Purchase Request dalam satu Purchase Order wajib berasal dari cabang yang sama.',
+        'special_type_mismatch' => 'Satu Purchase Order tidak boleh mencampur Purchase Request dengan tipe dokumen yang berbeda.',
         'items_not_found' => 'Terdapat item Purchase Request yang tidak ditemukan atau sudah dihapus.',
         'item_not_found' => 'Item Purchase Request tidak ditemukan.',
         'item_mismatch' => 'Item tidak sesuai dengan Purchase Request yang dipilih.',

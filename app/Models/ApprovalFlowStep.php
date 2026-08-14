@@ -144,6 +144,69 @@ class ApprovalFlowStep extends Model
         );
     }
 
+    /**
+     * Approver pengganti untuk tipe dokumen khusus.
+     */
+    public function specialApprovers(): HasMany
+    {
+        return $this->hasMany(
+            ApprovalFlowStepSpecialApprover::class,
+            'approval_flow_step_id',
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Substitusi Approver untuk Tipe Dokumen Khusus
+    |--------------------------------------------------------------------------
+    | Menimpa approver pada instance DI MEMORI saja -- sengaja tidak disimpan.
+    | Generator approval hanya membaca step untuk membentuk baris approval dan
+    | tidak pernah menyimpannya kembali, sehingga konfigurasi flow di database
+    | tidak ikut berubah.
+    |
+    | Dengan menimpa di satu titik, seluruh pembacaan turunan -- termasuk
+    | snapshot nama approver -- otomatis memakai approver pengganti.
+    |
+    | Mengembalikan true bila substitusi benar-benar diterapkan.
+    |--------------------------------------------------------------------------
+    */
+    public function applySpecialDocumentApprover(
+        ?int $specialDocumentTypeId,
+    ): bool {
+        if (!$specialDocumentTypeId) {
+            return false;
+        }
+
+        /*
+        | Memakai relasi yang sudah ter-load bila tersedia, supaya generator
+        | dapat melakukan eager load dan tidak menimbulkan query per step.
+        */
+        $override = $this->relationLoaded('specialApprovers')
+            ? $this->specialApprovers
+                ->firstWhere(
+                    'special_document_type_id',
+                    $specialDocumentTypeId,
+                )
+            : $this->specialApprovers()
+                ->where(
+                    'special_document_type_id',
+                    $specialDocumentTypeId,
+                )
+                ->first();
+
+        if (!$override || !$override->isValid()) {
+            return false;
+        }
+
+        $this->approver_type = strtoupper(
+            trim((string) $override->approver_type),
+        );
+
+        $this->approver_id = (int) $override->approver_id;
+
+        return true;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Query Scopes

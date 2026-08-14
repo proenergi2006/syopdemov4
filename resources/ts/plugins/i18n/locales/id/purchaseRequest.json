@@ -9,7 +9,9 @@
       "vendorRecommended": "Vendor Rekomendasi",
       "notes": "Catatan",
       "materialGroup": "Material Group",
-      "materialGroupPlaceholder": "Pilih material group"
+      "materialGroupPlaceholder": "Pilih material group",
+      "specialDocumentType": "Tipe Dokumen Khusus",
+      "specialDocumentTypeHint": "Kosongkan untuk dokumen biasa. Tipe khusus memakai jalur approval tersendiri."
     },
     "toast": {
       "loadAccessFailed": "Gagal memuat akses cabang dan department.",
@@ -57,7 +59,8 @@
       "qty": "Qty",
       "satuan": "Satuan",
       "hargaSatuan": "Harga satuan",
-      "keterangan": "Keterangan / Spesifikasi"
+      "keterangan": "Keterangan / Spesifikasi",
+      "specialDocumentType": "Pilih tipe dokumen khusus"
     },
     "noData": {
       "cabang": "Cabang tidak ditemukan",

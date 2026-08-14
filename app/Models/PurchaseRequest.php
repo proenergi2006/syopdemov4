@@ -65,6 +65,8 @@ class PurchaseRequest extends Model
         'top',
         'dpp',
         'ppn',
+
+        'special_document_type_id',
     ];
 
     protected $casts = [
@@ -162,6 +164,20 @@ class PurchaseRequest extends Model
         return $this->belongsTo(
             MasterVendor::class,
             'recommended_vendor_id',
+            'id'
+        );
+    }
+
+    /**
+     * Tipe Dokumen Khusus.
+     *
+     * NULL berarti dokumen biasa dan approval berjalan seperti biasa.
+     */
+    public function specialDocumentType()
+    {
+        return $this->belongsTo(
+            SpecialDocumentType::class,
+            'special_document_type_id',
             'id'
         );
     }

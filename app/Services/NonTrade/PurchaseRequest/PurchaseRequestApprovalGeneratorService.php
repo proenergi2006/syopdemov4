@@ -86,7 +86,7 @@ class PurchaseRequestApprovalGeneratorService
         |--------------------------------------------------------------------------
         */
         $flowSteps = ApprovalFlowStep::query()
-            ->with('branchMappings')
+            ->with(['branchMappings', 'specialApprovers'])
             ->where(
                 'approval_flow_id',
                 $approvalFlow->id,
@@ -102,6 +102,22 @@ class PurchaseRequestApprovalGeneratorService
                 ],
             ]);
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Substitusi approver untuk Tipe Dokumen Khusus
+        |--------------------------------------------------------------------------
+        | Dokumen biasa memiliki special_document_type_id NULL, sehingga tidak
+        | ada step yang tersentuh dan seluruh flow lama berperilaku sama persis.
+        |
+        | Dilakukan di sini -- sekali, tepat setelah step dimuat -- agar seluruh
+        | pemakaian di bawahnya otomatis memakai approver pengganti.
+        |--------------------------------------------------------------------------
+        */
+        $this->applySpecialDocumentApprovers(
+            $flowSteps,
+            $purchaseRequest,
+        );
 
         /*
         |--------------------------------------------------------------------------
@@ -864,6 +880,52 @@ class PurchaseRequestApprovalGeneratorService
         ]);
 
         return $flow;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Substitusi approver untuk Tipe Dokumen Khusus
+    |--------------------------------------------------------------------------
+    | Menimpa approver step di memori bila dokumen ini bertipe khusus dan step
+    | tersebut punya pengganti untuk tipe itu. Slot dan label approval tidak
+    | berubah -- hanya orang/role yang menyetujui.
+    |--------------------------------------------------------------------------
+    */
+    private function applySpecialDocumentApprovers(
+        $flowSteps,
+        PurchaseRequest $purchaseRequest,
+    ): void {
+        $specialTypeId = $purchaseRequest->special_document_type_id
+            ? (int) $purchaseRequest->special_document_type_id
+            : null;
+
+        if (!$specialTypeId) {
+            return;
+        }
+
+        $applied = [];
+
+        foreach ($flowSteps as $flowStep) {
+            if ($flowStep->applySpecialDocumentApprover($specialTypeId)) {
+                $applied[] = [
+                    'step_id' => $flowStep->id,
+                    'label' => $flowStep->label,
+                    'approver_type' => $flowStep->approver_type,
+                    'approver_id' => $flowStep->approver_id,
+                ];
+            }
+        }
+
+        if ($applied) {
+            Log::info(
+                '[PR Approval Generator] Substitusi approver dokumen khusus',
+                [
+                    'purchase_request_id' => $purchaseRequest->id,
+                    'special_document_type_id' => $specialTypeId,
+                    'steps' => $applied,
+                ],
+            );
+        }
     }
 
     private function resolveApproverName(

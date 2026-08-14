@@ -54,11 +54,29 @@ interface MasterDepartmentOption {
 
 type ApproverScope = 'GLOBAL' | 'SAME_BRANCH' | 'SELECTED_BRANCHES'
 
+interface SpecialApproverForm {
+  special_document_type_id: number | null
+  approver_type: 'ROLE' | 'USER'
+  approver_id: number | null
+}
+
+interface SpecialDocumentTypeOption {
+  id: number
+  code: string
+  name: string
+}
+
 interface ApproverForm {
   approver_type: 'ROLE' | 'USER'
   approver_id: number | null
   approver_scope: ApproverScope
   branch_ids: number[]
+
+  /*
+   * Approver pengganti per Tipe Dokumen Khusus. Kosong berarti approver di
+   * atas berlaku untuk semua dokumen -- perilaku seperti sebelum fitur ini.
+   */
+  special_approvers: SpecialApproverForm[]
 }
 
 interface ApprovalStepForm {
@@ -104,6 +122,53 @@ const isLoadingBranch = ref(false)
 const isLoadingPermissionModule = ref(false)
 
 const roleOptions = ref<MasterRoleOption[]>([])
+
+/*
+ * Tipe Dokumen Khusus untuk mengatur approver pengganti per step.
+ * Bila master-nya kosong, bagian pengaturan ini tidak dimunculkan sama sekali.
+ */
+const specialDocumentTypeOptions = ref<SpecialDocumentTypeOption[]>([])
+
+const loadSpecialDocumentTypes = async (): Promise<void> => {
+  try {
+    const response = await axios.get('/special-document-types/dropdown-select', {
+      /*
+       * scope=all: menu ini mengatur flow milik department LAIN, jadi daftar
+       * tipe tidak boleh disaring berdasarkan department admin yang login.
+       */
+      params: { scope: 'all' },
+      headers: { Accept: 'application/json' },
+    })
+
+    const data = Array.isArray(response?.data?.data) ? response.data.data : []
+
+    specialDocumentTypeOptions.value = data.map((item: any) => ({
+      id: Number(item.id),
+      code: String(item.code || ''),
+      name: String(item.name || '-'),
+    }))
+  } catch (error: unknown) {
+    console.error('[Special Document Types] FETCH ERROR:', error)
+    specialDocumentTypeOptions.value = []
+  }
+}
+
+const addSpecialApprover = (stepIndex: number, approverIndex: number): void => {
+  form.steps[stepIndex].approvers[approverIndex].special_approvers.push({
+    special_document_type_id: null,
+    approver_type: 'USER',
+    approver_id: null,
+  })
+}
+
+const removeSpecialApprover = (
+  stepIndex: number,
+  approverIndex: number,
+  specialIndex: number,
+): void => {
+  form.steps[stepIndex].approvers[approverIndex].special_approvers.splice(specialIndex, 1)
+}
+
 const userOptions = ref<MasterUserOption[]>([])
 const departmentOptions = ref<MasterDepartmentOption[]>([])
 const branchOptions = ref<DropdownOption[]>([])
@@ -256,6 +321,7 @@ const form = reactive<ApprovalFlowForm>({
           approver_id: null,
           approver_scope: 'GLOBAL',
           branch_ids: [],
+          special_approvers: [],
         },
       ],
     },
@@ -449,6 +515,7 @@ onMounted(async () => {
     loadApproverOptions(),
     loadDepartmentOptions(),
     loadBranchOptions(),
+    loadSpecialDocumentTypes(),
   ])
 })
 
@@ -657,6 +724,7 @@ const addStep = (): void => {
         approver_id: null,
         approver_scope: 'GLOBAL',
         branch_ids: [],
+        special_approvers: [],
       },
     ],
   })
@@ -682,6 +750,7 @@ const addApprover = (stepIndex: number): void => {
     approver_id: null,
     approver_scope: 'GLOBAL',
     branch_ids: [],
+    special_approvers: [],
   })
 }
 
@@ -941,6 +1010,18 @@ const buildPayload = () => {
               approver.approver_scope === 'SELECTED_BRANCHES'
                 ? [...new Set(approver.branch_ids.map(branchId => Number(branchId)))].filter(branchId => branchId > 0)
                 : [],
+
+            /*
+             * Hanya kirim yang lengkap. Baris kosong diabaikan agar admin bisa
+             * menambah baris tanpa langsung wajib mengisinya.
+             */
+            special_approvers: (approver.special_approvers || [])
+              .filter(special => special.special_document_type_id && special.approver_id)
+              .map(special => ({
+                special_document_type_id: Number(special.special_document_type_id),
+                approver_type: special.approver_type,
+                approver_id: Number(special.approver_id),
+              })),
           }),
         ),
       }),
@@ -1571,6 +1652,121 @@ const formatAmount = (value: number | string | null | undefined): string => {
                             </template>
                           </VAlert>
                         </VCol>
+                        <!--
+                          Approver pengganti untuk Tipe Dokumen Khusus.
+                          Hanya muncul bila master tipe dokumen memang terisi,
+                          sehingga tampilan lama tidak berubah bila fitur ini
+                          tidak dipakai.
+                        -->
+                        <VCol
+                          v-if="specialDocumentTypeOptions.length"
+                          cols="12"
+                        >
+                          <VDivider class="mb-3" />
+
+                          <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-2">
+                            <div class="d-flex align-center gap-2">
+                              <VIcon
+                                icon="tabler-replace"
+                                size="18"
+                                class="text-medium-emphasis"
+                              />
+
+                              <div>
+                                <div class="text-body-2 font-weight-medium">
+                                  Approver Pengganti (Dokumen Khusus)
+                                </div>
+
+                                <div class="text-caption text-medium-emphasis">
+                                  Opsional. Bila dokumen bertipe khusus, approver di atas digantikan oleh yang diatur di sini.
+                                </div>
+                              </div>
+                            </div>
+
+                            <VBtn
+                              size="small"
+                              variant="tonal"
+                              color="primary"
+                              prepend-icon="tabler-plus"
+                              class="text-none"
+                              :disabled="submitLoading"
+                              @click="addSpecialApprover(stepIndex, approverIndex)"
+                            >
+                              Tambah Pengganti
+                            </VBtn>
+                          </div>
+
+                          <VAlert
+                            v-if="!approver.special_approvers.length"
+                            color="secondary"
+                            variant="tonal"
+                            density="compact"
+                          >
+                            Belum ada pengganti. Approver di atas berlaku untuk semua dokumen.
+                          </VAlert>
+
+                          <VRow
+                            v-for="(special, specialIndex) in approver.special_approvers"
+                            :key="`special-${stepIndex}-${approverIndex}-${specialIndex}`"
+                            class="align-center"
+                          >
+                            <VCol cols="12" md="4">
+                              <VAutocomplete
+                                v-model="special.special_document_type_id"
+                                label="Tipe Dokumen *"
+                                :items="specialDocumentTypeOptions"
+                                item-title="name"
+                                item-value="id"
+                                density="comfortable"
+                                :disabled="submitLoading"
+                                :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+                                placeholder="Pilih tipe dokumen"
+                              />
+                            </VCol>
+
+                            <VCol cols="12" md="3">
+                              <VSelect
+                                v-model="special.approver_type"
+                                label="Tipe Approver *"
+                                :items="approverTypeOptions"
+                                item-title="title"
+                                item-value="value"
+                                density="comfortable"
+                                :disabled="submitLoading"
+                                @update:model-value="special.approver_id = null"
+                              />
+                            </VCol>
+
+                            <VCol cols="12" md="4">
+                              <VAutocomplete
+                                v-model="special.approver_id"
+                                label="Approver Pengganti *"
+                                :items="special.approver_type === 'ROLE' ? roleOptions : userOptions"
+                                item-title="name"
+                                item-value="id"
+                                :return-object="false"
+                                density="comfortable"
+                                :disabled="submitLoading"
+                                :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+                                placeholder="Pilih approver pengganti"
+                              />
+                            </VCol>
+
+                            <VCol cols="12" md="1" class="d-flex justify-end">
+                              <VBtn
+                                icon
+                                size="small"
+                                variant="text"
+                                color="error"
+                                :disabled="submitLoading"
+                                @click="removeSpecialApprover(stepIndex, approverIndex, specialIndex)"
+                              >
+                                <VIcon icon="tabler-trash" />
+                              </VBtn>
+                            </VCol>
+                          </VRow>
+                        </VCol>
+
                       </VRow>
                     </div>
                   </div>

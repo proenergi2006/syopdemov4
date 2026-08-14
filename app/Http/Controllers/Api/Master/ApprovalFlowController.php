@@ -37,6 +37,9 @@ class ApprovalFlowController extends Controller
                     'steps.role',
                     'steps.user',
                     'steps.branchMappings',
+                    'steps.specialApprovers.specialDocumentType',
+                    'steps.specialApprovers.approverUser:id,name',
+                    'steps.specialApprovers.approverRole',
                     'creatorDepartment',
                     'permissionModule',
                 ])
@@ -157,6 +160,32 @@ class ApprovalFlowController extends Controller
                             ->map(
                                 fn($branchId) => (int) $branchId,
                             )
+                            ->values()
+                            ->all(),
+
+                        /*
+                        | Approver pengganti per Tipe Dokumen Khusus. Array kosong
+                        | untuk step biasa.
+                        */
+                        'special_approvers' => $step
+                            ->specialApprovers
+                            ->map(function ($special) {
+                                return [
+                                    'special_document_type_id'
+                                    => (int) $special->special_document_type_id,
+
+                                    'special_document_type_name'
+                                    => $special->specialDocumentType?->name,
+
+                                    'approver_type'
+                                    => strtoupper((string) $special->approver_type),
+
+                                    'approver_id' => (int) $special->approver_id,
+
+                                    'approver_name'
+                                    => $special->resolveApproverName(),
+                                ];
+                            })
                             ->values()
                             ->all(),
                     ];
@@ -374,6 +403,28 @@ class ApprovalFlowController extends Controller
 
                 'steps.*.approvers.*.branch_ids.*' => [
                     'integer',
+                ],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Approver pengganti untuk Tipe Dokumen Khusus (opsional)
+            |--------------------------------------------------------------------------
+            */
+                'steps.*.approvers.*.special_approvers' => ['nullable', 'array'],
+                'steps.*.approvers.*.special_approvers.*.special_document_type_id' => [
+                    'required',
+                    'integer',
+                    'exists:special_document_types,id',
+                ],
+                'steps.*.approvers.*.special_approvers.*.approver_type' => [
+                    'required',
+                    'string',
+                    'in:ROLE,USER',
+                ],
+                'steps.*.approvers.*.special_approvers.*.approver_id' => [
+                    'required',
+                    'integer',
+                    'min:1',
                 ],
 
                 /*
@@ -663,6 +714,9 @@ class ApprovalFlowController extends Controller
                 'steps.role',
                 'steps.user',
                 'steps.branchMappings',
+                    'steps.specialApprovers.specialDocumentType',
+                    'steps.specialApprovers.approverUser:id,name',
+                    'steps.specialApprovers.approverRole',
                 'creatorDepartment',
                 'permissionModule',
             ]);
@@ -883,6 +937,28 @@ class ApprovalFlowController extends Controller
                 'steps.*.approvers' => ['required', 'array', 'min:1'],
                 'steps.*.approvers.*.approver_type' => ['required', 'string', 'in:ROLE,USER'],
                 'steps.*.approvers.*.approver_id' => ['required', 'integer'],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Approver pengganti untuk Tipe Dokumen Khusus (opsional)
+            |--------------------------------------------------------------------------
+            */
+                'steps.*.approvers.*.special_approvers' => ['nullable', 'array'],
+                'steps.*.approvers.*.special_approvers.*.special_document_type_id' => [
+                    'required',
+                    'integer',
+                    'exists:special_document_types,id',
+                ],
+                'steps.*.approvers.*.special_approvers.*.approver_type' => [
+                    'required',
+                    'string',
+                    'in:ROLE,USER',
+                ],
+                'steps.*.approvers.*.special_approvers.*.approver_id' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
                 'steps.*.approver_scope' => [
                     'nullable',
                     'string',
@@ -1116,6 +1192,9 @@ class ApprovalFlowController extends Controller
                 'steps.role',
                 'steps.user',
                 'steps.branchMappings',
+                    'steps.specialApprovers.specialDocumentType',
+                    'steps.specialApprovers.approverUser:id,name',
+                    'steps.specialApprovers.approverRole',
                 'creatorDepartment',
                 'permissionModule',
             ]);
@@ -1237,6 +1316,9 @@ class ApprovalFlowController extends Controller
                     'steps.role',
                     'steps.user',
                     'steps.branchMappings',
+                    'steps.specialApprovers.specialDocumentType',
+                    'steps.specialApprovers.approverUser:id,name',
+                    'steps.specialApprovers.approverRole',
                     'creatorDepartment',
                     'permissionModule',
                 ])
@@ -1289,6 +1371,32 @@ class ApprovalFlowController extends Controller
                             ->map(
                                 fn($branchId) => (int) $branchId,
                             )
+                            ->values()
+                            ->all(),
+
+                        /*
+                        | Approver pengganti per Tipe Dokumen Khusus. Array kosong
+                        | untuk step biasa.
+                        */
+                        'special_approvers' => $step
+                            ->specialApprovers
+                            ->map(function ($special) {
+                                return [
+                                    'special_document_type_id'
+                                    => (int) $special->special_document_type_id,
+
+                                    'special_document_type_name'
+                                    => $special->specialDocumentType?->name,
+
+                                    'approver_type'
+                                    => strtoupper((string) $special->approver_type),
+
+                                    'approver_id' => (int) $special->approver_id,
+
+                                    'approver_name'
+                                    => $special->resolveApproverName(),
+                                ];
+                            })
                             ->values()
                             ->all(),
                     ];
@@ -1744,11 +1852,70 @@ class ApprovalFlowController extends Controller
                             $branchIds = [];
                         }
 
+                        /*
+                    |--------------------------------------------------------------------------
+                    | Approver pengganti untuk Tipe Dokumen Khusus
+                    |--------------------------------------------------------------------------
+                    | Opsional. Bila kosong, approver di atas berlaku untuk semua
+                    | dokumen -- persis perilaku sebelum fitur ini ada.
+                    |--------------------------------------------------------------------------
+                    */
+                        $specialApprovers = collect(
+                            $approver['special_approvers'] ?? [],
+                        )
+                            ->map(function ($special) {
+                                $typeId = (int) (
+                                    $special['special_document_type_id'] ?? 0
+                                );
+
+                                $approverIdSpecial = (int) (
+                                    $special['approver_id'] ?? 0
+                                );
+
+                                $approverTypeSpecial = strtoupper(
+                                    trim(
+                                        (string) (
+                                            $special['approver_type'] ?? ''
+                                        ),
+                                    ),
+                                );
+
+                                if (
+                                    $typeId <= 0
+                                    || $approverIdSpecial <= 0
+                                    || !in_array(
+                                        $approverTypeSpecial,
+                                        [
+                                            ApprovalFlowStep::APPROVER_TYPE_ROLE,
+                                            ApprovalFlowStep::APPROVER_TYPE_USER,
+                                        ],
+                                        true,
+                                    )
+                                ) {
+                                    return null;
+                                }
+
+                                return [
+                                    'special_document_type_id' => $typeId,
+                                    'approver_type' => $approverTypeSpecial,
+                                    'approver_id' => $approverIdSpecial,
+                                ];
+                            })
+                            ->filter()
+                            /*
+                            | Satu tipe dokumen hanya boleh punya satu pengganti
+                            | pada approver ini, agar tidak ada aturan kembar.
+                            */
+                            ->unique('special_document_type_id')
+                            ->values()
+                            ->all();
+
                         return [
                             'approver_type' => $approverType,
                             'approver_id' => $approverId,
                             'approver_scope' => $approverScope,
                             'branch_ids' => $branchIds,
+                            'special_approvers' => $specialApprovers,
                         ];
                     },
                 );
@@ -1799,6 +1966,35 @@ class ApprovalFlowController extends Controller
                     'is_required'
                     => true,
                 ]);
+
+                /*
+            |--------------------------------------------------------------------------
+            | Simpan approver pengganti untuk Tipe Dokumen Khusus
+            |--------------------------------------------------------------------------
+            | Kosong untuk step biasa, sehingga tidak ada baris yang dibuat dan
+            | perilaku flow tidak berubah sama sekali.
+            |--------------------------------------------------------------------------
+            */
+                $specialApprovers = collect(
+                    $approver['special_approvers'] ?? [],
+                )
+                    ->map(
+                        fn(array $special): array => [
+                            'special_document_type_id'
+                            => $special['special_document_type_id'],
+
+                            'approver_type' => $special['approver_type'],
+                            'approver_id' => $special['approver_id'],
+                        ],
+                    )
+                    ->values()
+                    ->all();
+
+                if ($specialApprovers) {
+                    $flowStep
+                        ->specialApprovers()
+                        ->createMany($specialApprovers);
+                }
 
                 /*
             |--------------------------------------------------------------------------

@@ -42,6 +42,7 @@ use App\Http\Controllers\Api\Master\GroupCabangController;
 use App\Http\Controllers\Api\Master\MasterDokumenPendukungController;
 use App\Http\Controllers\Api\Master\MasterKeteranganTransaksiController;
 use App\Http\Controllers\Api\Master\MasterMaterialGroupController;
+use App\Http\Controllers\Api\Master\SpecialDocumentTypeController;
 use App\Http\Controllers\Api\Master\MasterVendorController;
 use App\Http\Controllers\Api\OngkosAngkutKapalController;
 use App\Http\Controllers\Api\Master\PermissionController;
@@ -154,6 +155,11 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
     Route::get(
         '/material-groups/dropdown-select',
         [MasterMaterialGroupController::class, 'dropdownSelect']
+    );
+
+    Route::get(
+        '/special-document-types/dropdown-select',
+        [SpecialDocumentTypeController::class, 'dropdownSelect']
     );
 
     /*

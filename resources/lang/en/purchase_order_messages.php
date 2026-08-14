@@ -95,6 +95,7 @@ return [
         'no_longer_processable_update' => 'Purchase Request :nomor_pr can no longer be used to update this PO.',
         'department_mismatch' => 'All Purchase Requests within a single Purchase Order must belong to the same department.',
         'cabang_mismatch' => 'All Purchase Requests within a single Purchase Order must belong to the same branch.',
+        'special_type_mismatch' => 'A single Purchase Order may not mix Purchase Requests of different document types.',
         'items_not_found' => 'Some Purchase Request items could not be found or have been deleted.',
         'item_not_found' => 'Purchase Request item not found.',
         'item_mismatch' => 'This item does not match the selected Purchase Request.',

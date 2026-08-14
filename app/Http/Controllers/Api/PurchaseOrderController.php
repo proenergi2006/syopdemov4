@@ -1552,6 +1552,10 @@ class PurchaseOrderController extends Controller
                         ]);
                     }
 
+                    $this->assertConsistentSpecialDocumentType(
+                        $purchaseRequests,
+                    );
+
                     /*
                 |--------------------------------------------------------------------------
                 | Lock Purchase Request Items
@@ -3165,6 +3169,10 @@ class PurchaseOrderController extends Controller
                             ],
                         ]);
                     }
+
+                    $this->assertConsistentSpecialDocumentType(
+                        $purchaseRequests,
+                    );
 
                     /*
                 |--------------------------------------------------------------------------
@@ -6272,6 +6280,44 @@ class PurchaseOrderController extends Controller
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Satu PO tidak boleh mencampur Tipe Dokumen Khusus
+    |--------------------------------------------------------------------------
+    | Satu PO hanya boleh berisi PR dengan tipe dokumen yang sama -- termasuk
+    | tidak boleh mencampur dokumen khusus dengan dokumen biasa.
+    |
+    | Alasannya: jalur approval diturunkan dari tipe dokumen. Bila satu PO
+    | berisi campuran, tidak ada jawaban tunggal yang benar untuk "siapa yang
+    | harus menyetujui", dan item dokumen khusus berisiko lolos lewat PO
+    | campuran tanpa persetujuan yang semestinya.
+    |
+    | PR biasa bernilai NULL, sehingga PO dari department lain -- yang tidak
+    | mengenal tipe khusus sama sekali -- selalu lolos pemeriksaan ini.
+    |--------------------------------------------------------------------------
+    */
+    private function assertConsistentSpecialDocumentType($purchaseRequests): void
+    {
+        $types = collect($purchaseRequests)
+            ->map(
+                fn($pr) => $pr->special_document_type_id
+                    ? (int) $pr->special_document_type_id
+                    : null,
+            )
+            ->unique()
+            ->values();
+
+        if ($types->count() <= 1) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'purchase_request_ids' => [
+                __('purchase_order_messages.purchase_request.special_type_mismatch'),
+            ],
+        ]);
     }
 
     private function applyPurchaseOrderListFilters($query, Request $request): void
