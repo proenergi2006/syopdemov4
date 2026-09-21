@@ -49,3 +49,7 @@ dist-ssr
 
 # iconify dist files
 resources/ts/@iconify/*.js
+
+# Catatan perubahan internal (lihat changelog/README.md)
+/changelog
+/.ignore

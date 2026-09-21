@@ -19,6 +19,8 @@ class ApprovalFlow extends Model
         'area_type',
         'cabang',
         'creator_department_id',
+        'all_departments',
+        'all_transaction_categories',
         'permission_module_id',
 
         'name',
@@ -35,6 +37,8 @@ class ApprovalFlow extends Model
         'min_amount' => 'decimal:2',
         'max_amount' => 'decimal:2',
         'is_active' => 'boolean',
+        'all_departments' => 'boolean',
+        'all_transaction_categories' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -43,6 +47,18 @@ class ApprovalFlow extends Model
 
     public const DOCUMENT_TYPE_PO = 'PO';
     public const DOCUMENT_TYPE_PR = 'PR';
+
+    // FPU = Form Pengajuan Uang, modul Pengajuan Dana.
+    public const DOCUMENT_TYPE_FPU = 'FPU';
+
+    // Realisasi = pertanggungjawaban atas FPU yang sudah dicairkan.
+    public const DOCUMENT_TYPE_REALISASI = 'REALISASI';
+
+    // Claim = penggantian uang yang sudah lebih dulu dikeluarkan pemohon.
+    public const DOCUMENT_TYPE_CLAIM = 'CLAIM';
+
+    // Perdin = izin perjalanan dinas, mendahului FPU yang membiayainya.
+    public const DOCUMENT_TYPE_PERDIN = 'PERDIN';
 
     public const AREA_HO = 'HO';
     public const AREA_CABANG = 'CABANG';
@@ -81,6 +97,61 @@ class ApprovalFlow extends Model
     public function creatorDepartment()
     {
         return $this->belongsTo(Department::class, 'creator_department_id');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cakupan flow
+    |--------------------------------------------------------------------------
+    | Satu flow bisa berlaku untuk beberapa department dan beberapa keterangan
+    | transaksi sekaligus, atau untuk semuanya lewat penanda all_*.
+    |--------------------------------------------------------------------------
+    */
+
+    public function departments()
+    {
+        return $this->belongsToMany(
+            Department::class,
+            'approval_flow_departments',
+            'approval_flow_id',
+            'department_id',
+        )->withTimestamps();
+    }
+
+    public function transactionCategories()
+    {
+        return $this->belongsToMany(
+            FundRequestTransactionCategory::class,
+            'approval_flow_transaction_categories',
+            'approval_flow_id',
+            'transaction_category_id',
+        )->withTimestamps();
+    }
+
+    /**
+     * Daftar department yang dicakup flow ini.
+     *
+     * Bila pivot kosong, creator_department_id dipakai sebagai cadangan agar
+     * data lama yang belum ter-backfill tetap punya pasangan.
+     *
+     * @return array<int, int>
+     */
+    public function resolvedDepartmentIds(): array
+    {
+        $this->loadMissing('departments');
+
+        $ids = $this->departments
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->all();
+
+        if ($ids) {
+            return $ids;
+        }
+
+        return $this->creator_department_id
+            ? [(int) $this->creator_department_id]
+            : [];
     }
 
     public function creator()

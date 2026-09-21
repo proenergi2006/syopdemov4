@@ -59,6 +59,15 @@ interface PurchaseRequestOption {
   id: number
   public_id: string
   nomor_pr: string
+
+  /*
+   * Penanda dokumen khusus. Null untuk PR biasa.
+   */
+  special_document_type?: {
+    id: number
+    code: string
+    name: string
+  } | null
   tanggal_pr: string
   cabang: string
   department: string
@@ -995,6 +1004,12 @@ const loadPurchaseRequestsByFilter = async (): Promise<void> => {
           cabang: item.cabang,
           department: item.department,
           total_amount: Number(item.total_amount || 0),
+
+          /*
+           * Wajib ikut dipetakan. Karena objek PR dibangun ulang di sini,
+           * field yang tidak disebut akan hilang meski dikirim backend.
+           */
+          special_document_type: item.special_document_type || null,
           recommended_vendor_id: item.recommended_vendor_id
             ? Number(item.recommended_vendor_id)
             : null,
@@ -2260,6 +2275,25 @@ onMounted(async () => {
                             class="ms-1"
                           />
                         </VBtn>
+
+                        <!--
+                          Penanda dokumen khusus, membantu sebelum memilih PR:
+                          satu PO tidak boleh mencampur tipe dokumen berbeda.
+                        -->
+                        <div v-if="pr.special_document_type?.name">
+                          <VChip
+                            size="x-small"
+                            color="warning"
+                            variant="tonal"
+                          >
+                            <VIcon
+                              icon="tabler-ship"
+                              size="12"
+                              start
+                            />
+                            {{ pr.special_document_type.name }}
+                          </VChip>
+                        </div>
                       </td>
 
                       <td class="col-attachment pr-attachment-cell">

@@ -1,8 +1,15 @@
 import auth from './auth.json'
+import businessTrip from './businessTrip.json'
+import cashAdvance from './cashAdvance.json'
+import cashAdvanceRealization from './cashAdvanceRealization.json'
+import claim from './claim.json'
 import common from './common.json'
 import dashboard from './dashboard.json'
+import fundRequestLimit from './fundRequestLimit.json'
 import navigation from './navigation.json'
+import paymentSchedule from './paymentSchedule.json'
 import purchaseRequest from './purchaseRequest.json'
+import queueHealth from './queueHealth.json'
 import purchaseOrder from './purchaseOrder.json'
 import goodsReceive from './goodsReceive.json'
 import goodsReturn from './goodsReturn.json'
@@ -17,6 +24,13 @@ export default {
   goodsReceive,
   goodsReturn,
   vendor,
+  cashAdvance,
+  cashAdvanceRealization,
+  claim,
+  queueHealth,
+  paymentSchedule,
+  fundRequestLimit,
+  businessTrip,
 
   /*
    * navigation.json di-spread di root (bukan dinamai `navigation: {...}`)

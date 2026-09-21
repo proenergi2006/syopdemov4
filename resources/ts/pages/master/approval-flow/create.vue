@@ -13,6 +13,15 @@ import {
 
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { formatNumberWithoutRp } from '@/utils/textFormatter'
+import {
+  documentTypeUsesAreaMatrix,
+  documentTypeUsesTransactionCategory,
+  getApprovalFlowDocumentTypeLabel,
+  getApprovalFlowModuleCode,
+  getDefaultApprovalFlowDocumentType,
+  loadApprovalFlowDocumentTypes,
+  normalizeApprovalFlowDocumentType,
+} from '@/utils/approvalFlowDocumentType'
 
 interface AxiosErrorShape {
   response?: {
@@ -102,9 +111,24 @@ interface ApprovalFlowForm {
 
   area_type: 'HO' | 'CABANG' | ''
   cabang: string | null
-  creator_department_id: number | null
+
+  /*
+   * Cakupan flow. Satu flow bisa mencakup beberapa department dan beberapa
+   * keterangan transaksi, atau seluruhnya lewat penanda all_*.
+   */
+  all_departments: boolean
+  department_ids: number[]
+
+  all_transaction_categories: boolean
+  transaction_category_ids: number[]
 
   steps: ApprovalStepForm[]
+}
+
+interface TransactionCategoryOption {
+  id: number
+  code: string
+  title: string
 }
 
 const autocompleteMultiple: any = true
@@ -265,28 +289,12 @@ const getAvailableApproverItems = (
   })
 }
 
-const normalizeDocumentType = (value: unknown): string => {
-  const rawValue = String(value || 'PO').trim()
-
-  if (!rawValue)
-    return 'PO'
-
-  const upperValue = rawValue.toUpperCase()
-
-  if (upperValue === 'PO')
-    return 'PO'
-
-  if (upperValue === 'PR')
-    return 'PR'
-
-  if (upperValue === 'VENDOR')
-    return 'Vendor'
-
-  return rawValue
-}
-
+/*
+ * Diambil mentah dari URL; dibakukan terhadap master pada onMounted setelah
+ * daftar jenis dokumen selesai dimuat.
+ */
 const getInitialDocumentType = (): string => {
-  return normalizeDocumentType(route.query.document_type || 'PO')
+  return String(route.query.document_type || '')
 }
 
 const makeLocalKey = (): string => {
@@ -307,7 +315,12 @@ const form = reactive<ApprovalFlowForm>({
 
   area_type: '',
   cabang: null,
-  creator_department_id: null,
+
+  all_departments: false,
+  department_ids: [],
+
+  all_transaction_categories: false,
+  transaction_category_ids: [],
 
   steps: [
     {
@@ -337,19 +350,7 @@ const expectedPermissionModuleCode = computed(() => {
 const matchDocumentTypeToModuleCode = (
   documentType: string,
 ): string => {
-  switch (String(documentType).toUpperCase()) {
-    case 'PR':
-      return 'purchase_request'
-
-    case 'PO':
-      return 'purchase_order'
-
-    case 'VENDOR':
-      return 'vendor'
-
-    default:
-      return ''
-  }
+  return getApprovalFlowModuleCode(documentType)
 }
 
 const loadPermissionModule = async (): Promise<void> => {
@@ -422,22 +423,57 @@ const loadPermissionModule = async (): Promise<void> => {
   }
 }
 
-const documentTypeUpper = computed(() => String(form.document_type || '').toUpperCase())
-const isPR = computed(() => documentTypeUpper.value === 'PR')
+
+/*
+ * PR dan FPU dibedakan per area + department, sehingga kedua field itu wajib
+ * diisi. Jenis dokumen lain tidak memakainya.
+ */
+const usesAreaMatrix = computed(() => documentTypeUsesAreaMatrix(form.document_type))
+
+/*
+ * Keterangan transaksi hanya dipakai jenis dokumen tertentu (FPU). Penentunya
+ * master permission module, bukan pemeriksaan jenis dokumen di sini.
+ */
+const usesTransactionCategory = computed(
+  () => documentTypeUsesTransactionCategory(form.document_type),
+)
+
+const transactionCategoryOptions = ref<TransactionCategoryOption[]>([])
+const isLoadingTransactionCategory = ref(false)
+
+const loadTransactionCategories = async (): Promise<void> => {
+  isLoadingTransactionCategory.value = true
+
+  try {
+    const response = await axios.get(
+      '/fund-request/transaction-categories/dropdown-select',
+      {
+        /*
+         * include_inactive: flow lama bisa saja memakai kategori yang sudah
+         * dinonaktifkan; tanpa ini pilihannya hilang diam-diam saat diedit.
+         */
+        params: { include_inactive: 1 },
+        headers: { Accept: 'application/json' },
+      },
+    )
+
+    const data = Array.isArray(response?.data?.data) ? response.data.data : []
+
+    transactionCategoryOptions.value = data.map((item: any) => ({
+      id: Number(item.id),
+      code: String(item.code || ''),
+      title: String(item.title || item.name || '-'),
+    }))
+  } catch (error: unknown) {
+    console.error('[Transaction Categories] FETCH ERROR:', error)
+    transactionCategoryOptions.value = []
+  } finally {
+    isLoadingTransactionCategory.value = false
+  }
+}
 
 const documentTypeLabel = computed(() => {
-  const type = documentTypeUpper.value
-
-  if (type === 'PO')
-    return 'Purchase Order (PO)'
-
-  if (type === 'PR')
-    return 'Purchase Request (PR)'
-
-  if (type === 'VENDOR')
-    return 'Master Vendor'
-
-  return form.document_type || '-'
+  return getApprovalFlowDocumentTypeLabel(form.document_type)
 })
 
 const pageTitle = computed(() => {
@@ -467,38 +503,81 @@ const amountRangePreview = computed(() => {
 })
 
 const selectedDepartmentName = computed(() => {
-  if (!form.creator_department_id)
+  if (form.all_departments)
+    return 'Semua Divisi'
+
+  if (!form.department_ids.length)
     return '-'
 
-  const department = departmentOptions.value.find(item => {
-    return Number(item.id) === Number(form.creator_department_id)
-  })
+  return form.department_ids
+    .map(id => {
+      const department = departmentOptions.value.find(
+        item => Number(item.id) === Number(id),
+      )
 
-  return department?.title
-    || department?.label
-    || department?.nama
-    || department?.name
-    || '-'
+      return department?.title
+        || department?.label
+        || department?.nama
+        || department?.name
+        || '-'
+    })
+    .join(', ')
 })
+
+const selectedTransactionCategoryName = computed(() => {
+  if (form.all_transaction_categories)
+    return 'Semua Keterangan Transaksi'
+
+  if (!form.transaction_category_ids.length)
+    return '-'
+
+  return form.transaction_category_ids
+    .map(id => {
+      return transactionCategoryOptions.value.find(
+        item => Number(item.id) === Number(id),
+      )?.title || '-'
+    })
+    .join(', ')
+})
+
+/**
+ * Menyelaraskan field area + department dengan jenis dokumen terpilih.
+ *
+ * Dipanggil dari watcher dan sekali lagi pada onMounted setelah master jenis
+ * dokumen selesai dimuat -- sebelum itu aturan area belum diketahui.
+ */
+const applyDocumentTypeDefaults = (): void => {
+  const normalizedType = normalizeApprovalFlowDocumentType(form.document_type)
+
+  form.document_type = normalizedType
+
+  /*
+   * Area dan department hanya berlaku bagi dokumen yang flow-nya dibedakan
+   * per matriks area + department. Untuk jenis lain, nilainya dikosongkan
+   * supaya tidak ikut terkirim.
+   */
+  if (!documentTypeUsesAreaMatrix(normalizedType)) {
+    form.area_type = ''
+    form.cabang = null
+    form.all_departments = false
+    form.department_ids = []
+  } else if (!form.area_type) {
+    form.area_type = 'HO'
+  }
+
+  /*
+   * Keterangan transaksi hanya dipakai sebagian jenis dokumen. Untuk yang
+   * lain, flow selalu tersimpan sebagai "semua kategori".
+   */
+  if (!documentTypeUsesTransactionCategory(normalizedType)) {
+    form.all_transaction_categories = true
+    form.transaction_category_ids = []
+  }
+}
 
 watch(
   () => form.document_type,
-  value => {
-    const normalizedType = normalizeDocumentType(value)
-
-    form.document_type = normalizedType
-
-    if (String(normalizedType).toUpperCase() !== 'PR') {
-      form.area_type = ''
-      form.cabang = null
-      form.creator_department_id = null
-
-      return
-    }
-
-    if (!form.area_type)
-      form.area_type = 'HO'
-  },
+  () => applyDocumentTypeDefaults(),
   { immediate: true },
 )
 
@@ -510,12 +589,34 @@ watch(
 )
 
 onMounted(async () => {
+  /*
+   * Harus lebih dulu: label, aturan area, dan pemetaan ke permission module
+   * semuanya dibaca dari master jenis dokumen ini.
+   */
+  try {
+    await loadApprovalFlowDocumentTypes()
+  } catch (error: any) {
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        error,
+        'Gagal memuat daftar jenis dokumen approval flow.',
+      ),
+    })
+  }
+
+  form.document_type = normalizeApprovalFlowDocumentType(form.document_type)
+    || getDefaultApprovalFlowDocumentType()
+
+  applyDocumentTypeDefaults()
+
   await Promise.all([
     loadPermissionModule(),
     loadApproverOptions(),
     loadDepartmentOptions(),
     loadBranchOptions(),
     loadSpecialDocumentTypes(),
+    loadTransactionCategories(),
   ])
 })
 
@@ -840,24 +941,37 @@ const validateForm = (): boolean => {
     return false
     }
 
-  if (isPR.value) {
+  if (usesAreaMatrix.value) {
     if (!form.area_type) {
       showErrorToast({
         title: 'Validasi Gagal',
-        text: 'Area type wajib dipilih untuk approval PR.',
+        text: `Area type wajib dipilih untuk approval ${documentTypeLabel.value}.`,
       })
 
       return false
     }
 
-    if (!form.creator_department_id) {
+    if (!form.all_departments && !form.department_ids.length) {
       showErrorToast({
         title: 'Validasi Gagal',
-        text: 'Department wajib dipilih untuk approval PR.',
+        text: `Department wajib dipilih untuk approval ${documentTypeLabel.value}.`,
       })
 
       return false
     }
+  }
+
+  if (
+    usesTransactionCategory.value
+    && !form.all_transaction_categories
+    && !form.transaction_category_ids.length
+  ) {
+    showErrorToast({
+      title: 'Validasi Gagal',
+      text: `Keterangan transaksi wajib dipilih untuk approval ${documentTypeLabel.value}.`,
+    })
+
+    return false
   }
 
   if (!form.steps.length) {
@@ -977,16 +1091,31 @@ const buildPayload = () => {
     is_active: Boolean(form.is_active),
 
     area_type:
-      isPR.value
+      usesAreaMatrix.value
         ? form.area_type
         : null,
 
     cabang: null,
 
-    creator_department_id:
-      isPR.value
-        ? form.creator_department_id
-        : null,
+    /*
+     * Cakupan flow. Backend menyimpan department_ids ke tabel pivot dan
+     * mengisi creator_department_id dari elemen pertama untuk kompatibilitas.
+     */
+    all_departments: usesAreaMatrix.value && form.all_departments,
+
+    department_ids:
+      usesAreaMatrix.value && !form.all_departments
+        ? form.department_ids
+        : [],
+
+    all_transaction_categories: usesTransactionCategory.value
+      ? form.all_transaction_categories
+      : true,
+
+    transaction_category_ids:
+      usesTransactionCategory.value && !form.all_transaction_categories
+        ? form.transaction_category_ids
+        : [],
 
     steps: form.steps.map(
       (step, stepIndex) => ({
@@ -1238,7 +1367,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
                 <VTextField
                   v-model="form.name"
                   label="Nama Approval Flow *"
-                  placeholder="Contoh: Approval PR Cabang GA 1 Juta sampai 10 Juta"
+                  :placeholder="`Contoh: Approval ${form.document_type} Cabang GA 1 Juta sampai 10 Juta`"
                   density="comfortable"
                   :disabled="submitLoading"
                   :error="isSubmitted && !form.name"
@@ -1308,7 +1437,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
         </VCard>
 
         <VCard
-          v-if="isPR"
+          v-if="usesAreaMatrix"
           class="mb-6 rounded-lg"
         >
           <VCardItem>
@@ -1322,9 +1451,13 @@ const formatAmount = (value: number | string | null | undefined): string => {
               </VAvatar>
             </template>
 
-            <VCardTitle>Kondisi Matrix PR</VCardTitle>
+            <!--
+              Judul mengikuti jenis dokumen aktif: kartu ini dipakai bersama
+              oleh seluruh dokumen bermatriks area (PR dan FPU).
+            -->
+            <VCardTitle>Kondisi Matrix {{ form.document_type }}</VCardTitle>
             <VCardSubtitle>
-              Rule tambahan khusus Purchase Request.
+              Rule tambahan khusus {{ documentTypeLabel }}.
             </VCardSubtitle>
           </VCardItem>
 
@@ -1336,7 +1469,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
               variant="tonal"
               class="mb-5"
             >
-              Flow PR ditentukan dari area, cabang, department dan nominal.
+              Flow {{ form.document_type }} ditentukan dari area, cabang, department dan nominal.
             </VAlert>
 
             <VRow>
@@ -1350,8 +1483,8 @@ const formatAmount = (value: number | string | null | undefined): string => {
                     :items="areaTypeOptions"
                     density="comfortable"
                     :disabled="submitLoading"
-                    :error="isSubmitted && isPR && !form.area_type"
-                    :error-messages="isSubmitted && isPR && !form.area_type ? ['Area type wajib dipilih'] : []"
+                    :error="isSubmitted && usesAreaMatrix && !form.area_type"
+                    :error-messages="isSubmitted && usesAreaMatrix && !form.area_type ? ['Area type wajib dipilih'] : []"
                     />
                 </VCol>
 
@@ -1359,21 +1492,78 @@ const formatAmount = (value: number | string | null | undefined): string => {
                     cols="12"
                     md="6"
                 >
+                    <!--
+                      Satu flow dapat mencakup beberapa department sekaligus,
+                      seperti baris "GA - IT - LOG" pada matriks.
+                    -->
                     <VAutocomplete
-                    v-model="form.creator_department_id"
+                    v-model="form.department_ids"
                     label="Department *"
                     :items="departmentOptions"
                     item-title="title"
                     item-value="id"
+                    :multiple="autocompleteMultiple"
+                    chips
+                    closable-chips
                     clearable
                     density="comfortable"
                     :loading="isLoadingDepartment"
-                    :disabled="submitLoading"
+                    :disabled="submitLoading || form.all_departments"
                     :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
-                    :error="isSubmitted && isPR && !form.creator_department_id"
-                    :error-messages="isSubmitted && isPR && !form.creator_department_id ? ['Department wajib dipilih'] : []"
+                    :error="isSubmitted && usesAreaMatrix && !form.all_departments && !form.department_ids.length"
+                    :error-messages="isSubmitted && usesAreaMatrix && !form.all_departments && !form.department_ids.length ? ['Department wajib dipilih'] : []"
                     no-data-text="Department tidak ditemukan"
-                    placeholder="Pilih department"
+                    :placeholder="form.all_departments ? 'Berlaku untuk semua department' : 'Pilih satu atau beberapa department'"
+                    />
+
+                    <VSwitch
+                    v-model="form.all_departments"
+                    color="primary"
+                    density="compact"
+                    hide-details
+                    class="mt-1"
+                    label="Semua Divisi"
+                    :disabled="submitLoading"
+                    />
+                </VCol>
+
+                <!--
+                  Keterangan transaksi hanya relevan bagi jenis dokumen yang
+                  memakainya (FPU). Penentunya master permission module, bukan
+                  pemeriksaan jenis dokumen di sini.
+                -->
+                <VCol
+                    v-if="usesTransactionCategory"
+                    cols="12"
+                >
+                    <VAutocomplete
+                    v-model="form.transaction_category_ids"
+                    label="Keterangan Transaksi *"
+                    :items="transactionCategoryOptions"
+                    item-title="title"
+                    item-value="id"
+                    :multiple="autocompleteMultiple"
+                    chips
+                    closable-chips
+                    clearable
+                    density="comfortable"
+                    :loading="isLoadingTransactionCategory"
+                    :disabled="submitLoading || form.all_transaction_categories"
+                    :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+                    :error="isSubmitted && usesTransactionCategory && !form.all_transaction_categories && !form.transaction_category_ids.length"
+                    :error-messages="isSubmitted && usesTransactionCategory && !form.all_transaction_categories && !form.transaction_category_ids.length ? ['Keterangan transaksi wajib dipilih'] : []"
+                    no-data-text="Keterangan transaksi tidak ditemukan"
+                    :placeholder="form.all_transaction_categories ? 'Berlaku untuk semua keterangan transaksi' : 'Pilih satu atau beberapa keterangan transaksi'"
+                    />
+
+                    <VSwitch
+                    v-model="form.all_transaction_categories"
+                    color="primary"
+                    density="compact"
+                    hide-details
+                    class="mt-1"
+                    label="Semua Keterangan Transaksi"
+                    :disabled="submitLoading"
                     />
                 </VCol>
             </VRow>
@@ -1842,7 +2032,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
                 </div>
               </div>
 
-              <template v-if="isPR">
+              <template v-if="usesAreaMatrix">
                 <div class="summary-item">
                     <div class="summary-label">
                     Area
@@ -1861,6 +2051,18 @@ const formatAmount = (value: number | string | null | undefined): string => {
                     </div>
                 </div>
             </template>
+
+              <div
+                v-if="usesTransactionCategory"
+                class="summary-item"
+              >
+                <div class="summary-label">
+                  Keterangan Transaksi
+                </div>
+                <div class="summary-value">
+                  {{ selectedTransactionCategoryName }}
+                </div>
+              </div>
 
               <div class="summary-item">
                 <div class="summary-label">

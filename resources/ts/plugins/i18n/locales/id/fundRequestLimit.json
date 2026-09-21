@@ -1,0 +1,68 @@
+{
+  "noAccess": "Anda tidak memiliki akses ke master batas pengajuan FPU.",
+  "intro": {
+    "title": "Berapa FPU boleh berjalan bersamaan",
+    "body": "Batas ini memaksa pemohon mempertanggungjawabkan FPU sebelumnya sebelum mengajukan yang baru. Dua angka yang diatur: berapa FPU boleh berjalan bersamaan, dan berapa lama sebuah FPU boleh menunggu direalisasi.",
+    "liveNotice": "Batas ini dinilai saat pemohon menekan Ajukan, tidak dibekukan ke dokumen. Menurunkannya langsung berlaku bagi semua orang — termasuk yang sedang berada di atas batas baru."
+  },
+  "list": {
+    "title": "Master Batas Pengajuan FPU",
+    "subtitle": "Batas yang paling khusus menang. Department mengalahkan area, dan area mengalahkan batas umum.",
+    "addButton": "Tambah Batas",
+    "previewButton": "Contoh",
+    "empty": "Belum ada batas pengajuan.",
+    "active": "Aktif",
+    "inactive": "Nonaktif",
+    "fallbackChip": "Umum",
+    "editButton": "Ubah",
+    "deleteButton": "Hapus",
+    "loadFailed": "Daftar batas pengajuan gagal dimuat."
+  },
+  "table": {
+    "name": "Nama Batas",
+    "scope": "Cakupan",
+    "maxOutstanding": "Maks FPU Berjalan",
+    "maxDays": "Maks Hari Realisasi",
+    "status": "Status",
+    "action": "Aksi"
+  },
+  "form": {
+    "createTitle": "Tambah Batas Pengajuan",
+    "editTitle": "Ubah Batas Pengajuan",
+    "name": "Nama Batas",
+    "namePlaceholder": "Misalnya: Batas Cabang",
+    "nameRequired": "Nama batas wajib diisi.",
+    "areaType": "Berlaku untuk Area",
+    "areaTypeHint": "Dikosongkan berarti berlaku untuk pusat maupun cabang.",
+    "department": "Berlaku untuk Department",
+    "departmentHint": "Dikosongkan berarti berlaku untuk seluruh department.",
+    "maxOutstanding": "Maksimal FPU Berjalan",
+    "maxOutstandingHint": "Berapa FPU boleh berjalan bersamaan untuk satu pemohon.",
+    "maxDays": "Maksimal Hari Realisasi",
+    "maxDaysHint": "Hari kalender — Sabtu dan Minggu ikut dihitung.",
+    "notes": "Catatan",
+    "notesPlaceholder": "Opsional. Misalnya alasan batas ini dibedakan.",
+    "isActive": "Aktif",
+    "saveSuccess": "Batas pengajuan tersimpan.",
+    "saveFailed": "Batas pengajuan gagal disimpan."
+  },
+  "delete": {
+    "confirmTitle": "Hapus batas ini?",
+    "confirmText": "Batas \"{nama}\" akan dihapus. Pemohon yang tercakup olehnya akan kembali mengikuti batas yang lebih umum.",
+    "confirmButton": "Ya, hapus",
+    "success": "Batas pengajuan dihapus.",
+    "failed": "Batas pengajuan gagal dihapus."
+  },
+  "preview": {
+    "title": "Contoh Penerapan",
+    "subtitle": "Batas mana yang akan dipakai untuk tiap area.",
+    "limitUsed": "Batas yang dipakai",
+    "noLimit": "Tidak ada batas",
+    "failed": "Contoh penerapan gagal dimuat."
+  },
+  "scope": {
+    "allAreas": "Semua area",
+    "allDepartments": "Semua department",
+    "fallback": "Berlaku umum"
+  }
+}

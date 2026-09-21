@@ -38,6 +38,14 @@ class PermissionModuleSeeder extends Seeder
                 'route_prefix' => '/master/vendor',
                 'sort_order' => 10,
                 'is_active' => true,
+
+                /*
+                | Mendaftarkan module ini sebagai jenis dokumen Approval Flow.
+                | Inilah master yang mengisi dropdown "Jenis Dokumen".
+                */
+                'approval_document_type' => 'Vendor',
+                'approval_document_label' => 'Master Vendor',
+                'approval_uses_area_matrix' => false,
             ],
 
             /*
@@ -52,6 +60,11 @@ class PermissionModuleSeeder extends Seeder
                 'route_prefix' => '/non_stock/purchase_request',
                 'sort_order' => 20,
                 'is_active' => true,
+
+                // Flow PR dibedakan per area + department.
+                'approval_document_type' => 'PR',
+                'approval_document_label' => 'Purchase Requisition (PR)',
+                'approval_uses_area_matrix' => true,
             ],
 
             /*
@@ -66,6 +79,10 @@ class PermissionModuleSeeder extends Seeder
                 'route_prefix' => '/non_stock/purchase_order',
                 'sort_order' => 30,
                 'is_active' => true,
+
+                'approval_document_type' => 'PO',
+                'approval_document_label' => 'Purchase Order (PO)',
+                'approval_uses_area_matrix' => false,
             ],
 
             /*
@@ -140,6 +157,17 @@ class PermissionModuleSeeder extends Seeder
                     'route_prefix' => $module['route_prefix'],
                     'sort_order' => $module['sort_order'],
                     'is_active' => $module['is_active'],
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Pendaftaran sebagai jenis dokumen Approval Flow
+                    |--------------------------------------------------------------------------
+                    | NULL untuk module yang memang tidak punya approval flow.
+                    |--------------------------------------------------------------------------
+                    */
+                    'approval_document_type' => $module['approval_document_type'] ?? null,
+                    'approval_document_label' => $module['approval_document_label'] ?? null,
+                    'approval_uses_area_matrix' => $module['approval_uses_area_matrix'] ?? false,
 
                     /*
                     |--------------------------------------------------------------------------

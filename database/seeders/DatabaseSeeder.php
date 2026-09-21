@@ -72,6 +72,40 @@ class DatabaseSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
+            | Modul Pengajuan Dana
+            |--------------------------------------------------------------------------
+            | Mendaftarkan permission module, permission, dan menu FPU. Dijalankan
+            | setelah MenuManagementSeeder karena ikut menggeser urutan menu induk.
+            |--------------------------------------------------------------------------
+            */
+            CashAdvanceModuleSeeder::class,
+            CashAdvanceRealizationModuleSeeder::class,
+            ClaimModuleSeeder::class,
+            FundRequestTransactionCategoryModuleSeeder::class,
+            FundRequestTransactionCategorySeeder::class,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Perjalanan Dinas
+            |--------------------------------------------------------------------------
+            | Membuat menu induknya sendiri, jadi tidak bergantung pada menu yang
+            | sudah ada selain sebagai acuan urutan dan pemetaan role.
+            |--------------------------------------------------------------------------
+            */
+            BusinessTripModuleSeeder::class,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pemantauan Antrean
+            |--------------------------------------------------------------------------
+            | Menempel pada menu Monitoring, jadi harus setelah MenuManagementSeeder
+            | yang membuat menu induknya.
+            |--------------------------------------------------------------------------
+            */
+            QueueMonitorModuleSeeder::class,
+
+            /*
+            |--------------------------------------------------------------------------
             | Super Admin Access
             |--------------------------------------------------------------------------
             | Role SA diberi semua permission dan semua menu aktif.

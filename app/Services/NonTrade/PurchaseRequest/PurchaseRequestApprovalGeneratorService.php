@@ -818,11 +818,29 @@ class PurchaseRequestApprovalGeneratorService
             |--------------------------------------------------------------------------
             | Department pembuat PR
             |--------------------------------------------------------------------------
+            | Satu flow dapat mencakup beberapa department lewat tabel pivot,
+            | atau seluruh department lewat penanda all_departments.
+            |
+            | creator_department_id tetap dibaca sebagai cadangan untuk flow
+            | yang belum punya baris pivot sama sekali.
+            |--------------------------------------------------------------------------
             */
-            ->where(
-                'creator_department_id',
-                (int) $departmentId,
-            )
+            ->where(function ($query) use ($departmentId) {
+                $query
+                    ->where('all_departments', true)
+                    ->orWhereHas(
+                        'departments',
+                        fn($departmentQuery) => $departmentQuery->where(
+                            'departments.id',
+                            (int) $departmentId,
+                        ),
+                    )
+                    ->orWhere(function ($legacyQuery) use ($departmentId) {
+                        $legacyQuery
+                            ->where('creator_department_id', (int) $departmentId)
+                            ->whereDoesntHave('departments');
+                    });
+            })
 
             /*
             |--------------------------------------------------------------------------
@@ -864,6 +882,11 @@ class PurchaseRequestApprovalGeneratorService
             | Prioritaskan rentang yang paling spesifik.
             |--------------------------------------------------------------------------
             */
+            /*
+            | Flow yang dibatasi ke department tertentu mengalahkan flow
+            | "Semua Divisi". false diurutkan lebih dulu daripada true.
+            */
+            ->orderBy('all_departments')
             ->orderByDesc('min_amount')
             ->orderBy('max_amount')
             ->orderByDesc('id')
@@ -874,7 +897,8 @@ class PurchaseRequestApprovalGeneratorService
             'approval_flow_id' => $flow?->id,
             'approval_flow_name' => $flow?->name,
             'area_type' => $flow?->area_type,
-            'creator_department_id' => $flow?->creator_department_id,
+            'all_departments' => $flow?->all_departments,
+            'department_ids' => $flow?->resolvedDepartmentIds(),
             'min_amount' => $flow?->min_amount,
             'max_amount' => $flow?->max_amount,
         ]);

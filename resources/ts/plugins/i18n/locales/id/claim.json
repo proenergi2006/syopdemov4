@@ -1,0 +1,314 @@
+{
+    "detail": {
+        "approvalModeAll": "Seluruh {count} approver harus menyetujui",
+        "approvalModeAny": "Cukup satu dari {count} approver",
+        "approvalStep": "Tahap",
+        "approvalsEmpty": "Belum ada proses approval.",
+        "approvalsTitle": "Riwayat Approval",
+        "approveButton": "Setujui",
+        "branch": "Cabang",
+        "closeButton": "Tutup",
+        "createdBy": "Dibuat oleh",
+        "date": "Tanggal",
+        "department": "Department",
+        "finalApprovedBy": "Disetujui oleh",
+        "itemAmount": "Nominal",
+        "itemAttachment": "Lampiran",
+        "itemDate": "Tanggal",
+        "itemDescription": "Deskripsi",
+        "itemNo": "No",
+        "itemsTitle": "Rincian Pengeluaran",
+        "loadFailed": "Detail Claim gagal dimuat.",
+        "notes": "Catatan",
+        "rejectButton": "Tolak",
+        "subject": "Perihal",
+        "submittedBy": "Diajukan oleh",
+        "title": "Detail Claim",
+        "total": "Total Claim",
+        "receivedAt": "Diterima Pada",
+        "receivedBy": "Diterima Oleh",
+        "scheduledPaymentDate": "Jadwal Pembayaran",
+        "paymentOnTrack": "Menunggu jadwal pembayarannya.",
+        "paymentOverdue": "Sudah melewati jadwalnya dan belum dibayarkan.",
+        "paymentEarly": "Dibayarkan lebih awal dari jadwalnya.",
+        "paymentOnTime": "Dibayarkan tepat pada jadwalnya.",
+        "paymentLate": "Dibayarkan setelah jadwalnya."
+    },
+    "form": {
+        "attachment": {
+            "addButton": "Tambah Lampiran",
+            "deleteButton": "Hapus",
+            "existingTitle": "Lampiran Tersimpan"
+        },
+        "backButton": "Kembali",
+        "buttons": {
+            "cancel": "Batal",
+            "save": "Simpan",
+            "update": "Simpan Perubahan"
+        },
+        "createSubtitle": "Penggantian uang yang sudah lebih dulu Anda keluarkan.",
+        "createTitle": "Buat Claim",
+        "editSubtitle": "Perubahan hanya dapat dilakukan selama Claim masih berstatus draft.",
+        "editTitle": "Ubah Claim",
+        "fields": {
+            "branch": "Cabang",
+            "date": "Tanggal",
+            "department": "Department",
+            "notes": "Catatan",
+            "subject": "Perihal",
+            "transactionCategory": "Keterangan Transaksi"
+        },
+        "itemDialog": {
+            "addRowButton": "Tambah Baris",
+            "discardButton": "Ya, tutup",
+            "discardText": "Perubahan pada rincian belum disimpan dan akan hilang.",
+            "discardTitle": "Tutup tanpa menyimpan?",
+            "saveButton": "Simpan Rincian",
+            "title": "Rincian Pengeluaran"
+        },
+        "items": {
+            "addButton": "Kelola Rincian",
+            "addButtonTooltip": "Rincian Claim",
+            "emptyAlert": "Belum ada rincian. Klik \"{action}\" untuk mengisinya.",
+            "resetButton": "Reset",
+            "resetConfirmText": "Seluruh baris rincian akan dikosongkan.",
+            "resetConfirmTitle": "Reset rincian?",
+            "sectionTitle": "Rincian Pengeluaran",
+            "tableActions": "Aksi",
+            "tableAmount": "Nominal",
+            "tableAttachment": "Lampiran",
+            "tableDate": "Tanggal",
+            "tableDescription": "Deskripsi",
+            "tableNo": "No",
+            "total": "Total Claim"
+        },
+        "loadingTitle": "Memuat data Claim...",
+        "noData": {
+            "branch": "Cabang tidak tersedia",
+            "department": "Pilih cabang terlebih dahulu",
+            "transactionCategory": "Keterangan transaksi tidak tersedia"
+        },
+        "placeholders": {
+            "branch": "Pilih cabang",
+            "date": "Pilih tanggal",
+            "department": "Pilih department",
+            "notes": "Catatan tambahan untuk approver",
+            "subject": "Contoh: Biaya perjalanan dinas ke Palembang",
+            "transactionCategory": "Pilih keterangan transaksi"
+        },
+        "reload": {
+            "branch": "Muat ulang daftar cabang"
+        },
+        "toast": {
+            "cancelConfirmText": "Data yang sudah diisi akan hilang.",
+            "cancelConfirmTitle": "Batalkan pengisian?",
+            "completeItemRow": "Lengkapi rincian pada baris {number}.",
+            "completeRequiredData": "Lengkapi data yang wajib diisi terlebih dahulu.",
+            "invalidFileSize": "\"{name}\" lebih dari 3MB.",
+            "invalidFileTitle": "File Tidak Valid",
+            "invalidFileType": "\"{name}\" bukan file PDF/JPG/JPEG/PNG.",
+            "itemAttachmentRequired": "Lampiran pada baris {number} wajib diisi minimal satu berkas.",
+            "itemDateRequired": "Tanggal pada baris {number} wajib diisi.",
+            "loadAccessFailed": "Gagal memuat data akses cabang dan department.",
+            "loadFailed": "Gagal memuat data Claim.",
+            "minOneItem": "Minimal satu baris rincian harus diisi.",
+            "saveConfirmText": "Claim akan disimpan sebagai draft dan belum masuk proses approval.",
+            "saveConfirmTitle": "Simpan Claim?",
+            "saveFailed": "Claim gagal disimpan.",
+            "savingData": "Menyimpan data...",
+            "updateConfirmText": "Perubahan pada Claim ini akan disimpan.",
+            "updateConfirmTitle": "Simpan perubahan?"
+        },
+        "validation": {
+            "branch": "Cabang wajib dipilih.",
+            "date": "Tanggal wajib diisi.",
+            "department": "Department wajib dipilih.",
+            "itemAmount": "Nominal wajib diisi.",
+            "itemAttachment": "Minimal satu berkas.",
+            "itemDate": "Tanggal wajib diisi.",
+            "itemDescription": "Deskripsi wajib diisi.",
+            "subject": "Perihal wajib diisi.",
+            "transactionCategory": "Keterangan transaksi wajib dipilih."
+        }
+    },
+    "list": {
+        "approve": {
+            "confirmButton": "Setujui",
+            "dialogSubtitle": "Pastikan rincian pengajuan sudah benar sebelum menyetujui.",
+            "dialogTitle": "Setujui Claim",
+            "failedFallback": "Claim gagal disetujui.",
+            "notesLabel": "Catatan (opsional)",
+            "notesPlaceholder": "Tulis catatan approval bila perlu",
+            "successFallback": "Claim berhasil disetujui."
+        },
+        "cancel": {
+            "confirmButton": "Batalkan Claim",
+            "dialogSubtitle": "Claim yang sudah dibatalkan tidak dapat dilanjutkan ke pembayaran.",
+            "dialogTitle": "Batalkan Claim",
+            "failedFallback": "Claim gagal dibatalkan.",
+            "notesLabel": "Alasan pembatalan",
+            "notesPlaceholder": "Jelaskan alasan pembatalan",
+            "notesRequired": "Alasan pembatalan wajib diisi.",
+            "successFallback": "Claim berhasil dibatalkan."
+        },
+        "createButton": "Buat Claim",
+        "emptySubtitle": "Data akan muncul di sini setelah Claim dibuat.",
+        "emptyTitle": "Belum ada data Claim",
+        "exportButton": "Export Excel",
+        "filters": {
+            "allBranches": "Semua Cabang",
+            "allDepartments": "Semua Departemen",
+            "branchLabel": "Cabang",
+            "departmentLabel": "Departemen",
+            "endDate": "Tanggal Akhir",
+            "pendingAction": {
+                "all": "Semua Dokumen",
+                "notPaid": "Belum Dibayarkan",
+                "notReceived": "Belum Diterima"
+            },
+            "pendingActionLabel": "Butuh Aksi",
+            "resetButton": "Reset Filter",
+            "searchLabel": "Cari",
+            "searchPlaceholder": "Nomor Claim, perihal, cabang, department",
+            "startDate": "Tanggal Awal",
+            "statusLabel": "Status",
+            "scheduledPaymentDate": "Jadwal Pembayaran"
+        },
+        "filtersSubtitle": "Saring daftar Claim sesuai kebutuhan Anda.",
+        "filtersTitle": "Filter Claim",
+        "menu": {
+            "approve": "Setujui",
+            "cancel": "Batalkan",
+            "delete": "Hapus",
+            "edit": "Ubah",
+            "notPaidBadge": "Belum Dibayarkan",
+            "pay": "Tandai Sudah Dibayarkan",
+            "print": "Cetak PDF",
+            "reject": "Tolak",
+            "submit": "Ajukan",
+            "viewDetail": "Lihat Detail",
+            "waitingMyApprovalBadge": "Menunggu approval Anda",
+            "receive": "Terima",
+            "notReceivedBadge": "Menunggu Diterima"
+        },
+        "onlyMyApproval": "Hanya yang menunggu approval saya",
+        "pay": {
+            "confirmButton": "Tandai Dibayarkan",
+            "confirmText": "Claim {nomor} akan ditandai sudah dibayarkan. Ini tahap terakhir dan tidak bisa dibatalkan.",
+            "confirmTitle": "Bayarkan Claim ini?",
+            "failedFallback": "Pembayaran Claim gagal diproses.",
+            "successFallback": "Claim berhasil ditandai sudah dibayarkan."
+        },
+        "print": {
+            "failed": "Cetakan Claim gagal dibuka.",
+            "loading": "Menyiapkan cetakan Claim...",
+            "popupBlocked": "Popup diblokir browser. Mohon izinkan popup untuk situs ini.",
+            "urlFailed": "URL cetak gagal dibuat.",
+            "windowClosed": "Jendela cetak telah ditutup."
+        },
+        "reject": {
+            "confirmButton": "Tolak",
+            "dialogSubtitle": "Penolakan menghentikan seluruh proses approval Claim ini.",
+            "dialogTitle": "Tolak Claim",
+            "failedFallback": "Claim gagal ditolak.",
+            "notesLabel": "Alasan penolakan",
+            "notesPlaceholder": "Jelaskan alasan penolakan",
+            "notesRequired": "Alasan penolakan wajib diisi.",
+            "successFallback": "Claim berhasil ditolak."
+        },
+        "signature": {
+            "agreementLabel": "Saya menyetujui penggunaan tanda tangan digital ini.",
+            "agreementRequired": "Anda wajib menyetujui penggunaan tanda tangan digital.",
+            "clearButton": "Bersihkan",
+            "dialogSubtitle": "Anda belum memiliki tanda tangan digital. Bubuhkan tanda tangan Anda di bawah ini untuk melanjutkan.",
+            "dialogTitle": "Tanda Tangan Digital",
+            "required": "Tanda tangan wajib diisi.",
+            "saveButton": "Simpan & Lanjutkan",
+            "saveFailed": "Gagal menyimpan tanda tangan digital."
+        },
+        "table": {
+            "branch": "Cabang",
+            "claimNumber": "Nomor Claim",
+            "date": "Tanggal",
+            "department": "Department",
+            "no": "No",
+            "status": "Status",
+            "subject": "Perihal",
+            "total": "Total"
+        },
+        "toast": {
+            "createdSuccess": "Claim berhasil dibuat.",
+            "deleteConfirmText": "Claim {nomor} akan dihapus dan tidak dapat dikembalikan.",
+            "deleteConfirmTitle": "Hapus Claim?",
+            "deleteFailed": "Claim gagal dihapus.",
+            "deleteSuccess": "Claim berhasil dihapus.",
+            "exportFailed": "Export data Claim gagal diproses.",
+            "exportLoading": "Menyiapkan file Excel Claim...",
+            "exportSuccess": "Data Claim berhasil diexport.",
+            "loadFailed": "Gagal memuat data Claim.",
+            "reloadData": "Muat Ulang",
+            "signatureCheckFailed": "Gagal memeriksa tanda tangan digital.",
+            "submitConfirmButton": "Ya, ajukan",
+            "submitConfirmText": "Claim {nomor} akan diajukan ke proses approval dan tidak dapat diubah lagi.",
+            "submitConfirmTitle": "Ajukan Claim?",
+            "submitFailedFallback": "Claim gagal diajukan.",
+            "submitLoading": "Mengajukan Claim...",
+            "submitSuccessFallback": "Claim berhasil diajukan.",
+            "updatedSuccess": "Claim berhasil diperbarui."
+        },
+        "bulk": {
+            "clearButton": "Batalkan Pilihan",
+            "partialTitle": "Sebagian gagal diproses",
+            "RECEIVE": {
+                "selectedLabel": "{count} Claim terpilih",
+                "actionButton": "Terima Terpilih",
+                "confirmTitle": "Terima Claim terpilih?",
+                "confirmText": "{count} Claim akan ditandai sudah diterima sekaligus.",
+                "confirmButton": "Ya, terima semua",
+                "loadingTitle": "Menerima {count} Claim...",
+                "successFallback": "Claim terpilih berhasil ditandai diterima.",
+                "failedFallback": "Penerimaan Claim terpilih gagal diproses."
+            },
+            "PAY": {
+                "confirmTitle": "Bayarkan claim terpilih?",
+                "confirmText": "{count} claim akan ditandai sudah dibayarkan sekaligus. Tindakan ini tidak bisa dibatalkan.",
+                "confirmButton": "Ya, bayarkan semua",
+                "loadingTitle": "Membayarkan {count} Claim...",
+                "selectedLabel": "{count} claim terpilih",
+                "actionButton": "Bayarkan Terpilih",
+                "successFallback": "Claim terpilih berhasil dibayarkan.",
+                "failedFallback": "Pembayaran claim terpilih gagal diproses."
+            }
+        },
+        "receive": {
+            "confirmTitle": "Terima Claim ini?",
+            "confirmText": "Claim {nomor} akan ditandai sudah diterima. Setelah ini uangnya baru bisa dibayarkan.",
+            "confirmButton": "Tandai Diterima",
+            "successFallback": "Claim berhasil ditandai sudah diterima.",
+            "failedFallback": "Penerimaan Claim gagal diproses."
+        },
+        "offSchedule": {
+            "dayPlural": "{count} hari",
+            "daySingular": "{count} hari",
+            "earlyMeta": "Dijadwalkan {tanggal}, masih {jarak} lagi.",
+            "earlyTitle": "Dibayarkan lebih awal dari jadwalnya",
+            "lateMeta": "Dijadwalkan {tanggal}, terlambat {jarak}.",
+            "lateTitle": "Sudah melewati jadwal pembayarannya",
+            "noteLabel": "Catatan (opsional)",
+            "placeholder": "Boleh dikosongkan. Misalnya alasan pembayarannya dimajukan atau tertunda."
+        },
+        "paymentDay": {
+            "blockedNotice": "Pembayaran hanya bisa dilakukan pada hari {days}. Ada Claim yang menunggu dibayarkan, tetapi hari ini bukan hari pembayaran — tombolnya akan aktif kembali pada hari tersebut."
+        }
+    },
+    "status": {
+        "all": "Semua",
+        "approved": "Approved",
+        "cancelled": "Cancelled",
+        "draft": "Draft",
+        "inProgress": "In Progress",
+        "paid": "Sudah Diganti",
+        "rejected": "Rejected",
+        "received": "Diterima"
+    }
+}

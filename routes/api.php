@@ -52,6 +52,13 @@ use App\Http\Controllers\Api\PurchaseOrderInventoryController;
 use App\Http\Controllers\Api\Master\UnitController as MasterUnitController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\CashAdvanceController;
+use App\Http\Controllers\Api\CashAdvanceRealizationController;
+use App\Http\Controllers\Api\BusinessTripController;
+use App\Http\Controllers\Api\ClaimController;
+use App\Http\Controllers\Api\Master\FundRequestTransactionCategoryController;
+use App\Http\Controllers\Api\Master\FundRequestLimitController;
+use App\Http\Controllers\Api\Master\PaymentScheduleController;
 use App\Http\Controllers\Api\PurchaseRequestController;
 use App\Http\Controllers\Api\ShippingInstructionController;
 use App\Http\Controllers\MasterBankController;
@@ -60,6 +67,9 @@ use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\GoodsReturnController;
 use App\Http\Controllers\Api\Dashboard\DashboardModuleController;
 use App\Http\Controllers\Api\Dashboard\PurchaseOrderDashboardController;
+use App\Http\Controllers\Api\Dashboard\GoodsReceiptDashboardController;
+use App\Http\Controllers\Api\Dashboard\PurchaseRequestDashboardController;
+use App\Http\Controllers\Api\Monitoring\QueueHealthController;
 use App\Http\Controllers\Monitoring\LogViewerController;
 use App\Http\Controllers\Api\Master\UserAccessAssignmentController;
 use App\Http\Controllers\Api\Master\MenuController as MasterMenuController;
@@ -212,6 +222,25 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 '/logs',
                 [LogViewerController::class, 'index'],
             );
+
+            /*
+            | Pemantauan antrean job. Jalur ketiga pelaporan kesehatan
+            | antrean, di samping log dan email peringatan.
+            */
+            Route::get(
+                '/queue-health',
+                [QueueHealthController::class, 'index'],
+            );
+
+            Route::post(
+                '/queue-health/retry',
+                [QueueHealthController::class, 'retry'],
+            );
+
+            Route::delete(
+                '/queue-health/failed',
+                [QueueHealthController::class, 'destroy'],
+            );
         });
 
     // ===================== USER ACCESS ASSIGNMENT =====================
@@ -249,6 +278,16 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 '/purchase-order/pending-approvals',
                 [PurchaseOrderDashboardController::class, 'pendingApprovals'],
             )->name('purchase-order.pending-approvals');
+
+            Route::get(
+                '/purchase-request',
+                [PurchaseRequestDashboardController::class, 'index'],
+            )->name('purchase-request');
+
+            Route::get(
+                '/goods-receipt',
+                [GoodsReceiptDashboardController::class, 'index'],
+            )->name('goods-receipt');
         });
 
     // ===================== DATA MASTER =====================
@@ -374,6 +413,15 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
         );
 
         // Approval Flow
+        /*
+        | Harus didaftarkan sebelum '/approval-flows/{publicId}', kalau tidak
+        | "document-types" akan tertangkap sebagai publicId.
+        */
+        Route::get(
+            '/approval-flows/document-types',
+            [ApprovalFlowController::class, 'documentTypeOptions'],
+        );
+
         Route::post('/approval-flows', [ApprovalFlowController::class, 'store']);
         Route::get('/approval-flows/{publicId}', [ApprovalFlowController::class, 'show']);
         Route::put('/approval-flows/{publicId}', [ApprovalFlowController::class, 'update']);
@@ -596,6 +644,396 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             ]);
         });
 
+    /*
+    |--------------------------------------------------------------------------
+    | PENGAJUAN DANA
+    |--------------------------------------------------------------------------
+    | FPU (Form Pengajuan Uang) dan turunannya. URL memakai bahasa Inggris
+    | mengikuti frontend /fund_request.
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('fund-request')
+        ->name('fund-request.')
+        ->group(function () {
+            /*
+            |------------------------------------------------------------------
+            | Master batas pengajuan FPU
+            |------------------------------------------------------------------
+            | preview didaftarkan sebelum apiResource, kalau tidak segmen
+            | "preview" akan tertangkap sebagai {id}.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'fund-request-limits/preview',
+                [FundRequestLimitController::class, 'preview'],
+            );
+
+            Route::apiResource(
+                'fund-request-limits',
+                FundRequestLimitController::class,
+            )
+                ->only(['index', 'store', 'update', 'destroy'])
+                ->parameters(['fund-request-limits' => 'id']);
+
+            /*
+            |------------------------------------------------------------------
+            | Master jadwal pembayaran Finance
+            |------------------------------------------------------------------
+            | preview didaftarkan sebelum apiResource, kalau tidak segmen
+            | "preview" akan tertangkap sebagai {id}.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'payment-schedules/preview',
+                [PaymentScheduleController::class, 'preview'],
+            );
+
+            Route::apiResource(
+                'payment-schedules',
+                PaymentScheduleController::class,
+            )
+                ->only(['index', 'store', 'update', 'destroy'])
+                ->parameters(['payment-schedules' => 'id']);
+
+            /*
+            |------------------------------------------------------------------
+            | Master keterangan transaksi
+            |------------------------------------------------------------------
+            | dropdown-select harus didaftarkan sebelum apiResource, kalau tidak
+            | "dropdown-select" akan tertangkap sebagai {id}.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'transaction-categories/dropdown-select',
+                [FundRequestTransactionCategoryController::class, 'dropdownSelect'],
+            );
+
+            Route::patch(
+                'transaction-categories/{id}/toggle-status',
+                [FundRequestTransactionCategoryController::class, 'toggleStatus'],
+            );
+
+            Route::apiResource(
+                'transaction-categories',
+                FundRequestTransactionCategoryController::class,
+            )
+                ->only(['index', 'store', 'update', 'destroy'])
+                ->parameters(['transaction-categories' => 'id']);
+
+            /*
+            | Didaftarkan sebelum apiResource, kalau tidak segmen "export-excel"
+            | akan tertangkap sebagai publicId.
+            */
+            Route::get(
+                'cash-advance/export-excel',
+                [CashAdvanceController::class, 'exportExcel'],
+            );
+
+            Route::post(
+                'cash-advance/{publicId}/print-url',
+                [CashAdvanceController::class, 'generatePrintUrl'],
+            );
+
+            Route::get(
+                'cash-advance/{publicId}/edit',
+                [CashAdvanceController::class, 'edit'],
+            );
+
+            Route::patch(
+                'cash-advance/{publicId}/submit',
+                [CashAdvanceController::class, 'submit'],
+            );
+
+            Route::patch(
+                'cash-advance/{publicId}/approve',
+                [CashAdvanceController::class, 'approve'],
+            );
+
+            Route::patch(
+                'cash-advance/{publicId}/reject',
+                [CashAdvanceController::class, 'reject'],
+            );
+
+            Route::patch(
+                'cash-advance/{publicId}/cancel',
+                [CashAdvanceController::class, 'cancel'],
+            );
+
+            Route::post(
+                'cash-advance/bulk-receive',
+                [CashAdvanceController::class, 'bulkReceive'],
+            );
+
+            Route::post(
+                'cash-advance/bulk-disburse',
+                [CashAdvanceController::class, 'bulkDisburse'],
+            );
+
+            Route::patch(
+                'cash-advance/{publicId}/receive',
+                [CashAdvanceController::class, 'receive'],
+            );
+
+            Route::patch(
+                'cash-advance/{publicId}/disburse',
+                [CashAdvanceController::class, 'disburse'],
+            );
+
+            Route::apiResource(
+                'cash-advance',
+                CashAdvanceController::class,
+            )->parameters([
+                'cash-advance' => 'publicId',
+            ]);
+
+            /*
+            |------------------------------------------------------------------
+            | REALISASI FPU
+            |------------------------------------------------------------------
+            | Route statis didaftarkan sebelum apiResource, kalau tidak
+            | segmennya akan tertangkap sebagai publicId.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'cash-advance-realization/export-excel',
+                [CashAdvanceRealizationController::class, 'exportExcel'],
+            );
+
+            Route::get(
+                'cash-advance-realization/realizable',
+                [CashAdvanceRealizationController::class, 'realizableCashAdvances'],
+            );
+
+            Route::post(
+                'cash-advance-realization/{publicId}/print-url',
+                [CashAdvanceRealizationController::class, 'generatePrintUrl'],
+            );
+
+            Route::get(
+                'cash-advance-realization/{publicId}/edit',
+                [CashAdvanceRealizationController::class, 'edit'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/submit',
+                [CashAdvanceRealizationController::class, 'submit'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/approve',
+                [CashAdvanceRealizationController::class, 'approve'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/reject',
+                [CashAdvanceRealizationController::class, 'reject'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/cancel',
+                [CashAdvanceRealizationController::class, 'cancel'],
+            );
+
+            /*
+            | Penerimaan mendahului penyelesaian selisih: berkasnya dinyatakan
+            | sudah di tangan, baru setelah itu uangnya berpindah.
+            */
+            Route::post(
+                'cash-advance-realization/bulk-receive',
+                [CashAdvanceRealizationController::class, 'bulkReceive'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/receive',
+                [CashAdvanceRealizationController::class, 'receive'],
+            );
+
+            /*
+            | Dua peristiwa berbeda, bukan satu aksi generik: sisa dikembalikan
+            | pemohon, atau kekurangan dibayarkan Finance.
+            */
+            Route::post(
+                'cash-advance-realization/bulk-return-difference',
+                [CashAdvanceRealizationController::class, 'bulkReturnDifference'],
+            );
+
+            Route::post(
+                'cash-advance-realization/bulk-reimburse-difference',
+                [CashAdvanceRealizationController::class, 'bulkReimburseDifference'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/return-difference',
+                [CashAdvanceRealizationController::class, 'returnDifference'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/reimburse-difference',
+                [CashAdvanceRealizationController::class, 'reimburseDifference'],
+            );
+
+            Route::apiResource(
+                'cash-advance-realization',
+                CashAdvanceRealizationController::class,
+            )->parameters([
+                'cash-advance-realization' => 'publicId',
+            ]);
+
+            /*
+            |------------------------------------------------------------------
+            | CLAIM
+            |------------------------------------------------------------------
+            | Route pembayaran oleh Finance, pembatalan, export, dan cetak
+            | menyusul bersama tahapnya.
+            |
+            | Route statis didaftarkan sebelum apiResource, kalau tidak
+            | segmennya akan tertangkap sebagai publicId.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'claim/export-excel',
+                [ClaimController::class, 'exportExcel'],
+            );
+
+            Route::post(
+                'claim/{publicId}/print-url',
+                [ClaimController::class, 'generatePrintUrl'],
+            );
+
+            Route::get(
+                'claim/{publicId}/edit',
+                [ClaimController::class, 'edit'],
+            );
+
+            Route::patch(
+                'claim/{publicId}/submit',
+                [ClaimController::class, 'submit'],
+            );
+
+            Route::patch(
+                'claim/{publicId}/approve',
+                [ClaimController::class, 'approve'],
+            );
+
+            Route::patch(
+                'claim/{publicId}/reject',
+                [ClaimController::class, 'reject'],
+            );
+
+            Route::patch(
+                'claim/{publicId}/cancel',
+                [ClaimController::class, 'cancel'],
+            );
+
+            /*
+            | Penerimaan mendahului pembayaran: berkasnya dinyatakan sudah di
+            | tangan, baru setelah itu Finance membayarkan.
+            */
+            Route::post(
+                'claim/bulk-receive',
+                [ClaimController::class, 'bulkReceive'],
+            );
+
+            Route::patch(
+                'claim/{publicId}/receive',
+                [ClaimController::class, 'receive'],
+            );
+
+            Route::post(
+                'claim/bulk-pay',
+                [ClaimController::class, 'bulkPay'],
+            );
+
+            Route::patch(
+                'claim/{publicId}/pay',
+                [ClaimController::class, 'pay'],
+            );
+
+            Route::apiResource(
+                'claim',
+                ClaimController::class,
+            )->parameters([
+                'claim' => 'publicId',
+            ]);
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | PERJALANAN DINAS
+    |--------------------------------------------------------------------------
+    | Perdin berdiri sendiri, terpisah dari pengajuan dana. Yang menautkannya
+    | ke FPU nanti adalah keterangan transaksi, bukan rute ini.
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('business-trip')
+        ->name('business-trip.')
+        ->group(function () {
+            /*
+            | Rute statis didaftarkan sebelum apiResource, kalau tidak segmen
+            | "options" akan tertangkap sebagai publicId.
+            */
+            Route::get(
+                'perdin/export-excel',
+                [BusinessTripController::class, 'exportExcel'],
+            );
+
+            Route::get(
+                'perdin/options',
+                [BusinessTripController::class, 'options'],
+            );
+
+            /*
+            | Dipanggil layar FPU: perdin milik pemohon yang sudah disetujui
+            | dan belum dipegang FPU lain yang masih hidup.
+            */
+            Route::get(
+                'perdin/eligible',
+                [BusinessTripController::class, 'eligible'],
+            );
+
+            /*
+            | Alur dokumennya. Semua memakai publicId, dan semua didaftarkan
+            | sebelum apiResource supaya segmennya tidak tertangkap sebagai id.
+            */
+            Route::patch(
+                'perdin/{publicId}/submit',
+                [BusinessTripController::class, 'submit'],
+            );
+
+            Route::patch(
+                'perdin/{publicId}/approve',
+                [BusinessTripController::class, 'approve'],
+            );
+
+            Route::patch(
+                'perdin/{publicId}/reject',
+                [BusinessTripController::class, 'reject'],
+            );
+
+            Route::patch(
+                'perdin/{publicId}/cancel',
+                [BusinessTripController::class, 'cancel'],
+            );
+
+            /*
+            | Tautan cetak berumur pendek. PDF-nya sendiri dilayani di luar
+            | grup ini, lewat tautan bertanda tangan -- lihat di bawah.
+            */
+            Route::get(
+                'perdin/{publicId}/print-url',
+                [BusinessTripController::class, 'generatePrintUrl'],
+            );
+
+            Route::apiResource(
+                'perdin',
+                BusinessTripController::class,
+            )
+                ->only(['index', 'store', 'show', 'update', 'destroy'])
+                ->parameters([
+                    'perdin' => 'publicId',
+                ]);
+        });
+
     //API ACCURATE
     Route::get('accurate/products', [AccurateController::class, 'products']);
     Route::get('accurate/accounts', [AccurateController::class, 'accounts']);
@@ -639,3 +1077,31 @@ Route::get(
     '/transaction/purchase-order/{publicId}/print-signed',
     [PurchaseOrderController::class, 'printSigned']
 )->name('transaction.purchase-order.print-signed')->middleware('signed:relative');
+
+/*
+|--------------------------------------------------------------------------
+| Cetakan Pengajuan Dana
+|--------------------------------------------------------------------------
+| Di luar group auth, sama seperti cetakan PR dan PO: yang menjaga bukan
+| token, melainkan tanda tangan URL yang hanya berlaku sepuluh menit.
+|--------------------------------------------------------------------------
+*/
+Route::get(
+    '/fund-request/cash-advance/{publicId}/print-signed',
+    [CashAdvanceController::class, 'printSigned']
+)->name('fund-request.cash-advance.print-signed')->middleware('signed:relative');
+
+Route::get(
+    '/fund-request/cash-advance-realization/{publicId}/print-signed',
+    [CashAdvanceRealizationController::class, 'printSigned']
+)->name('fund-request.cash-advance-realization.print-signed')->middleware('signed:relative');
+
+Route::get(
+    '/fund-request/claim/{publicId}/print-signed',
+    [ClaimController::class, 'printSigned']
+)->name('fund-request.claim.print-signed')->middleware('signed:relative');
+
+Route::get(
+    '/business-trip/perdin/{publicId}/print-signed',
+    [BusinessTripController::class, 'printSigned']
+)->name('business-trip.perdin.print-signed')->middleware('signed:relative');

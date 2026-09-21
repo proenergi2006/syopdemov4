@@ -2662,6 +2662,25 @@ onBeforeUnmount(() => {
                               {{ pr.nomor_pr }}
                             </div>
 
+                            <!--
+                              Penanda dokumen khusus. PR biasa tidak
+                              menampilkan chip ini sama sekali.
+                            -->
+                            <VChip
+                              v-if="pr.special_document_type?.name"
+                              size="x-small"
+                              color="warning"
+                              variant="tonal"
+                              class="mt-1 mb-1"
+                            >
+                              <VIcon
+                                icon="tabler-ship"
+                                size="12"
+                                start
+                              />
+                              {{ pr.special_document_type.name }}
+                            </VChip>
+
                             <div class="related-pr-meta mb-2">
                               <span>{{ formatDate(pr.tanggal_pr) }}</span>
                               <!-- <span>Rp {{ formatNumberWithoutRp(pr.total_amount || 0) }}</span> -->
@@ -2836,6 +2855,26 @@ onBeforeUnmount(() => {
                           <div class="item-main">
                             {{ toTitleCase(item.nama_item) || '-' }}
                           </div>
+
+                          <!--
+                            Material group diturunkan dari item PR asalnya.
+                            Item lama yang belum punya grup tidak menampilkan
+                            apa pun, bukan tanda hubung, agar tidak berisik.
+                          -->
+                          <VChip
+                            v-if="item.material_group?.name"
+                            size="x-small"
+                            color="primary"
+                            variant="tonal"
+                            class="mt-1"
+                          >
+                            <VIcon
+                              icon="tabler-category"
+                              size="12"
+                              start
+                            />
+                            {{ item.material_group.name }}
+                          </VChip>
                         </td>
 
                         <td>

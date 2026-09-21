@@ -304,8 +304,14 @@ input[altinputclass="inlinePicker"] {
     font-weight: 300;
   }
 
+  /*
+   * Kalender dipasang ke <body>, bukan ke dalam field-nya. Vuetify menumpuk
+   * overlay (VDialog, VMenu) mulai dari z-index 2000, jadi pada nilai 1051
+   * kalender terbuka DI BELAKANG dialog -- terlihat seperti field tanggalnya
+   * mati padahal hanya tertutup. Diangkat ke atas tumpukan itu.
+   */
   &.open {
-    z-index: 1051;
+    z-index: 2400;
   }
 
   &.hasTime.open {

@@ -1,4 +1,4 @@
-import Swal, { type SweetAlertIcon, type SweetAlertOptions, type SweetAlertResult } from 'sweetalert2'
+import Swal, { type SweetAlertIcon, type SweetAlertInput, type SweetAlertOptions, type SweetAlertResult } from 'sweetalert2'
 import { toast } from 'vue3-toastify'
 import i18n from '@/plugins/i18n'
 
@@ -22,6 +22,17 @@ interface ConfirmAlertOptions {
   icon?: SweetAlertIcon
   confirmButtonText?: string
   cancelButtonText?: string
+
+  /*
+  | Isian opsional di dalam penegasan, untuk hal yang tidak layak diberi
+  | formulir tersendiri -- misalnya alasan singkat saat sebuah pembayaran
+  | dilakukan di luar jadwalnya. Nilainya terbaca dari `result.value`.
+  */
+  input?: SweetAlertInput
+  inputLabel?: string
+  inputPlaceholder?: string
+  inputValue?: string
+  inputAttributes?: Record<string, string>
 }
 
 interface NotifyAlertOptions {

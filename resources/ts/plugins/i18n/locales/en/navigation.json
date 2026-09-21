@@ -40,5 +40,15 @@
   "Sopir": "Driver",
   "Mobil": "Vehicle",
   "Ongkos Angkut": "Freight Cost",
-  "Log Viewer": "Log Viewer"
+  "Log Viewer": "Log Viewer",
+  "Keterangan Transaksi": "Transaction Category",
+  "Pengajuan Dana": "Fund Request",
+  "FPU": "Cash Advance",
+  "Realisasi FPU": "Realization",
+  "Claim": "Claim",
+  "Jadwal Pembayaran": "Payment Schedule",
+  "Antrean Email": "Email Queue",
+  "Batas Pengajuan FPU": "Cash Advance Limit",
+  "Perjalanan Dinas": "Business Trip",
+  "Perdin": "Business Trip"
 }

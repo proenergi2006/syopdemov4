@@ -949,6 +949,28 @@ class MenuController extends Controller
                 $ownBadgeCount = 0;
 
                 foreach ($approvalModules as $moduleKey => $config) {
+                    /*
+                    | Jalur PERSIS lebih dulu, bila modulnya menyebutkannya.
+                    |
+                    | Pencocokan potongan kata tidak cukup untuk modul yang namanya
+                    | saling mengandung: jalur Realisasi memuat 'cash_advance', dan
+                    | judul "Realisasi FPU" memuat 'fpu'. Apa pun kata kunci yang
+                    | dipilih, salah satu menu akan mencuri hitungan yang lain.
+                    |
+                    | Modul lama tidak menyebutkan menu_paths, jadi tetap memakai
+                    | kata kunci seperti sebelumnya.
+                    */
+                    if (!empty($config['menu_paths'])) {
+                        foreach ($config['menu_paths'] as $exactPath) {
+                            if ($path === strtolower(trim((string) $exactPath))) {
+                                $ownBadgeCount += (int) ($badges[$moduleKey] ?? 0);
+                                break;
+                            }
+                        }
+
+                        continue;
+                    }
+
                     foreach (($config['menu_keywords'] ?? []) as $keyword) {
                         $normalizedKeyword = strtolower(trim((string) $keyword));
 
@@ -1069,6 +1091,92 @@ class MenuController extends Controller
                     'master-vendor',
                 ],
             ],
+            /*
+            | Keluarga Pengajuan Dana dan Perjalanan Dinas.
+            |
+            | Keempatnya memakai menu_paths, bukan kata kunci -- lihat alasannya
+            | pada injectNavigationBadges().
+            */
+            'cash_advance' => [
+                'document_table' => 'cash_advances',
+                'approval_table' => 'cash_advance_approvals',
+
+                'document_primary_key' => 'id',
+                'approval_foreign_key' => 'cash_advance_id',
+
+                'document_status_column' => 'status',
+                'document_in_progress_status' => 'IN PROGRESS',
+
+                'approval_status_column' => 'status',
+                'waiting_status' => 'WAITING',
+
+                'step_order_column' => 'step_order',
+                'approver_type_column' => 'approver_type',
+                'approver_id_column' => 'approver_id',
+
+                'menu_paths' => ['/fund_request/cash_advance'],
+            ],
+
+            'cash_advance_realization' => [
+                'document_table' => 'cash_advance_realizations',
+                'approval_table' => 'cash_advance_realization_approvals',
+
+                'document_primary_key' => 'id',
+                'approval_foreign_key' => 'cash_advance_realization_id',
+
+                'document_status_column' => 'status',
+                'document_in_progress_status' => 'IN PROGRESS',
+
+                'approval_status_column' => 'status',
+                'waiting_status' => 'WAITING',
+
+                'step_order_column' => 'step_order',
+                'approver_type_column' => 'approver_type',
+                'approver_id_column' => 'approver_id',
+
+                'menu_paths' => ['/fund_request/cash_advance_realization'],
+            ],
+
+            'claim' => [
+                'document_table' => 'claims',
+                'approval_table' => 'claim_approvals',
+
+                'document_primary_key' => 'id',
+                'approval_foreign_key' => 'claim_id',
+
+                'document_status_column' => 'status',
+                'document_in_progress_status' => 'IN PROGRESS',
+
+                'approval_status_column' => 'status',
+                'waiting_status' => 'WAITING',
+
+                'step_order_column' => 'step_order',
+                'approver_type_column' => 'approver_type',
+                'approver_id_column' => 'approver_id',
+
+                'menu_paths' => ['/fund_request/claim'],
+            ],
+
+            'business_trip' => [
+                'document_table' => 'business_trips',
+                'approval_table' => 'business_trip_approvals',
+
+                'document_primary_key' => 'id',
+                'approval_foreign_key' => 'business_trip_id',
+
+                'document_status_column' => 'status',
+                'document_in_progress_status' => 'IN PROGRESS',
+
+                'approval_status_column' => 'status',
+                'waiting_status' => 'WAITING',
+
+                'step_order_column' => 'step_order',
+                'approver_type_column' => 'approver_type',
+                'approver_id_column' => 'approver_id',
+
+                'menu_paths' => ['/business_trip/perdin'],
+            ],
+
             'inventory_po' => [
                 'menu_keywords' => [
                     'inventory purchase order',
@@ -1159,6 +1267,15 @@ class MenuController extends Controller
         $approverIdColumn = $config['approver_id_column'];
 
         return DB::table($documentTable)
+            ->when(
+                Schema::hasColumn($documentTable, 'deleted_at'),
+                /*
+                | Dokumen terhapus tidak ikut dihitung. Angka di sidebar yang
+                | menunjuk ke dokumen yang tidak akan pernah ditemukan orangnya
+                | lebih buruk daripada tidak ada angka sama sekali.
+                */
+                fn ($query) => $query->whereNull("{$documentTable}.deleted_at"),
+            )
             ->whereRaw(
                 "UPPER(TRIM({$documentTable}.{$documentStatusColumn})) = ?",
                 [$documentInProgressStatus]

@@ -14,6 +14,7 @@ use App\Services\NonTrade\GoodsReceive\GoodsReceivePostingService;
 use App\Services\NonTrade\GoodsReceive\GoodsReceiveService;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Support\DocumentNumberLock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -3821,6 +3822,13 @@ class GoodsReceiveController extends Controller
     private function generateDraftGRNumber(): string
     {
         $year = (int) now()->format('Y');
+
+        /*
+        | Deret nomor draft dipakai bersama seluruh cabang, jadi dua permintaan
+        | yang berjalan bersamaan akan menyimpulkan nomor yang sama bila tidak
+        | diserialkan lebih dulu.
+        */
+        DocumentNumberLock::acquire('gr', 'draft', (string) $year);
 
         /*
         |--------------------------------------------------------------------------

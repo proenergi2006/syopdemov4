@@ -113,12 +113,12 @@ class DashboardModuleSeeder extends Seeder
 
     private function seedDashboardModules(): void
     {
-        $nonTradeGroup = DashboardModuleGroup::query()->updateOrCreate(
+        $nonStockGroup = DashboardModuleGroup::query()->updateOrCreate(
             [
-                'code' => 'NON_TRADE',
+                'code' => 'NON_STOCK',
             ],
             [
-                'name' => 'Non Trade',
+                'name' => 'Non Stock',
                 'icon' => 'mdi-cart-outline',
                 'sort_order' => 10,
                 'is_active' => true,
@@ -141,7 +141,7 @@ class DashboardModuleSeeder extends Seeder
                     'Nilai permintaan',
                 ],
                 'is_active' => true,
-                'is_available' => false,
+                'is_available' => true,
                 'sort_order' => 10,
             ],
             [
@@ -174,10 +174,11 @@ class DashboardModuleSeeder extends Seeder
                 'features' => [
                     'Barang diterima',
                     'Outstanding PO',
-                    'Status receipt',
+                    'Kinerja vendor',
+                    'Pengembalian barang',
                 ],
                 'is_active' => true,
-                'is_available' => false,
+                'is_available' => true,
                 'sort_order' => 30,
             ],
             [
@@ -206,7 +207,7 @@ class DashboardModuleSeeder extends Seeder
                     'code' => $module['code'],
                 ],
                 [
-                    'dashboard_module_group_id' => $nonTradeGroup->id,
+                    'dashboard_module_group_id' => $nonStockGroup->id,
                     'title' => $module['title'],
                     'short_title' => $module['short_title'],
                     'description' => $module['description'],

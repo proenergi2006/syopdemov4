@@ -1175,8 +1175,12 @@ class PermissionModuleController extends Controller
                 'boolean',
             ],
 
+            /*
+            | Boleh tidak disebut. Yang tidak disebut tidak diubah -- lihat
+            | $willRequireScope di bawah.
+            */
             'requires_scope' => [
-                'required',
+                'sometimes',
                 'boolean',
             ],
         ]);
@@ -1218,7 +1222,16 @@ class PermissionModuleController extends Controller
         }
 
         $willBeActive = (bool) $validated['is_active'];
-        $willRequireScope = (bool) $validated['requires_scope'];
+
+        /*
+        | Tidak disebut berarti tidak diubah. Kalau yang tidak disebut dianggap
+        | false, tombol yang cuma mengubah status akan ikut mencabut pembatasan
+        | cakupan -- kerusakan yang tidak terlihat sampai ada yang melihat data
+        | cabang lain.
+        */
+        $willRequireScope = array_key_exists('requires_scope', $validated)
+            ? (bool) $validated['requires_scope']
+            : (bool) $permission->requires_scope;
 
         try {
             DB::transaction(

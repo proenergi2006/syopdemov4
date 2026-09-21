@@ -1,191 +1,394 @@
 {
-  "moduleLauncher": {
-    "header": {
-      "title": "Management Dashboard",
-      "badge": "Management View",
-      "description": "Pilih kategori dan modul yang ingin dipantau secara lebih detail.",
-      "categoryLabel": "Kategori",
-      "totalModulesLabel": "Total Modul"
+    "goodsReceipt": {
+        "header": {
+            "title": "Goods Receipt Management Dashboard",
+            "description": "Pantau barang yang sudah sampai, yang masih ditunggu, dan yang dikembalikan ke vendor.",
+            "lastUpdated": "Diperbarui",
+            "refresh": "Muat ulang data"
+        },
+        "filters": {
+            "periodType": "Jenis Periode",
+            "pickDate": "Pilih Tanggal",
+            "pickWeek": "Pilih Minggu",
+            "pickMonth": "Pilih Bulan",
+            "pickYear": "Pilih Tahun",
+            "startDate": "Tanggal Mulai",
+            "endDate": "Tanggal Selesai",
+            "branch": "Cabang",
+            "allBranches": "Semua Cabang",
+            "department": "Departemen",
+            "allDepartments": "Semua Departemen",
+            "scopeNote": "Filter cabang dan departemen mengikuti scope permission Anda.",
+            "periodOptions": {
+                "day": "Harian",
+                "week": "Mingguan",
+                "month": "Bulanan",
+                "year": "Tahunan",
+                "range": "Rentang Tanggal"
+            }
+        },
+        "empty": {
+            "title": "Belum ada penerimaan barang pada periode ini",
+            "description": "Angka nol di bawah bukan kegagalan memuat, melainkan memang belum ada dokumennya.",
+            "showYear": "Lihat satu tahun penuh"
+        },
+        "errors": {
+            "periodInvalid": "Lengkapi dulu pilihan periodenya.",
+            "dashboardFailed": "Dashboard Goods Receipt gagal dimuat."
+        },
+        "stats": {
+            "received": "Barang Diterima",
+            "outstanding": "Belum Sampai",
+            "outstandingHint": "{po} PO, {items} item menunggu kiriman",
+            "draft": "Draft Belum Diposting",
+            "draftHint": "Barang datang tetapi stok belum tercatat",
+            "returned": "Dikembalikan"
+        },
+        "performance": {
+            "fulfillmentTitle": "Tingkat Pemenuhan",
+            "fulfillmentLabel": "Terpenuhi",
+            "fulfillmentHint": "Bagian dari kuantitas PO disetujui yang barangnya sudah diterima.",
+            "leadTitle": "Rata-rata Waktu Kirim",
+            "days": "hari",
+            "leadHint": "Dihitung dari PO disetujui sampai barang diterima.",
+            "returnTitle": "Tingkat Pengembalian",
+            "returnHint": "{amount} dikembalikan dari {received} yang diterima.",
+            "partialLabel": "Penerimaan sebagian"
+        },
+        "attention": {
+            "title": "Butuh Tindak Lanjut",
+            "subtitle": "Dokumen yang menggantung lebih dari {days} hari ditandai merah.",
+            "badge": "{overdue} lewat batas dari {total}",
+            "outstandingTitle": "PO Belum Diterima Penuh",
+            "outstandingEmpty": "Semua PO yang disetujui sudah diterima penuh.",
+            "receivedPercent": "Terpenuhi {percent}%",
+            "idleDays": "Menunggu {days} hari",
+            "draftTitle": "Penerimaan Masih Draft",
+            "draftEmpty": "Tidak ada penerimaan yang tertinggal sebagai draft.",
+            "draftDays": "Draft {days} hari",
+            "openModule": "Buka modul Goods Receipt"
+        },
+        "chart": {
+            "title": "Tren Penerimaan Barang",
+            "subtitle": "Jumlah dokumen dibandingkan nilai barang yang diterima.",
+            "empty": "Belum ada data pada periode ini.",
+            "seriesCount": "Dokumen Penerimaan",
+            "seriesPosted": "Sudah Diposting",
+            "seriesAmount": "Nilai Diterima",
+            "axisCount": "Jumlah Dokumen",
+            "axisAmount": "Nilai"
+        },
+        "status": {
+            "title": "Status Penerimaan",
+            "subtitle": "Sebaran dokumen menurut statusnya.",
+            "empty": "Belum ada data pada periode ini.",
+            "totalLabel": "Total",
+            "draft": "Draft",
+            "posted": "Diposting",
+            "cancelled": "Dibatalkan"
+        },
+        "vendor": {
+            "title": "Kinerja Vendor",
+            "subtitle": "Diurutkan dari nilai barang terbesar. Perhatikan kecepatan kirim dan tingkat pengembaliannya.",
+            "empty": "Belum ada penerimaan dari vendor mana pun pada periode ini.",
+            "receiptCount": "{count} penerimaan",
+            "leadDays": "{days} hari"
+        },
+        "breakdown": {
+            "branchTitle": "Sebaran per Cabang",
+            "departmentTitle": "Sebaran per Departemen",
+            "subtitle": "Diurutkan dari nilai penerimaan terbesar.",
+            "empty": "Belum ada data pada periode ini.",
+            "count": "{count} penerimaan",
+            "detail": "{posted} diposting, {draft} masih draft."
+        },
+        "reason": {
+            "title": "Alasan Pengembalian",
+            "subtitle": "Pola masalah yang membuat barang dikembalikan ke vendor.",
+            "empty": "Tidak ada pengembalian barang pada periode ini.",
+            "count": "{count} kali"
+        }
     },
-    "filters": {
-      "categoryLabel": "Kategori Modul",
-      "displayLabel": "Tampilkan",
-      "displayOptions": {
-        "four": "4 Modul",
-        "eight": "8 Modul",
-        "twelve": "12 Modul",
-        "all": "Tampilkan Semua"
-      },
-      "allCategory": "Semua"
+    "moduleLauncher": {
+        "header": {
+            "title": "Management Dashboard",
+            "badge": "Management View",
+            "description": "Pilih kategori dan modul yang ingin dipantau secara lebih detail.",
+            "categoryLabel": "Kategori",
+            "totalModulesLabel": "Total Modul"
+        },
+        "filters": {
+            "categoryLabel": "Kategori Modul",
+            "displayLabel": "Tampilkan",
+            "displayOptions": {
+                "four": "4 Modul",
+                "eight": "8 Modul",
+                "twelve": "12 Modul",
+                "all": "Tampilkan Semua"
+            },
+            "allCategory": "Semua"
+        },
+        "section": {
+            "title": "{category} Dashboard",
+            "description": "Pilih modul untuk membuka dashboard dan analisis detail.",
+            "permissionBadge": "Berdasarkan permission"
+        },
+        "empty": {
+            "title": "Modul belum tersedia",
+            "description": "Tidak ada modul dashboard yang dapat ditampilkan pada kategori ini."
+        },
+        "card": {
+            "available": "Tersedia",
+            "comingSoon": "Segera",
+            "openDashboard": "Buka dashboard",
+            "notAvailable": "Belum tersedia",
+            "pendingApproval": "{count} menunggu approval Anda",
+            "viewAll": "Lihat Semua"
+        },
+        "infiniteScroll": {
+            "loadMore": "Scroll untuk memuat modul berikutnya",
+            "allLoaded": "Semua modul telah ditampilkan"
+        },
+        "errors": {
+            "groupsFailed": "Kategori dashboard gagal dimuat.",
+            "modulesFailed": "Daftar modul dashboard gagal dimuat."
+        }
     },
-    "section": {
-      "title": "{category} Dashboard",
-      "description": "Pilih modul untuk membuka dashboard dan analisis detail.",
-      "permissionBadge": "Berdasarkan permission"
+    "purchaseOrder": {
+        "header": {
+            "title": "Purchase Order Management Dashboard",
+            "description": "Perbandingan kebutuhan Purchase Requisition dan realisasi Purchase Order.",
+            "lastUpdated": "Terakhir diperbarui"
+        },
+        "filters": {
+            "title": "Filter Data",
+            "activePeriod": "Periode aktif:",
+            "periodType": "Jenis Periode",
+            "pickDate": "Pilih Tanggal",
+            "pickWeek": "Pilih Minggu",
+            "pickMonth": "Pilih Bulan",
+            "pickYear": "Pilih Tahun",
+            "startDate": "Tanggal Mulai",
+            "endDate": "Tanggal Selesai",
+            "weekLabel": "Minggu {week}, Tahun {year}",
+            "yearLabel": "Tahun {year}",
+            "rangeLabel": "{start} sampai {end}",
+            "allBranches": "Semua Cabang",
+            "branch": "Cabang",
+            "allDepartments": "Semua Departemen",
+            "department": "Departemen",
+            "scopeNote": "Filter cabang dan departemen mengikuti scope permission pengguna.",
+            "incompletePeriod": "Lengkapi pilihan periode terlebih dahulu.",
+            "periodOptions": {
+                "day": "Harian",
+                "week": "Mingguan",
+                "month": "Bulanan",
+                "year": "Tahunan",
+                "range": "Rentang Tanggal"
+            },
+            "scope": {
+                "label": "Scope {scope}",
+                "all": "Semua",
+                "ownCabang": "Cabang Saya",
+                "ownDepartment": "Departemen Saya"
+            }
+        },
+        "errors": {
+            "periodInvalid": "Periode filter belum diisi dengan benar.",
+            "dashboardFailed": "Data dashboard Purchase Order gagal dimuat.",
+            "pendingApprovalsFailed": "Daftar Purchase Order menunggu approval gagal dimuat."
+        },
+        "stats": {
+            "totalPr": {
+                "title": "Total Purchase Requisition",
+                "shortTitle": "PR",
+                "subtitle": "Jumlah kebutuhan yang diajukan"
+            },
+            "prAmount": {
+                "title": "Nilai Purchase Requisition",
+                "shortTitle": "Nilai PR",
+                "subtitle": "Total nilai kebutuhan pembelian"
+            },
+            "totalPo": {
+                "title": "Total Purchase Order",
+                "shortTitle": "PO",
+                "subtitle": "Jumlah pesanan yang diterbitkan"
+            },
+            "poAmount": {
+                "title": "Nilai Purchase Order",
+                "shortTitle": "Nilai PO",
+                "subtitle": "Total nilai realisasi pembelian"
+            }
+        },
+        "operational": {
+            "prNotOrdered": "PR Belum Menjadi PO",
+            "pendingApproval": "PO Menunggu Persetujuan",
+            "outstandingReceipt": "Outstanding Receipt",
+            "conversionRate": "Konversi PR ke PO"
+        },
+        "insight": {
+            "okTitle": "Proses procurement dalam kondisi terkendali",
+            "okMessage": "Belum ditemukan PR atau PO yang membutuhkan perhatian khusus pada periode terpilih.",
+            "warningTitle": "Perlu perhatian management",
+            "prNotOrdered": "{count} PR yang telah disetujui belum diproses menjadi PO",
+            "pendingApproval": "{count} PO masih menunggu persetujuan",
+            "outstandingReceipt": "{count} PO belum selesai diterima",
+            "conversionRate": "tingkat konversi PR ke PO baru mencapai {rate}%"
+        },
+        "chart": {
+            "realizationTitle": "Realisasi PO terhadap PR",
+            "realizationSubtitle": "Rasio nilai PO dibandingkan kebutuhan PR pada periode aktif",
+            "realizationSeriesLabel": "PO terhadap PR",
+            "realizationCenterLabel": "Realisasi",
+            "prAmountLabel": "Nilai PR",
+            "poAmountLabel": "Nilai PO",
+            "unrealizedGap": "Selisih belum terealisasi",
+            "noComparisonData": "Belum ada data PR dan PO",
+            "trendTitle": "Tren Nilai PR dan PO",
+            "trendSubtitlePrefix": "Pergerakan kebutuhan dan realisasi pada",
+            "noTrendData": "Belum ada data tren",
+            "noTrendChartData": "Belum ada data tren PR dan PO",
+            "transactionValueAxis": "Nilai transaksi ({scale})",
+            "scale": {
+                "rupiah": "Rupiah",
+                "thousand": "Ribu Rupiah",
+                "million": "Juta Rupiah",
+                "billion": "Miliar Rupiah",
+                "trillion": "Triliun Rupiah"
+            }
+        },
+        "breakdown": {
+            "byBranch": {
+                "title": "Analisis PR dan PO per Cabang",
+                "subtitle": "Perbandingan kebutuhan dan realisasi berdasarkan cabang",
+                "note": "Menampilkan {shown} cabang teratas dari {total} cabang.",
+                "empty": "Belum ada data per cabang"
+            },
+            "byDepartment": {
+                "title": "Analisis PR dan PO per Departemen",
+                "subtitle": "Perbandingan kebutuhan dan realisasi berdasarkan departemen",
+                "note": "Menampilkan {shown} departemen teratas dari {total} departemen.",
+                "empty": "Belum ada data per departemen"
+            },
+            "prLabel": "PR",
+            "poLabel": "PO",
+            "metricOptions": {
+                "amount": "Nilai Transaksi",
+                "count": "Jumlah Dokumen"
+            }
+        },
+        "status": {
+            "title": "Status Purchase Order",
+            "subtitle": "Kondisi PO pada periode terpilih",
+            "empty": "Belum ada data status.",
+            "inProgress": "In Progress",
+            "approved": "Approved"
+        },
+        "pendingApproval": {
+            "title": "Purchase Order yang Perlu Perhatian",
+            "subtitle": "PO yang menunggu approval pada periode filter di atas, diurutkan dari yang paling lama menggantung sejak diajukan",
+            "countBadge": "{count} PO",
+            "columnPo": "Purchase Order",
+            "columnValue": "Nilai",
+            "columnWaiting": "Menunggu Approval",
+            "submittedOn": "Diajukan {date}",
+            "createdOn": "(PO dibuat {date})",
+            "unknownApprover": "Belum ditentukan",
+            "empty": "Tidak ada PO yang menunggu approval"
+        }
     },
-    "empty": {
-      "title": "Modul belum tersedia",
-      "description": "Tidak ada modul dashboard yang dapat ditampilkan pada kategori ini."
-    },
-    "card": {
-      "available": "Tersedia",
-      "comingSoon": "Segera",
-      "openDashboard": "Buka dashboard",
-      "notAvailable": "Belum tersedia",
-      "pendingApproval": "{count} menunggu approval Anda",
-      "viewAll": "Lihat Semua"
-    },
-    "infiniteScroll": {
-      "loadMore": "Scroll untuk memuat modul berikutnya",
-      "allLoaded": "Semua modul telah ditampilkan"
-    },
-    "errors": {
-      "groupsFailed": "Kategori dashboard gagal dimuat.",
-      "modulesFailed": "Daftar modul dashboard gagal dimuat."
+    "purchaseRequest": {
+        "header": {
+            "title": "Purchase Requisition Management Dashboard",
+            "description": "Pantau kebutuhan yang diajukan, di mana prosesnya tertahan, dan mana yang perlu ditindaklanjuti.",
+            "lastUpdated": "Diperbarui",
+            "refresh": "Muat ulang data"
+        },
+        "filters": {
+            "periodType": "Jenis Periode",
+            "pickDate": "Pilih Tanggal",
+            "pickWeek": "Pilih Minggu",
+            "pickMonth": "Pilih Bulan",
+            "pickYear": "Pilih Tahun",
+            "startDate": "Tanggal Mulai",
+            "endDate": "Tanggal Selesai",
+            "branch": "Cabang",
+            "allBranches": "Semua Cabang",
+            "department": "Departemen",
+            "allDepartments": "Semua Departemen",
+            "scopeNote": "Filter cabang dan departemen mengikuti scope permission Anda.",
+            "periodOptions": {
+                "day": "Harian",
+                "week": "Mingguan",
+                "month": "Bulanan",
+                "year": "Tahunan",
+                "range": "Rentang Tanggal"
+            }
+        },
+        "empty": {
+            "title": "Tidak ada PR pada periode ini.",
+            "description": "Angka nol di bawah berarti periodenya memang kosong, bukan data gagal dimuat. Coba pilih periode lain.",
+            "showYear": "Lihat satu tahun penuh"
+        },
+        "errors": {
+            "periodInvalid": "Lengkapi pilihan periode terlebih dahulu.",
+            "dashboardFailed": "Data dashboard Purchase Requisition gagal dimuat."
+        },
+        "stats": {
+            "total": "Total PR",
+            "waiting": "Menunggu Approval",
+            "approved": "Disetujui",
+            "notFollowedUp": "Belum Jadi PO",
+            "averageApproval": "Rata-rata Waktu Approval",
+            "averageApprovalHint": "Dihitung dari pengajuan sampai persetujuan terakhir.",
+            "days": "hari",
+            "approvalRate": "Tingkat Persetujuan",
+            "approvalRateHint": "{approved} dari {official} PR yang berjalan berhasil disetujui."
+        },
+        "attention": {
+            "title": "Butuh Tindak Lanjut",
+            "subtitle": "Dokumen yang menggantung lebih dari {days} hari ditandai merah.",
+            "badge": "{overdue} lewat batas dari {total}",
+            "stuckTitle": "Tertahan di Approval",
+            "stuckEmpty": "Tidak ada PR yang tertahan di approval.",
+            "awaitingPoTitle": "Menunggu Dibuatkan PO",
+            "awaitingPoEmpty": "Semua PR yang disetujui sudah ditindaklanjuti.",
+            "waitingDays": "Menunggu {days} hari",
+            "idleDays": "Menganggur {days} hari",
+            "approvedOn": "Disetujui",
+            "openModule": "Buka Modul Purchase Requisition"
+        },
+        "bottleneck": {
+            "title": "Penumpukan Approval",
+            "subtitle": "Tahap mana yang paling banyak menahan PR, dan sudah berapa lama.",
+            "empty": "Tidak ada PR yang sedang menunggu approval.",
+            "step": "Tahap {order}",
+            "average": "rata-rata {days} hari",
+            "longest": "Menunggu paling lama {days} hari."
+        },
+        "chart": {
+            "title": "Tren Pengajuan",
+            "subtitle": "Jumlah PR dibandingkan nilai pengajuannya.",
+            "empty": "Belum ada data pada periode ini.",
+            "seriesCount": "PR Diajukan",
+            "seriesApproved": "PR Disetujui",
+            "seriesAmount": "Nilai Pengajuan",
+            "axisCount": "Jumlah PR",
+            "axisAmount": "Nilai"
+        },
+        "status": {
+            "title": "Sebaran Status",
+            "subtitle": "Termasuk yang gugur, bukan hanya yang berjalan.",
+            "empty": "Belum ada data pada periode ini.",
+            "totalLabel": "Total PR"
+        },
+        "breakdown": {
+            "branchTitle": "Sebaran per Cabang",
+            "departmentTitle": "Sebaran per Departemen",
+            "typeTitle": "Sebaran per Jenis Pengajuan",
+            "subtitle": "Diurutkan dari nilai pengajuan terbesar.",
+            "empty": "Belum ada data pada periode ini.",
+            "detail": "{waiting} menunggu approval, {approved} disetujui."
+        }
     }
-  },
-
-  "purchaseOrder": {
-    "header": {
-      "title": "Purchase Order Management Dashboard",
-      "description": "Perbandingan kebutuhan Purchase Requisition dan realisasi Purchase Order.",
-      "lastUpdated": "Terakhir diperbarui"
-    },
-    "filters": {
-      "title": "Filter Data",
-      "activePeriod": "Periode aktif:",
-      "periodType": "Jenis Periode",
-      "pickDate": "Pilih Tanggal",
-      "pickWeek": "Pilih Minggu",
-      "pickMonth": "Pilih Bulan",
-      "pickYear": "Pilih Tahun",
-      "startDate": "Tanggal Mulai",
-      "endDate": "Tanggal Selesai",
-      "weekLabel": "Minggu {week}, Tahun {year}",
-      "yearLabel": "Tahun {year}",
-      "rangeLabel": "{start} sampai {end}",
-      "allBranches": "Semua Cabang",
-      "branch": "Cabang",
-      "allDepartments": "Semua Departemen",
-      "department": "Departemen",
-      "scopeNote": "Filter cabang dan departemen mengikuti scope permission pengguna.",
-      "incompletePeriod": "Lengkapi pilihan periode terlebih dahulu.",
-      "periodOptions": {
-        "day": "Harian",
-        "week": "Mingguan",
-        "month": "Bulanan",
-        "year": "Tahunan",
-        "range": "Rentang Tanggal"
-      },
-      "scope": {
-        "label": "Scope {scope}",
-        "all": "Semua",
-        "ownCabang": "Cabang Saya",
-        "ownDepartment": "Departemen Saya"
-      }
-    },
-    "errors": {
-      "periodInvalid": "Periode filter belum diisi dengan benar.",
-      "dashboardFailed": "Data dashboard Purchase Order gagal dimuat.",
-      "pendingApprovalsFailed": "Daftar Purchase Order menunggu approval gagal dimuat."
-    },
-    "stats": {
-      "totalPr": {
-        "title": "Total Purchase Requisition",
-        "shortTitle": "PR",
-        "subtitle": "Jumlah kebutuhan yang diajukan"
-      },
-      "prAmount": {
-        "title": "Nilai Purchase Requisition",
-        "shortTitle": "Nilai PR",
-        "subtitle": "Total nilai kebutuhan pembelian"
-      },
-      "totalPo": {
-        "title": "Total Purchase Order",
-        "shortTitle": "PO",
-        "subtitle": "Jumlah pesanan yang diterbitkan"
-      },
-      "poAmount": {
-        "title": "Nilai Purchase Order",
-        "shortTitle": "Nilai PO",
-        "subtitle": "Total nilai realisasi pembelian"
-      }
-    },
-    "operational": {
-      "prNotOrdered": "PR Belum Menjadi PO",
-      "pendingApproval": "PO Menunggu Persetujuan",
-      "outstandingReceipt": "Outstanding Receipt",
-      "conversionRate": "Konversi PR ke PO"
-    },
-    "insight": {
-      "okTitle": "Proses procurement dalam kondisi terkendali",
-      "okMessage": "Belum ditemukan PR atau PO yang membutuhkan perhatian khusus pada periode terpilih.",
-      "warningTitle": "Perlu perhatian management",
-      "prNotOrdered": "{count} PR yang telah disetujui belum diproses menjadi PO",
-      "pendingApproval": "{count} PO masih menunggu persetujuan",
-      "outstandingReceipt": "{count} PO belum selesai diterima",
-      "conversionRate": "tingkat konversi PR ke PO baru mencapai {rate}%"
-    },
-    "chart": {
-      "realizationTitle": "Realisasi PO terhadap PR",
-      "realizationSubtitle": "Rasio nilai PO dibandingkan kebutuhan PR pada periode aktif",
-      "realizationSeriesLabel": "PO terhadap PR",
-      "realizationCenterLabel": "Realisasi",
-      "prAmountLabel": "Nilai PR",
-      "poAmountLabel": "Nilai PO",
-      "unrealizedGap": "Selisih belum terealisasi",
-      "noComparisonData": "Belum ada data PR dan PO",
-      "trendTitle": "Tren Nilai PR dan PO",
-      "trendSubtitlePrefix": "Pergerakan kebutuhan dan realisasi pada",
-      "noTrendData": "Belum ada data tren",
-      "noTrendChartData": "Belum ada data tren PR dan PO",
-      "transactionValueAxis": "Nilai transaksi ({scale})",
-      "scale": {
-        "rupiah": "Rupiah",
-        "thousand": "Ribu Rupiah",
-        "million": "Juta Rupiah",
-        "billion": "Miliar Rupiah",
-        "trillion": "Triliun Rupiah"
-      }
-    },
-    "breakdown": {
-      "byBranch": {
-        "title": "Analisis PR dan PO per Cabang",
-        "subtitle": "Perbandingan kebutuhan dan realisasi berdasarkan cabang",
-        "note": "Menampilkan {shown} cabang teratas dari {total} cabang.",
-        "empty": "Belum ada data per cabang"
-      },
-      "byDepartment": {
-        "title": "Analisis PR dan PO per Departemen",
-        "subtitle": "Perbandingan kebutuhan dan realisasi berdasarkan departemen",
-        "note": "Menampilkan {shown} departemen teratas dari {total} departemen.",
-        "empty": "Belum ada data per departemen"
-      },
-      "prLabel": "PR",
-      "poLabel": "PO",
-      "metricOptions": {
-        "amount": "Nilai Transaksi",
-        "count": "Jumlah Dokumen"
-      }
-    },
-    "status": {
-      "title": "Status Purchase Order",
-      "subtitle": "Kondisi PO pada periode terpilih",
-      "empty": "Belum ada data status.",
-      "inProgress": "In Progress",
-      "approved": "Approved"
-    },
-    "pendingApproval": {
-      "title": "Purchase Order yang Perlu Perhatian",
-      "subtitle": "PO yang menunggu approval pada periode filter di atas, diurutkan dari yang paling lama menggantung sejak diajukan",
-      "countBadge": "{count} PO",
-      "columnPo": "Purchase Order",
-      "columnValue": "Nilai",
-      "columnWaiting": "Menunggu Approval",
-      "submittedOn": "Diajukan {date}",
-      "createdOn": "(PO dibuat {date})",
-      "unknownApprover": "Belum ditentukan",
-      "empty": "Tidak ada PO yang menunggu approval"
-    }
-  }
 }

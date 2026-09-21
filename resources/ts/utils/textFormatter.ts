@@ -295,3 +295,39 @@ export const formatDecimalQty = (
     maximumFractionDigits: maxDecimal,
   }).format(numberValue)
 }
+
+/**
+ * Tanggal panjang beserta nama harinya: "Rabu, 16 September 2026".
+ *
+ * Dipakai di tempat yang harinya memang bagian dari informasinya -- jadwal
+ * pembayaran Finance hanya jatuh pada hari tertentu, jadi "16/09/2026" saja
+ * menghilangkan bagian yang paling dicari pembacanya.
+ */
+export const formatDateLong = (
+  value: string | null | undefined,
+  locale = 'id-ID',
+): string => {
+  if (!value)
+    return '-'
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime()))
+    return String(value)
+
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+}
+
+/** Menetralkan teks agar aman disisipkan ke markup. */
+export const escapeHtml = (value: string | null | undefined): string =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')

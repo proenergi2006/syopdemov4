@@ -886,6 +886,9 @@ async function updatePermissionStatus(
         name: permission.name,
         description: permission.description,
         is_active: nextStatus,
+
+        /* Ikut dikirim apa adanya: yang diubah tombol ini hanya statusnya. */
+        requires_scope: permission.requires_scope,
       },
       {
         headers: {

@@ -1448,7 +1448,7 @@ onMounted(async () => {
                     color="primary"
                     variant="tonal"
                     size="small"
-                    prepend-icon="tabler-plus"
+                    prepend-icon="tabler-list-details"
                     @click="openItemFullscreen"
                     class="text-none"
                   >
