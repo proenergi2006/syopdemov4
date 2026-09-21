@@ -11,6 +11,14 @@ import {
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { formatNumberWithoutRp, toTitleCase } from '@/utils/textFormatter'
+import {
+  approvalFlowDocumentTypeOptions,
+  documentTypeUsesAreaMatrix,
+  getApprovalFlowDocumentTypeLabel,
+  getDefaultApprovalFlowDocumentType,
+  loadApprovalFlowDocumentTypes,
+  normalizeApprovalFlowDocumentType,
+} from '@/utils/approvalFlowDocumentType'
 
 interface AxiosErrorShape {
   response?: {
@@ -84,6 +92,24 @@ interface ApprovalFlowItem {
   creator_department_id?: number | null
   creator_department_name?: string | null
   creator_department_code?: string | null
+
+  /*
+   * Cakupan flow: beberapa department dan beberapa keterangan transaksi,
+   * atau seluruhnya lewat penanda all_*.
+   */
+  all_departments?: boolean
+  departments?: Array<{
+    id: number
+    code?: string | null
+    name?: string | null
+  }>
+
+  all_transaction_categories?: boolean
+  transaction_categories?: Array<{
+    id: number
+    code?: string | null
+    name?: string | null
+  }>
 }
 
 interface MasterRoleOption {
@@ -156,8 +182,12 @@ const selectedDepartmentId = ref<number | null>(null)
 
 const departmentOptions = ref<DepartmentOption[]>([])
 
-const isPRFilter = computed(() => {
-  return String(selectedDocumentType.value || '').toUpperCase() === 'PR'
+/*
+ * Jenis dokumen yang flow-nya dibedakan per area + department (PR, FPU).
+ * Untuk jenis lain, filter Area/Department tidak berlaku.
+ */
+const usesAreaMatrixFilter = computed(() => {
+  return documentTypeUsesAreaMatrix(selectedDocumentType.value)
 })
 
 const areaTypeOptions = [
@@ -233,33 +263,45 @@ const fetchDepartmentOptions = async (): Promise<void> => {
   }
 }
 
-const isPRFlow = (item: ApprovalFlowItem): boolean => {
-  return String(item.document_type || '').toUpperCase() === 'PR'
+const usesAreaMatrix = (item: ApprovalFlowItem): boolean => {
+  return documentTypeUsesAreaMatrix(item.document_type)
 }
 
-const normalizeDocumentType = (value: unknown): string => {
-  const rawValue = String(value || 'PO').trim()
+/*
+ * Diisi mentah dari URL lebih dulu; dibakukan terhadap master pada onMounted
+ * setelah daftar jenis dokumen selesai dimuat.
+ */
+const selectedDocumentType = ref(String(route.query.document_type || ''))
 
-  if (!rawValue)
-    return 'PO'
+/*
+ * Menahan watcher supaya penetapan nilai awal tidak memicu satu pemuatan
+ * daftar tambahan di luar pemuatan pertama.
+ */
+const isInitializing = ref(true)
 
-  const upperValue = rawValue.toUpperCase()
-
-  if (upperValue === 'PO')
-    return 'PO'
-
-  if (upperValue === 'PR')
-    return 'PR'
-
-  if (upperValue === 'VENDOR')
-    return 'Vendor'
-
-  return rawValue
-}
-
-const selectedDocumentType = ref(normalizeDocumentType(route.query.document_type || 'PR'))
+const selectedDocumentTypeLabel = computed(() => {
+  return getApprovalFlowDocumentTypeLabel(selectedDocumentType.value)
+})
 
 const getCreatorDepartmentLabel = (item: ApprovalFlowItem): string => {
+  if (item.all_departments)
+    return 'Semua Divisi'
+
+  /*
+   * Satu flow bisa mencakup beberapa department. Kolom tunggal lama dipakai
+   * sebagai cadangan untuk flow yang belum punya baris pivot.
+   */
+  if (Array.isArray(item.departments) && item.departments.length) {
+    return item.departments
+      .map(department => {
+        const code = department.code || ''
+        const name = department.name || ''
+
+        return code && name ? `${code} - ${name}` : (name || code || '-')
+      })
+      .join(', ')
+  }
+
   const code = item.creator_department_code || ''
   const name = item.creator_department_name || ''
 
@@ -267,6 +309,23 @@ const getCreatorDepartmentLabel = (item: ApprovalFlowItem): string => {
     return `${code} - ${name}`
 
   return name || code || '-'
+}
+
+/**
+ * Label keterangan transaksi yang dicakup flow.
+ * Mengembalikan string kosong bila flow tidak dibatasi kategori, sehingga
+ * barisnya tidak perlu ditampilkan sama sekali.
+ */
+const getTransactionCategoryLabel = (item: ApprovalFlowItem): string => {
+  if (item.all_transaction_categories !== false)
+    return ''
+
+  if (!Array.isArray(item.transaction_categories) || !item.transaction_categories.length)
+    return ''
+
+  return item.transaction_categories
+    .map(category => category.name || category.code || '-')
+    .join(', ')
 }
 
 const normalizeNumberInput = (value: unknown): number | null => {
@@ -665,20 +724,7 @@ const submitEditApprovalFlow = async (): Promise<void> => {
   }
 }
 
-const documentTypeOptions = ref([
-  {
-    title: 'Purchase Request (PR)',
-    value: 'PR',
-  },
-  {
-    title: 'Purchase Order (PO)',
-    value: 'PO',
-  },
-  {
-    title: 'Master Vendor',
-    value: 'Vendor',
-  },
-])
+const documentTypeOptions = approvalFlowDocumentTypeOptions
 
 const statusOptions = ref([
   {
@@ -706,7 +752,7 @@ const totalInactiveFlow = computed(() => {
 const hasFilter = computed(() => {
   return Boolean(
     keyword.value
-      || selectedDocumentType.value !== 'PO'
+      || selectedDocumentType.value !== getDefaultApprovalFlowDocumentType()
       || selectedStatus.value !== 'active'
       || selectedAreaType.value !== 'all'
       || selectedDepartmentId.value,
@@ -722,13 +768,7 @@ const isFlowActive = (item: ApprovalFlowItem): boolean => {
 const getDocumentTypeLabel = (item: ApprovalFlowItem): string => {
   if (item.document_type_label) return item.document_type_label
 
-  const type = String(item.document_type || '').toUpperCase()
-
-  if (type === 'PO') return 'Purchase Order (PO)'
-  if (type === 'PR') return 'Purchase Requisition (PR)'
-  if (type === 'VENDOR') return 'Master Vendor'
-
-  return item.document_type || '-'
+  return getApprovalFlowDocumentTypeLabel(item.document_type)
 }
 
 const getFlowName = (item: ApprovalFlowItem): string => {
@@ -828,7 +868,7 @@ const getComparableMinAmount = (item: ApprovalFlowItem): number => {
    * PR tidak boleh merge antar-flow.
    * Karena PR dibedakan berdasarkan area + department + nominal.
    */
-  if (isPRFlow(currentFlow)) {
+  if (usesAreaMatrix(currentFlow)) {
     return getSortedSteps(currentFlow).map(step => ({
       ...step,
       step_order: getStepOrder(step),
@@ -1032,7 +1072,7 @@ const buildParams = (): Record<string, any> => {
     params.status = selectedStatus.value
   }
 
-  if (isPRFilter.value) {
+  if (usesAreaMatrixFilter.value) {
     if (selectedAreaType.value !== 'all')
       params.area_type = selectedAreaType.value
 
@@ -1110,7 +1150,7 @@ const reloadData = async (): Promise<void> => {
 
 const resetFilter = async (): Promise<void> => {
   keyword.value = ''
-  selectedDocumentType.value = 'PO'
+  selectedDocumentType.value = getDefaultApprovalFlowDocumentType()
   selectedStatus.value = 'active'
   page.value = 1
 
@@ -1129,7 +1169,8 @@ const goToCreate = async (): Promise<void> => {
   await router.push({
     path: '/master/approval-flow/create',
     query: {
-      document_type: selectedDocumentType.value || 'PO',
+      document_type: selectedDocumentType.value
+        || getDefaultApprovalFlowDocumentType(),
     },
   })
 }
@@ -1272,7 +1313,7 @@ const goToNextPage = async (): Promise<void> => {
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch([selectedAreaType, selectedDepartmentId], async () => {
-  if (!isPRFilter.value)
+  if (!usesAreaMatrixFilter.value)
     return
 
   page.value = 1
@@ -1289,6 +1330,9 @@ watch(keyword, () => {
 })
 
 watch([selectedDocumentType, selectedStatus], async () => {
+  if (isInitializing.value)
+    return
+
   page.value = 1
 
   const nextQuery: Record<string, any> = {
@@ -1307,6 +1351,28 @@ watch([selectedDocumentType, selectedStatus], async () => {
 })
 
 onMounted(async () => {
+  /*
+   * Daftar jenis dokumen harus siap lebih dulu: nilai filter, labelnya, dan
+   * aturan area/department semuanya dibakukan terhadap master ini.
+   */
+  try {
+    await loadApprovalFlowDocumentTypes()
+  } catch (error: any) {
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        error,
+        'Gagal memuat daftar jenis dokumen approval flow.',
+      ),
+    })
+  }
+
+  selectedDocumentType.value
+    = normalizeApprovalFlowDocumentType(selectedDocumentType.value)
+      || getDefaultApprovalFlowDocumentType()
+
+  isInitializing.value = false
+
   await Promise.all([
     loadApprovalFlows(),
     loadApproverOptions(),
@@ -1566,7 +1632,7 @@ onMounted(async () => {
 
           <!-- Row tambahan khusus PR -->
           <VExpandTransition>
-            <div v-if="isPRFilter">
+            <div v-if="usesAreaMatrixFilter">
               <VDivider class="my-4" />
 
               <div class="d-flex align-center gap-2 mb-3">
@@ -1576,7 +1642,7 @@ onMounted(async () => {
                   color="primary"
                 />
                 <div class="text-body-2 font-weight-semibold text-primary">
-                  Filter Khusus Purchase Request
+                  Filter Khusus {{ selectedDocumentTypeLabel }}
                 </div>
               </div>
 
@@ -1759,7 +1825,7 @@ onMounted(async () => {
                     </div>
 
                     <div
-                      v-if="isPRFlow(flow)"
+                      v-if="usesAreaMatrix(flow)"
                       class="d-flex flex-wrap gap-2 mb-2"
                     >
                       <VChip
@@ -1771,11 +1837,24 @@ onMounted(async () => {
                       </VChip>
 
                       <VChip
-                        color="secondary"
+                        :color="flow.all_departments ? 'primary' : 'secondary'"
                         variant="tonal"
                         size="small"
                       >
                         Department: {{ getCreatorDepartmentLabel(flow) }}
+                      </VChip>
+
+                      <!--
+                        Hanya muncul bila flow dibatasi keterangan transaksi
+                        tertentu; flow "semua kategori" tidak perlu penanda.
+                      -->
+                      <VChip
+                        v-if="getTransactionCategoryLabel(flow)"
+                        color="warning"
+                        variant="tonal"
+                        size="small"
+                      >
+                        Keterangan Transaksi: {{ getTransactionCategoryLabel(flow) }}
                       </VChip>
                     </div>
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\DocumentCounter;
+use App\Support\DocumentNumberLock;
 use App\Models\GoodsReceive;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -129,6 +130,24 @@ function generateDocumentNumber(
     $branch = $branch !== null ? trim((string) $branch) : null;
     $branch = $branch !== '' ? $branch : null;
 
+    /*
+    |--------------------------------------------------------------------------
+    | Kunci deret
+    |--------------------------------------------------------------------------
+    | Melindungi firstOrCreate di bawahnya: dua permintaan yang bersamaan bisa
+    | sama-sama mendapati barisnya belum ada, lalu sama-sama mencoba membuatnya.
+    | Indeks unik pada tabelnya membuat yang kedua gagal -- dan gagalnya muncul
+    | ke user sebagai error, bukan sebagai nomor berikutnya.
+    |--------------------------------------------------------------------------
+    */
+    DocumentNumberLock::acquire(
+        'doc-counter',
+        $docCode,
+        $department,
+        (string) $branch,
+        (string) $year,
+    );
+
     $counter = DocumentCounter::firstOrCreate(
         [
             'doc_code'   => $docCode,
@@ -141,10 +160,34 @@ function generateDocumentNumber(
         ]
     );
 
-    $counter->increment('last_number');
-    $counter->refresh();
+    /*
+    |--------------------------------------------------------------------------
+    | Penambahan dan pembacaan dalam satu pernyataan
+    |--------------------------------------------------------------------------
+    | increment() lalu refresh() adalah dua pernyataan terpisah. Di antara
+    | keduanya, permintaan lain bisa ikut menambah, dan refresh() justru memuat
+    | hasil milik orang itu -- keduanya berakhir memakai nomor yang sama.
+    |
+    | UPDATE ... RETURNING mengembalikan nilai hasil penambahan milik pemanggil
+    | ini sendiri, sehingga tidak ada celah di antaranya.
+    |--------------------------------------------------------------------------
+    */
+    $increment = DB::selectOne(
+        'UPDATE document_counters
+            SET last_number = last_number + 1,
+                updated_at  = NOW()
+          WHERE id = ?
+      RETURNING last_number',
+        [$counter->id],
+    );
 
-    $number = str_pad((string) $counter->last_number, 4, '0', STR_PAD_LEFT);
+    if (!$increment) {
+        throw new Exception(
+            "Gagal menambah penghitung nomor dokumen: {$docCode}/{$department}/{$branch}/{$year}",
+        );
+    }
+
+    $number = str_pad((string) $increment->last_number, 4, '0', STR_PAD_LEFT);
     $roman = getRomanMonth($month);
 
     $segments = array_filter([

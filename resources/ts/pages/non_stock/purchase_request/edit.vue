@@ -1639,7 +1639,7 @@ onMounted(async () => {
                       color="primary"
                       variant="tonal"
                       size="small"
-                      prepend-icon="tabler-plus"
+                      prepend-icon="tabler-list-details"
                       @click="openItemFullscreen"
                       class="text-none"
                     >
@@ -1670,7 +1670,7 @@ onMounted(async () => {
                       variant="tonal"
                       density="compact"
                     >
-                      Belum ada item. Klik <strong>Tambah Item</strong> untuk menambahkan item.
+                      {{ t('purchaseRequest.create.items.emptyAlert', { action: t('purchaseRequest.create.items.addButton') }) }}
                     </VAlert>
 
                     <div v-else class="d-flex flex-column gap-3">

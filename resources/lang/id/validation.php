@@ -163,6 +163,29 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'attributes' => [],
+    /*
+    |--------------------------------------------------------------------------
+    | Nama field pada pesan validasi
+    |--------------------------------------------------------------------------
+    | Tanpa ini, pesan otomatis Laravel memakai nama kolom mentah seperti
+    | "transaction category id" yang tidak dikenali pengguna.
+    |--------------------------------------------------------------------------
+    */
+    'attributes' => [
+        'transaction_category_id' => 'Keterangan Transaksi',
+        'transaction_category_ids' => 'Keterangan Transaksi',
+        'request_type' => 'Sifat Pengajuan',
+        'department_id' => 'Department',
+        'department_ids' => 'Department',
+        'branch' => 'Cabang',
+        'subject' => 'Perihal',
+        'date' => 'Tanggal',
+        'items' => 'Rincian Pengajuan',
+        'notes' => 'Catatan',
+        'code' => 'Kode',
+        'name' => 'Nama',
+        'sort_order' => 'Urutan Tampil',
+        'description' => 'Keterangan',
+    ],
 
 ];

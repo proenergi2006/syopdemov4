@@ -1,0 +1,70 @@
+{
+  "noAccess": "You do not have access to the payment schedule master.",
+  "intro": {
+    "title": "When a document gets paid",
+    "body": "What is configured here is not how long the wait is, but the cut-off. A document Finance receives before a cut-off joins that cut-off's payment batch. The date is frozen the moment the document is marked as received and then sent to the requester — changing a schedule here does not move documents already in flight.",
+    "holidayNotice": "Public holidays are not taken into account yet. If a date falls on a holiday, Finance handles it outside the system."
+  },
+  "list": {
+    "title": "Payment Schedule Master",
+    "subtitle": "The most specific schedule wins. Transaction category beats module, and module beats the general schedule.",
+    "addButton": "Add Schedule",
+    "empty": "No payment schedules yet.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "fallbackChip": "General",
+    "noCutoff": "This schedule has no cut-off at all, so it produces no date.",
+    "previewButton": "Preview",
+    "editButton": "Edit",
+    "deleteButton": "Delete",
+    "loadFailed": "Failed to load the payment schedules."
+  },
+  "form": {
+    "createTitle": "Add Payment Schedule",
+    "editTitle": "Edit Payment Schedule",
+    "name": "Schedule Name",
+    "namePlaceholder": "For example: Business Travel Schedule",
+    "nameRequired": "The schedule name is required.",
+    "documentType": "Applies to Module",
+    "documentTypePlaceholder": "All modules",
+    "documentTypeHint": "Leave empty to apply to every module.",
+    "category": "Applies to Transaction Category",
+    "categoryPlaceholder": "All transaction categories",
+    "categoryHint": "Leave empty to apply to every transaction category.",
+    "cutoffTitle": "Cut-off",
+    "cutoffSubtitle": "Documents received up to this point join its payment batch.",
+    "addCutoff": "Add Cut-off",
+    "cutoffDay": "Cut-off Day",
+    "cutoffTime": "Cut-off Time",
+    "paymentDay": "Payment Day",
+    "weekOffset": "Week",
+    "weekSame": "The same week",
+    "weekNext": "The following week",
+    "weekAfter": "Two weeks later",
+    "notes": "Notes",
+    "notesPlaceholder": "Optional. For example, why this schedule differs.",
+    "isActive": "Active",
+    "sentence": "Received by {cutoffDay} {cutoffTime} is paid on {paymentDay} {week}",
+    "saveFailed": "Failed to save the payment schedule.",
+    "saveSuccess": "The payment schedule was saved."
+  },
+  "delete": {
+    "confirmTitle": "Delete this schedule?",
+    "confirmText": "The schedule \"{nama}\" will be deleted. Documents whose dates are already frozen are not affected.",
+    "confirmButton": "Yes, delete",
+    "success": "The payment schedule was deleted.",
+    "failed": "Failed to delete the payment schedule."
+  },
+  "preview": {
+    "title": "Worked Example",
+    "usedSchedule": "Schedule in use:",
+    "received": "Received",
+    "paid": "Paid",
+    "failed": "Failed to load the worked example."
+  },
+  "scope": {
+    "allModules": "All modules",
+    "allCategories": "All transaction categories",
+    "fallback": "Applies generally"
+  }
+}

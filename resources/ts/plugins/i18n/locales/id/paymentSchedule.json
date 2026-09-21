@@ -1,0 +1,70 @@
+{
+  "noAccess": "Anda tidak memiliki akses ke master jadwal pembayaran.",
+  "intro": {
+    "title": "Kapan sebuah dokumen dibayarkan",
+    "body": "Yang diatur di sini bukan lamanya menunggu, melainkan batas setornya. Berkas yang diterima Finance sebelum suatu batas ikut rombongan pembayaran batas itu. Tanggalnya dibekukan saat berkas ditandai diterima, lalu dikirimkan ke pemohon — mengubah jadwal di sini tidak menggeser dokumen yang sudah berjalan.",
+    "holidayNotice": "Hari libur nasional belum diperhitungkan. Kalau tanggalnya jatuh pada tanggal merah, Finance menanganinya di luar sistem."
+  },
+  "list": {
+    "title": "Master Jadwal Pembayaran",
+    "subtitle": "Jadwal yang paling khusus menang. Keterangan transaksi mengalahkan modul, dan modul mengalahkan jadwal umum.",
+    "addButton": "Tambah Jadwal",
+    "empty": "Belum ada jadwal pembayaran.",
+    "active": "Aktif",
+    "inactive": "Nonaktif",
+    "fallbackChip": "Umum",
+    "noCutoff": "Jadwal ini belum punya satu pun batas setor, jadi tidak menghasilkan tanggal apa pun.",
+    "previewButton": "Contoh",
+    "editButton": "Ubah",
+    "deleteButton": "Hapus",
+    "loadFailed": "Daftar jadwal pembayaran gagal dimuat."
+  },
+  "form": {
+    "createTitle": "Tambah Jadwal Pembayaran",
+    "editTitle": "Ubah Jadwal Pembayaran",
+    "name": "Nama Jadwal",
+    "namePlaceholder": "Misalnya: Jadwal Perdin",
+    "nameRequired": "Nama jadwal wajib diisi.",
+    "documentType": "Berlaku untuk Modul",
+    "documentTypePlaceholder": "Semua modul",
+    "documentTypeHint": "Dikosongkan berarti berlaku untuk seluruh modul.",
+    "category": "Berlaku untuk Keterangan Transaksi",
+    "categoryPlaceholder": "Semua keterangan transaksi",
+    "categoryHint": "Dikosongkan berarti berlaku untuk seluruh keterangan transaksi.",
+    "cutoffTitle": "Batas Setor",
+    "cutoffSubtitle": "Berkas yang diterima sampai batas ini ikut rombongan pembayarannya.",
+    "addCutoff": "Tambah Batas",
+    "cutoffDay": "Batas Hari",
+    "cutoffTime": "Batas Jam",
+    "paymentDay": "Hari Bayar",
+    "weekOffset": "Minggu Ke-",
+    "weekSame": "Minggu yang sama",
+    "weekNext": "Minggu berikutnya",
+    "weekAfter": "2 minggu berikutnya",
+    "notes": "Catatan",
+    "notesPlaceholder": "Opsional. Misalnya alasan jadwal ini dibedakan.",
+    "isActive": "Aktif",
+    "sentence": "Diterima sampai {cutoffDay} pukul {cutoffTime} dibayar {paymentDay} {week}",
+    "saveFailed": "Jadwal pembayaran gagal disimpan.",
+    "saveSuccess": "Jadwal pembayaran tersimpan."
+  },
+  "delete": {
+    "confirmTitle": "Hapus jadwal ini?",
+    "confirmText": "Jadwal \"{nama}\" akan dihapus. Dokumen yang tanggalnya sudah terlanjur dibekukan tidak ikut berubah.",
+    "confirmButton": "Ya, hapus",
+    "success": "Jadwal pembayaran dihapus.",
+    "failed": "Jadwal pembayaran gagal dihapus."
+  },
+  "preview": {
+    "title": "Contoh Perhitungan",
+    "usedSchedule": "Jadwal yang dipakai:",
+    "received": "Diterima",
+    "paid": "Dibayar",
+    "failed": "Contoh perhitungan gagal dimuat."
+  },
+  "scope": {
+    "allModules": "Semua modul",
+    "allCategories": "Semua keterangan transaksi",
+    "fallback": "Berlaku umum"
+  }
+}

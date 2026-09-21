@@ -173,6 +173,29 @@ return [
     |
     */
 
-    'attributes' => [],
+    /*
+    |--------------------------------------------------------------------------
+    | Field names used in validation messages
+    |--------------------------------------------------------------------------
+    | Without these, Laravel falls back to raw column names such as
+    | "transaction category id", which mean nothing to the user.
+    |--------------------------------------------------------------------------
+    */
+    'attributes' => [
+        'transaction_category_id' => 'Transaction Category',
+        'transaction_category_ids' => 'Transaction Category',
+        'request_type' => 'Request Type',
+        'department_id' => 'Department',
+        'department_ids' => 'Department',
+        'branch' => 'Branch',
+        'subject' => 'Subject',
+        'date' => 'Date',
+        'items' => 'Request Lines',
+        'notes' => 'Notes',
+        'code' => 'Code',
+        'name' => 'Name',
+        'sort_order' => 'Display Order',
+        'description' => 'Description',
+    ],
 
 ];

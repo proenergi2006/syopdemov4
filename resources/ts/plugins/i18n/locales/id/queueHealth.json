@@ -1,0 +1,67 @@
+{
+    "header": {
+        "title": "Pemantauan Antrean Email",
+        "description": "Memastikan email yang diantrekan benar-benar terkirim, bukan diam-diam menumpuk.",
+        "checkedAt": "Diperiksa",
+        "refresh": "Periksa ulang"
+    },
+    "status": {
+        "sehat": "Sehat",
+        "perhatian": "Perlu Diperhatikan",
+        "bermasalah": "Bermasalah"
+    },
+    "units": {
+        "minutes": "menit"
+    },
+    "reasons": {
+        "title": "Yang ditemukan",
+        "healthy": "Antrean berjalan normal. Tidak ada job yang tertahan maupun gagal."
+    },
+    "stats": {
+        "waiting": "Job Menunggu",
+        "waitingHint": "{reserved} sedang dikerjakan",
+        "oldest": "Menunggu Terlama",
+        "oldestHint": "Di atas {threshold} menit berarti worker kemungkinan tidak berjalan",
+        "failedTotal": "Job Gagal",
+        "failedTotalHint": "Seluruhnya, termasuk yang lama",
+        "failedRecent": "Gagal Terbaru",
+        "failedRecentHint": "Dalam {hours} jam terakhir"
+    },
+    "byJob": {
+        "title": "Kegagalan Menurut Jenis",
+        "subtitle": "Banyak kegagalan dari satu jenis berarti masalah yang berbeda dari kegagalan yang tersebar.",
+        "job": "Jenis Job",
+        "count": "Jumlah",
+        "lastFailed": "Terakhir Gagal",
+        "sampleError": "Contoh Pesan"
+    },
+    "failedList": {
+        "title": "Daftar Job Gagal",
+        "subtitle": "Job yang sudah menyerah setelah seluruh percobaan ulang habis.",
+        "empty": "Tidak ada job yang gagal.",
+        "truncated": "Menampilkan {shown} dari {total} job gagal."
+    },
+    "retry": {
+        "oneButton": "Ulangi job ini",
+        "allButton": "Ulangi semua",
+        "confirmTitle": "Ulangi job gagal?",
+        "confirmOne": "Job ini akan dikembalikan ke antrean dan dicoba kirim lagi.",
+        "confirmAll": "Seluruh job gagal akan dikembalikan ke antrean dan dicoba kirim lagi.",
+        "confirmButton": "Ya, ulangi",
+        "successFallback": "Job dikembalikan ke antrean.",
+        "failedFallback": "Job gagal tidak bisa diulang."
+    },
+    "delete": {
+        "oneButton": "Buang job ini",
+        "allButton": "Buang semua",
+        "confirmTitle": "Buang job gagal?",
+        "confirmOne": "Job ini akan dihapus permanen dan emailnya tidak akan pernah terkirim.",
+        "confirmAll": "Seluruh job gagal akan dihapus permanen dan emailnya tidak akan pernah terkirim.",
+        "confirmButton": "Ya, buang",
+        "successFallback": "Job gagal dibuang.",
+        "failedFallback": "Job gagal tidak bisa dibuang."
+    },
+    "errors": {
+        "loadFailed": "Kesehatan antrean gagal dimuat."
+    }
+}

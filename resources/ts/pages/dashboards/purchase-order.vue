@@ -484,6 +484,17 @@ const hasItemPriceComparison = computed(() => {
   return itemPriceComparison.value.items.length > 0
 })
 
+/*
+ * Daftar kosong punya dua arti yang sangat berbeda, dan keduanya tidak boleh
+ * memakai pesan yang sama:
+ *
+ * - Tidak ada item PR yang terealisasi jadi PO pada periode ini.
+ * - Ada itemnya, tetapi seluruh harganya persis sama -- justru kabar baik.
+ */
+const allItemPricesMatch = computed(() =>
+  itemPriceComparison.value.items.length === 0
+  && itemPriceComparison.value.summary.total_items > 0)
+
 const topItemPriceComparisonItems = computed(() => {
   return itemPriceComparison.value.items.slice(0, 8)
 })
@@ -2599,22 +2610,6 @@ async function applyFilter(): Promise<void> {
   await fetchDashboard()
 }
 
-async function resetFilter(): Promise<void> {
-  selectedPeriod.value = 'month'
-  selectedDate.value = getLocalDateValue(today)
-  selectedWeek.value = getCurrentWeekValue(today)
-  selectedMonth.value = getMonthValue(today)
-  selectedYear.value = currentYear
-
-  startDate.value = getFirstDateOfMonth(today)
-  endDate.value = getLocalDateValue(today)
-
-  selectedCabangId.value = null
-  selectedDepartmentId.value = null
-
-  await fetchDashboard()
-}
-
 async function refreshDashboard(): Promise<void> {
   await fetchDashboard()
 }
@@ -2639,69 +2634,75 @@ onMounted(async () => {
   <section class="purchase-order-dashboard">
     <!-- Header -->
     <VCard class="dashboard-header mb-6">
-      <VCardText class="pa-5 pa-md-7">
-        <div
-          class="d-flex flex-wrap align-center justify-space-between gap-4"
-        >
-          <div class="d-flex align-center gap-4">
-            <VBtn
-              icon
-              color="secondary"
-              variant="tonal"
-              @click="backToDashboard"
-            >
-              <VIcon icon="mdi-arrow-left" />
-            </VBtn>
+      <VCardText class="d-flex flex-wrap align-center justify-space-between gap-4 pa-6">
+        <div class="d-flex align-center gap-4 min-w-0">
+          <VBtn
+            icon
+            variant="tonal"
+            color="secondary"
+            size="small"
+            @click="backToDashboard"
+          >
+            <VIcon icon="mdi-arrow-left" />
+          </VBtn>
 
-            <VAvatar
-              color="success"
-              variant="flat"
-              rounded="lg"
-              size="58"
-              class="header-avatar"
-            >
-              <VIcon
-                icon="mdi-file-sign"
-                size="31"
-              />
-            </VAvatar>
+          <VAvatar
+            size="52"
+            color="success"
+            variant="tonal"
+            rounded
+          >
+            <VIcon
+              icon="mdi-file-sign"
+              size="28"
+            />
+          </VAvatar>
 
-            <div>
-              <div
-                class="d-flex flex-wrap align-center gap-2 mb-1"
-              >
-                <h1 class="text-h4 font-weight-bold mb-0">
-                  {{ t('dashboard.purchaseOrder.header.title') }}
-                </h1>
-              </div>
+          <div class="min-w-0">
+            <div class="text-h5 font-weight-bold">
+              {{ t('dashboard.purchaseOrder.header.title') }}
+            </div>
 
-              <p class="text-body-2 text-medium-emphasis mb-0">
-                {{ t('dashboard.purchaseOrder.header.description') }}
-              </p>
+            <div class="text-body-2 text-medium-emphasis mt-1">
+              {{ t('dashboard.purchaseOrder.header.description') }}
             </div>
           </div>
+        </div>
 
-          <div class="text-md-end">
-            <div class="text-caption text-medium-emphasis">
-              {{ t('dashboard.purchaseOrder.header.lastUpdated') }}
-            </div>
+        <div class="d-flex align-center gap-2 flex-wrap">
+          <VChip
+            size="small"
+            variant="tonal"
+            color="success"
+            prepend-icon="mdi-shield-account-outline"
+          >
+            {{ t('dashboard.purchaseOrder.filters.scope.label', { scope: scopeViewLabel(access.scope_view) }) }}
+          </VChip>
 
-            <div class="text-body-2 font-weight-medium">
-              {{ formatDateTime(lastUpdatedAt) }}
-            </div>
+          <VChip
+            size="small"
+            variant="tonal"
+            prepend-icon="mdi-clock-outline"
+          >
+            {{ t('dashboard.purchaseOrder.header.lastUpdated') }} {{ formatDateTime(lastUpdatedAt) }}
+          </VChip>
 
-            <VBtn
-              size="small"
-              variant="text"
-              color="primary"
-              prepend-icon="mdi-refresh"
-              :loading="isLoading"
-              class="mt-1 text-none"
-              @click="refreshDashboard"
+          <VBtn
+            icon
+            variant="tonal"
+            size="small"
+            :loading="isLoading"
+            @click="refreshDashboard"
+          >
+            <VIcon icon="mdi-refresh" />
+
+            <VTooltip
+              activator="parent"
+              location="bottom"
             >
               {{ t('common.actions.refresh') }}
-            </VBtn>
-          </div>
+            </VTooltip>
+          </VBtn>
         </div>
       </VCardText>
 
@@ -2715,32 +2716,6 @@ onMounted(async () => {
     <!-- Filter -->
     <VCard class="dashboard-card filter-card mb-6">
       <VCardText class="pa-5">
-        <div class="filter-header">
-          <div>
-            <h2 class="text-h6 font-weight-semibold mb-1">
-              {{ t('dashboard.purchaseOrder.filters.title') }}
-            </h2>
-
-            <p class="text-body-2 text-medium-emphasis mb-0">
-              {{ t('dashboard.purchaseOrder.filters.activePeriod') }}
-              <strong>
-                {{
-                  appliedPeriodLabel
-                    || selectedPeriodDescription
-                }}
-              </strong>
-            </p>
-          </div>
-
-          <VChip
-            color="primary"
-            variant="tonal"
-            prepend-icon="mdi-shield-account-outline"
-          >
-            {{ t('dashboard.purchaseOrder.filters.scope.label', { scope: scopeViewLabel(access.scope_view) }) }}
-          </VChip>
-        </div>
-
         <div class="filter-grid">
           <VSelect
             v-model="selectedPeriod"
@@ -2749,9 +2724,9 @@ onMounted(async () => {
             item-value="value"
             :label="t('dashboard.purchaseOrder.filters.periodType')"
             prepend-inner-icon="mdi-calendar-filter-outline"
-            variant="outlined"
-            density="comfortable"
+            density="compact"
             hide-details
+            @update:model-value="applyFilter"
           />
 
           <VTextField
@@ -2760,9 +2735,9 @@ onMounted(async () => {
             type="date"
             :label="t('dashboard.purchaseOrder.filters.pickDate')"
             prepend-inner-icon="mdi-calendar-today-outline"
-            variant="outlined"
-            density="comfortable"
+            density="compact"
             hide-details
+            @update:model-value="applyFilter"
           />
 
           <VTextField
@@ -2771,9 +2746,9 @@ onMounted(async () => {
             type="week"
             :label="t('dashboard.purchaseOrder.filters.pickWeek')"
             prepend-inner-icon="mdi-calendar-week-outline"
-            variant="outlined"
-            density="comfortable"
+            density="compact"
             hide-details
+            @update:model-value="applyFilter"
           />
 
           <VTextField
@@ -2782,9 +2757,9 @@ onMounted(async () => {
             type="month"
             :label="t('dashboard.purchaseOrder.filters.pickMonth')"
             prepend-inner-icon="mdi-calendar-month-outline"
-            variant="outlined"
-            density="comfortable"
+            density="compact"
             hide-details
+            @update:model-value="applyFilter"
           />
 
           <VSelect
@@ -2795,9 +2770,9 @@ onMounted(async () => {
             item-value="value"
             :label="t('dashboard.purchaseOrder.filters.pickYear')"
             prepend-inner-icon="mdi-calendar-blank-multiple"
-            variant="outlined"
-            density="comfortable"
+            density="compact"
             hide-details
+            @update:model-value="applyFilter"
           />
 
           <template v-if="selectedPeriod === 'range'">
@@ -2806,9 +2781,9 @@ onMounted(async () => {
               type="date"
               :label="t('dashboard.purchaseOrder.filters.startDate')"
               prepend-inner-icon="mdi-calendar-start"
-              variant="outlined"
-              density="comfortable"
+              density="compact"
               hide-details
+              @update:model-value="applyFilter"
             />
 
             <VTextField
@@ -2816,9 +2791,9 @@ onMounted(async () => {
               type="date"
               :label="t('dashboard.purchaseOrder.filters.endDate')"
               prepend-inner-icon="mdi-calendar-end"
-              variant="outlined"
-              density="comfortable"
+              density="compact"
               hide-details
+              @update:model-value="applyFilter"
             />
           </template>
 
@@ -2833,12 +2808,11 @@ onMounted(async () => {
                 : t('dashboard.purchaseOrder.filters.branch')
             "
             prepend-inner-icon="mdi-office-building-outline"
-            variant="outlined"
-            density="comfortable"
+            density="compact"
             hide-details
             :readonly="!access.can_filter_cabang"
-            :clearable="access.can_filter_cabang"
             :loading="isLoadingOptions"
+            @update:model-value="applyFilter"
           />
 
           <VSelect
@@ -2852,55 +2826,21 @@ onMounted(async () => {
                 : t('dashboard.purchaseOrder.filters.department')
             "
             prepend-inner-icon="mdi-account-group-outline"
-            variant="outlined"
-            density="comfortable"
+            density="compact"
             hide-details
-            :readonly="
-              !access.can_filter_department
-            "
-            :clearable="
-              access.can_filter_department
-            "
+            :readonly="!access.can_filter_department"
             :loading="isLoadingOptions"
+            @update:model-value="applyFilter"
           />
         </div>
 
-        <VDivider class="my-5" />
-
-        <div class="filter-footer">
-          <div class="text-body-2 text-medium-emphasis">
-            <VIcon
-              icon="mdi-information-outline"
-              size="18"
-              class="me-1"
-            />
-
-            {{ t('dashboard.purchaseOrder.filters.scopeNote') }}
-          </div>
-
-          <div class="d-flex align-center gap-2">
-            <VBtn
-              color="secondary"
-              variant="tonal"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="isLoading"
-              @click="resetFilter"
-              class="text-none"
-            >
-              {{ t('common.actions.reset') }}
-            </VBtn>
-
-            <VBtn
-              color="primary"
-              prepend-icon="mdi-filter-check-outline"
-              :loading="isLoading"
-              :disabled="!isFilterValid"
-              @click="applyFilter"
-              class="text-none"
-            >
-              {{ t('common.actions.apply') }}
-            </VBtn>
-          </div>
+        <div class="text-caption text-medium-emphasis mt-3">
+          <VIcon
+            icon="mdi-information-outline"
+            size="14"
+            class="me-1"
+          />
+          {{ t('dashboard.purchaseOrder.filters.scopeNote') }}
         </div>
 
         <VAlert
@@ -3190,7 +3130,7 @@ onMounted(async () => {
     </VRow>
 
     <!-- Value Comparison PR vs PO -->
-    <!-- <VCard class="dashboard-card chart-card mb-6">
+    <VCard class="dashboard-card chart-card mb-6">
       <VCardItem class="chart-card-header">
         <template #prepend>
           <VAvatar
@@ -3353,10 +3293,10 @@ onMounted(async () => {
           </div>
         </div>
       </VCardText>
-    </VCard> -->
+    </VCard>
 
     <!-- Item Price Comparison -->
-    <!-- <VCard class="dashboard-card chart-card mb-6">
+    <VCard class="dashboard-card chart-card mb-6">
       <VCardItem class="chart-card-header">
         <template #prepend>
           <VAvatar
@@ -3372,9 +3312,19 @@ onMounted(async () => {
           Perbandingan Harga Item PR dan PO
         </VCardTitle>
 
+        <!--
+          Hanya item yang harganya menyimpang yang didaftar. Item yang harganya
+          sama tidak menuntut keputusan apa pun, dan menampilkannya justru
+          menyamarkan yang benar-benar berubah.
+        -->
         <VCardSubtitle>
-          Monitoring perubahan harga satuan dari kebutuhan PR ke realisasi PO pada
+          Hanya item yang harga satuannya berbeda antara PR dan PO pada
           {{ executiveChartSubtitle }}.
+
+          <template v-if="itemPriceComparison.summary.unchanged_items > 0">
+            {{ formatNumber(itemPriceComparison.summary.unchanged_items) }} item lain harganya sama
+            dan tidak ditampilkan.
+          </template>
         </VCardSubtitle>
       </VCardItem>
 
@@ -3499,27 +3449,40 @@ onMounted(async () => {
           class="empty-state"
         >
           <VAvatar
-            color="secondary"
+            :color="allItemPricesMatch ? 'success' : 'secondary'"
             variant="tonal"
             size="60"
             class="mb-3"
           >
             <VIcon
-              icon="mdi-tag-search-outline"
+              :icon="allItemPricesMatch ? 'mdi-check-decagram-outline' : 'mdi-tag-search-outline'"
               size="31"
             />
           </VAvatar>
 
-          <div class="font-weight-medium">
-            Belum ada data perbandingan harga item
-          </div>
+          <template v-if="allItemPricesMatch">
+            <div class="font-weight-medium">
+              Seluruh harga item PR dan PO sama
+            </div>
 
-          <div class="text-body-2 text-medium-emphasis mt-1">
-            Data akan muncul setelah item PR direalisasikan menjadi PO pada periode aktif.
-          </div>
+            <div class="text-body-2 text-medium-emphasis mt-1">
+              {{ formatNumber(itemPriceComparison.summary.total_items) }} item dibandingkan pada
+              {{ executiveChartSubtitle }}, tidak ada satu pun yang harganya berubah.
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="font-weight-medium">
+              Belum ada data perbandingan harga item
+            </div>
+
+            <div class="text-body-2 text-medium-emphasis mt-1">
+              Data akan muncul setelah item PR direalisasikan menjadi PO pada periode aktif.
+            </div>
+          </template>
         </div>
       </VCardText>
-    </VCard> -->
+    </VCard>
 
     <!-- Breakdown Cabang dan Departemen -->
     <VRow class="match-height mb-2">

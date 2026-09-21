@@ -1844,8 +1844,24 @@ class PurchaseOrderDashboardService
                 ),
             ],
 
+            /*
+            |------------------------------------------------------------------
+            | Hanya item yang harganya BERBEDA yang ditampilkan.
+            |------------------------------------------------------------------
+            | Item yang harga PR dan PO-nya sama tidak menuntut keputusan apa
+            | pun; menampilkannya hanya memenuhi tabel dan menyamarkan item
+            | yang benar-benar menyimpang. Jumlahnya tetap dilaporkan lewat
+            | unchanged_items pada summary, jadi tidak ada informasi yang
+            | hilang.
+            |
+            | Urutannya sudah dari simpangan persentase terbesar.
+            |------------------------------------------------------------------
+            */
             'items' => $items
-                ->take(10)
+                ->reject(
+                    fn(array $item): bool => $item['variance_type'] === 'same',
+                )
+                ->take(15)
                 ->values()
                 ->all(),
         ];

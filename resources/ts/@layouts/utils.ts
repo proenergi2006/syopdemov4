@@ -65,7 +65,32 @@ export const isNavLinkActive = (link: NavLink, router: Router) => {
   if (!linkPath)
     return false
 
-  return currentRoute.path.startsWith(linkPath)
+  /*
+   * Pencocokan awalan harus berhenti di batas segmen URL.
+   *
+   * startsWith() polos membuat satu menu ikut menyala untuk menu lain yang
+   * namanya kebetulan berawalan sama -- misalnya "Cash Advance"
+   * (/fund_request/cash_advance) ikut aktif saat membuka
+   * /fund_request/cash_advance_realization, dan "Wilayah" (/master/wilayah)
+   * ikut aktif saat membuka /master/wilayah-angkut.
+   *
+   * Halaman turunan seperti /fund_request/cash_advance/create tetap dianggap
+   * aktif karena diawali linkPath + '/'.
+   */
+  const stripTrailingSlash = (value: string): string =>
+    value.replace(/\/+$/, '') || '/'
+
+  const normalizedLink = stripTrailingSlash(linkPath)
+  const normalizedCurrent = stripTrailingSlash(currentRoute.path)
+
+  if (normalizedCurrent === normalizedLink)
+    return true
+
+  // Root tidak boleh dianggap awalan seluruh halaman.
+  if (normalizedLink === '/')
+    return false
+
+  return normalizedCurrent.startsWith(`${normalizedLink}/`)
 }
 
 /**

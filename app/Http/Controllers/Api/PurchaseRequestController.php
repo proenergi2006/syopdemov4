@@ -10,6 +10,7 @@ use App\Models\ApprovalMatrixPR;
 use App\Models\MasterMaterialGroup;
 use App\Models\PrAttachment;
 use App\Models\SpecialDocumentType;
+use App\Support\DocumentNumberLock;
 use Illuminate\Http\Request;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
@@ -62,6 +63,13 @@ class PurchaseRequestController extends Controller
     private function generateDraftPRNumber(): string
     {
         $year = (int) now()->format('Y');
+
+        /*
+        | Deret nomor draft dipakai bersama seluruh cabang, jadi dua permintaan
+        | yang berjalan bersamaan akan menyimpulkan nomor yang sama bila tidak
+        | diserialkan lebih dulu.
+        */
+        DocumentNumberLock::acquire('pr', 'draft', (string) $year);
 
         /*
         |--------------------------------------------------------------------------
@@ -4513,6 +4521,8 @@ class PurchaseRequestController extends Controller
 
                     'departmentData:id,kode,nama',
 
+                    'specialDocumentType:id,code,name',
+
                     'recommendedVendor:id,nama_vendor,status_pkp,jenis_pembayaran,top',
 
                     'attachments',
@@ -4678,6 +4688,17 @@ class PurchaseRequestController extends Controller
 
                         'nomor_pr'
                         => $pr->nomor_pr,
+
+                        /*
+                        | Penanda dokumen khusus, dipakai sebagai petunjuk saat
+                        | memilih PR pada form PO. Bernilai null untuk PR biasa.
+                        */
+                        'special_document_type'
+                        => $pr->specialDocumentType ? [
+                            'id' => $pr->specialDocumentType->id,
+                            'code' => $pr->specialDocumentType->code,
+                            'name' => $pr->specialDocumentType->name,
+                        ] : null,
 
                         'tanggal_pr'
                         => $pr->tanggal_pr,

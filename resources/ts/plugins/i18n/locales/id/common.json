@@ -5,7 +5,9 @@
     "refresh": "Perbarui",
     "confirm": "Ya",
     "cancel": "Batal",
-    "delete": "Hapus"
+    "delete": "Hapus",
+    "close": "Tutup",
+    "save": "Simpan"
   },
   "attachment": {
     "title": "Lampiran",
@@ -57,5 +59,15 @@
     "notFound": "Data tidak ditemukan.",
     "validationError": "Data yang dikirim tidak valid.",
     "serverError": "Terjadi kesalahan pada server."
-  }
+  },
+  "days": {
+    "1": "Senin",
+    "2": "Selasa",
+    "3": "Rabu",
+    "4": "Kamis",
+    "5": "Jumat",
+    "6": "Sabtu",
+    "7": "Minggu"
+  },
+  "and": "dan"
 }

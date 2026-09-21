@@ -1,0 +1,68 @@
+{
+  "noAccess": "You do not have access to the cash advance limit master.",
+  "intro": {
+    "title": "How many cash advances may run at once",
+    "body": "This limit forces a requester to account for earlier cash advances before submitting a new one. Two numbers are configured: how many may run at once, and how long one may wait to be realized.",
+    "liveNotice": "This limit is evaluated the moment a requester hits Submit — it is not frozen onto the document. Lowering it takes effect immediately for everyone, including those currently above the new limit."
+  },
+  "list": {
+    "title": "Cash Advance Limit Master",
+    "subtitle": "The most specific limit wins. Department beats area, and area beats the general limit.",
+    "addButton": "Add Limit",
+    "previewButton": "Preview",
+    "empty": "No submission limits yet.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "fallbackChip": "General",
+    "editButton": "Edit",
+    "deleteButton": "Delete",
+    "loadFailed": "Failed to load the submission limits."
+  },
+  "table": {
+    "name": "Limit Name",
+    "scope": "Scope",
+    "maxOutstanding": "Max Running",
+    "maxDays": "Max Days to Realize",
+    "status": "Status",
+    "action": "Action"
+  },
+  "form": {
+    "createTitle": "Add Submission Limit",
+    "editTitle": "Edit Submission Limit",
+    "name": "Limit Name",
+    "namePlaceholder": "For example: Branch Limit",
+    "nameRequired": "The limit name is required.",
+    "areaType": "Applies to Area",
+    "areaTypeHint": "Leave empty to apply to both head office and branches.",
+    "department": "Applies to Department",
+    "departmentHint": "Leave empty to apply to every department.",
+    "maxOutstanding": "Maximum Running Advances",
+    "maxOutstandingHint": "How many cash advances one requester may have running at once.",
+    "maxDays": "Maximum Days to Realize",
+    "maxDaysHint": "Calendar days — weekends are counted too.",
+    "notes": "Notes",
+    "notesPlaceholder": "Optional. For example, why this limit differs.",
+    "isActive": "Active",
+    "saveSuccess": "The submission limit was saved.",
+    "saveFailed": "Failed to save the submission limit."
+  },
+  "delete": {
+    "confirmTitle": "Delete this limit?",
+    "confirmText": "The limit \"{nama}\" will be deleted. Requesters covered by it will fall back to a more general limit.",
+    "confirmButton": "Yes, delete",
+    "success": "The submission limit was deleted.",
+    "failed": "Failed to delete the submission limit."
+  },
+  "preview": {
+    "title": "Worked Example",
+    "subtitle": "Which limit applies to each area.",
+    "limitUsed": "Limit in use",
+    "noLimit": "No limit",
+    "failed": "Failed to load the worked example."
+  },
+  "scope": {
+    "allAreas": "All areas",
+    "allDepartments": "All departments",
+    "fallback": "Applies generally"
+  }
+}

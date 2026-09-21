@@ -3319,6 +3319,7 @@ onBeforeUnmount(() => {
                         </div>
                       </VCol>
 
+
                       <VCol cols="12" md="6">
                         <div class="info-box">
                           <div class="info-label">{{ t('purchaseRequest.detail.createdBy') }}</div>
@@ -3459,7 +3460,10 @@ onBeforeUnmount(() => {
 
                                 <div class="flex-grow-1 min-w-0">
                                   <div class="d-flex align-center justify-space-between gap-2">
-                                    <div class="font-weight-bold text-primary related-po-number">
+                                    <div
+                                      class="font-weight-bold text-primary related-po-number"
+                                      :title="po.nomor_po"
+                                    >
                                       {{ po.nomor_po }}
                                     </div>
 
@@ -3572,6 +3576,35 @@ onBeforeUnmount(() => {
                     >
                       {{ t('purchaseRequest.detail.noRecommendedVendor') }}
                     </VAlert>
+
+                    <!--
+                      Tipe Dokumen Khusus hanya muncul bila PR memang ditandai.
+                      PR biasa tidak menampilkan bagian ini sama sekali, bukan
+                      menampilkan tanda hubung.
+                    -->
+                    <div
+                      v-if="detailPurchaseRequest.special_document_type?.name"
+                      class="mt-4"
+                    >
+                      <VDivider class="mb-3" />
+
+                      <div class="text-caption text-medium-emphasis mb-2">
+                        {{ t('purchaseRequest.detail.specialDocumentType') }}
+                      </div>
+
+                      <VChip
+                        size="small"
+                        color="warning"
+                        variant="tonal"
+                      >
+                        <VIcon
+                          icon="tabler-ship"
+                          size="14"
+                          start
+                        />
+                        {{ detailPurchaseRequest.special_document_type.name }}
+                      </VChip>
+                    </div>
                   </VCardText>
                 </VCard>
               </VCol>
@@ -4412,11 +4445,20 @@ onBeforeUnmount(() => {
   background: rgba(var(--v-theme-primary), 0.08);
 }
 
+/*
+ * Nomor PO dibuat lebih kecil dan ditahan dalam satu baris supaya tidak
+ * mendorong chip status ke baris berikutnya.
+ *
+ * Ellipsis dipakai sebagai pengaman untuk nomor yang sangat panjang -- isi
+ * penuhnya tetap dapat dilihat lewat tooltip pada elemennya, sehingga tidak
+ * ada bagian nomor yang benar-benar hilang.
+ */
 .related-po-number {
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  font-size: 0.75rem;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .related-po-meta {

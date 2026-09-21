@@ -1,0 +1,67 @@
+{
+    "header": {
+        "title": "Email Queue Monitoring",
+        "description": "Confirms that queued emails are actually delivered, not quietly piling up.",
+        "checkedAt": "Checked",
+        "refresh": "Check again"
+    },
+    "status": {
+        "sehat": "Healthy",
+        "perhatian": "Needs Attention",
+        "bermasalah": "Unhealthy"
+    },
+    "units": {
+        "minutes": "minutes"
+    },
+    "reasons": {
+        "title": "What was found",
+        "healthy": "The queue is running normally. Nothing is stuck or failed."
+    },
+    "stats": {
+        "waiting": "Waiting Jobs",
+        "waitingHint": "{reserved} currently running",
+        "oldest": "Longest Wait",
+        "oldestHint": "Above {threshold} minutes suggests the worker is not running",
+        "failedTotal": "Failed Jobs",
+        "failedTotalHint": "All of them, including older ones",
+        "failedRecent": "Recent Failures",
+        "failedRecentHint": "Within the last {hours} hours"
+    },
+    "byJob": {
+        "title": "Failures by Type",
+        "subtitle": "Many failures of one type mean something different from failures spread across types.",
+        "job": "Job Type",
+        "count": "Count",
+        "lastFailed": "Last Failed",
+        "sampleError": "Sample Message"
+    },
+    "failedList": {
+        "title": "Failed Job List",
+        "subtitle": "Jobs that gave up after exhausting every retry.",
+        "empty": "No failed jobs.",
+        "truncated": "Showing {shown} of {total} failed jobs."
+    },
+    "retry": {
+        "oneButton": "Retry this job",
+        "allButton": "Retry all",
+        "confirmTitle": "Retry failed job?",
+        "confirmOne": "This job goes back to the queue and will be attempted again.",
+        "confirmAll": "Every failed job goes back to the queue and will be attempted again.",
+        "confirmButton": "Yes, retry",
+        "successFallback": "Job returned to the queue.",
+        "failedFallback": "The failed job could not be retried."
+    },
+    "delete": {
+        "oneButton": "Discard this job",
+        "allButton": "Discard all",
+        "confirmTitle": "Discard failed job?",
+        "confirmOne": "This job is deleted permanently and its email will never be sent.",
+        "confirmAll": "Every failed job is deleted permanently and those emails will never be sent.",
+        "confirmButton": "Yes, discard",
+        "successFallback": "Failed job discarded.",
+        "failedFallback": "The failed job could not be discarded."
+    },
+    "errors": {
+        "loadFailed": "Failed to load queue health."
+    }
+}

@@ -29,6 +29,26 @@ class Kernel extends ConsoleKernel
         */
         $schedule->command('activitylog:clean')
             ->daily();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pengawasan antrean
+        |--------------------------------------------------------------------------
+        | Memeriksa apakah email yang diantrekan benar-benar terkirim. Worker
+        | yang mati tidak meninggalkan error di mana pun, jadi tanpa pemeriksaan
+        | berkala keadaan itu hanya ketahuan dari keluhan pengguna.
+        |
+        | Lima belas menit dipilih supaya masalah ketahuan dalam waktu wajar
+        | tanpa membanjiri log. Emailnya sendiri punya jeda peringatan
+        | tersendiri, jadi frekuensi ini tidak membuat kotak masuk penuh.
+        |
+        | withoutOverlapping mencegah dua pemeriksaan berjalan bersamaan bila
+        | satu di antaranya tertahan SMTP yang lambat.
+        |--------------------------------------------------------------------------
+        */
+        $schedule->command('queue:health-check')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
     }
 
     /**

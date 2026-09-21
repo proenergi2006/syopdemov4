@@ -1,0 +1,314 @@
+{
+    "detail": {
+        "approvalModeAll": "All {count} approvers must approve",
+        "approvalModeAny": "Any one of {count} approvers",
+        "approvalStep": "Step",
+        "approvalsEmpty": "No approval process yet.",
+        "approvalsTitle": "Approval History",
+        "approveButton": "Approve",
+        "branch": "Branch",
+        "closeButton": "Close",
+        "createdBy": "Created by",
+        "date": "Date",
+        "department": "Department",
+        "finalApprovedBy": "Approved by",
+        "itemAmount": "Amount",
+        "itemAttachment": "Attachment",
+        "itemDate": "Date",
+        "itemDescription": "Description",
+        "itemNo": "No",
+        "itemsTitle": "Expense Lines",
+        "loadFailed": "Failed to load the claim detail.",
+        "notes": "Notes",
+        "rejectButton": "Reject",
+        "subject": "Subject",
+        "submittedBy": "Submitted by",
+        "title": "Claim Detail",
+        "total": "Claim Total",
+        "receivedAt": "Received At",
+        "receivedBy": "Received By",
+        "scheduledPaymentDate": "Scheduled Payment",
+        "paymentOnTrack": "Waiting for its scheduled payment.",
+        "paymentOverdue": "Past its schedule and not yet paid.",
+        "paymentEarly": "Paid ahead of schedule.",
+        "paymentOnTime": "Paid exactly on schedule.",
+        "paymentLate": "Paid after its schedule."
+    },
+    "form": {
+        "attachment": {
+            "addButton": "Add Attachment",
+            "deleteButton": "Remove",
+            "existingTitle": "Saved Attachments"
+        },
+        "backButton": "Back",
+        "buttons": {
+            "cancel": "Cancel",
+            "save": "Save",
+            "update": "Save Changes"
+        },
+        "createSubtitle": "Reimbursement for money you have already spent.",
+        "createTitle": "New Claim",
+        "editSubtitle": "Editing is only possible while the document is still a draft.",
+        "editTitle": "Edit Claim",
+        "fields": {
+            "branch": "Branch",
+            "date": "Date",
+            "department": "Department",
+            "notes": "Notes",
+            "subject": "Subject",
+            "transactionCategory": "Transaction Category"
+        },
+        "itemDialog": {
+            "addRowButton": "Add Row",
+            "discardButton": "Yes, close",
+            "discardText": "Changes to the request lines have not been saved and will be lost.",
+            "discardTitle": "Close without saving?",
+            "saveButton": "Save Lines",
+            "title": "Expense Lines"
+        },
+        "items": {
+            "addButton": "Manage Lines",
+            "addButtonTooltip": "FPU Details",
+            "emptyAlert": "No lines yet. Click \"{action}\" to fill them in.",
+            "resetButton": "Reset",
+            "resetConfirmText": "All rows will be cleared.",
+            "resetConfirmTitle": "Reset the request lines?",
+            "sectionTitle": "Expense Lines",
+            "tableActions": "Actions",
+            "tableAmount": "Amount",
+            "tableAttachment": "Attachment",
+            "tableDate": "Date",
+            "tableDescription": "Description",
+            "tableNo": "No",
+            "total": "Claim Total"
+        },
+        "loadingTitle": "Loading claim data...",
+        "noData": {
+            "branch": "No branch available",
+            "department": "Select a branch first",
+            "transactionCategory": "No transaction category available"
+        },
+        "placeholders": {
+            "branch": "Select a branch",
+            "date": "Pick a date",
+            "department": "Select a department",
+            "notes": "Additional notes for the approvers",
+            "subject": "e.g. Business trip expenses to Palembang",
+            "transactionCategory": "Select a transaction category"
+        },
+        "reload": {
+            "branch": "Reload branch list"
+        },
+        "toast": {
+            "cancelConfirmText": "Anything you have filled in will be lost.",
+            "cancelConfirmTitle": "Discard this form?",
+            "completeItemRow": "Please complete the request line on row {number}.",
+            "completeRequiredData": "Please complete the required fields first.",
+            "invalidFileSize": "\"{name}\" is larger than 3MB.",
+            "invalidFileTitle": "Invalid File",
+            "invalidFileType": "\"{name}\" is not a PDF/JPG/JPEG/PNG file.",
+            "itemAttachmentRequired": "Row {number} requires at least one attachment.",
+            "itemDateRequired": "Date on row {number} is required.",
+            "loadAccessFailed": "Failed to load branch and department access data.",
+            "loadFailed": "Failed to load claim data.",
+            "minOneItem": "At least one request line is required.",
+            "saveConfirmText": "It will be saved as a draft and will not enter the approval process yet.",
+            "saveConfirmTitle": "Save this claim?",
+            "saveFailed": "Failed to save the claim.",
+            "savingData": "Saving data...",
+            "updateConfirmText": "The changes to this claim will be saved.",
+            "updateConfirmTitle": "Save the changes?"
+        },
+        "validation": {
+            "branch": "Branch is required.",
+            "date": "Date is required.",
+            "department": "Department is required.",
+            "itemAmount": "Amount is required.",
+            "itemAttachment": "At least one file.",
+            "itemDate": "Date is required.",
+            "itemDescription": "Description is required.",
+            "subject": "Subject is required.",
+            "transactionCategory": "Transaction category is required."
+        }
+    },
+    "list": {
+        "approve": {
+            "confirmButton": "Approve",
+            "dialogSubtitle": "Make sure the request lines are correct before approving.",
+            "dialogTitle": "Approve Claim",
+            "failedFallback": "Failed to approve the claim.",
+            "notesLabel": "Notes (optional)",
+            "notesPlaceholder": "Add an approval note if needed",
+            "successFallback": "Claim approved successfully."
+        },
+        "cancel": {
+            "confirmButton": "Cancel Claim",
+            "dialogSubtitle": "A cancelled claim cannot proceed to reimbursement.",
+            "dialogTitle": "Cancel Claim",
+            "failedFallback": "Failed to cancel the claim.",
+            "notesLabel": "Cancellation reason",
+            "notesPlaceholder": "Explain why this is cancelled",
+            "notesRequired": "The cancellation reason is required.",
+            "successFallback": "Claim cancelled successfully."
+        },
+        "createButton": "New Claim",
+        "emptySubtitle": "Records will appear here once a claim is created.",
+        "emptyTitle": "No claim yet",
+        "exportButton": "Export Excel",
+        "filters": {
+            "allBranches": "All Branches",
+            "allDepartments": "All Departments",
+            "branchLabel": "Branch",
+            "departmentLabel": "Department",
+            "endDate": "End Date",
+            "pendingAction": {
+                "all": "All Documents",
+                "notPaid": "Awaiting Reimbursement",
+                "notReceived": "Not Yet Received"
+            },
+            "pendingActionLabel": "Needs Action",
+            "resetButton": "Reset Filters",
+            "searchLabel": "Search",
+            "searchPlaceholder": "Number, subject, branch, department",
+            "startDate": "Start Date",
+            "statusLabel": "Status",
+            "scheduledPaymentDate": "Scheduled Payment"
+        },
+        "filtersSubtitle": "Narrow down the claim list to what you need.",
+        "filtersTitle": "Claim Filters",
+        "menu": {
+            "approve": "Approve",
+            "cancel": "Cancel",
+            "delete": "Delete",
+            "edit": "Edit",
+            "notPaidBadge": "Awaiting Reimbursement",
+            "pay": "Mark as Reimbursed",
+            "print": "Print PDF",
+            "reject": "Reject",
+            "submit": "Submit",
+            "viewDetail": "View Detail",
+            "waitingMyApprovalBadge": "Awaiting your approval",
+            "receive": "Receive",
+            "notReceivedBadge": "Awaiting Receipt"
+        },
+        "onlyMyApproval": "Only those awaiting my approval",
+        "pay": {
+            "confirmButton": "Mark as Reimbursed",
+            "confirmText": "Claim {nomor} will be marked as paid. This is the final step and cannot be undone.",
+            "confirmTitle": "Pay this claim?",
+            "failedFallback": "Failed to process the reimbursement.",
+            "successFallback": "Claim marked as reimbursed."
+        },
+        "print": {
+            "failed": "Failed to open the printout.",
+            "loading": "Preparing the claim printout...",
+            "popupBlocked": "The popup was blocked. Please allow popups for this site.",
+            "urlFailed": "Failed to create the print URL.",
+            "windowClosed": "The print window was closed."
+        },
+        "reject": {
+            "confirmButton": "Reject",
+            "dialogSubtitle": "Rejecting stops the entire approval process for this document.",
+            "dialogTitle": "Reject Claim",
+            "failedFallback": "Failed to reject the claim.",
+            "notesLabel": "Rejection reason",
+            "notesPlaceholder": "Explain why this is rejected",
+            "notesRequired": "The rejection reason is required.",
+            "successFallback": "Claim rejected successfully."
+        },
+        "signature": {
+            "agreementLabel": "I agree to the use of this digital signature.",
+            "agreementRequired": "You must agree to the use of the digital signature.",
+            "clearButton": "Clear",
+            "dialogSubtitle": "You do not have a digital signature yet. Please sign below to continue.",
+            "dialogTitle": "Digital Signature",
+            "required": "A signature is required.",
+            "saveButton": "Save & Continue",
+            "saveFailed": "Failed to save the digital signature."
+        },
+        "table": {
+            "branch": "Branch",
+            "claimNumber": "Claim No.",
+            "date": "Date",
+            "department": "Department",
+            "no": "No",
+            "status": "Status",
+            "subject": "Subject",
+            "total": "Total"
+        },
+        "toast": {
+            "createdSuccess": "Claim created successfully.",
+            "deleteConfirmText": "Claim {nomor} will be deleted and cannot be restored.",
+            "deleteConfirmTitle": "Delete this claim?",
+            "deleteFailed": "Failed to delete the claim.",
+            "deleteSuccess": "Claim deleted successfully.",
+            "exportFailed": "Failed to export the claim data.",
+            "exportLoading": "Preparing the claim Excel file...",
+            "exportSuccess": "Claim data exported successfully.",
+            "loadFailed": "Failed to load claim data.",
+            "reloadData": "Reload",
+            "signatureCheckFailed": "Failed to check the digital signature.",
+            "submitConfirmButton": "Yes, submit",
+            "submitConfirmText": "Claim {nomor} will enter the approval process and can no longer be edited.",
+            "submitConfirmTitle": "Submit this claim?",
+            "submitFailedFallback": "Failed to submit the claim.",
+            "submitLoading": "Submitting claim...",
+            "submitSuccessFallback": "Claim submitted successfully.",
+            "updatedSuccess": "Claim updated successfully."
+        },
+        "bulk": {
+            "clearButton": "Clear Selection",
+            "partialTitle": "Some documents failed",
+            "RECEIVE": {
+                "selectedLabel": "{count} claims selected",
+                "actionButton": "Receive Selected",
+                "confirmTitle": "Receive the selected claims?",
+                "confirmText": "{count} claims will be marked as received at once.",
+                "confirmButton": "Yes, receive all",
+                "loadingTitle": "Receiving {count} claims...",
+                "successFallback": "The selected claims were marked as received.",
+                "failedFallback": "Failed to receive the selected claims."
+            },
+            "PAY": {
+                "confirmTitle": "Pay the selected claims?",
+                "confirmText": "{count} claims will be marked as paid at once. This cannot be undone.",
+                "confirmButton": "Yes, pay all",
+                "loadingTitle": "Paying {count} claims...",
+                "selectedLabel": "{count} claims selected",
+                "actionButton": "Pay Selected",
+                "successFallback": "The selected claims were paid.",
+                "failedFallback": "Failed to pay the selected claims."
+            }
+        },
+        "receive": {
+            "confirmTitle": "Receive this claim?",
+            "confirmText": "Claim {nomor} will be marked as received. Only then can it be reimbursed.",
+            "confirmButton": "Mark as Received",
+            "successFallback": "The claim was marked as received.",
+            "failedFallback": "Failed to receive the claim."
+        },
+        "offSchedule": {
+            "dayPlural": "{count} days",
+            "daySingular": "{count} day",
+            "earlyMeta": "Scheduled for {tanggal}, still {jarak} away.",
+            "earlyTitle": "Paid ahead of schedule",
+            "lateMeta": "Scheduled for {tanggal}, {jarak} late.",
+            "lateTitle": "Past its payment schedule",
+            "noteLabel": "Note (optional)",
+            "placeholder": "May be left blank. For example, why it was brought forward or delayed."
+        },
+        "paymentDay": {
+            "blockedNotice": "Payment is only possible on {days}. Some claims are waiting, but today is not a payment day — the button becomes available again on those days."
+        }
+    },
+    "status": {
+        "all": "All",
+        "approved": "Approved",
+        "cancelled": "Cancelled",
+        "draft": "Draft",
+        "inProgress": "In Progress",
+        "paid": "Reimbursed",
+        "rejected": "Rejected",
+        "received": "Received"
+    }
+}

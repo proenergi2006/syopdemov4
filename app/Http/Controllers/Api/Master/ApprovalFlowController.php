@@ -12,11 +12,39 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use App\Models\PermissionModule;
+use App\Services\ApprovalFlow\ApprovalDocumentTypeService;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Collection;
 
 class ApprovalFlowController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Daftar jenis dokumen
+    |--------------------------------------------------------------------------
+    | Dibaca dari permission_modules, bukan ditulis di kode. Disimpan sebagai
+    | properti supaya cache-nya berlaku untuk seluruh request.
+    |--------------------------------------------------------------------------
+    */
+    public function __construct(
+        private ApprovalDocumentTypeService $documentTypes,
+    ) {
+    }
+
+    /**
+     * GET /master/approval-flows/document-types
+     *
+     * Sumber isi dropdown "Jenis Dokumen" di frontend.
+     */
+    public function documentTypeOptions(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Jenis dokumen approval flow berhasil dimuat.',
+            'data' => $this->documentTypes->toOptions(),
+        ], 200);
+    }
+
     public function index(Request $request): JsonResponse
     {
         try {
@@ -41,6 +69,8 @@ class ApprovalFlowController extends Controller
                     'steps.specialApprovers.approverUser:id,name',
                     'steps.specialApprovers.approverRole',
                     'creatorDepartment',
+                    'departments',
+                    'transactionCategories',
                     'permissionModule',
                 ])
                 ->when(
@@ -105,8 +135,26 @@ class ApprovalFlowController extends Controller
                 $query->where('area_type', strtoupper((string) $request->input('area_type')));
             }
 
+            /*
+            | Filter department ikut menampilkan flow "Semua Divisi", karena
+            | flow seperti itu memang berlaku untuk department yang dipilih.
+            */
             if ($request->filled('creator_department_id')) {
-                $query->where('creator_department_id', (int) $request->input('creator_department_id'));
+                $departmentId = (int) $request->input('creator_department_id');
+
+                $query->where(function ($scopeQuery) use ($departmentId) {
+                    $scopeQuery
+                        ->where('all_departments', true)
+                        ->orWhereHas(
+                            'departments',
+                            fn($d) => $d->where('departments.id', $departmentId),
+                        )
+                        ->orWhere(function ($legacy) use ($departmentId) {
+                            $legacy
+                                ->where('creator_department_id', $departmentId)
+                                ->whereDoesntHave('departments');
+                        });
+                });
             }
 
             $approvalFlows = $query
@@ -241,6 +289,8 @@ class ApprovalFlowController extends Controller
                         ?? null,
                     'creator_department_code' => $flow->creatorDepartment?->kode ?? null,
 
+                    ...$this->flowScopePayload($flow),
+
                     'steps_count' => $steps
                         ->pluck('step_order')
                         ->unique()
@@ -352,6 +402,26 @@ class ApprovalFlowController extends Controller
                 'area_type' => ['nullable', 'string', 'max:50'],
                 'cabang' => ['nullable', 'string', 'max:100'],
                 'creator_department_id' => ['nullable', 'integer'],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Cakupan department dan keterangan transaksi
+            |--------------------------------------------------------------------------
+            | Satu flow dapat mencakup beberapa department sekaligus, atau
+            | seluruhnya lewat all_departments. Sama halnya untuk keterangan
+            | transaksi pada dokumen yang memakainya.
+            |--------------------------------------------------------------------------
+            */
+                'all_departments' => ['nullable', 'boolean'],
+                'department_ids' => ['nullable', 'array'],
+                'department_ids.*' => ['integer', 'exists:departments,id'],
+
+                'all_transaction_categories' => ['nullable', 'boolean'],
+                'transaction_category_ids' => ['nullable', 'array'],
+                'transaction_category_ids.*' => [
+                    'integer',
+                    'exists:fund_request_transaction_categories,id',
+                ],
 
                 /*
             |--------------------------------------------------------------------------
@@ -513,33 +583,27 @@ class ApprovalFlowController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | PR Condition
+        | Kondisi matriks area
         |--------------------------------------------------------------------------
         */
             $areaType = $request->filled('area_type')
                 ? strtoupper(trim((string) $request->input('area_type')))
                 : null;
 
-            $creatorDepartmentId = $request->filled('creator_department_id')
-                ? (int) $request->input('creator_department_id')
-                : null;
+            $scope = $this->resolveFlowScope($request, $documentTypeUpper);
 
-            if ($documentTypeUpper === 'PR') {
+            $creatorDepartmentId = $scope['creator_department_id'];
+
+            if ($this->documentTypeUsesAreaMatrix($documentTypeUpper)) {
                 if (!in_array($areaType, ['HO', 'CABANG'], true)) {
                     DB::rollBack();
 
                     return response()->json([
                         'success' => false,
-                        'message' => 'Area type wajib dipilih untuk approval PR.',
-                    ], 422);
-                }
-
-                if (!$creatorDepartmentId) {
-                    DB::rollBack();
-
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Department wajib dipilih untuk approval PR.',
+                        'message' => sprintf(
+                            'Area type wajib dipilih untuk approval %s.',
+                            $documentTypeUpper,
+                        ),
                     ], 422);
                 }
             } else {
@@ -638,9 +702,13 @@ class ApprovalFlowController extends Controller
                 'area_type' => $areaType,
                 'cabang' => $cabang,
                 'creator_department_id' => $creatorDepartmentId,
+                'all_departments' => $scope['all_departments'],
+                'all_transaction_categories' => $scope['all_transaction_categories'],
 
                 'updated_by' => $request->user()->id ?? null,
             ]);
+
+            $this->syncFlowScope($flow, $scope);
 
             /*
         |--------------------------------------------------------------------------
@@ -718,6 +786,8 @@ class ApprovalFlowController extends Controller
                     'steps.specialApprovers.approverUser:id,name',
                     'steps.specialApprovers.approverRole',
                 'creatorDepartment',
+                'departments',
+                'transactionCategories',
                 'permissionModule',
             ]);
 
@@ -808,6 +878,8 @@ class ApprovalFlowController extends Controller
                         ?? $flow->creatorDepartment?->name
                         ?? null,
                     'creator_department_code' => $flow->creatorDepartment?->kode ?? null,
+
+                    ...$this->flowScopePayload($flow),
 
                     'is_active' => (bool) $flow->is_active,
                     'status' => $flow->is_active ? 'ACTIVE' : 'INACTIVE',
@@ -923,6 +995,26 @@ class ApprovalFlowController extends Controller
 
                 /*
             |--------------------------------------------------------------------------
+            | Cakupan department dan keterangan transaksi
+            |--------------------------------------------------------------------------
+            | Satu flow dapat mencakup beberapa department sekaligus, atau
+            | seluruhnya lewat all_departments. Sama halnya untuk keterangan
+            | transaksi pada dokumen yang memakainya.
+            |--------------------------------------------------------------------------
+            */
+                'all_departments' => ['nullable', 'boolean'],
+                'department_ids' => ['nullable', 'array'],
+                'department_ids.*' => ['integer', 'exists:departments,id'],
+
+                'all_transaction_categories' => ['nullable', 'boolean'],
+                'transaction_category_ids' => ['nullable', 'array'],
+                'transaction_category_ids.*' => [
+                    'integer',
+                    'exists:fund_request_transaction_categories,id',
+                ],
+
+                /*
+            |--------------------------------------------------------------------------
             | Nested Steps
             |--------------------------------------------------------------------------
             | FE mengirim:
@@ -1008,34 +1100,29 @@ class ApprovalFlowController extends Controller
                 ? strtoupper(trim((string) $request->input('area_type')))
                 : null;
 
-            $creatorDepartmentId = $request->filled('creator_department_id')
-                ? (int) $request->input('creator_department_id')
-                : null;
+            $scope = $this->resolveFlowScope($request, $documentTypeUpper);
+
+            $creatorDepartmentId = $scope['creator_department_id'];
 
             /*
         |--------------------------------------------------------------------------
-        | Validasi khusus PR
+        | Validasi dokumen bermatriks area
         |--------------------------------------------------------------------------
-        | Untuk PR, area_type dan creator_department_id wajib.
-        | Cabang tidak wajib karena CABANG berarti semua cabang.
+        | Untuk dokumen bermatriks area, area_type wajib. Cakupan department
+        | sudah divalidasi resolveFlowScope(). Cabang tidak wajib karena
+        | CABANG berarti semua cabang.
         |--------------------------------------------------------------------------
         */
-            if ($documentTypeUpper === 'PR') {
+            if ($this->documentTypeUsesAreaMatrix($documentTypeUpper)) {
                 if (!in_array($areaType, ['HO', 'CABANG'], true)) {
                     DB::rollBack();
 
                     return response()->json([
                         'success' => false,
-                        'message' => 'Area type wajib dipilih untuk approval PR.',
-                    ], 422);
-                }
-
-                if (!$creatorDepartmentId) {
-                    DB::rollBack();
-
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Creator department wajib dipilih untuk approval PR.',
+                        'message' => sprintf(
+                            'Area type wajib dipilih untuk approval %s.',
+                            $documentTypeUpper,
+                        ),
                     ], 422);
                 }
             } else {
@@ -1134,10 +1221,14 @@ class ApprovalFlowController extends Controller
                 'area_type' => $areaType,
                 'cabang' => $cabang,
                 'creator_department_id' => $creatorDepartmentId,
+                'all_departments' => $scope['all_departments'],
+                'all_transaction_categories' => $scope['all_transaction_categories'],
 
                 'created_by' => $request->user()->id ?? null,
                 'updated_by' => $request->user()->id ?? null,
             ]);
+
+            $this->syncFlowScope($flow, $scope);
 
             $this->createApprovalFlowSteps(
                 $flow,
@@ -1196,6 +1287,8 @@ class ApprovalFlowController extends Controller
                     'steps.specialApprovers.approverUser:id,name',
                     'steps.specialApprovers.approverRole',
                 'creatorDepartment',
+                'departments',
+                'transactionCategories',
                 'permissionModule',
             ]);
 
@@ -1320,6 +1413,8 @@ class ApprovalFlowController extends Controller
                     'steps.specialApprovers.approverUser:id,name',
                     'steps.specialApprovers.approverRole',
                     'creatorDepartment',
+                    'departments',
+                    'transactionCategories',
                     'permissionModule',
                 ])
                 ->findOrFail($id);
@@ -1446,6 +1541,8 @@ class ApprovalFlowController extends Controller
                         ?? null,
                     'creator_department_code' => $flow->creatorDepartment?->kode ?? null,
 
+                    ...$this->flowScopePayload($flow),
+
                     'is_active' => (bool) $flow->is_active,
                     'status' => $flow->is_active ? 'ACTIVE' : 'INACTIVE',
 
@@ -1472,17 +1569,212 @@ class ApprovalFlowController extends Controller
         }
     }
 
+    /**
+     * Apakah flow jenis dokumen ini dibedakan per area + department.
+     *
+     * Dokumen seperti ini dipilih berdasarkan kombinasi area, department
+     * pembuat, dan rentang nominal, sehingga kedua kolom itu wajib terisi.
+     * Jenis dokumen lain tidak memakainya dan kolomnya dikosongkan.
+     *
+     * Penentunya adalah permission_modules.approval_uses_area_matrix.
+     */
+    private function documentTypeUsesAreaMatrix(
+        string $documentType,
+    ): bool {
+        return $this->documentTypes->usesAreaMatrix($documentType);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cakupan flow: department dan keterangan transaksi
+    |--------------------------------------------------------------------------
+    | Satu flow bisa berlaku untuk beberapa department sekaligus atau untuk
+    | seluruhnya, sesuai matriks yang memuat baris "GA - IT - LOG" maupun
+    | "Semua Divisi". Hal yang sama berlaku untuk keterangan transaksi pada
+    | jenis dokumen yang memakainya.
+    |
+    | @return array{
+    |     all_departments: bool,
+    |     department_ids: array<int, int>,
+    |     creator_department_id: int|null,
+    |     all_transaction_categories: bool,
+    |     transaction_category_ids: array<int, int>
+    | }
+    |
+    | @throws ValidationException bila cakupan wajib tidak terisi.
+    |--------------------------------------------------------------------------
+    */
+    private function resolveFlowScope(
+        Request $request,
+        string $documentTypeUpper,
+    ): array {
+        $usesAreaMatrix = $this->documentTypeUsesAreaMatrix($documentTypeUpper);
+
+        $usesTransactionCategory = $this->documentTypes
+            ->usesTransactionCategory($documentTypeUpper);
+
+        $toIdList = static fn($value) => collect(
+            is_array($value) ? $value : [],
+        )
+            ->map(fn($id) => (int) $id)
+            ->filter(fn(int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        /*
+        |----------------------------------------------------------------------
+        | Department
+        |----------------------------------------------------------------------
+        */
+        $allDepartments = false;
+        $departmentIds = collect();
+
+        if ($usesAreaMatrix) {
+            $allDepartments = $request->boolean('all_departments');
+
+            $departmentIds = $toIdList($request->input('department_ids'));
+
+            /*
+            | Kompatibilitas: form lama hanya mengirim creator_department_id
+            | tunggal. Tanpa penanganan ini, menyimpan lewat versi frontend
+            | lama akan menghapus cakupan department flow tersebut.
+            */
+            if (
+                !$allDepartments
+                && $departmentIds->isEmpty()
+                && $request->filled('creator_department_id')
+            ) {
+                $departmentIds = collect([
+                    (int) $request->input('creator_department_id'),
+                ]);
+            }
+
+            if ($allDepartments) {
+                $departmentIds = collect();
+            } elseif ($departmentIds->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'department_ids' => [
+                        sprintf(
+                            'Department wajib dipilih untuk approval %s.',
+                            $documentTypeUpper,
+                        ),
+                    ],
+                ]);
+            }
+        }
+
+        /*
+        |----------------------------------------------------------------------
+        | Keterangan transaksi
+        |----------------------------------------------------------------------
+        | Jenis dokumen yang tidak memakainya selalu tersimpan sebagai "semua",
+        | supaya pencocokan flow-nya tidak pernah tersaring kolom ini.
+        |----------------------------------------------------------------------
+        */
+        $allTransactionCategories = true;
+        $transactionCategoryIds = collect();
+
+        if ($usesTransactionCategory) {
+            $allTransactionCategories = $request->boolean(
+                'all_transaction_categories',
+            );
+
+            $transactionCategoryIds = $toIdList(
+                $request->input('transaction_category_ids'),
+            );
+
+            if ($allTransactionCategories) {
+                $transactionCategoryIds = collect();
+            } elseif ($transactionCategoryIds->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'transaction_category_ids' => [
+                        sprintf(
+                            'Keterangan transaksi wajib dipilih untuk approval %s.',
+                            $documentTypeUpper,
+                        ),
+                    ],
+                ]);
+            }
+        }
+
+        return [
+            'all_departments' => $allDepartments,
+            'department_ids' => $departmentIds->all(),
+
+            /*
+            | Tetap diisi department pertama demi kompatibilitas kode lama
+            | yang masih membaca kolom tunggal ini.
+            */
+            'creator_department_id' => $departmentIds->first(),
+
+            'all_transaction_categories' => $allTransactionCategories,
+            'transaction_category_ids' => $transactionCategoryIds->all(),
+        ];
+    }
+
+    /**
+     * Menyimpan cakupan flow ke tabel pivot.
+     */
+    private function syncFlowScope(ApprovalFlow $flow, array $scope): void
+    {
+        $flow->departments()->sync($scope['department_ids']);
+        $flow->transactionCategories()->sync($scope['transaction_category_ids']);
+    }
+
+    /**
+     * Cakupan flow untuk dikirim ke frontend.
+     *
+     * Wajib ikut pada setiap response yang dibaca form edit. Tanpa ini pilihan
+     * multi-nilai tidak pernah kembali terisi saat flow dibuka, dan penyimpanan
+     * berikutnya malah menghapus isi pivot-nya -- tersimpan, tapi tampak hilang.
+     */
+    private function flowScopePayload(ApprovalFlow $flow): array
+    {
+        $departments = $flow->relationLoaded('departments')
+            ? $flow->departments
+            : $flow->departments()->get();
+
+        $categories = $flow->relationLoaded('transactionCategories')
+            ? $flow->transactionCategories
+            : $flow->transactionCategories()->get();
+
+        return [
+            'all_departments' => (bool) $flow->all_departments,
+
+            'department_ids' => $departments
+                ->pluck('id')
+                ->map(fn($id) => (int) $id)
+                ->values()
+                ->all(),
+
+            'department_names' => $departments
+                ->map(fn($department) => $department->nama
+                    ?? $department->name
+                    ?? $department->kode)
+                ->filter()
+                ->values()
+                ->all(),
+
+            'all_transaction_categories' => (bool) $flow->all_transaction_categories,
+
+            'transaction_category_ids' => $categories
+                ->pluck('id')
+                ->map(fn($id) => (int) $id)
+                ->values()
+                ->all(),
+
+            'transaction_category_names' => $categories
+                ->pluck('name')
+                ->filter()
+                ->values()
+                ->all(),
+        ];
+    }
+
     private function getDocumentTypeLabel(
         ?string $documentType,
     ): string {
-        return match (strtoupper(
-            trim((string) $documentType),
-        )) {
-            'PO' => 'Purchase Order (PO)',
-            'PR' => 'Purchase Requisition (PR)',
-            'VENDOR' => 'Master Vendor',
-            default => $documentType ?: '-',
-        };
+        return $this->documentTypes->label($documentType);
     }
 
     /**
@@ -1491,21 +1783,7 @@ class ApprovalFlowController extends Controller
     private function normalizeDocumentType(
         string $documentType,
     ): string {
-        $documentType = strtoupper(
-            trim($documentType),
-        );
-
-        return match ($documentType) {
-            'PR' => ApprovalFlow::DOCUMENT_TYPE_PR,
-            'PO' => ApprovalFlow::DOCUMENT_TYPE_PO,
-            'VENDOR' => 'Vendor',
-
-            default => throw ValidationException::withMessages([
-                'document_type' => [
-                    'Jenis dokumen approval flow tidak valid.',
-                ],
-            ]),
-        };
+        return $this->documentTypes->normalize($documentType);
     }
 
     /**
@@ -1514,17 +1792,7 @@ class ApprovalFlowController extends Controller
     private function getPermissionModuleCode(
         string $documentType,
     ): string {
-        return match (strtoupper(trim($documentType))) {
-            'PR' => 'purchase_request',
-            'PO' => 'purchase_order',
-            'VENDOR' => 'vendor',
-
-            default => throw ValidationException::withMessages([
-                'permission_module_id' => [
-                    'Module untuk jenis dokumen tersebut belum dikonfigurasi.',
-                ],
-            ]),
-        };
+        return $this->documentTypes->permissionModuleCode($documentType);
     }
 
     /**
@@ -1579,6 +1847,11 @@ class ApprovalFlowController extends Controller
      * untuk kompatibilitas code existing.
      *
      * Sumber utama modul tetap permission_module_id.
+     *
+     * Daftar di bawah bukan daftar jenis dokumen, melainkan penambal untuk
+     * tiga jenis dokumen yang sudah terlanjur punya module_name berbeda dari
+     * nama permission module-nya. Jenis dokumen baru jatuh ke default dan
+     * tidak perlu ditambahkan ke sini.
      */
     private function getLegacyModuleName(
         string $documentType,

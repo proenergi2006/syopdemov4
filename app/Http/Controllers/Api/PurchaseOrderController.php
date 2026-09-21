@@ -11,6 +11,7 @@ use App\Models\PurchaseOrderApproval;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
+use App\Support\DocumentNumberLock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -1391,6 +1392,13 @@ class PurchaseOrderController extends Controller
                             'id_department',
                             'status',
                             'status_po',
+
+                            /*
+                            | Wajib ikut diambil. Tanpa kolom ini nilainya
+                            | selalu null sehingga pemeriksaan pencampuran
+                            | tipe dokumen lolos diam-diam.
+                            */
+                            'special_document_type_id',
                         ])
                         ->keyBy(
                             fn(PurchaseRequest $pr): int =>
@@ -2176,12 +2184,20 @@ class PurchaseOrderController extends Controller
                 'vendor:id,nama_vendor,status_pkp,jenis_pembayaran,top',
                 'cabangData:id,nama_cabang,inisial_cabang',
                 'departmentData:id,kode,nama',
-                'purchaseRequests:id,nomor_pr,tanggal_pr,total_amount,recommended_vendor_id,cabang,id_department',
+                'purchaseRequests:id,nomor_pr,tanggal_pr,total_amount,recommended_vendor_id,cabang,id_department,special_document_type_id',
                 'purchaseRequests.recommendedVendor:id,nama_vendor,status_pkp,jenis_pembayaran,top',
+                'purchaseRequests.specialDocumentType:id,code,name',
                 'purchaseRequests.attachments',
                 'purchaseRequests.items.unit',
                 'items.unit:id,kode,nama',
                 'items.purchaseRequestItem.unit',
+
+                /*
+                | Material group tidak disimpan pada item PO. Diambil dari item
+                | PR asalnya supaya tidak ada dua sumber kebenaran yang bisa
+                | berbeda bila grup pada PR diubah.
+                */
+                'items.purchaseRequestItem.materialGroup:id,code,name',
                 'attachments',
                 'creator',
                 'requesterSigner',
@@ -2285,6 +2301,16 @@ class PurchaseOrderController extends Controller
                             'nomor_pr' => $pr->nomor_pr,
                             'tanggal_pr' => $pr->tanggal_pr,
                             'total_amount' => (float) ($pr->total_amount ?? 0),
+
+                            /*
+                            | Bernilai null untuk PR biasa, sehingga frontend
+                            | dapat menyembunyikan penandanya sepenuhnya.
+                            */
+                            'special_document_type' => $pr->specialDocumentType ? [
+                                'id' => $pr->specialDocumentType->id,
+                                'code' => $pr->specialDocumentType->code,
+                                'name' => $pr->specialDocumentType->name,
+                            ] : null,
 
                             'recommended_vendor_id' => $pr->recommended_vendor_id,
                             'recommended_vendor' => $pr->recommendedVendor ? [
@@ -2418,6 +2444,17 @@ class PurchaseOrderController extends Controller
                             'purchase_request_item_id' => $item->purchase_request_item_id,
 
                             'nama_item' => $item->nama_item,
+
+                            /*
+                            | Diturunkan dari item PR, bukan disimpan di item PO.
+                            | Bernilai null untuk item lama yang belum punya grup.
+                            */
+                            'material_group' => $prItem?->materialGroup ? [
+                                'id' => $prItem->materialGroup->id,
+                                'code' => $prItem->materialGroup->code,
+                                'name' => $prItem->materialGroup->name,
+                            ] : null,
+
                             'qty' => $qtyPo,
 
                             'qty_received' => $qtyReceived,
@@ -3018,6 +3055,13 @@ class PurchaseOrderController extends Controller
                             'id_department',
                             'status',
                             'status_po',
+
+                            /*
+                            | Wajib ikut diambil. Tanpa kolom ini nilainya
+                            | selalu null sehingga pemeriksaan pencampuran
+                            | tipe dokumen lolos diam-diam.
+                            */
+                            'special_document_type_id',
                         ])
                         ->keyBy(
                             fn(PurchaseRequest $pr): int =>
@@ -6039,6 +6083,13 @@ class PurchaseOrderController extends Controller
     private function generateDraftPONumber(): string
     {
         $year = (int) now()->format('Y');
+
+        /*
+        | Deret nomor draft dipakai bersama seluruh cabang, jadi dua permintaan
+        | yang berjalan bersamaan akan menyimpulkan nomor yang sama bila tidak
+        | diserialkan lebih dulu.
+        */
+        DocumentNumberLock::acquire('po', 'draft', (string) $year);
 
         /*
         |--------------------------------------------------------------------------
