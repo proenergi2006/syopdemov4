@@ -49,6 +49,42 @@ return [
     |--------------------------------------------------------------------------
     */
     'claim' => [
+        /*
+        | Gugur karena perdinnya, bukan karena ada yang menolaknya.
+        |
+        | Dipisah dari 'rejected' justru karena itu: tidak ada penolak,
+        | dan pesan yang menyebut penolak akan mengarang orang.
+        |
+        | Satu kalimat utuh per sebab, bukan satu kalimat bertambal kata
+        | kerja. Notifikasi diterjemahkan ulang saat DIBACA, memakai kunci
+        | dan parameter yang tersimpan -- dan parameternya tidak ikut
+        | diterjemahkan. Kata kerja yang dikirim sebagai parameter akan
+        | membeku dalam bahasa penulisnya, dan pembaca bahasa lain
+        | menerima kalimat yang separuh benar.
+        */
+        'lapsed_by_trip' => [
+            'requester' => [
+                'cancelled' => [
+                    'title' => 'Claim Gugur',
+                    'message' => 'Claim :claim_number gugur karena Perjalanan Dinas :trip_number dibatalkan.',
+                ],
+                'rejected' => [
+                    'title' => 'Claim Gugur',
+                    'message' => 'Claim :claim_number gugur karena Perjalanan Dinas :trip_number ditolak.',
+                ],
+            ],
+            'approver' => [
+                'cancelled' => [
+                    'title' => 'Persetujuan Claim Dihentikan',
+                    'message' => 'Persetujuan Claim :claim_number dihentikan karena Perjalanan Dinas :trip_number dibatalkan.',
+                ],
+                'rejected' => [
+                    'title' => 'Persetujuan Claim Dihentikan',
+                    'message' => 'Persetujuan Claim :claim_number dihentikan karena Perjalanan Dinas :trip_number ditolak.',
+                ],
+            ],
+        ],
+
         'receipt_request' => [
             'title' => 'Claim Menunggu Diterima',
             'message' => 'Claim :claim_number senilai Rp :total_amount menunggu Anda terima.',
@@ -92,8 +128,70 @@ return [
             'title' => 'Claim Ditolak',
             'message' => 'Claim :claim_number ditolak oleh :rejecter_name.',
         ],
+
+        /*
+        | Angka yang ditulis pemohon sendiri berubah di tangan orang
+        | lain. Kedua angkanya disebut terang-terangan, beserta
+        | alasannya -- kembaran kalimat yang sama di FPU.
+        */
+        'amount_revised' => [
+            'title' => 'Nominal Claim Direvisi',
+            'message' => 'Nominal Claim :claim_number diubah oleh :reviser_name dari :old_total menjadi :new_total. Alasan: :reason',
+        ],
+
+        /*
+        | Tanggal pembayaran yang sudah dijanjikan ikut batal. Disebut
+        | terang-terangan karena itulah yang sudah dicatat pemohon dari
+        | email sebelumnya -- dan tanpa menyebutnya, kabar ini hanya
+        | memberi tahu bahwa ada sesuatu yang berubah.
+        |
+        | Dua kalimat karena dokumen lama bisa saja tidak pernah punya
+        | tanggal pembayaran.
+        */
+        'receipt_reverted' => [
+            'title' => 'Penerimaan Claim Dibatalkan',
+            'with_date' => 'Penerimaan Claim :claim_number dibatalkan oleh :actor_name. Jadwal pembayaran :scheduled_date ikut batal. Dokumen kembali ke status disetujui. Alasan: :reason',
+            'without_date' => 'Penerimaan Claim :claim_number dibatalkan oleh :actor_name. Dokumen kembali ke status disetujui. Alasan: :reason',
+        ],
     ],
+
     'cash_advance' => [
+        /*
+        | Gugur karena perdinnya, bukan karena ada yang menolaknya.
+        |
+        | Dipisah dari 'rejected' justru karena itu: tidak ada penolak,
+        | dan pesan yang menyebut penolak akan mengarang orang.
+        |
+        | Satu kalimat utuh per sebab, bukan satu kalimat bertambal kata
+        | kerja. Notifikasi diterjemahkan ulang saat DIBACA, memakai kunci
+        | dan parameter yang tersimpan -- dan parameternya tidak ikut
+        | diterjemahkan. Kata kerja yang dikirim sebagai parameter akan
+        | membeku dalam bahasa penulisnya, dan pembaca bahasa lain
+        | menerima kalimat yang separuh benar.
+        */
+        'lapsed_by_trip' => [
+            'requester' => [
+                'cancelled' => [
+                    'title' => 'FPU Gugur',
+                    'message' => 'FPU :advance_number gugur karena Perjalanan Dinas :trip_number dibatalkan.',
+                ],
+                'rejected' => [
+                    'title' => 'FPU Gugur',
+                    'message' => 'FPU :advance_number gugur karena Perjalanan Dinas :trip_number ditolak.',
+                ],
+            ],
+            'approver' => [
+                'cancelled' => [
+                    'title' => 'Persetujuan FPU Dihentikan',
+                    'message' => 'Persetujuan FPU :advance_number dihentikan karena Perjalanan Dinas :trip_number dibatalkan.',
+                ],
+                'rejected' => [
+                    'title' => 'Persetujuan FPU Dihentikan',
+                    'message' => 'Persetujuan FPU :advance_number dihentikan karena Perjalanan Dinas :trip_number ditolak.',
+                ],
+            ],
+        ],
+
         /*
         | Di luar approval flow: penerimanya pemegang permission pencairan,
         | bukan approver dokumen ini.
@@ -133,6 +231,44 @@ return [
         'disbursed' => [
             'title' => 'FPU Sudah Dibayarkan',
             'message' => 'FPU :advance_number telah dibayarkan oleh :disburser_name.',
+
+
+            /*
+            | Yang menyimpang dari jadwal dikabarkan apa adanya, beserta
+            | keterangan Finance bila ada. Pemohon yang dijanjikan Rabu
+            | lalu menerima uangnya Senin berikutnya berhak tahu tanpa
+            | harus membuka rincian dokumennya sendiri.
+            */
+            'message_early' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, lebih awal dari jadwal :scheduled_date.',
+            'message_early_reason' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, lebih awal dari jadwal :scheduled_date. Keterangan Finance: :reason',
+            'message_late' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, melewati jadwal :scheduled_date.',
+            'message_late_reason' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, melewati jadwal :scheduled_date. Keterangan Finance: :reason',
+        ],
+
+        /*
+        | Angka yang ditulis pemohon sendiri berubah di tangan orang
+        | lain. Kedua angkanya disebut terang-terangan, beserta
+        | alasannya -- yang membacanya tidak semestinya perlu membuka
+        | aplikasi hanya untuk tahu berapa selisihnya.
+        */
+        'amount_revised' => [
+            'title' => 'Nominal FPU Direvisi',
+            'message' => 'Nominal FPU :advance_number diubah oleh :reviser_name dari :old_total menjadi :new_total. Alasan: :reason',
+        ],
+
+        /*
+        | Tanggal pembayaran yang sudah dijanjikan ikut batal. Disebut
+        | terang-terangan karena itulah yang sudah dicatat pemohon dari
+        | email sebelumnya -- dan tanpa menyebutnya, kabar ini hanya
+        | memberi tahu bahwa ada sesuatu yang berubah.
+        |
+        | Dua kalimat karena dokumen lama bisa saja tidak pernah punya
+        | tanggal pembayaran.
+        */
+        'receipt_reverted' => [
+            'title' => 'Penerimaan FPU Dibatalkan',
+            'with_date' => 'Penerimaan FPU :advance_number dibatalkan oleh :actor_name. Jadwal pembayaran :scheduled_date ikut batal. Dokumen kembali ke status disetujui. Alasan: :reason',
+            'without_date' => 'Penerimaan FPU :advance_number dibatalkan oleh :actor_name. Dokumen kembali ke status disetujui. Alasan: :reason',
         ],
     ],
 
@@ -185,6 +321,21 @@ return [
             'title' => 'Selisih Realisasi FPU Selesai',
             'message' => 'Selisih Realisasi FPU :realization_number telah diselesaikan oleh :settler_name.',
         ],
+
+        /*
+        | Tanggal pembayaran yang sudah dijanjikan ikut batal. Disebut
+        | terang-terangan karena itulah yang sudah dicatat pemohon dari
+        | email sebelumnya -- dan tanpa menyebutnya, kabar ini hanya
+        | memberi tahu bahwa ada sesuatu yang berubah.
+        |
+        | Dua kalimat karena dokumen lama bisa saja tidak pernah punya
+        | tanggal pembayaran.
+        */
+        'receipt_reverted' => [
+            'title' => 'Penerimaan Realisasi FPU Dibatalkan',
+            'with_date' => 'Penerimaan Realisasi FPU :realization_number dibatalkan oleh :actor_name. Jadwal pembayaran :scheduled_date ikut batal. Dokumen kembali ke status disetujui. Alasan: :reason',
+            'without_date' => 'Penerimaan Realisasi FPU :realization_number dibatalkan oleh :actor_name. Dokumen kembali ke status disetujui. Alasan: :reason',
+        ],
     ],
     'business_trip' => [
         'approval_request' => [
@@ -206,6 +357,48 @@ return [
         'rejected' => [
             'title' => 'Perdin Ditolak',
             'message' => 'Perdin :trip_number ditolak oleh :approver_name. Catatan: :notes',
+        ],
+
+        /*
+        | Untuk pihak yang mengurus pemesanan, bukan untuk pemohon.
+        | Nada dan isinya berbeda: yang dibutuhkan pembacanya adalah
+        | siapa yang berangkat, ke mana, dan kapan.
+        */
+        'travel_arrangement' => [
+            'title' => 'Perdin siap diurus pemesanannya',
+            'message' => 'Perdin :trip_number atas nama :employee_name sudah disetujui seluruhnya. Tujuan :destination, berangkat :depart_date.',
+        ],
+        /*
+        | Kabar untuk yang berangkat, satu per pemesanan.
+        |
+        | Tiga kalimat, bukan satu: dipesan, diganti, dan dibatalkan adalah
+        | tiga kabar yang berbeda akibatnya. Kalimat seragam "ada perubahan
+        | pemesanan" memaksa pembacanya membuka aplikasi hanya untuk tahu
+        | apakah ia perlu berbuat sesuatu.
+        */
+        'arrangement' => [
+            'created' => [
+                'title' => 'Pemesanan Perjalanan Sudah Diurus',
+                'message' => 'Untuk perdin :trip_number, :type sudah dipesan (:vendor). Rinciannya bisa dilihat di detail perdin.',
+            ],
+
+            'replaced' => [
+                'title' => 'Pemesanan Pengganti Sudah Diurus',
+                'message' => 'Untuk perdin :trip_number, :type sudah dipesan ulang (:vendor) menggantikan pemesanan yang dibatalkan. Gunakan yang terbaru ini.',
+            ],
+
+            'cancelled' => [
+                'title' => 'Pemesanan Perjalanan Dibatalkan',
+                'message' => 'Untuk perdin :trip_number, :type (:vendor) dibatalkan. Alasannya bisa dilihat di detail perdin.',
+            ],
+
+            'type_penginapan' => 'penginapan',
+            'type_tiket' => 'tiket pesawat',
+            'type_transport' => 'transport lokal',
+            'type_lainnya' => 'pemesanan lainnya',
+
+            /* Nama penyedianya boleh kosong, kalimatnya tetap harus utuh. */
+            'vendor_unset' => 'penyedia belum dicantumkan',
         ],
     ],
 ];

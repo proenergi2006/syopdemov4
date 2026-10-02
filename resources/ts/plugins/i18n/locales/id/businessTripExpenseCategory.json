@@ -1,0 +1,42 @@
+{
+    "title": "Kategori Biaya Perdin",
+    "subtitle": "Pengelompokan rincian FPU dan Realisasi yang keterangan transaksinya Perjalanan Dinas.",
+    "search": "Cari nama atau keterangan",
+    "statusAll": "Semua status",
+    "statusActive": "Aktif",
+    "statusInactive": "Nonaktif",
+    "addButton": "Tambah Kategori",
+    "empty": "Belum ada kategori biaya.",
+    "loadFailed": "Data kategori biaya gagal dimuat.",
+    "columns": {
+        "order": "Urutan",
+        "name": "Nama Kategori",
+        "description": "Keterangan",
+        "status": "Status",
+        "actions": "Aksi"
+    },
+    "form": {
+        "createTitle": "Tambah Kategori Biaya",
+        "editTitle": "Ubah Kategori Biaya",
+        "name": "Nama Kategori",
+        "nameHint": "Muncul sebagai judul kelompok pada rincian dan cetakan.",
+        "description": "Keterangan",
+        "sortOrder": "Urutan Tampil",
+        "sortOrderHint": "Makin kecil makin atas. Berjarak sepuluh supaya kategori baru bisa diselipkan tanpa menggeser yang lain.",
+        "active": "Aktif",
+        "activeHint": "Yang nonaktif hilang dari pilihan, tetapi dokumen lama yang memakainya tetap terbaca.",
+        "save": "Simpan",
+        "cancel": "Batal"
+    },
+    "toggle": {
+        "activate": "Aktifkan",
+        "deactivate": "Nonaktifkan"
+    },
+    "delete": {
+        "action": "Hapus",
+        "title": "Hapus kategori ini?",
+        "text": "Kategori {name} akan dihapus. Tindakan ini tidak bisa dibatalkan.",
+        "confirm": "Ya, Hapus",
+        "inUseTooltip": "Sudah dipakai rincian dokumen — nonaktifkan saja."
+    }
+}

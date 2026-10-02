@@ -99,6 +99,8 @@ return [
         'failed' => 'Failed to export the cash advance data.',
         'filename' => 'CashAdvance',
         'sheet_title' => 'Cash Advance',
+        'no_expense_category' => '(no category)',
+        'arranged_by_ga' => 'Arranged by GA (not claimed)',
         'no_item' => '(no lines)',
 
         'columns' => [
@@ -112,6 +114,9 @@ return [
             'subject' => 'Subject',
             'item_date' => 'Line Date',
             'item_description' => 'Line Description',
+            'expense_category' => 'Expense Category',
+            'qty' => 'Qty',
+            'unit_price' => 'Unit Cost',
             'item_amount' => 'Line Amount',
             'total_amount' => 'Total Requested',
             'status' => 'Status',
@@ -149,5 +154,19 @@ return [
         'item_date_outside_trip' => 'Row :row: the date falls outside business trip :number (:from to :to). A trip expense cannot be dated outside the trip itself.',
         'trip_not_approved' => 'This cash advance cannot be disbursed yet: business trip :number is still awaiting management approval.',
         'trip_not_valid' => 'This cash advance cannot be disbursed: business trip :number was rejected or cancelled. Cancel this cash advance, or submit the business trip again.',
+    ],
+
+    /*
+    | Rincian berkategori pada dokumen perjalanan dinas.
+    |
+    | Nominal tiap baris dihitung dari Qty x Rincian Biaya, bukan diterima
+    | dari layar -- nominal yang bisa datang dari dua tempat cepat atau
+    | lambat akan datang berbeda.
+    */
+    'breakdown' => [
+        'category_required' => 'Row :row: the expense category is not selected. Business trip lines are grouped by category.',
+        'qty_required' => 'Row :row: Qty is required and must be greater than zero.',
+        'unit_price_required' => 'Row :row: Unit cost is required and must be greater than zero.',
+        'arranged_has_items' => 'Category :category is marked as arranged by GA, so it cannot have any lines. Remove the lines, or turn the marker off.',
     ],
 ];

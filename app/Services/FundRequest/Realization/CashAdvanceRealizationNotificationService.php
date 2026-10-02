@@ -305,6 +305,62 @@ class CashAdvanceRealizationNotificationService
     /**
      * Dikirim ke pemohon setelah PIC menandai dokumennya diterima.
      */
+    /**
+     * Dikirim ke pemohon ketika Finance menarik kembali penerimaan berkasnya.
+     *
+     * Tanggal pembayaran yang batal disebut terang-terangan: itulah yang
+     * sudah ia catat dari email sebelumnya, dan tanpa menyebutnya kabar ini
+     * hanya memberi tahu bahwa "ada sesuatu yang berubah".
+     *
+     * Dokumennya sendiri tidak hilang -- ia kembali ke status disetujui dan
+     * masih bisa diterima ulang. Itu pun perlu dikatakan, kalau tidak pemohon
+     * akan mengira pengajuannya batal.
+     */
+    public function notifyReceiptReverted(
+        CashAdvanceRealization $realization,
+        User $actor,
+        ?string $scheduledDate,
+        string $reason,
+    ): void {
+        $requesterId = $this->getRequesterUserId($realization);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        /*
+        | Dokumen lama bisa saja tidak pernah punya tanggal pembayaran.
+        | Kalimatnya dipilih menurut itu, bukan diisi tanda hubung -- "tanggal
+        | pembayaran - dibatalkan" tidak berarti apa-apa bagi pembacanya.
+        */
+        $bagian = $scheduledDate ? 'with_date' : 'without_date';
+
+        $messageParams = [
+            'realization_number' => $realization->realization_number,
+            'actor_name' => $actor->name ?? '-',
+            'scheduled_date' => $scheduledDate ?? '-',
+            'reason' => trim($reason),
+        ];
+
+        $titleKey = 'notification_messages.cash_advance_realization.receipt_reverted.title';
+        $messageKey = 'notification_messages.cash_advance_realization.receipt_reverted.' . $bagian;
+
+        Notification::create([
+            'user_id' => $requesterId,
+            'type' => 'cash_advance_realization_receipt_reverted',
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'module' => self::MODULE,
+            'reference_type' => CashAdvanceRealization::class,
+            'reference_id' => $realization->id,
+            'reference_public_id' => $realization->encrypted_id,
+            'url' => self::URL,
+        ]);
+    }
+
     public function notifyReceived(
         CashAdvanceRealization $realization,
         User $receiver,

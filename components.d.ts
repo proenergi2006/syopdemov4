@@ -284,6 +284,7 @@ declare module '@vue/runtime-core' {
     ErrorHeader: typeof import('./resources/ts/@core/components/ErrorHeader.vue')['default']
     I18n: typeof import('./resources/ts/@core/components/I18n.vue')['default']
     LoadingStateCard: typeof import('./resources/ts/@core/components/LoadingStateCard.vue')['default']
+    NotFoundView: typeof import('./resources/ts/@core/components/NotFoundView.vue')['default']
     Notifications: typeof import('./resources/ts/@core/components/Notifications.vue')['default']
     OffSchedulePaymentDialog: typeof import('./resources/ts/@core/components/OffSchedulePaymentDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

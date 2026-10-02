@@ -31,7 +31,6 @@ interface ItineraryForm {
   time_end: string | null
   timezone: string
   description: string
-  pic: string
 }
 
 interface EmployeeIdentity {
@@ -64,7 +63,6 @@ const emptyRow = (): ItineraryForm => ({
   time_end: null,
   timezone: 'WIB',
   description: '',
-  pic: '',
 })
 
 const form = reactive({
@@ -94,9 +92,9 @@ const rowIncomplete = (baris: ItineraryForm): boolean =>
 | Rundown disunting di modal layar penuh
 |--------------------------------------------------------------------------
 | Mengikuti pola rincian FPU. Satu baris rundown membawa tanggal, dua jam,
-| zona waktu, keterangan, dan PIC sekaligus -- tujuh kolom yang terlalu
-| padat untuk dimuat di tengah formulir, dan hanya menyisakan kotak-kotak
-| sempit yang harus digeser ke samping untuk dibaca.
+| zona waktu, dan keterangan sekaligus -- enam kolom yang terlalu padat
+| untuk dimuat di tengah formulir, dan hanya menyisakan kotak-kotak sempit
+| yang harus digeser ke samping untuk dibaca.
 |
 | Halaman utama hanya menampilkan ringkasannya sebagai teks.
 |--------------------------------------------------------------------------
@@ -262,7 +260,7 @@ const buildDaySkeleton = (): void => {
 
   /* Baris kosong yang menganggur dipakai dulu sebelum menambah yang baru. */
   const kosong = tempItineraries.value.filter(
-    row => !row.date && !row.time_start && !row.description.trim() && !row.pic.trim(),
+    row => !row.date && !row.time_start && !row.description.trim(),
   )
 
   const terpakai = tempItineraries.value.filter(row => !kosong.includes(row))
@@ -352,7 +350,7 @@ const saveItineraryDialog = (): void => {
   | "tambah 20" yang tidak semuanya terpakai, bukan kesalahan pengguna.
   */
   const terisi = tempItineraries.value.filter(
-    row => row.date || row.time_start || row.description.trim() || row.pic.trim(),
+    row => row.date || row.time_start || row.description.trim(),
   )
 
   if (!terisi.length) {
@@ -508,7 +506,6 @@ const save = async (): Promise<void> => {
         time_end: baris.time_end || null,
         timezone: baris.timezone,
         description: baris.description.trim(),
-        pic: baris.pic.trim() || null,
       })),
     })
 
@@ -824,19 +821,6 @@ onMounted(() => {
                       <span v-if="summaryTime(row)">&middot; {{ summaryTime(row) }}</span>
                     </div>
                   </div>
-
-                  <div
-                    v-if="row.pic"
-                    class="text-end"
-                  >
-                    <div class="text-caption text-medium-emphasis">
-                      {{ t('businessTrip.form.fields.rowPic') }}
-                    </div>
-
-                    <div class="font-weight-medium">
-                      {{ row.pic }}
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1031,9 +1015,6 @@ onMounted(() => {
                     {{ t('businessTrip.form.fields.rowDescription') }}
                     <span class="text-error">*</span>
                   </th>
-                  <th style="min-inline-size: 200px;">
-                    {{ t('businessTrip.form.fields.rowPic') }}
-                  </th>
                   <th style="inline-size: 56px;" />
                 </tr>
               </thead>
@@ -1088,15 +1069,6 @@ onMounted(() => {
                       density="compact"
                       hide-details="auto"
                       :placeholder="t('businessTrip.form.itineraryDialog.descriptionPlaceholder')"
-                    />
-                  </td>
-
-                  <td>
-                    <VTextField
-                      v-model="baris.pic"
-                      density="compact"
-                      hide-details="auto"
-                      :placeholder="t('businessTrip.form.itineraryDialog.picPlaceholder')"
                     />
                   </td>
 

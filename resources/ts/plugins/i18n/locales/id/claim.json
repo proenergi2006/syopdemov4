@@ -56,7 +56,8 @@
             "department": "Department",
             "notes": "Catatan",
             "subject": "Perihal",
-            "transactionCategory": "Keterangan Transaksi"
+            "transactionCategory": "Keterangan Transaksi",
+            "businessTrip": "Dokumen Perjalanan Dinas"
         },
         "itemDialog": {
             "addRowButton": "Tambah Baris",
@@ -86,7 +87,8 @@
         "noData": {
             "branch": "Cabang tidak tersedia",
             "department": "Pilih cabang terlebih dahulu",
-            "transactionCategory": "Keterangan transaksi tidak tersedia"
+            "transactionCategory": "Keterangan transaksi tidak tersedia",
+            "businessTrip": "Tidak ada Perdin yang bisa dipakai. Pastikan Perdin Anda sudah disetujui dan belum dipakai FPU atau Claim lain."
         },
         "placeholders": {
             "branch": "Pilih cabang",
@@ -94,7 +96,8 @@
             "department": "Pilih department",
             "notes": "Catatan tambahan untuk approver",
             "subject": "Contoh: Biaya perjalanan dinas ke Palembang",
-            "transactionCategory": "Pilih keterangan transaksi"
+            "transactionCategory": "Pilih keterangan transaksi",
+            "businessTrip": "Pilih Perdin yang sudah disetujui"
         },
         "reload": {
             "branch": "Muat ulang daftar cabang"
@@ -117,7 +120,8 @@
             "saveFailed": "Claim gagal disimpan.",
             "savingData": "Menyimpan data...",
             "updateConfirmText": "Perubahan pada Claim ini akan disimpan.",
-            "updateConfirmTitle": "Simpan perubahan?"
+            "updateConfirmTitle": "Simpan perubahan?",
+            "linesClearedByCategory": "Rincian pengeluaran dikosongkan karena keterangan transaksinya berganti. Cara pengisiannya berbeda, jadi rinciannya diisi ulang dari awal."
         },
         "validation": {
             "branch": "Cabang wajib dipilih.",
@@ -128,14 +132,27 @@
             "itemDate": "Tanggal wajib diisi.",
             "itemDescription": "Deskripsi wajib diisi.",
             "subject": "Perihal wajib diisi.",
-            "transactionCategory": "Keterangan transaksi wajib dipilih."
+            "transactionCategory": "Keterangan transaksi wajib dipilih.",
+            "businessTrip": "Dokumen Perjalanan Dinas wajib dipilih.",
+            "itemDateOutsideTrip": "Di luar periode perdin."
+        },
+        "hints": {
+            "businessTrip": "Hanya Perdin milik Anda yang sudah disetujui dan belum dipakai FPU atau Claim lain yang berjalan.",
+            "businessTripPeriod": "Periode perjalanan: {from} s/d {to}. Tanggal rincian hanya bisa dipilih di dalam rentang itu."
+        },
+        "businessTripState": {
+            "approved": "Disetujui",
+            "pending": "Menunggu acc",
+            "locked": "Belum bisa dipilih: perdin ini belum disetujui, atau sudah dipakai dokumen lain.",
+            "waitingStep": "Terkunci — menunggu persetujuan tahap {step}: {who}",
+            "someone": "penyetuju berikutnya"
         }
     },
     "list": {
         "approve": {
             "confirmButton": "Setujui",
             "dialogSubtitle": "Pastikan rincian pengajuan sudah benar sebelum menyetujui.",
-            "dialogTitle": "Setujui Claim",
+            "dialogTitle": "Setujui Claim {number}?",
             "failedFallback": "Claim gagal disetujui.",
             "notesLabel": "Catatan (opsional)",
             "notesPlaceholder": "Tulis catatan approval bila perlu",
@@ -204,12 +221,17 @@
             "loading": "Menyiapkan cetakan Claim...",
             "popupBlocked": "Popup diblokir browser. Mohon izinkan popup untuk situs ini.",
             "urlFailed": "URL cetak gagal dibuat.",
-            "windowClosed": "Jendela cetak telah ditutup."
+            "windowClosed": "Jendela cetak telah ditutup.",
+            "attachmentTitle": "Cetak dokumen",
+            "attachmentCount": "Dokumen ini punya {count} lampiran.",
+            "attachmentInclude": "Gabungkan lampiran ke dalam satu PDF",
+            "attachmentPdfNotice": "Lampiran berupa gambar akan dimasukkan ke halaman berikutnya, dua per halaman. Lampiran yang sudah berformat PDF tidak bisa digabung — namanya tetap didaftarkan pada halaman terakhir agar bisa dibuka terpisah.",
+            "attachmentConfirm": "Cetak"
         },
         "reject": {
             "confirmButton": "Tolak",
             "dialogSubtitle": "Penolakan menghentikan seluruh proses approval Claim ini.",
-            "dialogTitle": "Tolak Claim",
+            "dialogTitle": "Tolak Claim {number}?",
             "failedFallback": "Claim gagal ditolak.",
             "notesLabel": "Alasan penolakan",
             "notesPlaceholder": "Jelaskan alasan penolakan",
@@ -299,6 +321,34 @@
         },
         "paymentDay": {
             "blockedNotice": "Pembayaran hanya bisa dilakukan pada hari {days}. Ada Claim yang menunggu dibayarkan, tetapi hari ini bukan hari pembayaran — tombolnya akan aktif kembali pada hari tersebut."
+        },
+        "revise": {
+            "title": "Terima Berkas Claim {nomor}",
+            "subtitle": "Periksa rinciannya. Bila ada nominal yang perlu dibetulkan, ubah di kolom kanan — angka yang diajukan pemohon tetap tersimpan sebagai pembanding.",
+            "colDate": "Tanggal",
+            "colDescription": "Keterangan",
+            "colSubmitted": "Diajukan",
+            "colRevised": "Nominal Diterima",
+            "totalSubmitted": "Total diajukan",
+            "totalRevised": "Total diterima",
+            "warning": "Nominalnya berubah. Pemohon akan menerima pemberitahuan berisi angka lama, angka baru, dan alasan di bawah ini.",
+            "notes": "Alasan Revisi",
+            "notesHint": "Dibaca pemohon. Jelaskan singkat kenapa nominalnya dibetulkan.",
+            "notesRequired": "Alasan revisi wajib diisi karena ada nominal yang berubah.",
+            "invalidAmount": "Nominal pada baris \"{name}\" belum diisi dengan benar.",
+            "confirmUnchanged": "Terima Berkas",
+            "confirmRevised": "Terima & Revisi Nominal"
+        },
+        "unreceive": {
+            "menu": "Batalkan Terima",
+            "title": "Batalkan penerimaan berkas ini?",
+            "warning": "Dokumen kembali ke status disetujui, dan jadwal pembayaran yang sudah dijanjikan ke pemohon ikut dibatalkan. Setelah ini Claim bisa dibatalkan atau diterima ulang.",
+            "notes": "Alasan Pembatalan Penerimaan",
+            "notesHint": "Dibaca pemohon. Jelaskan singkat kenapa penerimaannya ditarik kembali.",
+            "notesRequired": "Alasan pembatalan penerimaan wajib diisi.",
+            "confirm": "Ya, Batalkan Terima",
+            "successFallback": "Penerimaan berkas berhasil dibatalkan.",
+            "failedFallback": "Penerimaan berkas gagal dibatalkan."
         }
     },
     "status": {

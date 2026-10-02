@@ -7,6 +7,7 @@ import {
   closeAlert,
   showConfirmAlert,
   showErrorToast,
+  showInfoToast,
   showLoadingAlert,
   showWarningToast,
 } from '@/utils/alert'
@@ -25,6 +26,15 @@ interface CashAdvanceItemForm {
    * dibaca bersama buktinya sendiri. Wajib minimal satu berkas.
    */
   attachments: File[]
+
+  /*
+  | Hanya terisi pada FPU perjalanan dinas. Di sana rinciannya
+  | dikelompokkan per kategori, dan nominalnya tidak pernah diketik --
+  | ia selalu hasil qty x harga satuan.
+  */
+  expense_category_id: number | null
+  qty: number | null
+  unit_price: number | null
 }
 
 interface UserAccessAssignmentItem {
@@ -91,6 +101,10 @@ const createEmptyItem = (): CashAdvanceItemForm => ({
   description: '',
   amount: 0,
   attachments: [],
+
+  expense_category_id: null,
+  qty: null,
+  unit_price: null,
 })
 
 const form = reactive({
@@ -113,6 +127,26 @@ const form = reactive({
   notes: '',
   items: [createEmptyItem()] as CashAdvanceItemForm[],
 })
+
+/**
+ * Baris rincian itu benar-benar berisi sesuatu.
+ *
+ * Formulir berangkat dengan satu baris kosong -- itulah yang nanti diisi
+ * di modal. Tanpa pemeriksaan ini, baris itu ikut tergambar pada ringkasan
+ * sebagai "- · Tanggal: - · Rp 0", tepat di bawah tulisan bahwa rinciannya
+ * belum ada.
+ *
+ * Ketiganya diperiksa, bukan keterangannya saja: baris yang sudah
+ * bernominal tetapi belum diberi keterangan tetap berisi sesuatu, dan
+ * menyembunyikannya berarti menyembunyikan angka yang sudah diketik orang.
+ */
+const isItemFilled = (item: { description?: string; date?: string | null; amount?: unknown }): boolean =>
+  Boolean(String(item.description ?? '').trim())
+  || Boolean(String(item.date ?? '').trim())
+  || Number(item.amount ?? 0) > 0
+
+/** Ada rincian yang pantas ditampilkan dan pantas direset. */
+const hasItemDetails = computed<boolean>(() => form.items.some(isItemFilled))
 
 const requestTypeList = ['Rutin', 'Non Rutin']
 
@@ -221,6 +255,19 @@ const needsBusinessTrip = computed<boolean>(() => {
 
   return Boolean((dipilih as any)?.requires_business_trip)
 })
+
+/*
+| Lampiran wajib, KECUALI untuk FPU perjalanan dinas.
+|
+| Biaya perjalanan sebagian besar belum punya bukti saat diajukan --
+| tiket, penginapan, dan transport lokal baru ada kuitansinya setelah
+| perjalanannya berlangsung. Buktinya menyusul di Realisasi, bukan di
+| pengajuan; mewajibkannya di sini hanya melahirkan lampiran asal ada.
+|
+| Dibaca dari keterangan transaksinya, sumber yang sama dengan yang
+| menentukan wajib tidaknya dokumen perdin.
+*/
+const attachmentRequired = computed<boolean>(() => !needsBusinessTrip.value)
 
 /*
 | Tanggal baris rincian mengikuti periode perjalanannya.
@@ -627,6 +674,179 @@ const missingHeaderFields = computed<string[]>(() => {
   return kurang
 })
 
+/*
+|--------------------------------------------------------------------------
+| Rincian berkategori, khusus FPU perjalanan dinas
+|--------------------------------------------------------------------------
+| Bentuknya mengikuti formulir kertas yang berjalan: Item, Qty, Rincian
+| Biaya, Total -- dikelompokkan Transportasi, Penginapan, Uang Saku.
+|
+| Kategorinya dibaca dari master, bukan ditulis di sini: urutan tampilnya
+| dan kategori keempat tidak semestinya menunggu rilis.
+|--------------------------------------------------------------------------
+*/
+interface ExpenseCategoryOption {
+  id: number
+  name: string
+  sort_order: number
+}
+
+const expenseCategoryList = ref<ExpenseCategoryOption[]>([])
+const isLoadingExpenseCategory = ref(false)
+
+/* Kategori yang ditandai diurus GA -- tidak ditagihkan, tanpa baris. */
+const arrangedCategories = ref<number[]>([])
+
+const loadExpenseCategories = async (): Promise<void> => {
+  if (!needsBusinessTrip.value) {
+    expenseCategoryList.value = []
+
+    return
+  }
+
+  isLoadingExpenseCategory.value = true
+
+  try {
+    const response = await axios.get(
+      '/fund-request/business-trip-expense-categories/dropdown-select',
+      { headers: { Accept: 'application/json' } },
+    )
+
+    expenseCategoryList.value = Array.isArray(response?.data?.data)
+      ? response.data.data
+      : []
+  }
+  catch (error: unknown) {
+    expenseCategoryList.value = []
+  }
+  finally {
+    isLoadingExpenseCategory.value = false
+  }
+}
+
+watch(needsBusinessTrip, () => {
+  loadExpenseCategories()
+
+  /*
+  | Keterangan transaksinya berganti ke bukan-perdin: penanda GA dan
+  | pengelompokan barisnya kehilangan artinya. Dibersihkan di sini,
+  | bukan dibiarkan terbawa diam-diam ke dokumen yang tidak mengenalnya.
+  */
+  if (!needsBusinessTrip.value) {
+    arrangedCategories.value = []
+
+    for (const item of form.items) {
+      item.expense_category_id = null
+      item.qty = null
+      item.unit_price = null
+    }
+  }
+}, { immediate: true })
+
+/**
+ * Nominal sebuah baris perdin: selalu qty x harga satuan.
+ *
+ * Tidak pernah diketik. Server pun menghitungnya sendiri dan mengabaikan
+ * angka yang dikirim layar -- yang di sini hanya menampilkan hasil yang
+ * sama supaya yang mengisi tahu apa yang akan tersimpan.
+ */
+const lineTotal = (item: CashAdvanceItemForm): number =>
+  Math.round((Number(item.qty) || 0) * (Number(item.unit_price) || 0) * 100) / 100
+
+/* Baris yang sedang disunting, dikelompokkan menurut kategorinya. */
+const tempItemsByCategory = computed<{
+  category: ExpenseCategoryOption
+  rows: { item: CashAdvanceItemForm; index: number }[]
+  total: number
+  arranged: boolean
+}[]>(() =>
+  expenseCategoryList.value.map(category => {
+    const rows = tempItems.value
+      .map((item, index) => ({ item, index }))
+      .filter(baris => Number(baris.item.expense_category_id) === Number(category.id))
+
+    return {
+      category,
+      rows,
+      total: rows.reduce((jumlah, baris) => jumlah + lineTotal(baris.item), 0),
+      arranged: arrangedCategories.value.includes(Number(category.id)),
+    }
+  }))
+
+/*
+| Rincian yang SUDAH tersimpan, dikelompokkan untuk ringkasan di halaman.
+|
+| Berbeda dari tempItemsByCategory yang membaca baris di dalam modal. Keduanya
+| perlu: yang satu menggambar apa yang sedang disunting, yang ini menggambar
+| apa yang akan terkirim.
+*/
+const formItemsByCategory = computed<{
+  category: ExpenseCategoryOption
+  rows: CashAdvanceItemForm[]
+  total: number
+  arranged: boolean
+}[]>(() =>
+  expenseCategoryList.value
+    .map(category => {
+      const rows = form.items.filter(
+        item => Number(item.expense_category_id) === Number(category.id),
+      )
+
+      return {
+        category,
+        rows,
+        total: rows.reduce((jumlah, item) => jumlah + Number(item.amount || 0), 0),
+        arranged: arrangedCategories.value.includes(Number(category.id)),
+      }
+    })
+
+    /*
+    | Kategori yang kosong DAN tidak diurus GA tidak ditampilkan: ia tidak
+    | mengatakan apa-apa, hanya menambah tinggi halaman.
+    */
+    .filter(kelompok => kelompok.rows.length > 0 || kelompok.arranged))
+
+/* Ada sesuatu untuk ditampilkan: baris, atau kategori yang diurus GA. */
+const hasBreakdownSummary = computed<boolean>(() =>
+  formItemsByCategory.value.length > 0)
+
+const tempItemsTotal = computed<number>(() =>
+  tempItems.value.reduce((jumlah, item) => jumlah + lineTotal(item), 0))
+
+/**
+ * Menandai atau membatalkan "diurus GA" pada sebuah kategori.
+ *
+ * Menandainya membuang baris kategori itu. Keduanya pernyataan yang saling
+ * meniadakan -- server menolak dokumen yang mengatakan dua-duanya -- dan
+ * membuangnya di sini lebih jujur daripada menyimpannya diam-diam lalu
+ * ditolak saat menyimpan.
+ */
+const toggleArranged = (categoryId: number): void => {
+  const id = Number(categoryId)
+
+  if (arrangedCategories.value.includes(id)) {
+    arrangedCategories.value = arrangedCategories.value.filter(satu => satu !== id)
+
+    return
+  }
+
+  arrangedCategories.value = [...arrangedCategories.value, id]
+
+  tempItems.value = tempItems.value.filter(
+    item => Number(item.expense_category_id) !== id,
+  )
+}
+
+/** Menambah satu baris kosong pada sebuah kategori. */
+const addItemRowTo = (categoryId: number): void => {
+  tempItems.value.push({
+    ...createEmptyItem(),
+    expense_category_id: Number(categoryId),
+    qty: 1,
+    unit_price: 0,
+  })
+}
+
 const openItemFullscreen = (): void => {
   /*
   | Rincian baru bisa diisi setelah kepalanya lengkap.
@@ -654,8 +874,25 @@ const openItemFullscreen = (): void => {
 
   tempItems.value = cloneItems(form.items)
 
-  if (!tempItems.value.length)
+  if (needsBusinessTrip.value) {
+    /*
+    | Baris tanpa kategori dibuang sebelum modalnya terbuka.
+    |
+    | Ia tidak tergambar di kelompok mana pun -- tidak ada kategori yang
+    | memuatnya -- sementara penjagaannya tetap melihatnya dan menolak
+    | menyimpan karena baris yang tidak bisa dilihat siapa pun.
+    |
+    | Baris begitu lahir dari dua tempat: baris kosong bawaan formulir,
+    | dan rincian lama yang dibuat sebelum keterangan transaksinya
+    | diganti menjadi perjalanan dinas.
+    */
+    tempItems.value = tempItems.value.filter(
+      item => Number(item.expense_category_id) > 0,
+    )
+  }
+  else if (!tempItems.value.length) {
     tempItems.value = [createEmptyItem()]
+  }
 
   itemDialogSaved.value = false
   itemDialog.value = true
@@ -678,7 +915,153 @@ const discardItemDialog = (): void => {
   itemDialog.value = false
 }
 
+/**
+ * Memeriksa rincian perdin, dan mengembalikan true bila sudah layak.
+ *
+ * Aturannya berbeda dari rincian biasa: tanpa tanggal, tetapi menuntut
+ * kategori, Qty, dan Rincian Biaya. Totalnya tidak diperiksa -- ia
+ * selalu hasil hitungan, bukan isian.
+ */
+const validateBreakdownRows = (): boolean => {
+  /*
+  | Tidak ada baris DAN tidak ada kategori yang diurus GA: FPU-nya tidak
+  | menagih apa pun dan tidak menjelaskan kenapa.
+  |
+  | Yang seluruhnya diurus GA justru sah: pemohon memang tidak menagih
+  | apa pun karena GA yang memesan semuanya. Itu keadaan yang sudah
+  | dijelaskan, bukan formulir yang belum selesai.
+  */
+  if (!tempItems.value.length && !arrangedCategories.value.length) {
+    showWarningToast({
+      title: t('common.alert.warning'),
+      text: t('cashAdvance.form.breakdown.toastNoRows'),
+    })
+
+    return false
+  }
+
+  for (const [index, item] of tempItems.value.entries()) {
+    const nomor = index + 1
+
+    if (!Number(item.expense_category_id)) {
+      showWarningToast({
+        title: t('common.alert.warning'),
+        text: t('cashAdvance.form.breakdown.toastCategory', { number: nomor }),
+      })
+
+      return false
+    }
+
+    if (!item.description.trim()) {
+      showWarningToast({
+        title: t('common.alert.warning'),
+        text: t('cashAdvance.form.toast.completeItemRow', { number: nomor }),
+      })
+
+      return false
+    }
+
+    if (!(Number(item.qty) > 0)) {
+      showWarningToast({
+        title: t('common.alert.warning'),
+        text: t('cashAdvance.form.breakdown.toastQty', { number: nomor }),
+      })
+
+      return false
+    }
+
+    if (!(Number(item.unit_price) > 0)) {
+      showWarningToast({
+        title: t('common.alert.warning'),
+        text: t('cashAdvance.form.breakdown.toastUnitPrice', { number: nomor }),
+      })
+
+      return false
+    }
+  }
+
+  return true
+}
+
+/**
+ * Mengosongkan rincian karena keterangan transaksinya berganti.
+ *
+ * Tidak diam-diam: yang sudah terisi dikabarkan hilang. Baris yang sudah
+ * diketik orang tidak pantas lenyap tanpa sepatah kata, walau lenyapnya
+ * memang benar.
+ */
+const clearLinesOnCategoryChange = (): void => {
+  const adaIsi = form.items.some(isItemFilled)
+    || arrangedCategories.value.length > 0
+
+  form.items = []
+  arrangedCategories.value = []
+  itemDialogSaved.value = false
+
+  if (!adaIsi)
+    return
+
+  showInfoToast({
+    title: t('common.alert.info'),
+    text: t('cashAdvance.form.toast.linesClearedByCategory'),
+  })
+}
+
+/*
+| Pengawasnya pada keterangan transaksinya saja.
+|
+| Mengganti nomor perdin tidak mengubah cara pengisiannya -- yang berubah
+| perjalanan mana yang dibiayai, bukan bentuk rinciannya -- jadi rincian
+| yang sudah diisi tidak ada alasan untuk hilang.
+*/
+watch(() => form.transaction_category_id, (baru, lama) => {
+  /*
+  | Nilai pertamanya dilewati.
+  |
+  | Pada halaman sunting, yang memasangnya pemuat dokumennya sendiri, dan
+  | mengosongkan rincian di saat itu berarti membuang rincian tersimpan
+  | sebelum orangnya sempat melihatnya.
+  */
+  if (lama === null || lama === undefined || lama === '')
+    return
+
+  if (Number(lama) === Number(baru))
+    return
+
+  clearLinesOnCategoryChange()
+})
+
 const saveItemsFromDialog = (): void => {
+  /*
+  | Rincian perdin punya aturannya sendiri, dan berhenti di sini --
+  | pemeriksaan di bawahnya menuntut tanggal dan nominal yang pada
+  | bentuk ini memang tidak ada.
+  */
+  if (needsBusinessTrip.value) {
+    isSubmitted.value = true
+
+    if (!validateBreakdownRows())
+      return
+
+    /*
+    | Hanya baris berkategori yang disimpan; sisanya tidak pernah ada.
+    |
+    | Nominalnya diisi di sini, memakai hitungan yang sama persis dengan
+    | server. Bukan supaya server memakainya -- ia tetap menghitung sendiri
+    | dan mengabaikan kiriman -- melainkan supaya ringkasan dan totalnya di
+    | layar menunjukkan angka yang akan tersimpan.
+    */
+    const barisBerkategori = tempItems.value
+      .filter(item => Number(item.expense_category_id) > 0)
+      .map(item => ({ ...item, amount: lineTotal(item) }))
+
+    form.items = cloneItems(barisBerkategori)
+    itemDialogSaved.value = true
+    itemDialog.value = false
+
+    return
+  }
+
   /*
    * Tanggal wajib pada setiap baris. Dipisah dari pemeriksaan deskripsi
    * dan nominal supaya pesannya menunjuk langsung ke kolom yang kosong.
@@ -732,7 +1115,10 @@ const saveItemsFromDialog = (): void => {
     return
   }
 
-  const withoutAttachment = tempItems.value.findIndex(item => !item.attachments.length)
+  /* Tidak berlaku untuk FPU perdin -- buktinya menyusul di Realisasi. */
+  const withoutAttachment = attachmentRequired.value
+    ? tempItems.value.findIndex(item => !item.attachments.length)
+    : -1
 
   if (withoutAttachment !== -1) {
     isSubmitted.value = true
@@ -776,6 +1162,28 @@ const resetItems = async (): Promise<void> => {
 
   form.items = []
   tempItems.value = []
+}
+
+/**
+ * Rincian Biaya: berformat di kotaknya, angka polos di modelnya.
+ *
+ * Yang tersimpan harus tetap angka. Server menolak teks berformat --
+ * "24.200" mendua artinya, dan menebaknya berarti menebak nominal.
+ */
+const handleUnitPriceInput = (event: Event, index: number): void => {
+  const target = event.target as HTMLInputElement
+
+  const result = formatSanitizedNumberInput(target.value, formatMoney, {
+    maxLength: 15,
+    emptyAsZero: true,
+  })
+
+  if (!tempItems.value[index])
+    return
+
+  tempItems.value[index].unit_price = result.numeric ?? 0
+
+  target.value = result.formatted
 }
 
 const handleAmountInput = (event: Event, index: number): void => {
@@ -870,8 +1278,12 @@ const removeLineAttachment = (index: number, fileIndex: number): void => {
 }
 
 /** Baris tanpa bukti sama sekali; dipakai untuk menandai isian yang kurang. */
-const lineMissingAttachment = (index: number): boolean =>
-  !tempItems.value[index]?.attachments.length
+const lineMissingAttachment = (index: number): boolean => {
+  if (!attachmentRequired.value)
+    return false
+
+  return !tempItems.value[index]?.attachments.length
+}
 
 const formatFileSize = (bytes: number): string =>
   `${(bytes / 1024 / 1024).toFixed(2)} MB`
@@ -904,7 +1316,13 @@ const validateForm = (): boolean => {
     return false
   }
 
-  if (!form.items.length) {
+  /*
+  | Dokumen perdin yang seluruh kategorinya diurus GA sah tanpa satu
+  | baris pun: pemohon memang tidak mengeluarkan apa-apa karena GA yang
+  | memesan semuanya. Itu keadaan yang sudah dijelaskan, bukan formulir
+  | yang belum selesai -- dan aturan yang sama sudah berlaku di modalnya.
+  */
+  if (!form.items.length && !(needsBusinessTrip.value && arrangedCategories.value.length)) {
     showWarningToast({
       title: t('common.alert.warning'),
       text: t('cashAdvance.form.toast.minOneItem'),
@@ -917,7 +1335,14 @@ const validateForm = (): boolean => {
    * Tanggal wajib pada setiap baris. Dipisah dari pemeriksaan deskripsi
    * dan nominal supaya pesannya menunjuk langsung ke kolom yang kosong.
    */
-  const withoutDate = form.items.findIndex(item => !String(item.date ?? '').trim())
+  /*
+  | Bentuk perdin memang tidak bertanggal: kolomnya tidak ada di modal,
+  | jadi menuntutnya di sini berarti menolak dokumen karena kolom yang
+  | tidak bisa diisi siapa pun.
+  */
+  const withoutDate = needsBusinessTrip.value
+    ? -1
+    : form.items.findIndex(item => !String(item.date ?? '').trim())
 
   if (withoutDate !== -1) {
     showWarningToast({
@@ -963,7 +1388,9 @@ const validateForm = (): boolean => {
    * backend, supaya user tidak perlu menunggu satu perjalanan request untuk
    * tahu baris mana yang belum dilampiri.
    */
-  const withoutAttachment = form.items.findIndex(item => !item.attachments.length)
+  const withoutAttachment = attachmentRequired.value
+    ? form.items.findIndex(item => !item.attachments.length)
+    : -1
 
   if (withoutAttachment !== -1) {
     showWarningToast({
@@ -997,6 +1424,16 @@ const buildFormData = (): FormData => {
   formData.append('request_type', String(form.request_type || ''))
   formData.append('notes', form.notes || '')
 
+  /*
+  | Kategori yang ditandai diurus GA. Dikirim sebagai daftar id, dan
+  | hanya pada FPU perdin -- di tempat lain ia tidak berarti apa-apa.
+  */
+  if (needsBusinessTrip.value) {
+    arrangedCategories.value.forEach(id => {
+      formData.append('arranged_categories[]', String(id))
+    })
+  }
+
   formData.append(
     'items',
     JSON.stringify(
@@ -1004,6 +1441,15 @@ const buildFormData = (): FormData => {
         date: item.date || null,
         description: item.description,
         amount: Number(item.amount || 0),
+
+        /*
+        | Hanya berarti pada FPU perdin; server mengabaikannya di tempat
+        | lain. Nominalnya pun dihitung ulang di sana -- amount di atas
+        | dikirim apa adanya untuk bentuk yang lama.
+        */
+        expense_category_id: item.expense_category_id,
+        qty: item.qty,
+        unit_price: item.unit_price,
       })),
     ),
   )
@@ -1436,12 +1882,14 @@ onMounted(async () => {
                   </VTooltip>
                 </VBtn>
 
+                <!-- Tidak ada yang bisa direset selama rinciannya kosong. -->
                 <VBtn
                   type="button"
                   color="error"
                   variant="outlined"
                   size="small"
                   class="text-none"
+                  :disabled="!hasItemDetails"
                   @click="resetItems"
                 >
                   {{ t('cashAdvance.form.items.resetButton') }}
@@ -1461,13 +1909,88 @@ onMounted(async () => {
             >
               <VCardText>
                 <VAlert
-                  v-if="!form.items.length || form.items.every(item => !item.description)"
+                  v-if="needsBusinessTrip ? !hasBreakdownSummary : !hasItemDetails"
                   type="info"
                   variant="tonal"
                   density="compact"
                 >
                   {{ t('cashAdvance.form.items.emptyAlert', { action: t('cashAdvance.form.items.addButton') }) }}
                 </VAlert>
+
+                <!--
+                  RINGKASAN PERJALANAN DINAS
+
+                  Dikelompokkan per kategori, tanpa tanggal -- bentuk yang sama
+                  dengan modalnya dan dengan formulir kertasnya.
+
+                  Kategori yang diurus GA ikut ditampilkan walau tanpa baris:
+                  kosongnya disengaja, dan itu perlu terbaca. Tanpa ini, FPU yang
+                  seluruhnya diurus GA tampak seperti belum diisi sama sekali.
+                -->
+                <div
+                  v-if="needsBusinessTrip && hasBreakdownSummary"
+                  class="d-flex flex-column gap-3"
+                >
+                  <div
+                    v-for="kelompok in formItemsByCategory"
+                    :key="`ringkas-${kelompok.category.id}`"
+                    class="ca-cat-card"
+                  >
+                    <div class="ca-cat-head">
+                      <div class="ca-cat-name">
+                        {{ kelompok.category.name }}
+                      </div>
+
+                      <VChip
+                        v-if="kelompok.arranged"
+                        size="x-small"
+                        variant="tonal"
+                        color="warning"
+                      >
+                        {{ t('cashAdvance.form.breakdown.arrangedByGa') }}
+                      </VChip>
+
+                      <div class="ca-cat-total">
+                        <span class="text-caption text-medium-emphasis">
+                          {{ t('cashAdvance.form.items.total') }}
+                        </span>
+
+                        <strong>Rp {{ formatMoney(kelompok.total) || '0' }}</strong>
+                      </div>
+                    </div>
+
+                    <div
+                      v-if="kelompok.arranged"
+                      class="ca-cat-arranged"
+                    >
+                      {{ t('cashAdvance.form.breakdown.arrangedNotice') }}
+                    </div>
+
+                    <template v-else>
+                      <div
+                        v-for="(item, index) in kelompok.rows"
+                        :key="`ringkas-${kelompok.category.id}-${index}`"
+                        class="ca-sum-line"
+                      >
+                        <div class="min-w-0 flex-grow-1">
+                          <div class="font-weight-medium">
+                            {{ item.description || '-' }}
+                          </div>
+
+                          <div class="text-caption text-medium-emphasis mt-1">
+                            {{ t('cashAdvance.form.breakdown.tableQty') }}
+                            {{ item.qty ?? '-' }}
+                            &times; Rp {{ formatMoney(item.unit_price) || '0' }}
+                          </div>
+                        </div>
+
+                        <div class="font-weight-bold text-no-wrap">
+                          Rp {{ formatMoney(item.amount) || '0' }}
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
 
                 <!--
                   Muncul begitu perdinnya dipilih, tanpa menunggu disimpan.
@@ -1484,8 +2007,15 @@ onMounted(async () => {
                   {{ outsideTripMessage(itemsOutsideTripRange, 'cashAdvance.form.items.outsideTripAlert') }}
                 </VAlert>
 
+                <!--
+                  Syaratnya disebut, bukan v-else.
+
+                  v-else berpasangan dengan apa pun yang kebetulan berdiri
+                  tepat di atasnya; sekali ada yang menyisipkan peringatan di
+                  antaranya, pasangannya berpindah tanpa bersuara.
+                -->
                 <div
-                  v-else
+                  v-if="!needsBusinessTrip && hasItemDetails"
                   class="d-flex flex-column gap-3"
                 >
                   <div
@@ -1645,7 +2175,13 @@ onMounted(async () => {
 
           <VSpacer />
 
+          <!--
+            Disembunyikan pada bentuk berkategori: ia melahirkan baris tanpa
+            kategori, yang tidak tergambar di kelompok mana pun. Di sana
+            barisnya lahir dari tombol milik kategorinya masing-masing.
+          -->
           <VBtn
+            v-if="!needsBusinessTrip"
             variant="flat"
             class="me-3 text-none"
             prepend-icon="tabler-plus"
@@ -1664,165 +2200,425 @@ onMounted(async () => {
         </VToolbar>
 
         <VCardText class="pa-4">
-          <div class="ca-table-wrapper">
-            <VTable class="ca-item-table">
-              <thead>
-                <tr>
-                  <th class="ca-col-no">
-                    {{ t('cashAdvance.form.items.tableNo') }}
-                  </th>
-                  <th class="ca-col-date">
-                    {{ t('cashAdvance.form.items.tableDate') }}
-                    <span class="text-error">*</span>
-                  </th>
-                  <th class="ca-col-desc">
-                    {{ t('cashAdvance.form.items.tableDescription') }}
-                  </th>
-                  <th class="ca-col-amount">
-                    {{ t('cashAdvance.form.items.tableAmount') }}
-                  </th>
-                  <th class="ca-col-attachment">
-                    {{ t('cashAdvance.form.items.tableAttachment') }}
-                    <span class="text-error">*</span>
-                  </th>
-                  <th class="ca-col-action text-center">
-                    {{ t('cashAdvance.form.items.tableActions') }}
-                  </th>
-                </tr>
-              </thead>
+          <!--
+            RINCIAN BIASA
 
-              <tbody>
-                <tr
-                  v-for="(item, index) in tempItems"
-                  :key="`item-${index}`"
-                >
-                  <td class="text-medium-emphasis">
-                    {{ index + 1 }}
-                  </td>
+            Tabel datar: tanggal, keterangan, nominal. Dipakai seluruh FPU
+            yang keterangan transaksinya bukan perjalanan dinas.
+          -->
+          <template v-if="!needsBusinessTrip">
+            <div class="ca-table-wrapper">
+              <VTable class="ca-item-table">
+                <thead>
+                  <tr>
+                    <th class="ca-col-no">
+                      {{ t('cashAdvance.form.items.tableNo') }}
+                    </th>
+                    <th class="ca-col-date">
+                      {{ t('cashAdvance.form.items.tableDate') }}
+                      <span class="text-error">*</span>
+                    </th>
+                    <th class="ca-col-desc">
+                      {{ t('cashAdvance.form.items.tableDescription') }}
+                    </th>
+                    <th class="ca-col-amount">
+                      {{ t('cashAdvance.form.items.tableAmount') }}
+                    </th>
+                    <th class="ca-col-attachment">
+                      {{ t('cashAdvance.form.items.tableAttachment') }}
 
-                  <td>
-                    <AppDateTimePicker
-                      v-model="item.date"
-                      density="compact"
-                      hide-details="auto"
-                      :config="lineDateConfig"
-                      :error="(isSubmitted && !item.date) || dateOutsideTrip(item.date)"
-                      :error-messages="itemDateErrors(item)"
-                    />
-                  </td>
+                      <span
+                        v-if="attachmentRequired"
+                        class="text-error"
+                      >*</span>
 
-                  <td>
-                    <VTextField
-                      v-model="item.description"
-                      density="compact"
-                      variant="outlined"
-                      hide-details="auto"
-                      :error="isSubmitted && !item.description.trim()"
-                      :error-messages="isSubmitted && !item.description.trim() ? [t('cashAdvance.form.validation.itemDescription')] : []"
-                    />
-                  </td>
-
-                  <td>
-                    <VTextField
-                      :model-value="formatMoney(item.amount)"
-                      density="compact"
-                      variant="outlined"
-                      hide-details="auto"
-                      prefix="Rp"
-                      inputmode="numeric"
-                      :error="isSubmitted && Number(item.amount || 0) <= 0"
-                      :error-messages="isSubmitted && Number(item.amount || 0) <= 0 ? [t('cashAdvance.form.validation.itemAmount')] : []"
-                      @input="handleAmountInput($event, index)"
-                    />
-                  </td>
-
-                  <!--
-                    Bukti melekat pada baris ini. Berkas yang sudah dipilih
-                    ditampilkan di sel yang sama supaya jelas milik baris mana.
-                  -->
-                  <td>
-                    <div class="d-flex flex-column gap-2">
-                      <input
-                        :ref="el => setLineFileRef(el, index)"
-                        type="file"
-                        multiple
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        class="d-none"
-                        @change="handleLineFileUpload($event, index)"
+                      <!--
+                        Disebut apa adanya ketika tidak wajib: bintang merah pada
+                        kolom yang sebenarnya opsional membuat orang mencari-cari
+                        berkas yang tidak diperlukan.
+                      -->
+                      <span
+                        v-else
+                        class="text-caption text-medium-emphasis ms-1"
                       >
+                        {{ t('cashAdvance.form.items.attachmentOptional') }}
+                      </span>
+                    </th>
+                    <th class="ca-col-action text-center">
+                      {{ t('cashAdvance.form.items.tableActions') }}
+                    </th>
+                  </tr>
+                </thead>
 
-                      <VBtn
-                        type="button"
-                        size="small"
+                <tbody>
+                  <tr
+                    v-for="(item, index) in tempItems"
+                    :key="`item-${index}`"
+                  >
+                    <td class="text-medium-emphasis">
+                      {{ index + 1 }}
+                    </td>
+
+                    <td>
+                      <AppDateTimePicker
+                        v-model="item.date"
+                        density="compact"
+                        hide-details="auto"
+                        :config="lineDateConfig"
+                        :error="(isSubmitted && !item.date) || dateOutsideTrip(item.date)"
+                        :error-messages="itemDateErrors(item)"
+                      />
+                    </td>
+
+                    <td>
+                      <VTextField
+                        v-model="item.description"
+                        density="compact"
                         variant="outlined"
-                        class="text-none align-self-start"
-                        :color="isSubmitted && lineMissingAttachment(index) ? 'error' : 'primary'"
-                        prepend-icon="tabler-paperclip"
-                        @click="triggerLineFileInput(index)"
-                      >
-                        {{ t('cashAdvance.form.attachment.addButton') }}
-                      </VBtn>
+                        hide-details="auto"
+                        :error="isSubmitted && !item.description.trim()"
+                        :error-messages="isSubmitted && !item.description.trim() ? [t('cashAdvance.form.validation.itemDescription')] : []"
+                      />
+                    </td>
 
-                      <div
-                        v-if="isSubmitted && lineMissingAttachment(index)"
-                        class="text-error text-caption"
-                      >
-                        {{ t('cashAdvance.form.validation.itemAttachment') }}
-                      </div>
+                    <td>
+                      <VTextField
+                        :model-value="formatMoney(item.amount)"
+                        density="compact"
+                        variant="outlined"
+                        hide-details="auto"
+                        prefix="Rp"
+                        inputmode="numeric"
+                        :error="isSubmitted && Number(item.amount || 0) <= 0"
+                        :error-messages="isSubmitted && Number(item.amount || 0) <= 0 ? [t('cashAdvance.form.validation.itemAmount')] : []"
+                        @input="handleAmountInput($event, index)"
+                      />
+                    </td>
 
-                      <div
-                        v-for="(file, fileIndex) in item.attachments"
-                        :key="`item-${index}-file-${fileIndex}`"
-                        class="ca-line-file"
-                      >
-                        <VIcon
-                          :icon="getFileType(file) === 'PDF' ? 'mdi-file-pdf-box' : 'mdi-file-image-outline'"
-                          size="18"
-                          color="primary"
-                        />
-
-                        <div class="ca-line-file__body">
-                          <div class="ca-line-file__name">
-                            {{ file.name }}
-                          </div>
-
-                          <div class="text-caption text-medium-emphasis">
-                            {{ formatFileSize(file.size) }}
-                          </div>
-                        </div>
+                    <!--
+                      Bukti melekat pada baris ini. Berkas yang sudah dipilih
+                      ditampilkan di sel yang sama supaya jelas milik baris mana.
+                    -->
+                    <td>
+                      <div class="d-flex flex-column gap-2">
+                        <input
+                          :ref="el => setLineFileRef(el, index)"
+                          type="file"
+                          multiple
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          class="d-none"
+                          @change="handleLineFileUpload($event, index)"
+                        >
 
                         <VBtn
-                          icon
-                          size="x-small"
-                          variant="text"
-                          color="error"
-                          @click="removeLineAttachment(index, fileIndex)"
+                          type="button"
+                          size="small"
+                          variant="outlined"
+                          class="text-none align-self-start"
+                          :color="isSubmitted && lineMissingAttachment(index) ? 'error' : 'primary'"
+                          prepend-icon="tabler-paperclip"
+                          @click="triggerLineFileInput(index)"
+                        >
+                          {{ t('cashAdvance.form.attachment.addButton') }}
+                        </VBtn>
+
+                        <div
+                          v-if="isSubmitted && lineMissingAttachment(index)"
+                          class="text-error text-caption"
+                        >
+                          {{ t('cashAdvance.form.validation.itemAttachment') }}
+                        </div>
+
+                        <div
+                          v-for="(file, fileIndex) in item.attachments"
+                          :key="`item-${index}-file-${fileIndex}`"
+                          class="ca-line-file"
                         >
                           <VIcon
-                            icon="tabler-x"
-                            size="16"
+                            :icon="getFileType(file) === 'PDF' ? 'mdi-file-pdf-box' : 'mdi-file-image-outline'"
+                            size="18"
+                            color="primary"
                           />
-                        </VBtn>
-                      </div>
-                    </div>
-                  </td>
 
-                  <td class="text-center">
-                    <VBtn
-                      icon
-                      size="small"
-                      variant="text"
-                      color="error"
-                      :disabled="tempItems.length <= 1"
-                      @click="removeItemRow(index)"
-                    >
-                      <VIcon icon="tabler-trash" />
-                    </VBtn>
-                  </td>
-                </tr>
-              </tbody>
-            </VTable>
-          </div>
+                          <div class="ca-line-file__body">
+                            <div class="ca-line-file__name">
+                              {{ file.name }}
+                            </div>
+
+                            <div class="text-caption text-medium-emphasis">
+                              {{ formatFileSize(file.size) }}
+                            </div>
+                          </div>
+
+                          <VBtn
+                            icon
+                            size="x-small"
+                            variant="text"
+                            color="error"
+                            @click="removeLineAttachment(index, fileIndex)"
+                          >
+                            <VIcon
+                              icon="tabler-x"
+                              size="16"
+                            />
+                          </VBtn>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td class="text-center">
+                      <VBtn
+                        icon
+                        size="small"
+                        variant="text"
+                        color="error"
+                        :disabled="tempItems.length <= 1"
+                        @click="removeItemRow(index)"
+                      >
+                        <VIcon icon="tabler-trash" />
+                      </VBtn>
+                    </td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </div>
+          </template>
+
+          <!--
+            RINCIAN PERJALANAN DINAS
+
+            Dikelompokkan per kategori, mengikuti formulir kertasnya:
+            Item, Qty, Rincian Biaya, Total.
+
+            Totalnya baca-saja -- ia selalu Qty x Rincian Biaya, dan server
+            menghitungnya sendiri. Kotak isian untuk angka yang akan
+            dihitung ulang hanya mengundang orang mengetik sesuatu yang
+            lalu diabaikan.
+          -->
+          <template v-else>
+            <VAlert
+              v-if="!expenseCategoryList.length"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              {{ t('cashAdvance.form.breakdown.noCategory') }}
+            </VAlert>
+
+            <div
+              v-for="kelompok in tempItemsByCategory"
+              :key="`kategori-${kelompok.category.id}`"
+              class="ca-cat-card"
+            >
+              <div class="ca-cat-head">
+                <div class="ca-cat-name">
+                  {{ kelompok.category.name }}
+                </div>
+
+                <!--
+                  Diurus GA: kategori ini tidak ditagihkan sama sekali, jadi
+                  tidak perlu diisi apa-apa. Menyalakannya membuang baris
+                  yang terlanjur ada -- keduanya pernyataan yang saling
+                  meniadakan, dan server menolak dokumen yang mengatakan
+                  dua-duanya.
+                -->
+                <VSwitch
+                  :model-value="kelompok.arranged"
+                  color="warning"
+                  density="compact"
+                  hide-details
+                  :label="t('cashAdvance.form.breakdown.arrangedByGa')"
+                  class="ca-cat-switch"
+                  @update:model-value="toggleArranged(kelompok.category.id)"
+                />
+
+                <div class="ca-cat-total">
+                  <span class="text-caption text-medium-emphasis">
+                    {{ t('cashAdvance.form.items.total') }}
+                  </span>
+
+                  <strong>Rp {{ formatMoney(kelompok.total) || '0' }}</strong>
+                </div>
+              </div>
+
+              <div
+                v-if="kelompok.arranged"
+                class="ca-cat-arranged"
+              >
+                {{ t('cashAdvance.form.breakdown.arrangedNotice') }}
+              </div>
+
+              <template v-else>
+                <div class="ca-table-wrapper">
+                  <VTable class="ca-item-table">
+                    <thead>
+                      <tr>
+                        <th class="ca-col-no">
+                          {{ t('cashAdvance.form.items.tableNo') }}
+                        </th>
+                        <th class="ca-col-desc">
+                          {{ t('cashAdvance.form.breakdown.tableItem') }}
+                        </th>
+                        <th class="ca-col-qty">
+                          {{ t('cashAdvance.form.breakdown.tableQty') }}
+                        </th>
+                        <th class="ca-col-unit">
+                          {{ t('cashAdvance.form.breakdown.tableUnitPrice') }}
+                        </th>
+                        <th class="ca-col-amount">
+                          {{ t('cashAdvance.form.items.total') }}
+                        </th>
+                        <th class="ca-col-attachment">
+                          {{ t('cashAdvance.form.items.tableAttachment') }}
+
+                          <span class="text-caption text-medium-emphasis ms-1">
+                            {{ t('cashAdvance.form.items.attachmentOptional') }}
+                          </span>
+                        </th>
+                        <th class="ca-col-action text-center">
+                          {{ t('cashAdvance.form.items.tableActions') }}
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr v-if="!kelompok.rows.length">
+                        <td
+                          colspan="7"
+                          class="text-center text-medium-emphasis py-4"
+                        >
+                          {{ t('cashAdvance.form.breakdown.categoryEmpty') }}
+                        </td>
+                      </tr>
+
+                      <tr
+                        v-for="(baris, urut) in kelompok.rows"
+                        :key="`baris-${kelompok.category.id}-${baris.index}`"
+                      >
+                        <td class="text-medium-emphasis">
+                          {{ urut + 1 }}
+                        </td>
+
+                        <td>
+                          <VTextField
+                            v-model="baris.item.description"
+                            density="compact"
+                            variant="outlined"
+                            hide-details="auto"
+                            :placeholder="t('cashAdvance.form.breakdown.itemPlaceholder')"
+                            :error="isSubmitted && !baris.item.description.trim()"
+                          />
+                        </td>
+
+                        <td>
+                          <VTextField
+                            v-model.number="baris.item.qty"
+                            type="number"
+                            min="0"
+                            step="any"
+                            density="compact"
+                            variant="outlined"
+                            hide-details="auto"
+                            :error="isSubmitted && !(Number(baris.item.qty) > 0)"
+                          />
+                        </td>
+
+                        <td>
+                          <VTextField
+                            :model-value="formatMoney(baris.item.unit_price)"
+                            density="compact"
+                            variant="outlined"
+                            hide-details="auto"
+                            prefix="Rp"
+                            inputmode="numeric"
+                            :error="isSubmitted && !(Number(baris.item.unit_price) > 0)"
+                            @input="handleUnitPriceInput($event, baris.index)"
+                          />
+                        </td>
+
+                        <!-- Baca-saja: ia selalu Qty x Rincian Biaya. -->
+                        <td class="text-end font-weight-bold">
+                          Rp {{ formatMoney(lineTotal(baris.item)) || '0' }}
+                        </td>
+
+                        <td>
+                          <div class="d-flex flex-column gap-2">
+                            <input
+                              :ref="el => setLineFileRef(el, baris.index)"
+                              type="file"
+                              multiple
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              class="d-none"
+                              @change="handleLineFileUpload($event, baris.index)"
+                            >
+
+                            <VBtn
+                              type="button"
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              class="text-none align-self-start"
+                              prepend-icon="tabler-paperclip"
+                              @click="triggerLineFileInput(baris.index)"
+                            >
+                              {{ t('cashAdvance.form.attachment.addButton') }}
+                            </VBtn>
+
+                            <div class="d-flex flex-wrap gap-1">
+                              <VChip
+                                v-for="(file, fileIndex) in baris.item.attachments"
+                                :key="`berkas-${baris.index}-${fileIndex}`"
+                                size="x-small"
+                                variant="tonal"
+                                color="primary"
+                                closable
+                                @click:close="removeLineFile(baris.index, fileIndex)"
+                              >
+                                {{ file.name }}
+                              </VChip>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td class="text-center">
+                          <VBtn
+                            icon
+                            size="small"
+                            variant="text"
+                            color="error"
+                            @click="removeItemRow(baris.index)"
+                          >
+                            <VIcon icon="tabler-trash" />
+                          </VBtn>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </VTable>
+                </div>
+
+                <div class="pa-3">
+                  <VBtn
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    prepend-icon="tabler-plus"
+                    class="text-none"
+                    @click="addItemRowTo(kelompok.category.id)"
+                  >
+                    {{ t('cashAdvance.form.breakdown.addRowTo', { name: kelompok.category.name }) }}
+                  </VBtn>
+                </div>
+              </template>
+            </div>
+
+            <div class="d-flex justify-end mt-2">
+              <div class="ca-total-box">
+                <span>{{ t('cashAdvance.form.items.total') }}</span>
+                <strong>Rp {{ formatMoney(tempItemsTotal) || '0' }}</strong>
+              </div>
+            </div>
+          </template>
         </VCardText>
       </VCard>
     </VDialog>
@@ -1865,6 +2661,72 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/*
+| Kartu kategori pada modal rincian perdin.
+|
+| Tiap kategori berdiri sebagai kartunya sendiri supaya batas antar kelompok
+| terbaca sekilas -- pada formulir kertasnya pun begitu, dipisah baris tebal.
+*/
+.ca-cat-card {
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 10px;
+  margin-block-end: 1rem;
+}
+
+.ca-cat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  border-block-end: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgba(var(--v-theme-on-surface), 0.03);
+  gap: 1rem;
+  padding-block: 0.625rem;
+  padding-inline: 1rem;
+}
+
+.ca-cat-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* Didorong ke kanan supaya totalnya sejajar antar kategori. */
+.ca-cat-total {
+  display: flex;
+  align-items: baseline;
+  margin-inline-start: auto;
+  gap: 0.5rem;
+}
+
+.ca-cat-switch {
+  flex: 0 0 auto;
+}
+
+.ca-sum-line {
+  display: flex;
+  align-items: flex-start;
+  border-block-start: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  gap: 1rem;
+  padding-block: 0.625rem;
+  padding-inline: 1rem;
+}
+
+.ca-cat-arranged {
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 0.85rem;
+  font-style: italic;
+  padding-block: 1rem;
+  padding-inline: 1rem;
+}
+
+.ca-col-qty {
+  inline-size: 110px;
+}
+
+.ca-col-unit {
+  inline-size: 170px;
+}
+
 /* Ringkasan rincian pada halaman utama. */
 .ca-summary-card {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));

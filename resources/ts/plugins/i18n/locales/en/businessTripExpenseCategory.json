@@ -1,0 +1,42 @@
+{
+    "title": "Business Trip Expense Category",
+    "subtitle": "The grouping used by cash advance and realization lines whose transaction category is a business trip.",
+    "search": "Search name or description",
+    "statusAll": "All statuses",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "addButton": "Add Category",
+    "empty": "No expense categories yet.",
+    "loadFailed": "Expense categories could not be loaded.",
+    "columns": {
+        "order": "Order",
+        "name": "Category Name",
+        "description": "Description",
+        "status": "Status",
+        "actions": "Actions"
+    },
+    "form": {
+        "createTitle": "Add Expense Category",
+        "editTitle": "Edit Expense Category",
+        "name": "Category Name",
+        "nameHint": "Appears as the group heading on line items and printouts.",
+        "description": "Description",
+        "sortOrder": "Display Order",
+        "sortOrderHint": "Lower comes first. Spaced by ten so a new category can be slotted in without shifting the others.",
+        "active": "Active",
+        "activeHint": "Inactive ones disappear from the choices, while existing documents that use them still read correctly.",
+        "save": "Save",
+        "cancel": "Cancel"
+    },
+    "toggle": {
+        "activate": "Activate",
+        "deactivate": "Deactivate"
+    },
+    "delete": {
+        "action": "Delete",
+        "title": "Delete this category?",
+        "text": "Category {name} will be deleted. This cannot be undone.",
+        "confirm": "Yes, Delete",
+        "inUseTooltip": "Already used by document lines — deactivate it instead."
+    }
+}

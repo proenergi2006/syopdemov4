@@ -140,4 +140,19 @@ return [
         'no_access_branch_department' => 'Anda tidak memiliki akses pada cabang dan department tersebut.',
         'no_access_create' => 'Anda tidak memiliki akses untuk membuat Claim pada cabang dan department tersebut.',
     ],
+
+    /*
+    | Claim yang menagihkan perjalanan dinas.
+    |
+    | Satu perdin hanya boleh dipegang satu dokumen yang masih hidup --
+    | FPU atau Claim, tidak keduanya. Tanpa itu, satu perjalanan bisa
+    | dibayar dua kali lewat dua pintu yang berbeda.
+    */
+    'business_trip' => [
+        'required' => 'Claim dengan keterangan transaksi perjalanan dinas wajib menunjuk dokumen Perdin yang sudah disetujui.',
+        'not_eligible' => 'Dokumen Perdin yang dipilih tidak dapat dipakai: pastikan Perdin tersebut milik Anda, sudah disetujui, dan belum dipakai FPU atau Claim lain yang masih berjalan.',
+        'trip_not_approved' => 'Claim ini belum bisa dibayarkan: Perjalanan Dinas :number masih menunggu persetujuan manajemen.',
+        'trip_not_valid' => 'Claim ini tidak bisa dibayarkan: Perjalanan Dinas :number sudah dibatalkan atau ditolak.',
+        'item_date_outside_trip' => 'Baris :row: tanggalnya di luar periode Perjalanan Dinas :number (:from s/d :to). Biaya perjalanan tidak bisa bertanggal di luar perjalanannya.',
+    ],
 ];

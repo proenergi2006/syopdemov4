@@ -14,7 +14,11 @@
 
     $currentMode = $mode ?? 'approval_request';
 
-    $translationMode = in_array($currentMode, ['final_approved', 'rejected'], true)
+    $translationMode = in_array(
+        $currentMode,
+        ['final_approved', 'rejected', 'travel_arrangement'],
+        true,
+    )
         ? $currentMode
         : 'default';
 
@@ -27,13 +31,13 @@
     ]);
 
     $displayStatus = match ($currentMode) {
-        'final_approved' => 'APPROVED',
+        'final_approved', 'travel_arrangement' => 'APPROVED',
         'rejected' => 'REJECTED',
         default => 'IN PROGRESS',
     };
 
     $statusColor = match ($currentMode) {
-        'final_approved' => '#1b7f4f',
+        'final_approved', 'travel_arrangement' => '#1b7f4f',
         'rejected' => '#b3261e',
         default => '#8a6d1f',
     };
@@ -224,9 +228,6 @@
                                             </td>
                                             <td style="padding:7px 10px; font-size:11px; border-top:1px solid #eef2f7;">
                                                 {{ $baris->description }}
-                                                @if (!empty($baris->pic))
-                                                    <span style="color:#5b6b80;">({{ $baris->pic }})</span>
-                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach

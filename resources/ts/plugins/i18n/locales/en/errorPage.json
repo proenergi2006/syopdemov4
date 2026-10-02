@@ -1,0 +1,10 @@
+{
+  "notFound": {
+    "title": "Page not found",
+    "description": "This address does not exist in SYOP. The link may be mistyped, or the page may have moved. Nothing is broken — you are simply at an address we don't recognise.",
+    "pathLabel": "Address you opened",
+    "backToDashboard": "Back to Dashboard",
+    "goBack": "Previous Page",
+    "help": "If you believe this page should exist, send the address above to the IT team."
+  }
+}

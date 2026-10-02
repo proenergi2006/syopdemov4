@@ -21,6 +21,13 @@ import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
 
 interface CashAdvanceRow {
+
+  /*
+  | Jumlah lampiran. Dipakai satu hal saja: menentukan perlu tidaknya
+  | layar bertanya "gabungkan lampiran ke dalam cetakan?".
+  */
+  attachment_count?: number
+
   id: number
   public_id: string
   advance_number: string | null
@@ -79,6 +86,8 @@ interface CashAdvanceAbilities {
   can_delete: boolean
   can_cancel: boolean
   can_receive: boolean
+  can_revise_amount: boolean
+  can_unreceive: boolean
   can_disburse: boolean
   can_create_realization: boolean
 }
@@ -125,6 +134,8 @@ const defaultAbilities = (): CashAdvanceAbilities => ({
   can_delete: false,
   can_cancel: false,
   can_receive: false,
+  can_revise_amount: false,
+  can_unreceive: false,
   can_disburse: false,
   can_create_realization: false,
 })
@@ -280,6 +291,53 @@ const detail = ref<any | null>(null)
 
 /*
 |--------------------------------------------------------------------------
+| Rincian perjalanan dinas pada modal detail
+|--------------------------------------------------------------------------
+| Dikelompokkan menurut kategori, dan kategori yang diurus GA ikut masuk walau
+| tanpa baris: kosongnya disengaja, dan itu perlu terbaca. Tanpa ini, dokumen
+| yang seluruhnya diurus GA tampak seperti dokumen yang rinciannya belum
+| diisi.
+|
+| Urutan barisnya dibiarkan apa adanya dari server -- itulah urutan yang sama
+| dengan yang tercetak di kertas.
+*/
+const detailBreakdown = computed<{ name: string; arranged: boolean; rows: any[] }[]>(() => {
+  const barisRincian: any[] = detail.value?.items || []
+  const kelompok: { name: string; arranged: boolean; rows: any[] }[] = []
+
+  for (const row of barisRincian) {
+    const nama = String(row.expense_category_name || '').trim()
+
+    if (!nama)
+      continue
+
+    const adaKelompok = kelompok.find(satu => satu.name === nama)
+
+    if (adaKelompok)
+      adaKelompok.rows.push(row)
+    else
+      kelompok.push({ name: nama, arranged: false, rows: [row] })
+  }
+
+  for (const nama of (detail.value?.arranged_categories || [])) {
+    const teks = String(nama || '').trim()
+
+    if (teks && !kelompok.some(satu => satu.name === teks))
+      kelompok.push({ name: teks, arranged: true, rows: [] })
+  }
+
+  return kelompok
+})
+
+/*
+| Bentuknya dikenali dari isinya, bukan dari penanda terpisah: penanda yang
+| mengatakan "ini perdin" sementara rinciannya tidak berkategori akan
+| menggambar tabel kosong tanpa sebab yang kelihatan.
+*/
+const detailHasBreakdown = computed<boolean>(() => detailBreakdown.value.length > 0)
+
+/*
+|--------------------------------------------------------------------------
 | Tanda tangan digital
 |--------------------------------------------------------------------------
 | Submit dan approve keduanya membutuhkan tanda tangan. Bila user belum
@@ -397,6 +455,29 @@ const showScheduledPaymentFilter = computed<boolean>(() => canDisburse.value)
 
 /** Sudah menyentuh batas: pengajuan baru akan ditolak server. */
 const submissionBlocked = computed<boolean>(() => submissionLimit.value?.blocked === true)
+
+/*
+| Sebab mana yang menahan. Keduanya bisa berlaku sekaligus.
+|
+| Dibaca dari `reasons` yang dikirim server, bukan disimpulkan ulang di
+| sini dari jumlah dan daftar telatnya. Menyimpulkan ulang berarti dua
+| tempat menjawab pertanyaan yang sama, dan suatu hari jawabannya berbeda.
+*/
+const blockedByOverdue = computed<boolean>(() =>
+  submissionLimit.value?.reasons?.includes('OVERDUE') === true)
+
+const blockedByCount = computed<boolean>(() =>
+  submissionLimit.value?.reasons?.includes('TOO_MANY') === true)
+
+/*
+| Tertahan, padahal jumlahnya sendiri masih di bawah batas.
+|
+| Inilah keadaan yang membuat spanduk lamanya membingungkan, dan justru
+| keadaan ini yang perlu dikatakan terang-terangan: yang menahan bukan
+| jumlahnya.
+*/
+const blockedButCountIsFine = computed<boolean>(() =>
+  submissionBlocked.value && !blockedByCount.value)
 
 /** Daftar dokumen yang terlambat direalisasi, dirangkai jadi satu kalimat. */
 const overdueText = computed<string>(() =>
@@ -815,7 +896,21 @@ const canPrint = (row: CashAdvanceRow): boolean =>
   || isStatus(row, 'RECEIVED')
   || isStatus(row, 'DISBURSED')
 
-const printDocument = async (row: CashAdvanceRow): Promise<void> => {
+/*
+|--------------------------------------------------------------------------
+| Cetak, dengan atau tanpa lampiran
+|--------------------------------------------------------------------------
+| Lampiran gambar disatukan ke dalam PDF-nya, dua per halaman. Yang
+| berformat PDF tidak bisa disisipkan -- dompdf menggambar halaman dari
+| HTML, ia tidak bisa menempelkan halaman PDF yang sudah jadi. Namanya
+| tetap didaftarkan di halaman terakhir supaya tidak hilang tanpa jejak.
+|--------------------------------------------------------------------------
+*/
+const printAttachmentDialog = ref(false)
+const printTarget = ref<CashAdvanceRow | null>(null)
+const printWithAttachments = ref(false)
+
+const runPrint = async (row: CashAdvanceRow, withAttachments: boolean): Promise<void> => {
   if (!row.public_id || printLoadingId.value)
     return
 
@@ -844,7 +939,13 @@ const printDocument = async (row: CashAdvanceRow): Promise<void> => {
      */
     const response = await axios.post(
       `/fund-request/cash-advance/${encodeURIComponent(row.public_id)}/print-url`,
-      null,
+
+      /*
+      | Pilihannya ikut ditandatangani server bersama tautannya, jadi ia
+      | dikirim di sini -- bukan ditempelkan ke URL hasilnya, yang akan
+      | merusak tanda tangannya.
+      */
+      { with_attachments: withAttachments },
       { headers: { Accept: 'application/json' } },
     )
 
@@ -876,6 +977,37 @@ const printDocument = async (row: CashAdvanceRow): Promise<void> => {
   finally {
     printLoadingId.value = null
   }
+}
+
+const printDocument = async (row: CashAdvanceRow): Promise<void> => {
+  if (!row.public_id || printLoadingId.value)
+    return
+
+  /*
+  | Hanya ditanyakan kalau memang ada lampirannya. Pertanyaan yang
+  | jawabannya cuma satu bukan pilihan, ia hambatan -- dan cetakan adalah
+  | aksi yang paling sering diulang orang.
+  */
+  if ((row.attachment_count ?? 0) > 0) {
+    printTarget.value = row
+    printWithAttachments.value = false
+    printAttachmentDialog.value = true
+
+    return
+  }
+
+  await runPrint(row, false)
+}
+
+const confirmPrint = async (): Promise<void> => {
+  const row = printTarget.value
+
+  if (!row)
+    return
+
+  printAttachmentDialog.value = false
+
+  await runPrint(row, printWithAttachments.value)
 }
 
 /*
@@ -941,9 +1073,16 @@ const needsReceipt = (row: CashAdvanceRow): boolean =>
 | tidak ditawarkan.
 |--------------------------------------------------------------------------
 */
+/*
+| Batalkan berhenti begitu Finance menerima berkasnya.
+|
+| Yang sudah diterima berada di antrean pembayaran dan sudah punya tanggal
+| yang dijanjikan ke pemohon. Aturannya sama persis dengan yang dijaga
+| server -- lihat CashAdvanceController::cancel().
+*/
 const canCancelFor = (row: CashAdvanceRow): boolean => {
   return canCancel.value
-    && (isStatus(row, 'APPROVED') || isStatus(row, 'RECEIVED'))
+    && isStatus(row, 'APPROVED')
     && !row.has_active_realization
 }
 
@@ -1406,9 +1545,256 @@ const runBulkAction = async (): Promise<void> => {
 | menerima keduanya -- layar ini saja yang tidak lagi mengirimnya.
 |--------------------------------------------------------------------------
 */
+/*
+|--------------------------------------------------------------------------
+| Revisi nominal saat menerima berkas
+|--------------------------------------------------------------------------
+| Finance memegang nota aslinya ketika berkasnya sampai di mejanya, dan di
+| situlah selisihnya ketahuan. Maka pembetulannya menempel pada aksi terima,
+| bukan berdiri sebagai aksi sendiri yang harus diingat untuk dikerjakan.
+|--------------------------------------------------------------------------
+*/
+interface ReviseLine {
+  id: number
+  date: string | null
+  description: string
+
+  /* Angka yang diajukan pemohon -- pembanding yang tidak ikut berubah. */
+  submitted: number
+
+  /* Isian yang sedang disunting. Teks, bukan angka: kotak yang dikosongkan
+  | harus boleh kosong sejenak tanpa berubah sendiri menjadi nol. */
+  amount: string
+}
+
+const reviseDialog = ref(false)
+const reviseLoading = ref(false)
+const reviseSaving = ref(false)
+const reviseError = ref('')
+const reviseRow = ref<CashAdvanceRow | null>(null)
+const reviseLines = ref<ReviseLine[]>([])
+const reviseNotes = ref('')
+
+const reviseSubmittedTotal = computed<number>(() =>
+  reviseLines.value.reduce((jumlah, baris) => jumlah + baris.submitted, 0))
+
+const reviseNewTotal = computed<number>(() =>
+  reviseLines.value.reduce((jumlah, baris) => jumlah + (Number(baris.amount) || 0), 0))
+
+/*
+| Dibandingkan sebagai rupiah bulat, bukan sebagai angka pecahan. Selisih
+| sepersekian sen yang lahir dari pembacaan teks bukan revisi; menganggapnya
+| revisi akan meminta alasan atas perubahan yang tidak pernah terjadi.
+*/
+const reviseChanged = computed<boolean>(() =>
+  reviseLines.value.some(baris =>
+    Math.round(Number(baris.amount) || 0) !== Math.round(baris.submitted)))
+
+const reviseLineChanged = (baris: ReviseLine): boolean =>
+  Math.round(Number(baris.amount) || 0) !== Math.round(baris.submitted)
+
+/**
+ * Membuka modal rincian untuk dibetulkan nominalnya.
+ *
+ * Rinciannya diambil saat modalnya dibuka. Kalau gagal, modalnya tidak
+ * dibuka sama sekali -- modal kosong bertuliskan "gagal memuat" mengundang
+ * orang menekan Simpan atas rincian yang tidak pernah ia lihat.
+ */
+const openRevise = async (row: CashAdvanceRow): Promise<void> => {
+  if (!row?.public_id || reviseLoading.value)
+    return
+
+  reviseLoading.value = true
+
+  try {
+    const response = await axios.get(`/fund-request/cash-advance/${row.public_id}`, {
+      headers: { Accept: 'application/json' },
+    })
+
+    const isi = response.data?.data
+
+    if (!isi)
+      throw new Error(t('cashAdvance.detail.loadFailed'))
+
+    reviseLines.value = (isi.items ?? []).map((baris: Record<string, unknown>): ReviseLine => ({
+      id: Number(baris.id),
+      date: (baris.date as string | null) ?? null,
+      description: String(baris.description ?? ''),
+      submitted: Number(baris.amount ?? 0),
+      amount: String(Number(baris.amount ?? 0)),
+    }))
+
+    reviseRow.value = row
+    reviseNotes.value = ''
+    reviseError.value = ''
+    reviseDialog.value = true
+  }
+  catch (error: unknown) {
+    showErrorToast({
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(error, t('cashAdvance.detail.loadFailed')),
+    })
+  }
+  finally {
+    reviseLoading.value = false
+  }
+}
+
+const submitRevise = async (): Promise<void> => {
+  if (!reviseRow.value)
+    return
+
+  reviseError.value = ''
+
+  const salah = reviseLines.value.find(baris =>
+    baris.amount.trim() === '' || Number.isNaN(Number(baris.amount)) || Number(baris.amount) < 0)
+
+  if (salah) {
+    reviseError.value = t('cashAdvance.list.revise.invalidAmount', { name: salah.description })
+
+    return
+  }
+
+  /*
+  | Alasannya diminta hanya kalau angkanya memang berubah. Finance yang
+  | membuka rinciannya, melihat semuanya sudah benar, lalu menekan Terima
+  | tidak sedang merevisi apa pun.
+  */
+  if (reviseChanged.value && !reviseNotes.value.trim()) {
+    reviseError.value = t('cashAdvance.list.revise.notesRequired')
+
+    return
+  }
+
+  reviseSaving.value = true
+
+  try {
+    const response = await axios.patch(
+      `/fund-request/cash-advance/${reviseRow.value.public_id}/receive`,
+      {
+        items: reviseLines.value.map(baris => ({
+          id: baris.id,
+          amount: Number(baris.amount),
+        })),
+        revision_notes: reviseNotes.value.trim() || undefined,
+      },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    reviseDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('cashAdvance.list.receive.successFallback'),
+    })
+
+    await fetchCashAdvances()
+  }
+  catch (error: unknown) {
+    /*
+    | Pesannya ditaruh DI DALAM modalnya. Formulirnya masih terbuka dan masih
+    | berisi angka yang sudah disunting; pesan yang lewat di sudut layar akan
+    | hilang sebelum yang mengisi selesai membacanya.
+    */
+    reviseError.value = getApiErrorMessage(
+      error,
+      t('cashAdvance.list.receive.failedFallback'),
+    )
+  }
+  finally {
+    reviseSaving.value = false
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Batal terima
+|--------------------------------------------------------------------------
+| Jalan mundur dari meja Finance. Dokumennya kembali ke status disetujui,
+| dan dari sana bisa dibatalkan seperti biasa.
+|
+| Tanpa aksi ini, dokumen yang terlanjur diterima keliru tidak punya pintu
+| keluar selain dicairkan -- uang keluar hanya karena tidak ada tombol untuk
+| mengurungkannya.
+|--------------------------------------------------------------------------
+*/
+const unreceiveDialog = ref(false)
+const unreceiveLoading = ref(false)
+const unreceiveError = ref('')
+const unreceiveTarget = ref<CashAdvanceRow | null>(null)
+const unreceiveNotes = ref('')
+
+const openUnreceive = (row: CashAdvanceRow): void => {
+  unreceiveTarget.value = row
+  unreceiveNotes.value = ''
+  unreceiveError.value = ''
+  unreceiveDialog.value = true
+}
+
+const submitUnreceive = async (): Promise<void> => {
+  if (!unreceiveTarget.value?.public_id || unreceiveLoading.value)
+    return
+
+  /*
+  | Alasannya wajib. Tanggal pembayaran yang sudah dijanjikan ke pemohon
+  | ikut batal karenanya, dan pencabutan tanpa penjelasan hanya melahirkan
+  | pertanyaan yang tidak ada jawabannya.
+  */
+  if (!unreceiveNotes.value.trim()) {
+    unreceiveError.value = t('cashAdvance.list.unreceive.notesRequired')
+
+    return
+  }
+
+  unreceiveLoading.value = true
+
+  try {
+    const response = await axios.patch(
+      `/fund-request/cash-advance/${unreceiveTarget.value.public_id}/unreceive`,
+      { notes: unreceiveNotes.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    unreceiveDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('cashAdvance.list.unreceive.successFallback'),
+    })
+
+    await fetchCashAdvances()
+  }
+  catch (error: unknown) {
+    /* Pesannya di dalam dialognya: alasannya masih terketik di sana. */
+    unreceiveError.value = getApiErrorMessage(
+      error,
+      t('cashAdvance.list.unreceive.failedFallback'),
+    )
+  }
+  finally {
+    unreceiveLoading.value = false
+  }
+}
+
 const openReceive = async (row: CashAdvanceRow): Promise<void> => {
   if (!row?.public_id || receiveLoading.value)
     return
+
+  /*
+  | Yang berwenang merevisi melihat rinciannya, bukan pertanyaan.
+  |
+  | Pertanyaan "terima berkas ini?" mengandaikan tidak ada yang perlu
+  | diperiksa. Bagi yang memegang notanya, justru itulah yang perlu
+  | diperiksa -- dan kalau semuanya sudah cocok, ia menekan Terima tanpa
+  | mengubah apa-apa.
+  */
+  if (abilities.value.can_revise_amount) {
+    await openRevise(row)
+
+    return
+  }
 
   const konfirmasi = await showConfirmAlert({
     title: t('cashAdvance.list.receive.confirmTitle'),
@@ -1481,8 +1867,20 @@ const openReceive = async (row: CashAdvanceRow): Promise<void> => {
 |--------------------------------------------------------------------------
 */
 /** Ada baris yang menunggu dibayar tetapi hari ini bukan harinya. */
+/*
+| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia
+| hanya berarti bagi orang yang punya tombol itu. Hanya yang berwenang mencairkan yang melihatnya.
+|
+| Barisnya disaring menurut status, bukan hanya menurut can_pay_today.
+| Jadwal pembayaran tetap menempel sesudah dokumennya dibayar, jadi tanpa
+| saringan ini dokumen yang sudah lunas pun ikut menjawab "hari ini bukan
+| hari pembayaran" -- dan spanduknya mengumumkan ada yang menunggu
+| dicairkan padahal tidak ada satu pun.
+*/
 const blockedByPaymentDay = computed<boolean>(() =>
-  rows.value.some(row => row.can_pay_today === false))
+  canDisburse.value
+  && rows.value.some(row =>
+    row.can_pay_today === false && isStatus(row, 'RECEIVED')))
 
 const paymentDeviation = (row: CashAdvanceRow): 'EARLY' | 'LATE' | null => {
   if (!row.scheduled_payment_date)
@@ -2366,11 +2764,28 @@ onMounted(async () => {
       class="mb-4"
       :icon="submissionBlocked ? 'tabler-hand-stop' : 'tabler-info-circle'"
     >
+      <!--
+        Judulnya menyebut SEBAB yang menahan, bukan jumlahnya.
+
+        Selama tidak tertahan, jumlahnya memang kabar yang paling berguna.
+        Begitu tertahan, jumlah yang masih di bawah batas justru menyesatkan:
+        pembacanya menyimpulkan ia boleh mengajukan, lalu ditolak server.
+      -->
       <div class="font-weight-medium">
-        {{ t('cashAdvance.list.submissionLimit.counter', {
-          count: submissionLimit.outstanding,
-          max: submissionLimit.max_outstanding,
-        }) }}
+        <template v-if="blockedByOverdue">
+          {{ t('cashAdvance.list.submissionLimit.blockedOverdueTitle') }}
+        </template>
+
+        <template v-else-if="submissionBlocked">
+          {{ t('cashAdvance.list.submissionLimit.blockedTooManyTitle') }}
+        </template>
+
+        <template v-else>
+          {{ t('cashAdvance.list.submissionLimit.counter', {
+            count: submissionLimit.outstanding,
+            max: submissionLimit.max_outstanding,
+          }) }}
+        </template>
       </div>
 
       <div
@@ -2384,10 +2799,25 @@ onMounted(async () => {
       </div>
 
       <div
-        v-else-if="submissionBlocked"
+        v-if="blockedByCount"
         class="text-body-2 mt-1"
       >
         {{ t('cashAdvance.list.submissionLimit.blocked') }}
+      </div>
+
+      <!--
+        Dan kalau jumlahnya ternyata bukan penyebabnya, itu dikatakan
+        terang-terangan -- pertanyaan pertama yang muncul di kepala
+        pembacanya adalah "tapi kan baru dua dari tiga?".
+      -->
+      <div
+        v-if="blockedButCountIsFine"
+        class="text-body-2 mt-1 text-medium-emphasis"
+      >
+        {{ t('cashAdvance.list.submissionLimit.countIsNotTheCause', {
+          count: submissionLimit.outstanding,
+          max: submissionLimit.max_outstanding,
+        }) }}
       </div>
     </VAlert>
 
@@ -2732,6 +3162,29 @@ onMounted(async () => {
 
                     <VListItemTitle class="text-primary">
                       {{ t('cashAdvance.list.menu.receive') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <!--
+                    Jalan mundur dari meja Finance. Muncul hanya pada dokumen
+                    yang memang sudah diterima -- dan hanya bagi yang
+                    berwenang menariknya kembali.
+                  -->
+                  <VListItem
+                    v-if="isStatus(row, 'RECEIVED') && abilities.can_unreceive"
+                    href="javascript:void(0)"
+                    @click="openUnreceive(row)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-arrow-back-up"
+                        :size="20"
+                        class="me-3 text-warning"
+                      />
+                    </template>
+
+                    <VListItemTitle class="text-warning">
+                      {{ t('cashAdvance.list.unreceive.menu') }}
                     </VListItemTitle>
                   </VListItem>
 
@@ -3301,7 +3754,162 @@ onMounted(async () => {
               </VChip>
             </div>
 
-            <div class="ca-detail__table">
+            <!--
+              Bentuk perjalanan dinas: dikelompokkan menurut kategori, tanpa
+              tanggal. Kolom Tanggal diganti Qty dan Rincian Biaya -- pada
+              bentuk ini tanggalnya selalu "-".
+            -->
+            <div
+              v-if="detailHasBreakdown"
+              class="ca-detail__table"
+            >
+              <VTable density="compact">
+                <thead>
+                  <tr>
+                    <th style="inline-size: 3rem;">
+                      {{ t('cashAdvance.detail.itemNo') }}
+                    </th>
+                    <th>{{ t('cashAdvance.form.breakdown.tableItem') }}</th>
+                    <th
+                      class="text-center"
+                      style="inline-size: 5rem;"
+                    >
+                      {{ t('cashAdvance.form.breakdown.tableQty') }}
+                    </th>
+                    <th
+                      class="text-end"
+                      style="inline-size: 9rem;"
+                    >
+                      {{ t('cashAdvance.form.breakdown.tableUnitPrice') }}
+                    </th>
+                    <th
+                      class="text-end"
+                      style="inline-size: 11rem;"
+                    >
+                      {{ t('cashAdvance.detail.itemAmount') }}
+                    </th>
+                    <th style="inline-size: 14rem;">
+                      {{ t('cashAdvance.detail.itemAttachment') }}
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <template
+                    v-for="kelompok in detailBreakdown"
+                    :key="`detail-kategori-${kelompok.name}`"
+                  >
+                    <tr class="ca-detail__cat-row">
+                      <td colspan="6">
+                        {{ kelompok.name }}
+
+                        <VChip
+                          v-if="kelompok.arranged"
+                          size="x-small"
+                          variant="tonal"
+                          color="warning"
+                          class="ms-2"
+                        >
+                          {{ t('cashAdvance.form.breakdown.arrangedByGa') }}
+                        </VChip>
+                      </td>
+                    </tr>
+
+                    <tr v-if="kelompok.arranged">
+                      <td
+                        colspan="6"
+                        class="ca-detail__meta"
+                      >
+                        {{ t('cashAdvance.form.breakdown.arrangedNotice') }}
+                      </td>
+                    </tr>
+
+                    <tr
+                      v-for="(item, index) in kelompok.rows"
+                      :key="`detail-item-${item.id}`"
+                    >
+                      <td class="text-medium-emphasis">
+                        {{ index + 1 }}
+                      </td>
+
+                      <td class="text-wrap">
+                        {{ item.description }}
+                      </td>
+
+                      <td class="text-center">
+                        {{ item.qty ?? '-' }}
+                      </td>
+
+                      <td class="text-end">
+                        Rp {{ formatNumberWithoutRp(Number(item.unit_price || 0)) }}
+                      </td>
+
+                      <td class="text-end font-weight-medium">
+                        Rp {{ formatNumberWithoutRp(Number(item.amount || 0)) }}
+                      </td>
+
+                      <td>
+                        <div
+                          v-if="(item.attachments || []).length"
+                          class="d-flex flex-column gap-1"
+                        >
+                          <a
+                            v-for="attachment in item.attachments"
+                            :key="`detail-item-${item.id}-file-${attachment.id}`"
+                            class="ca-detail__line-file"
+                            :href="attachment.url || undefined"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <VIcon
+                              :icon="getAttachmentIcon(attachment.mime_type)"
+                              size="18"
+                              color="primary"
+                            />
+
+                            <span class="ca-detail__line-file-name">
+                              {{ attachment.original_filename || attachment.filename }}
+                            </span>
+                          </a>
+                        </div>
+
+                        <span
+                          v-else
+                          class="ca-detail__meta"
+                        >—</span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+
+                <tfoot>
+                  <tr class="ca-detail__table-total">
+                    <td colspan="4">
+                      {{ t('cashAdvance.detail.total') }}
+                    </td>
+
+                    <td class="text-end">
+                      Rp {{ formatNumberWithoutRp(Number(detail.total_amount || 0)) }}
+                    </td>
+
+                    <td />
+                  </tr>
+                </tfoot>
+              </VTable>
+            </div>
+
+            <!--
+              Bentuk biasa: satu tabel datar, bertanggal.
+
+              Syaratnya disebut, bukan v-else. v-else berpasangan dengan apa
+              pun yang kebetulan berdiri tepat di atasnya; sekali ada yang
+              menyisipkan sesuatu di antaranya, pasangannya berpindah tanpa
+              bersuara.
+            -->
+            <div
+              v-if="!detailHasBreakdown"
+              class="ca-detail__table"
+            >
               <VTable density="compact">
                 <thead>
                   <tr>
@@ -3779,17 +4387,22 @@ onMounted(async () => {
       max-width="520"
     >
       <VCard>
+        <!--
+          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
+          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
+          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
+          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
+          dipastikan sebelum menjawab.
+        -->
         <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvance.list.approve.dialogTitle') }}
+          {{ t('cashAdvance.list.approve.dialogTitle', {
+            number: approveTarget?.advance_number || '-',
+          }) }}
         </VCardTitle>
 
         <VCardText>
           <div class="text-body-2 text-medium-emphasis mb-4">
             {{ t('cashAdvance.list.approve.dialogSubtitle') }}
-          </div>
-
-          <div class="font-weight-medium mb-4">
-            {{ approveTarget?.advance_number || '-' }}
           </div>
 
           <!--
@@ -3861,22 +4474,208 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG REJECT -->
+    <!--
+      TERIMA BERKAS, SEKALIGUS MEMBETULKAN NOMINALNYA
+
+      Hanya untuk yang memegang izin revisi. Yang lain tetap melihat
+      pertanyaan penegasan biasa -- lihat openReceive().
+
+      Angka pemohon tetap terpampang di samping kotak isian, bukan
+      digantikan olehnya: salah ketik satu digit hanya bisa ketahuan kalau
+      ada pembandingnya di sebelahnya.
+    -->
+    <VDialog
+      v-model="reviseDialog"
+      max-width="880"
+      scrollable
+    >
+      <VCard v-if="reviseRow">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('cashAdvance.list.revise.title', { nomor: reviseRow.advance_number || '-' }) }}
+        </VCardTitle>
+
+        <VCardSubtitle class="pb-3">
+          {{ t('cashAdvance.list.revise.subtitle') }}
+        </VCardSubtitle>
+
+        <VDivider />
+
+        <VCardText>
+          <VAlert
+            v-if="reviseError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ reviseError }}
+          </VAlert>
+
+          <div class="ca-revise-scroll">
+            <VTable density="compact">
+              <thead>
+                <tr>
+                  <th class="text-no-wrap">
+                    {{ t('cashAdvance.list.revise.colDate') }}
+                  </th>
+                  <th>
+                    {{ t('cashAdvance.list.revise.colDescription') }}
+                  </th>
+                  <th class="text-end text-no-wrap">
+                    {{ t('cashAdvance.list.revise.colSubmitted') }}
+                  </th>
+                  <th
+                    class="text-end text-no-wrap"
+                    style="inline-size: 190px;"
+                  >
+                    {{ t('cashAdvance.list.revise.colRevised') }}
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr
+                  v-for="baris in reviseLines"
+                  :key="`revisi-${baris.id}`"
+                >
+                  <td class="text-no-wrap">
+                    {{ formatDate(baris.date) }}
+                  </td>
+
+                  <td>{{ baris.description }}</td>
+
+                  <td class="text-end text-no-wrap text-medium-emphasis">
+                    Rp {{ formatNumberWithoutRp(baris.submitted) }}
+                  </td>
+
+                  <td>
+                    <VTextField
+                      v-model="baris.amount"
+                      type="number"
+                      min="0"
+                      step="1"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      class="ca-revise-input"
+                      :class="[{ 'ca-revise-input--changed': reviseLineChanged(baris) }]"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+
+          <!-- Kedua totalnya berdampingan, supaya selisihnya tidak perlu dihitung -->
+          <div class="ca-revise-total">
+            <div>
+              <div class="text-caption text-medium-emphasis">
+                {{ t('cashAdvance.list.revise.totalSubmitted') }}
+              </div>
+
+              <div class="text-body-1">
+                Rp {{ formatNumberWithoutRp(reviseSubmittedTotal) }}
+              </div>
+            </div>
+
+            <VIcon
+              icon="tabler-arrow-right"
+              size="18"
+              class="text-disabled"
+            />
+
+            <div>
+              <div class="text-caption text-medium-emphasis">
+                {{ t('cashAdvance.list.revise.totalRevised') }}
+              </div>
+
+              <div
+                class="text-h6 font-weight-bold"
+                :class="[reviseChanged ? 'text-warning' : 'text-high-emphasis']"
+              >
+                Rp {{ formatNumberWithoutRp(reviseNewTotal) }}
+              </div>
+            </div>
+          </div>
+
+          <!--
+            Alasannya muncul hanya ketika angkanya memang berubah. Kotak yang
+            selalu terpampang mengajak orang mengisinya walau tidak ada yang
+            perlu dijelaskan.
+          -->
+          <VExpandTransition>
+            <div v-if="reviseChanged">
+              <VAlert
+                type="warning"
+                variant="tonal"
+                density="compact"
+                class="mt-4 mb-3"
+              >
+                {{ t('cashAdvance.list.revise.warning') }}
+              </VAlert>
+
+              <VTextarea
+                v-model="reviseNotes"
+                :label="t('cashAdvance.list.revise.notes')"
+                :hint="t('cashAdvance.list.revise.notesHint')"
+                persistent-hint
+                rows="2"
+                density="comfortable"
+              />
+            </div>
+          </VExpandTransition>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="reviseSaving"
+            @click="reviseDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            :color="reviseChanged ? 'warning' : 'primary'"
+            class="text-none"
+            :loading="reviseSaving"
+            @click="submitRevise"
+          >
+            {{
+              reviseChanged
+                ? t('cashAdvance.list.revise.confirmRevised')
+                : t('cashAdvance.list.revise.confirmUnchanged')
+            }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <VDialog
       v-model="rejectDialog"
       max-width="520"
     >
       <VCard>
+        <!--
+          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
+          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
+          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
+          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
+          dipastikan sebelum menjawab.
+        -->
         <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvance.list.reject.dialogTitle') }}
+          {{ t('cashAdvance.list.reject.dialogTitle', {
+            number: rejectTarget?.advance_number || '-',
+          }) }}
         </VCardTitle>
 
         <VCardText>
           <div class="text-body-2 text-medium-emphasis mb-4">
             {{ t('cashAdvance.list.reject.dialogSubtitle') }}
-          </div>
-
-          <div class="font-weight-medium mb-4">
-            {{ rejectTarget?.advance_number || '-' }}
           </div>
 
           <VTextarea
@@ -4042,10 +4841,184 @@ onMounted(async () => {
     </VDialog>
     <!-- Penegasan pembayaran di luar jadwal -->
     <OffSchedulePaymentDialog ref="offScheduleDialog" />
+
+    <!--
+      BATAL TERIMA
+
+      Peringatannya menyebut akibatnya, bukan sekadar bertanya. Yang
+      menekannya perlu tahu bahwa tanggal pembayaran yang sudah dijanjikan
+      ikut batal -- itu bagian yang tidak terlihat dari namanya.
+    -->
+    <VDialog
+      v-model="unreceiveDialog"
+      max-width="520"
+    >
+      <VCard v-if="unreceiveTarget">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('cashAdvance.list.unreceive.title') }}
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <VAlert
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ t('cashAdvance.list.unreceive.warning') }}
+          </VAlert>
+
+          <VAlert
+            v-if="unreceiveError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ unreceiveError }}
+          </VAlert>
+
+          <div class="text-body-2 text-medium-emphasis mb-3">
+            {{ t('cashAdvance.list.unreceive.notesHint') }}
+          </div>
+
+          <VTextarea
+            v-model="unreceiveNotes"
+            :label="t('cashAdvance.list.unreceive.notes')"
+            rows="3"
+            density="comfortable"
+            autofocus
+          />
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="unreceiveLoading"
+            @click="unreceiveDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="warning"
+            class="text-none"
+            :loading="unreceiveLoading"
+            :disabled="!unreceiveNotes.trim()"
+            @click="submitUnreceive"
+          >
+            {{ t('cashAdvance.list.unreceive.confirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!--
+      CETAK: gabung lampiran atau tidak
+
+      Muncul hanya pada dokumen yang punya lampiran. Keterangan soal PDF
+      disebutkan di muka, bukan disembunyikan sampai cetakannya jadi --
+      orang yang mengira vouchernya ikut tercetak akan berhenti memeriksa.
+    -->
+    <VDialog
+      v-model="printAttachmentDialog"
+      max-width="480"
+    >
+      <VCard v-if="printTarget">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('cashAdvance.list.print.attachmentTitle') }}
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <div class="text-body-2 mb-3">
+            {{ t('cashAdvance.list.print.attachmentCount', {
+              count: printTarget.attachment_count ?? 0,
+            }) }}
+          </div>
+
+          <VCheckbox
+            v-model="printWithAttachments"
+            :label="t('cashAdvance.list.print.attachmentInclude')"
+            density="comfortable"
+            hide-details
+          />
+
+          <VAlert
+            v-if="printWithAttachments"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ t('cashAdvance.list.print.attachmentPdfNotice') }}
+          </VAlert>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            @click="printAttachmentDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="primary"
+            class="text-none"
+            prepend-icon="tabler-printer"
+            @click="confirmPrint"
+          >
+            {{ t('cashAdvance.list.print.attachmentConfirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </section>
 </template>
 
 <style scoped>
+/*
+| Tabel revisinya bisa panjang; yang boleh menggeser hanya tabelnya, bukan
+| seluruh modal -- kedua totalnya harus tetap terlihat selagi angkanya
+| disunting.
+*/
+.ca-revise-scroll {
+  overflow-y: auto;
+  max-block-size: 44vh;
+}
+
+.ca-revise-input {
+  inline-size: 170px;
+}
+
+/* Baris yang disentuh ditandai, supaya yang berubah tidak perlu dicari. */
+.ca-revise-input--changed :deep(.v-field) {
+  border-color: rgb(var(--v-theme-warning));
+  background: rgba(var(--v-theme-warning), 0.06);
+}
+
+.ca-revise-total {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 10px;
+  gap: 1.25rem;
+  margin-block-start: 1rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+}
 .ca-approval-filter {
   display: flex;
   align-items: center;
@@ -4257,6 +5230,12 @@ onMounted(async () => {
 
 .ca-detail__section-title .v-icon {
   color: rgba(var(--v-theme-primary), 0.8);
+}
+
+/* Baris judul kategori pada rincian perjalanan dinas. */
+.ca-detail__cat-row td {
+  background: rgba(var(--v-theme-primary), 0.06);
+  font-weight: 600;
 }
 
 .ca-detail__table {

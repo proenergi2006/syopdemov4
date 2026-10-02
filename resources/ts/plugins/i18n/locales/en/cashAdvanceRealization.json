@@ -98,10 +98,15 @@
             "popupBlocked": "The popup was blocked. Please allow popups for this site.",
             "windowClosed": "The print window was closed.",
             "urlFailed": "Failed to create the print URL.",
-            "failed": "Failed to open the printout."
+            "failed": "Failed to open the printout.",
+            "attachmentTitle": "Print document",
+            "attachmentCount": "This document has {count} attachment(s).",
+            "attachmentInclude": "Merge attachments into a single PDF",
+            "attachmentPdfNotice": "Image attachments are added on the following pages, two per page. Attachments that are already PDFs cannot be merged — their names are still listed on the last page so they can be opened separately.",
+            "attachmentConfirm": "Print"
         },
         "approve": {
-            "dialogTitle": "Approve Realization",
+            "dialogTitle": "Approve realization {number}?",
             "dialogSubtitle": "Make sure the realized amounts match the receipts before approving.",
             "notesLabel": "Notes (optional)",
             "notesPlaceholder": "Add an approval note if needed",
@@ -110,7 +115,7 @@
             "failedFallback": "Failed to approve the realization."
         },
         "reject": {
-            "dialogTitle": "Reject Realization",
+            "dialogTitle": "Reject realization {number}?",
             "dialogSubtitle": "Rejecting stops the entire approval process for this document.",
             "notesLabel": "Rejection reason",
             "notesPlaceholder": "Explain why this is rejected",
@@ -220,6 +225,17 @@
         },
         "paymentDay": {
             "blockedNotice": "Payment is only possible on {days}. Some documents are waiting, but today is not a payment day — the button becomes available again on those days."
+        },
+        "unreceive": {
+            "menu": "Undo Receive",
+            "title": "Undo the receipt of this document?",
+            "warning": "The document goes back to approved, and the payment date already promised to the requester is cancelled with it. The realization can then be cancelled or received again.",
+            "notes": "Reason for Undoing Receipt",
+            "notesHint": "The requester reads this. Briefly explain why the receipt was undone.",
+            "notesRequired": "A reason is required.",
+            "confirm": "Yes, Undo Receipt",
+            "successFallback": "The receipt was undone.",
+            "failedFallback": "The receipt could not be undone."
         }
     },
     "form": {
@@ -322,6 +338,22 @@
             "discardTitle": "Close without saving?",
             "discardText": "Changes to the realization lines have not been saved and will be lost.",
             "discardButton": "Yes, close"
+        },
+        "breakdown": {
+            "noCategory": "No active business trip expense category yet. Ask an admin to add one in the Business Trip Expense Category master.",
+            "arrangedByGa": "Arranged by GA",
+            "arrangedNotice": "General Affair handles this category, so the requester spent nothing on it in this realization and it needs no lines.",
+            "tableItem": "Item",
+            "tableQty": "Qty",
+            "tableUnitPrice": "Unit Cost",
+            "categoryEmpty": "No lines in this category yet.",
+            "itemPlaceholder": "e.g. Dexlite fuel (616 KM) Palembang pool - Bayung Lencir",
+            "addRowTo": "Add {name} line",
+            "totalReadonly": "Total is computed from Qty x Unit Cost.",
+            "toastNoRows": "There are no lines at all. Fill in at least one, or mark the category as arranged by GA.",
+            "toastCategory": "Row {number}: the expense category is not selected.",
+            "toastQty": "Row {number}: Qty is required and must be greater than zero.",
+            "toastUnitPrice": "Row {number}: Unit cost is required and must be greater than zero."
         }
     },
     "detail": {

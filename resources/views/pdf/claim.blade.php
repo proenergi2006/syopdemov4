@@ -569,5 +569,13 @@
     <div class="footer">
         Dokumen ini dicetak dari sistem SYOP pada {{ now()->format('d/m/Y H:i') }} WIB.
     </div>
+
+    {{--
+        Lampiran, bila pencetaknya memintanya digabung. Tanpa permintaan
+        itu, variabelnya kosong dan partial ini tidak menghasilkan
+        satu halaman pun.
+    --}}
+    @include('pdf.partials.attachments')
+
 </body>
 </html>

@@ -84,6 +84,15 @@ class CashAdvanceRealizationModuleSeeder extends Seeder
             ['receive', 'Receive Realisasi FPU', 'Menandai Realisasi FPU yang sudah disetujui sudah diterima, sebelum selisihnya diselesaikan.', false],
 
             /*
+            | Jalan mundur dari meja penerimaan.
+            |
+            | Dipisah dari receive karena bobotnya lain: menerima berkas
+            | menambah dokumen ke antrean, menariknya kembali mencabut tanggal
+            | yang sudah dijanjikan ke pemohon lewat email.
+            */
+            ['unreceive', 'Undo Receive Realisasi FPU', 'Membatalkan penerimaan berkas Realisasi FPU sehingga dokumennya kembali ke status disetujui. Tanggal pembayaran yang sudah dijanjikan ikut dibatalkan.', false],
+
+            /*
             | Penyelesaian selisih dipecah dua, mengikuti arah uangnya:
             |
             | - return    : pemohon mengembalikan sisa dana ke Finance.

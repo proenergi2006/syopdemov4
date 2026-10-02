@@ -70,6 +70,9 @@ class CashAdvanceRealization extends Model
         'received_by',
         'received_at',
         'receipt_notes',
+        'receipt_reverted_by',
+        'receipt_reverted_at',
+        'receipt_reversal_notes',
         'scheduled_payment_date',
         'settled_by',
         'settled_at',
@@ -94,6 +97,7 @@ class CashAdvanceRealization extends Model
         'rejected_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'received_at' => 'datetime',
+        'receipt_reverted_at' => 'datetime',
         'scheduled_payment_date' => 'date',
         'settled_at' => 'datetime',
     ];

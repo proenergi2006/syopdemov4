@@ -99,6 +99,8 @@ return [
         'failed' => 'Export data FPU gagal diproses.',
         'filename' => 'FPU',
         'sheet_title' => 'FPU',
+        'no_expense_category' => '(tanpa kategori)',
+        'arranged_by_ga' => 'Diurus GA (tidak ditagihkan)',
         'no_item' => '(tanpa rincian)',
 
         'columns' => [
@@ -112,6 +114,9 @@ return [
             'subject' => 'Perihal',
             'item_date' => 'Tanggal Rincian',
             'item_description' => 'Deskripsi Rincian',
+            'expense_category' => 'Kategori Biaya',
+            'qty' => 'Qty',
+            'unit_price' => 'Rincian Biaya',
             'item_amount' => 'Nominal Rincian',
             'total_amount' => 'Total Pengajuan',
             'status' => 'Status',
@@ -149,5 +154,19 @@ return [
         'item_date_outside_trip' => 'Baris :row: tanggalnya di luar periode Perjalanan Dinas :number (:from s/d :to). Biaya perjalanan tidak bisa bertanggal di luar perjalanannya.',
         'trip_not_approved' => 'FPU ini belum bisa dicairkan: Perjalanan Dinas :number masih menunggu persetujuan manajemen.',
         'trip_not_valid' => 'FPU ini tidak bisa dicairkan: Perjalanan Dinas :number ditolak atau dibatalkan. Batalkan FPU ini, atau ajukan ulang perdinnya.',
+    ],
+
+    /*
+    | Rincian berkategori pada dokumen perjalanan dinas.
+    |
+    | Nominal tiap baris dihitung dari Qty x Rincian Biaya, bukan diterima
+    | dari layar -- nominal yang bisa datang dari dua tempat cepat atau
+    | lambat akan datang berbeda.
+    */
+    'breakdown' => [
+        'category_required' => 'Baris :row: kategori biayanya belum dipilih. Rincian perjalanan dinas dikelompokkan per kategori.',
+        'qty_required' => 'Baris :row: Qty wajib diisi dan harus lebih dari nol.',
+        'unit_price_required' => 'Baris :row: Rincian Biaya wajib diisi dan harus lebih dari nol.',
+        'arranged_has_items' => 'Kategori :category ditandai diurus GA, jadi tidak boleh punya baris rincian. Hapus barisnya, atau matikan penandanya.',
     ],
 ];

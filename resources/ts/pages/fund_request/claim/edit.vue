@@ -7,6 +7,7 @@ import {
   closeAlert,
   showConfirmAlert,
   showErrorToast,
+  showInfoToast,
   showLoadingAlert,
   showWarningToast,
 } from '@/utils/alert'
@@ -74,7 +75,100 @@ const isSubmitted = ref(false)
 */
 const { dialogDateConfig } = useDialogDatePicker()
 
-const lineDateConfig = dialogDateConfig()
+/*
+| Rentang tanggal baris rincian, mengikuti periode perjalanannya.
+|
+| Kosong selama Claim-nya tidak bertaut perdin -- pengeluaran biasa tidak
+| terikat periode apa pun.
+*/
+const lineDateRange = ref<{ minDate?: string; maxDate?: string }>({})
+
+const lineDateConfig = computed(() => dialogDateConfig(lineDateRange.value))
+
+const businessTripList = ref<BusinessTripOption[]>([])
+const isLoadingBusinessTrip = ref(false)
+
+const transactionCategoryList = ref<TransactionCategoryOption[]>([])
+const isLoadingTransactionCategory = ref(false)
+
+const loadTransactionCategories = async (): Promise<void> => {
+  isLoadingTransactionCategory.value = true
+
+  try {
+    const response = await axios.get(
+      '/fund-request/transaction-categories/dropdown-select',
+      {
+        headers: { Accept: 'application/json' },
+
+        /*
+         * Satu master menampung daftar FPU dan Claim sekaligus, jadi
+         * modulnya harus disebut supaya keduanya tidak tercampur.
+         */
+        params: { document_type: 'CLAIM' },
+      },
+    )
+
+    const data = Array.isArray(response?.data?.data) ? response.data.data : []
+
+    transactionCategoryList.value = data.map((item: any) => ({
+      id: Number(item.id),
+      title: String(item.title || item.name || '-'),
+      requires_business_trip: Boolean(item.requires_business_trip),
+    }))
+  }
+  catch (error: unknown) {
+    console.error('[Cash Advance] TRANSACTION CATEGORY ERROR:', error)
+    transactionCategoryList.value = []
+  }
+  finally {
+    isLoadingTransactionCategory.value = false
+  }
+}
+
+/** Keterangan pendek kenapa sebuah perdin belum bisa dipilih. */
+const businessTripLockReason = (item: BusinessTripOption): string => {
+  if (item.selectable)
+    return ''
+
+  if (!item.waiting_step)
+    return t('claim.form.businessTripState.locked')
+
+  return t('claim.form.businessTripState.waitingStep', {
+    step: item.waiting_step.step_order,
+    who: item.waiting_step.approver
+      || item.waiting_step.label
+      || t('claim.form.businessTripState.someone'),
+  })
+}
+
+/*
+| Tanggal di luar periode diperiksa terus-menerus, bukan sekali saat
+| dipilih: keterangan transaksinya bisa diganti BELAKANGAN, sesudah
+| rinciannya terisi, sehingga baris yang tadinya sah mendadak berada di
+| luar periode.
+*/
+const dateOutsideTrip = (value: unknown): boolean => {
+  const { minDate, maxDate } = lineDateRange.value
+
+  if (!minDate || !maxDate)
+    return false
+
+  const tanggal = String(value ?? '').trim()
+
+  return tanggal !== '' && (tanggal < minDate || tanggal > maxDate)
+}
+
+/** Pesan pada kolom tanggal sebuah baris, bila memang ada. */
+const itemDateErrors = (item: { date?: string | null }): string[] => {
+  if (dateOutsideTrip(item.date))
+    return [t('claim.form.validation.itemDateOutsideTrip')]
+
+  if (isSubmitted.value && !item.date)
+    return [t('claim.form.validation.itemDate')]
+
+  return []
+}
+
 const isSaving = ref(false)
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024
@@ -115,6 +209,9 @@ const form = reactive({
    */
   transaction_category_id: null as number | null,
 
+  /* Diisi hanya bila keterangan transaksinya menuntut Perdin. */
+  business_trip_id: null as number | null,
+
   // Rutin / Non Rutin, mengikuti tipe PR.
 
   subject: '',
@@ -122,46 +219,147 @@ const form = reactive({
   items: [createEmptyItem()] as ClaimItemForm[],
 })
 
+/**
+ * Baris rincian itu benar-benar berisi sesuatu.
+ *
+ * Formulir berangkat dengan satu baris kosong -- itulah yang nanti diisi
+ * di modal. Tanpa pemeriksaan ini, baris itu ikut tergambar pada ringkasan
+ * sebagai "- · Tanggal: - · Rp 0", tepat di bawah tulisan bahwa rinciannya
+ * belum ada.
+ *
+ * Ketiganya diperiksa, bukan keterangannya saja: baris yang sudah
+ * bernominal tetapi belum diberi keterangan tetap berisi sesuatu, dan
+ * menyembunyikannya berarti menyembunyikan angka yang sudah diketik orang.
+ */
+const isItemFilled = (item: { description?: string; date?: string | null; amount?: unknown }): boolean =>
+  Boolean(String(item.description ?? '').trim())
+  || Boolean(String(item.date ?? '').trim())
+  || Number(item.amount ?? 0) > 0
+
+/** Ada rincian yang pantas ditampilkan dan pantas direset. */
+const hasItemDetails = computed<boolean>(() => form.items.some(isItemFilled))
+
+const selectedBusinessTrip = computed<BusinessTripOption | null>(() =>
+  businessTripList.value.find(
+    item => Number(item.id) === Number(form.business_trip_id),
+  ) ?? null)
+
+/** Keterangan transaksi yang sedang dipilih menuntut dokumen Perdin. */
+const needsBusinessTrip = computed<boolean>(() => {
+  const dipilih = transactionCategoryList.value.find(
+    item => Number(item.id) === Number(form.transaction_category_id),
+  )
+
+  return Boolean(dipilih?.requires_business_trip)
+})
+
 interface TransactionCategoryOption {
   id: number
   title: string
+
+  /*
+  | Penanda dari master: keterangan transaksi ini menuntut dokumen Perdin.
+  | Dibaca dari penandanya, bukan dari namanya -- nama bisa disunting orang.
+  */
+  requires_business_trip?: boolean
 }
 
-const transactionCategoryList = ref<TransactionCategoryOption[]>([])
-const isLoadingTransactionCategory = ref(false)
+interface BusinessTripOption {
+  id: number
+  trip_number: string
+  destination: string
+  depart_date: string | null
+  return_date: string | null
+  status: string
+  selectable: boolean
+  waiting_step?: { step_order: number; label: string | null; approver: string | null } | null
+}
 
-const loadTransactionCategories = async (): Promise<void> => {
-  isLoadingTransactionCategory.value = true
+/**
+ * Perdin yang boleh dipakai: milik sendiri, sudah disetujui, dan belum
+ * dipegang FPU atau Claim lain yang masih berjalan.
+ *
+ * Daftarnya disusun server dengan aturan yang sama persis yang dipakai
+ * memeriksa kiriman ini nanti. Kalau disusun dengan aturan sendiri, layar
+ * akan menawarkan sesuatu yang lalu ditolak.
+ */
+const loadBusinessTrips = async (): Promise<void> => {
+  /*
+  | Daftar keterangan transaksinya belum tiba: belum ada yang bisa
+  | dikatakan tentang perlu tidaknya perdin, karena jawabannya justru
+  | ada di daftar itu.
+  |
+  | Berhenti di sini, bukan meneruskan ke cabang di bawah: cabang itu
+  | membuang tautan perdin yang tersimpan, dan membuangnya atas dasar
+  | tebakan 'tidak perlu' yang kebetulan selalu benar selama daftarnya
+  | kosong. Diam lebih benar daripada menebak.
+  */
+  if (!transactionCategoryList.value.length)
+    return
+
+  if (!needsBusinessTrip.value) {
+    businessTripList.value = []
+    form.business_trip_id = null
+
+    return
+  }
+
+  isLoadingBusinessTrip.value = true
 
   try {
-    const response = await axios.get(
-      '/fund-request/transaction-categories/dropdown-select',
-      {
-        headers: { Accept: 'application/json' },
+  /*
+  | Claim ini sendiri dikecualikan dari penyaring "sudah terpakai" --
+  | kalau tidak, membuka Claim lama akan kehilangan tautan perdinnya.
+  */
+    const response = await axios.get('/business-trip/perdin/eligible', {
+      params: { claim_public_id: publicId.value },
+    })
 
-        /*
-         * Satu master menampung daftar FPU dan Claim sekaligus, jadi
-         * modulnya harus disebut supaya keduanya tidak tercampur.
-         */
-        params: { document_type: 'CLAIM' },
-      },
-    )
-
-    const data = Array.isArray(response?.data?.data) ? response.data.data : []
-
-    transactionCategoryList.value = data.map((item: any) => ({
-      id: Number(item.id),
-      title: String(item.title || item.name || '-'),
-    }))
+    businessTripList.value = Array.isArray(response?.data?.data)
+      ? response.data.data
+      : []
   }
   catch (error: unknown) {
-    console.error('[Cash Advance] TRANSACTION CATEGORY ERROR:', error)
-    transactionCategoryList.value = []
+    businessTripList.value = []
   }
   finally {
-    isLoadingTransactionCategory.value = false
+    isLoadingBusinessTrip.value = false
   }
 }
+
+/* Daftarnya diminta ulang setiap keterangan transaksinya berganti. */
+/*
+| Dua pemicu, dan yang kedua yang menentukan di halaman sunting.
+|
+| Perlu tidaknya perdin baru bisa dijawab setelah daftar keterangan
+| transaksinya tiba. Tanpa memuat ulang di saat itu, halaman yang
+| memuat dokumennya lebih dulu akan berhenti dengan pemilih perdin
+| kosong selamanya -- dan urutan pemuatan bukan sesuatu yang pantas
+| dijadikan sandaran diam-diam.
+*/
+watch([() => form.transaction_category_id, transactionCategoryList], () => {
+  loadBusinessTrips()
+})
+
+/*
+| Tanggal baris rincian mengikuti periode perjalanannya.
+|
+| Biaya sebuah perjalanan tidak mungkin bertanggal di luar perjalanan itu.
+| Dibatasi di kalendernya, bukan hanya ditolak sesudah dikirim -- tanggal
+| yang salah sebaiknya tidak pernah sempat dipilih.
+*/
+watch(
+  [selectedBusinessTrip, needsBusinessTrip],
+  () => {
+    const trip = needsBusinessTrip.value ? selectedBusinessTrip.value : null
+
+    lineDateRange.value = {
+      minDate: trip?.depart_date || undefined,
+      maxDate: trip?.return_date || undefined,
+    }
+  },
+  { immediate: true },
+)
 
 const required = (value: unknown): boolean =>
   value !== '' && value !== null && value !== undefined
@@ -294,6 +492,14 @@ const loadClaim = async (): Promise<void> => {
       ? Number(data.transaction_category_id)
       : null
 
+    /*
+     * Tautan perdinnya ikut dimuat, kalau tidak menyimpan ulang dokumen yang
+     * tidak disentuh justru akan memutus tautannya.
+     */
+    form.business_trip_id = data.business_trip_id
+      ? Number(data.business_trip_id)
+      : null
+
     form.subject = data.subject || ''
     form.notes = data.notes || ''
 
@@ -414,6 +620,52 @@ const discardItemDialog = (): void => {
   tempDeletedIds.value = []
   itemDialog.value = false
 }
+
+/**
+ * Mengosongkan rincian karena keterangan transaksinya berganti.
+ *
+ * Tidak diam-diam: yang sudah terisi dikabarkan hilang. Baris yang sudah
+ * diketik orang tidak pantas lenyap tanpa sepatah kata, walau lenyapnya
+ * memang benar.
+ */
+const clearLinesOnCategoryChange = (): void => {
+  const adaIsi = form.items.some(isItemFilled)
+
+  form.items = []
+  itemDialogSaved.value = false
+
+  if (!adaIsi)
+    return
+
+  showInfoToast({
+    title: t('common.alert.info'),
+    text: t('claim.form.toast.linesClearedByCategory'),
+  })
+}
+
+/*
+| Pengawasnya pada keterangan transaksinya saja.
+|
+| Mengganti nomor perdin tidak mengubah cara pengisiannya -- yang berubah
+| perjalanan mana yang dibiayai, bukan bentuk rinciannya -- jadi rincian
+| yang sudah diisi tidak ada alasan untuk hilang.
+*/
+watch(() => form.transaction_category_id, (baru, lama) => {
+  /*
+  | Nilai pertamanya dilewati.
+  |
+  | Pada halaman sunting, yang memasangnya pemuat dokumennya sendiri, dan
+  | mengosongkan rincian di saat itu berarti membuang rincian tersimpan
+  | sebelum orangnya sempat melihatnya.
+  */
+  if (lama === null || lama === undefined || lama === '')
+    return
+
+  if (Number(lama) === Number(baru))
+    return
+
+  clearLinesOnCategoryChange()
+})
 
 const saveItemsFromDialog = (): void => {
   /*
@@ -639,6 +891,7 @@ const validateForm = (): boolean => {
     || !required(form.branch)
     || !required(form.department_id)
     || !required(form.transaction_category_id)
+    || (needsBusinessTrip.value && !required(form.business_trip_id))
     || !form.subject.trim()
   ) {
     showWarningToast({
@@ -723,6 +976,14 @@ const buildFormData = (): FormData => {
   formData.append('department_id', String(form.department_id || ''))
   formData.append('subject', form.subject)
   formData.append('transaction_category_id', String(form.transaction_category_id || ''))
+
+  /*
+  | Hanya dikirim bila keterangan transaksinya memang menuntutnya. Server
+  | mengabaikannya pada kategori lain, tetapi mengirimnya tetap keliru --
+  | ia menyatakan tautan yang tidak ada.
+  */
+  if (needsBusinessTrip.value && form.business_trip_id)
+    formData.append('business_trip_id', String(form.business_trip_id))
   formData.append('notes', form.notes || '')
 
   formData.append(
@@ -998,6 +1259,94 @@ onMounted(async () => {
                   :no-data-text="t('claim.form.noData.transactionCategory')"
                   :placeholder="t('claim.form.placeholders.transactionCategory')"
                 />
+
+                <!--
+                  PEMILIH PERDIN
+
+                  Muncul hanya bila keterangan transaksinya menuntut dokumen
+                  Perdin. Daftarnya sudah disaring server: milik pemohon,
+                  sudah disetujui, dan belum dipegang FPU atau Claim lain
+                  yang masih berjalan.
+                -->
+                <VAutocomplete
+                  v-if="needsBusinessTrip"
+                  v-model="form.business_trip_id"
+                  :label="t('claim.form.fields.businessTrip')"
+                  :items="businessTripList"
+                  item-value="id"
+                  density="comfortable"
+                  class="mt-4"
+                  :loading="isLoadingBusinessTrip"
+                  clearable
+                  :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+                  :error="isSubmitted && !form.business_trip_id"
+                  :error-messages="isSubmitted && !form.business_trip_id
+                    ? [t('claim.form.validation.businessTrip')]
+                    : []"
+                  :no-data-text="t('claim.form.noData.businessTrip')"
+                  :placeholder="t('claim.form.placeholders.businessTrip')"
+                  persistent-placeholder
+                  :hint="t('claim.form.hints.businessTrip')"
+                  persistent-hint
+                >
+                  <!--
+                    Yang belum boleh dipakai tetap ditampilkan, tetapi tidak
+                    bisa diklik -- dan sebabnya dikatakan di barisnya sendiri,
+                    bukan disembunyikan.
+                  -->
+                  <template #item="{ props: itemProps, item }">
+                    <VListItem
+                      v-bind="itemProps"
+                      :disabled="!item.raw.selectable"
+                      :title="item.raw.trip_number"
+                      :subtitle="item.raw.selectable
+                        ? `${item.raw.destination} · ${item.raw.depart_date} → ${item.raw.return_date}`
+                        : businessTripLockReason(item.raw)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          :icon="item.raw.selectable ? 'tabler-plane' : 'tabler-lock'"
+                          :color="item.raw.selectable ? undefined : 'warning'"
+                          size="18"
+                          class="me-2"
+                        />
+                      </template>
+
+                      <template #append>
+                        <VChip
+                          size="x-small"
+                          variant="tonal"
+                          :color="item.raw.status === 'APPROVED' ? 'success' : 'warning'"
+                        >
+                          {{ item.raw.status === 'APPROVED'
+                            ? t('claim.form.businessTripState.approved')
+                            : t('claim.form.businessTripState.pending') }}
+                        </VChip>
+                      </template>
+                    </VListItem>
+                  </template>
+
+                  <template #selection="{ item }">
+                    <span>{{ item.raw.trip_number }} &mdash; {{ item.raw.destination }}</span>
+                  </template>
+                </VAutocomplete>
+
+                <!--
+                  Periode perjalanannya, sebagai pegangan saat mengisi rincian.
+                  Tanggal di luar periode tidak bisa dipilih di kalendernya.
+                -->
+                <VAlert
+                  v-if="needsBusinessTrip && selectedBusinessTrip"
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-2"
+                >
+                  {{ t('claim.form.hints.businessTripPeriod', {
+                    from: selectedBusinessTrip.depart_date,
+                    to: selectedBusinessTrip.return_date,
+                  }) }}
+                </VAlert>
               </VCol>
 
               <VCol cols="12">
@@ -1042,12 +1391,14 @@ onMounted(async () => {
                   </VTooltip>
                 </VBtn>
 
+                <!-- Tidak ada yang bisa direset selama rinciannya kosong. -->
                 <VBtn
                   type="button"
                   color="error"
                   variant="outlined"
                   size="small"
                   class="text-none"
+                  :disabled="!hasItemDetails"
                   @click="resetItems"
                 >
                   {{ t('claim.form.items.resetButton') }}
@@ -1065,7 +1416,7 @@ onMounted(async () => {
             >
               <VCardText>
                 <VAlert
-                  v-if="!form.items.length || form.items.every(item => !item.description)"
+                  v-if="!hasItemDetails"
                   type="info"
                   variant="tonal"
                   density="compact"
@@ -1073,8 +1424,15 @@ onMounted(async () => {
                   {{ t('claim.form.items.emptyAlert', { action: t('claim.form.items.addButton') }) }}
                 </VAlert>
 
+                <!--
+                  Syaratnya disebut, bukan v-else.
+
+                  v-else berpasangan dengan apa pun yang kebetulan berdiri
+                  tepat di atasnya; sekali ada yang menyisipkan peringatan di
+                  antaranya, pasangannya berpindah tanpa bersuara.
+                -->
                 <div
-                  v-else
+                  v-if="hasItemDetails"
                   class="d-flex flex-column gap-3"
                 >
                   <div
@@ -1371,8 +1729,8 @@ onMounted(async () => {
                       density="compact"
                       hide-details="auto"
                       :config="lineDateConfig"
-                      :error="isSubmitted && !item.date"
-                      :error-messages="isSubmitted && !item.date ? [t('claim.form.validation.itemDate')] : []"
+                      :error="(isSubmitted && !item.date) || dateOutsideTrip(item.date)"
+                      :error-messages="itemDateErrors(item)"
                     />
                   </td>
 

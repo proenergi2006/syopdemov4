@@ -6,8 +6,13 @@ use App\Exports\ClaimExport;
 use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
+use App\Http\Controllers\Api\BusinessTripController;
 use App\Http\Controllers\Controller;
+use App\Services\FundRequest\PrintAttachmentCollector;
+use App\Services\FundRequest\ReceiptReversalService;
+use App\Models\BusinessTrip;
 use App\Models\Claim;
+use App\Services\FundRequest\AmountRevisionService;
 use App\Models\ClaimApproval;
 use App\Models\ClaimAttachment;
 use App\Models\ClaimItem;
@@ -105,11 +110,18 @@ class ClaimController extends Controller
                 'can_delete' => $user->hasPermission('claim.delete'),
                 'can_cancel' => $user->hasPermission('claim.cancel'),
                 'can_receive' => $user->hasPermission('claim.receive'),
+                /*
+                | Menentukan bentuk layar penerimaan: sekadar pertanyaan,
+                | atau modal berisi rincian yang nominalnya bisa dibetulkan.
+                */
+                'can_revise_amount' => $user->hasPermission('claim.revise_amount'),
                 'can_pay' => $user->hasPermission('claim.pay'),
             ];
 
             $query = Claim::query()
+                ->withCount('attachments')
                 ->with([
+                    'businessTrip:id,trip_number,depart_date,return_date',
                     'branchData',
                     'departmentData',
                     'transactionCategory',
@@ -210,6 +222,16 @@ class ClaimController extends Controller
                         'subject' => $claim->subject,
 
                         'transaction_category_id' => $claim->transaction_category_id,
+
+                        /*
+                        | Perjalanan dinas yang ditagihkan Claim ini, bila ada.
+                        |
+                        | Nomornya ikut supaya layar tidak perlu menebaknya dari id --
+                        | pada rincian dan daftar tidak ada daftar perdin apa pun untuk
+                        | mencocokkannya.
+                        */
+                        'business_trip_id' => $claim->business_trip_id,
+                        'business_trip_number' => $claim->businessTrip?->trip_number,
                         'transaction_category' => $claim->transactionCategory?->name,
 
                         'branch' => $claim->branchData?->nama_cabang ?? '-',
@@ -220,6 +242,22 @@ class ClaimController extends Controller
                         'department_id' => $claim->department_id,
 
                         'total_amount' => (float) $claim->total_amount,
+
+                        /*
+                        | Jumlah lampiran, dipakai layar untuk menentukan perlu tidaknya
+                        | bertanya "gabungkan lampiran ke dalam cetakan?". Dokumen tanpa
+                        | lampiran tidak semestinya ditanyai.
+                        */
+                        'attachment_count' => (int) ($claim->attachments_count ?? 0),
+
+                        /*
+                        | Total yang diajukan pemohon sebelum revisi Finance. Null
+                        | berarti angkanya apa adanya -- bukan nol, dan bukan salinan.
+                        */
+                        'original_total_amount' => $claim->original_total_amount !== null
+                            ? (float) $claim->original_total_amount
+                            : null,
+                        'amount_revision_notes' => $claim->amount_revision_notes,
                         'notes' => $claim->notes,
                         'status' => $claim->status,
 
@@ -357,6 +395,14 @@ class ClaimController extends Controller
 
             $items = $this->decodeItems($request->input('items'));
 
+            /*
+            | Perdinnya ditentukan sebelum apa pun disimpan. Kiriman yang
+            | ditolak di sini tidak boleh meninggalkan draft separuh jadi.
+            */
+            $businessTripId = $this->resolveBusinessTripId($request, $user);
+
+            $this->assertItemDatesWithinTrip($items, $businessTripId);
+
             $totalAmount = round(
                 array_sum(array_map(fn(array $item) => (float) $item['amount'], $items)),
                 2,
@@ -371,6 +417,8 @@ class ClaimController extends Controller
 
                 'transaction_category_id'
                 => (int) $request->input('transaction_category_id'),
+
+                'business_trip_id' => $businessTripId,
 
                 'branch' => (string) $request->input('branch'),
                 'department_id' => (int) $request->input('department_id'),
@@ -472,6 +520,7 @@ class ClaimController extends Controller
             }
 
             $claim->load([
+                'businessTrip',
                 'branchData',
                 'departmentData',
                 'transactionCategory',
@@ -543,7 +592,7 @@ class ClaimController extends Controller
                 ], 404);
             }
 
-            $claim->load(['items', 'attachments']);
+            $claim->load(['items', 'attachments', 'businessTrip']);
 
             return response()->json([
                 'success' => true,
@@ -555,9 +604,28 @@ class ClaimController extends Controller
                     'date' => optional($claim->date)->toDateString(),
                     'subject' => $claim->subject,
                     'transaction_category_id' => $claim->transaction_category_id,
+
+                    /*
+                    | Perjalanan dinas yang ditagihkan Claim ini, bila ada.
+                    |
+                    | Nomornya ikut supaya layar tidak perlu menebaknya dari id --
+                    | pada rincian dan daftar tidak ada daftar perdin apa pun untuk
+                    | mencocokkannya.
+                    */
+                    'business_trip_id' => $claim->business_trip_id,
+                    'business_trip_number' => $claim->businessTrip?->trip_number,
                     'branch' => $claim->branch,
                     'department_id' => $claim->department_id,
                     'total_amount' => (float) $claim->total_amount,
+
+                    /*
+                    | Total yang diajukan pemohon sebelum revisi Finance. Null
+                    | berarti angkanya apa adanya -- bukan nol, dan bukan salinan.
+                    */
+                    'original_total_amount' => $claim->original_total_amount !== null
+                        ? (float) $claim->original_total_amount
+                        : null,
+                    'amount_revision_notes' => $claim->amount_revision_notes,
                     'notes' => $claim->notes,
                     'status' => $claim->status,
                     'items' => $this->transformItems($claim),
@@ -658,6 +726,15 @@ class ClaimController extends Controller
 
             $items = $this->decodeItems($request->input('items'));
 
+            /*
+            | Claim ini sendiri dikecualikan dari penyaring "sudah terpakai".
+            | Tanpa itu, membuka Claim lama lalu menyimpannya kembali akan
+            | ditolak oleh tautannya sendiri.
+            */
+            $businessTripId = $this->resolveBusinessTripId($request, $user, (int) $claim->id);
+
+            $this->assertItemDatesWithinTrip($items, $businessTripId);
+
             $totalAmount = round(
                 array_sum(array_map(fn(array $item) => (float) $item['amount'], $items)),
                 2,
@@ -669,6 +746,8 @@ class ClaimController extends Controller
 
                 'transaction_category_id'
                 => (int) $request->input('transaction_category_id'),
+
+                'business_trip_id' => $businessTripId,
 
                 'branch' => (string) $request->input('branch'),
                 'department_id' => (int) $request->input('department_id'),
@@ -1279,6 +1358,19 @@ class ClaimController extends Controller
                 'mimes:' . self::ATTACHMENT_MIMES,
                 'max:' . self::ATTACHMENT_MAX_KB,
             ],
+
+            /*
+            | Nominal hasil pembetulan Finance, bila ada. Wewenang dan
+            | kewajiban alasannya diperiksa AmountRevisionService, dan hanya
+            | kalau angkanya memang berubah -- lihat keterangan di sana.
+            */
+            'items' => ['nullable', 'array'],
+            'items.*.id' => ['required', 'integer'],
+            'items.*.amount' => ['required', 'numeric', 'min:0'],
+
+            'revision_notes' => ['nullable', 'string', 'max:2000'],
+        ], [], [
+            'items.*.amount' => __('fund_request_messages.revision.amount_label'),
         ]);
 
         DB::beginTransaction();
@@ -1299,6 +1391,28 @@ class ClaimController extends Controller
                     'success' => false,
                     'message' => __('claim_messages.receive.only_approved'),
                 ], 422);
+            }
+
+            /*
+            | Nominalnya dibetulkan lebih dulu, selagi statusnya masih
+            | Approved. Kalau revisinya ditolak, dokumennya tidak boleh
+            | terlanjur tercatat diterima.
+            */
+            $revisi = app(AmountRevisionService::class)->apply(
+                document: $claim,
+                permission: 'claim.revise_amount',
+                user: $user,
+                requested: $validated['items'] ?? [],
+                notes: $validated['revision_notes'] ?? null,
+            );
+
+            if (!$revisi['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($revisi['message_key']),
+                ], $revisi['status']);
             }
 
             $diterimaPada = now();
@@ -1328,7 +1442,7 @@ class ClaimController extends Controller
 
             $claim->refresh();
 
-            $this->notifyReceiptStage($claim, $user);
+            $this->notifyReceiptStage($claim, $user, $revisi);
 
             return response()->json([
                 'success' => true,
@@ -1364,6 +1478,115 @@ class ClaimController extends Controller
     /**
      * Menandai banyak dokumen sekaligus sebagai sudah diterima.
      */
+    /**
+     * Menarik kembali penerimaan berkas.
+     *
+     * Dokumennya kembali ke status disetujui, dan dari sana bisa dibatalkan
+     * seperti biasa. Tanpa jalan mundur ini, dokumen yang terlanjur diterima
+     * keliru tidak punya pintu keluar selain dicairkan -- uang keluar hanya
+     * karena tidak ada tombol untuk mengurungkannya.
+     *
+     * Aturannya ada di ReceiptReversalService, dipakai bersama tiga modul.
+     */
+    public function unreceive(string $publicId, Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        /*
+        | Diperiksa di sini SELAIN di layanannya.
+        |
+        | Kalau hanya di layanan, yang tidak berwenang akan lebih dulu
+        | menabrak validasi dan menerima "alasan wajib diisi" -- pesan yang
+        | mengajaknya mengisi formulir yang tidak akan pernah ia lewati.
+        */
+        if (!$user || !$user->hasPermission('claim.unreceive')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.receipt_reversal.forbidden'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], [
+            'notes' => __('fund_request_messages.receipt_reversal.notes_label'),
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $id = Crypt::decryptString($publicId);
+
+            $claim = Claim::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            $hasil = app(ReceiptReversalService::class)->revert(
+                document: $claim,
+                approvedStatus: Claim::STATUS_APPROVED,
+                receivedStatus: Claim::STATUS_RECEIVED,
+                user: $user,
+                permission: 'claim.unreceive',
+                notes: $validated['notes'],
+            );
+
+            if (!$hasil['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($hasil['message_key']),
+                ], $hasil['status']);
+            }
+
+            DB::commit();
+
+            $claim->refresh();
+
+            /*
+            | Pemohon dikabari SESUDAH transaksinya tuntas.
+            |
+            | Tanggal pembayarannya sudah pernah dikirim ke dia lewat email;
+            | sekarang tanggal itu batal. Kalau ia tidak diberi tahu, yang
+            | terjadi adalah ia menunggu uang pada hari yang tidak akan
+            | pernah datang.
+            */
+            try {
+                app(ClaimNotificationService::class)->notifyReceiptReverted(
+                    $claim,
+                    $user,
+                    $hasil['scheduled_date'],
+                    $validated['notes'],
+                );
+            } catch (\Throwable $notifyError) {
+                Log::error('[Claim] Notify batal terima gagal', [
+                    'id' => $claim->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('fund_request_messages.receipt_reversal.success'),
+                'data' => [
+                    'id' => $claim->id,
+                    'status' => $claim->status,
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[Claim] Batal terima gagal', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.receipt_reversal.failed'),
+            ], 500);
+        }
+    }
+
     public function bulkReceive(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -1434,14 +1657,35 @@ class ClaimController extends Controller
      * tuntas. Kegagalannya dicatat saja, tidak membatalkan yang sudah
      * tersimpan.
      */
-    private function notifyReceiptStage(Claim $dokumen, $user): void
-    {
+    private function notifyReceiptStage(
+        Claim $dokumen,
+        $user,
+
+        /*
+        | Ringkasan revisi nominalnya, bila memang ada yang berubah.
+        |
+        | Dikirim sebagai parameter, bukan dibaca ulang dari dokumen: dari
+        | dokumen hanya terbaca keadaan terakhir, sedangkan yang perlu
+        | dikabarkan adalah perubahannya -- dari berapa menjadi berapa.
+        */
+        ?array $revisi = null,
+    ): void {
         try {
             $notificationService = app(ClaimNotificationService::class);
             $mailService = app(ClaimMailService::class);
 
             $notificationService->notifyReceived($dokumen, $user);
             $mailService->sendReceived($dokumen, $user);
+
+            /* Nominal yang berubah adalah kabar tersendiri, bukan titipan. */
+            if ($revisi && ($revisi['changed'] ?? false)) {
+                $notificationService->notifyAmountRevised(
+                    $dokumen,
+                    $user,
+                    $revisi['old_total'],
+                    $revisi['new_total'],
+                );
+            }
 
             $notificationService->notifyPaymentRequest($dokumen);
                     $mailService->sendPaymentRequest($dokumen);
@@ -1540,6 +1784,44 @@ class ClaimController extends Controller
             'data' => $hasil,
         ], 200);
     }
+    /**
+     * Perjalanan dinas yang menahan pembayaran Claim ini, bila ada.
+     *
+     * Kembaran businessTripBlockingDisbursement() pada FPU, dan sengaja
+     * ditulis semirip mungkin dengannya: dua modul yang menjalankan aturan
+     * yang sama sebaiknya terbaca sama, supaya yang berubah di satu sisi
+     * terlihat tidak berubah di sisi lain.
+     */
+    private function businessTripBlockingPayment(Claim $claim): ?string
+    {
+        if (!$claim->business_trip_id) {
+            return null;
+        }
+
+        $trip = BusinessTrip::find($claim->business_trip_id);
+
+        if (!$trip) {
+            return null;
+        }
+
+        $status = strtoupper((string) $trip->status);
+
+        if ($status === BusinessTrip::STATUS_APPROVED) {
+            return null;
+        }
+
+        return in_array(
+            $status,
+            [BusinessTrip::STATUS_REJECTED, BusinessTrip::STATUS_CANCELLED],
+            true,
+        )
+            ? __('claim_messages.business_trip.trip_not_valid', [
+                'number' => (string) $trip->trip_number,
+            ])
+            : __('claim_messages.business_trip.trip_not_approved', [
+                'number' => (string) $trip->trip_number,
+            ]);
+    }
     public function pay(string $publicId, Request $request): JsonResponse
     {
         $user = $request->user();
@@ -1583,6 +1865,23 @@ class ClaimController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => __('claim_messages.pay.only_received'),
+                ], 422);
+            }
+
+            /*
+            | Perjalanannya harus masih berdiri. Diperiksa di sini, bukan hanya
+            | saat Claim dibuat: yang berubah di antara keduanya justru keadaan
+            | perdinnya, dan uang tidak boleh keluar untuk perjalanan yang
+            | sudah tidak jadi ada.
+            */
+            $penahan = $this->businessTripBlockingPayment($claim);
+
+            if ($penahan) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $penahan,
                 ], 422);
             }
 
@@ -1712,13 +2011,18 @@ class ClaimController extends Controller
             | Dokumen yang sudah diterima tetapi belum dibayarkan masih boleh
             | dibatalkan -- sama seperti FPU.
             */
-            if (
-                !in_array(
-                    strtoupper((string) $claim->status),
-                    [Claim::STATUS_APPROVED, Claim::STATUS_RECEIVED],
-                    true,
-                )
-            ) {
+            /*
+            | Hanya yang BELUM diterima Finance.
+            |
+            | Begitu berkasnya diterima, dokumennya masuk antrean pembayaran
+            | dan sudah punya tanggal yang dijanjikan ke pemohon. Yang sudah
+            | telanjur diterima dibatalkan lewat dua langkah: Finance menarik
+            | penerimaannya dulu, baru dokumennya dibatalkan -- supaya yang
+            | memegang berkasnya ikut tahu, bukan dilangkahi.
+            |
+            | Aturan yang sama berlaku di FPU dan Claim.
+            */
+            if (strtoupper((string) $claim->status) !== Claim::STATUS_APPROVED) {
                 DB::rollBack();
 
                 return response()->json([
@@ -1890,10 +2194,22 @@ class ClaimController extends Controller
 
             Claim::query()->findOrFail($id);
 
+            /*
+            | Pilihan menggabung lampiran ikut masuk tanda tangan.
+            |
+            | Tautannya berlaku sepuluh menit dan bisa disimpan orang.
+            | Parameter di luar tanda tangan bisa diubah sesudah tautannya
+            | diberikan -- dan yang diubah di sini menentukan berkas siapa
+            | saja yang ikut tercetak.
+            */
+            $denganLampiran = $request->boolean('with_attachments');
+
             $relativeUrl = URL::temporarySignedRoute(
                 'fund-request.claim.print-signed',
                 now()->addMinutes(10),
-                ['publicId' => $publicId],
+                $denganLampiran
+                    ? ['publicId' => $publicId, 'with_attachments' => 1]
+                    : ['publicId' => $publicId],
                 false,
             );
 
@@ -1973,12 +2289,40 @@ class ClaimController extends Controller
                 ?: $claim->items->sum(fn($item) => (float) ($item->amount ?? 0))
             );
 
+            /*
+            | Lampiran hanya diambil kalau memang diminta. Halaman cetak
+            | tanpa lampiran tidak perlu membayar pembacaan berkasnya.
+            */
+            $attachmentPages = [];
+            $attachmentOthers = [];
+
+            if ($request->boolean('with_attachments')) {
+                $claim->loadMissing('attachments');
+
+                $terpilah = app(PrintAttachmentCollector::class)->collect(
+                    $claim->attachments,
+                    [
+                        'REQUEST' => 'Lampiran Pengajuan',
+                        'RECEIPT' => 'Lampiran Penerimaan',
+                        'PAYMENT' => 'Bukti Pembayaran',
+                    ],
+                );
+
+                $attachmentPages = app(PrintAttachmentCollector::class)
+                    ->paginate($terpilah['images']);
+
+                $attachmentOthers = $terpilah['others'];
+            }
+
             $pdf = Pdf::loadView('pdf.claim', [
                 'claim' => $claim,
                 'totalAmount' => $totalAmount,
                 'terbilang' => RupiahWords::of($totalAmount),
                 'requester' => $this->buildRequesterSigner($claim),
                 'approvers' => $this->buildApproverSigners($claim),
+
+                'attachmentPages' => $attachmentPages,
+                'attachmentOthers' => $attachmentOthers,
             ])->setPaper('a4', 'portrait');
 
             return $this->pdfResponse(
@@ -2766,6 +3110,115 @@ class ClaimController extends Controller
      *
      * @throws ValidationException
      */
+    /**
+     * Keterangan transaksinya menuntut dokumen perjalanan dinas.
+     *
+     * Ditentukan master, bukan dari nama kategorinya. Nama bisa disunting
+     * orang; penandanya tidak ikut berubah karenanya.
+     */
+    private function isBusinessTripCategory(Request $request): bool
+    {
+        return (bool) DB::table('fund_request_transaction_categories')
+            ->where('id', (int) $request->input('transaction_category_id'))
+            ->value('requires_business_trip');
+    }
+
+    /**
+     * Perdin yang ditunjuk Claim ini, sesudah diperiksa kelayakannya.
+     *
+     * Kelayakannya dibaca dari eligibleQuery -- sumber yang sama yang
+     * dipakai menyusun pilihan di layar. Di sanalah tertulis bahwa satu
+     * perdin hanya boleh dipegang satu dokumen yang masih hidup, FPU
+     * maupun Claim; menulis ulang syaratnya di sini berarti dua tempat
+     * menjawab pertanyaan yang sama.
+     *
+     * @param  int|null  $claimId  Claim yang sedang disunting sendiri.
+     */
+    private function resolveBusinessTripId(
+        Request $request,
+        $user,
+        ?int $claimId = null,
+    ): ?int {
+        if (!$this->isBusinessTripCategory($request)) {
+            return null;
+        }
+
+        $tripId = $request->filled('business_trip_id')
+            ? (int) $request->input('business_trip_id')
+            : 0;
+
+        if ($tripId <= 0) {
+            throw ValidationException::withMessages([
+                'business_trip_id' => [
+                    __('claim_messages.business_trip.required'),
+                ],
+            ]);
+        }
+
+        $layak = app(BusinessTripController::class)
+            ->eligibleQuery((int) $user->id, null, $claimId)
+            ->whereKey($tripId)
+            ->exists();
+
+        if (!$layak) {
+            throw ValidationException::withMessages([
+                'business_trip_id' => [
+                    __('claim_messages.business_trip.not_eligible'),
+                ],
+            ]);
+        }
+
+        return $tripId;
+    }
+
+    /**
+     * Tanggal baris rincian harus berada di dalam periode perjalanannya.
+     *
+     * Hanya berlaku bila Claim-nya bertaut ke perdin. Claim biasa tidak
+     * dibatasi sama sekali -- pengeluarannya tidak terikat periode apa pun.
+     *
+     * Ditegakkan di sini juga, bukan hanya di kalender: batas yang hanya
+     * ada di layar bukan batas.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    private function assertItemDatesWithinTrip(array $items, ?int $businessTripId): void
+    {
+        if (!$businessTripId) {
+            return;
+        }
+
+        $trip = BusinessTrip::find($businessTripId);
+
+        if (!$trip || !$trip->depart_date || !$trip->return_date) {
+            return;
+        }
+
+        $mulai = $trip->depart_date->toDateString();
+        $akhir = $trip->return_date->toDateString();
+
+        foreach ($items as $index => $item) {
+            $tanggal = trim((string) ($item['date'] ?? ''));
+
+            if ($tanggal === '') {
+                continue;
+            }
+
+            if ($tanggal < $mulai || $tanggal > $akhir) {
+                throw ValidationException::withMessages([
+                    'items' => [
+                        __('claim_messages.business_trip.item_date_outside_trip', [
+                            'row' => (int) $index + 1,
+                            'number' => $trip->trip_number,
+                            'from' => $trip->depart_date->format('d/m/Y'),
+                            'to' => $trip->return_date->format('d/m/Y'),
+                        ]),
+                    ],
+                ]);
+            }
+        }
+    }
+
     private function assertEveryLineHasAttachment(
         Request $request,
         array $itemIdsByIndex,
@@ -2900,6 +3353,16 @@ class ClaimController extends Controller
             'subject' => $claim->subject,
 
             'transaction_category_id' => $claim->transaction_category_id,
+
+            /*
+            | Perjalanan dinas yang ditagihkan Claim ini, bila ada.
+            |
+            | Nomornya ikut supaya layar tidak perlu menebaknya dari id --
+            | pada rincian dan daftar tidak ada daftar perdin apa pun untuk
+            | mencocokkannya.
+            */
+            'business_trip_id' => $claim->business_trip_id,
+            'business_trip_number' => $claim->businessTrip?->trip_number,
             'transaction_category' => $claim->transactionCategory?->name,
 
             'branch' => $claim->branchData?->nama_cabang ?? '-',
@@ -2910,6 +3373,15 @@ class ClaimController extends Controller
             'department_id' => $claim->department_id,
 
             'total_amount' => (float) $claim->total_amount,
+
+            /*
+            | Total yang diajukan pemohon sebelum revisi Finance. Null
+            | berarti angkanya apa adanya -- bukan nol, dan bukan salinan.
+            */
+            'original_total_amount' => $claim->original_total_amount !== null
+                ? (float) $claim->original_total_amount
+                : null,
+            'amount_revision_notes' => $claim->amount_revision_notes,
             'notes' => $claim->notes,
             'status' => $claim->status,
 
@@ -3010,6 +3482,14 @@ class ClaimController extends Controller
                 'date' => optional($item->date)->toDateString(),
                 'description' => $item->description,
                 'amount' => (float) $item->amount,
+
+                /*
+                | Nominal yang diajukan pemohon, terisi hanya bila Finance
+                | pernah membetulkannya. Null berarti angkanya apa adanya.
+                */
+                'original_amount' => $item->original_amount !== null
+                    ? (float) $item->original_amount
+                    : null,
 
                 'attachments' => collect($attachmentsByItem->get($item->id, []))
                     ->map(fn(ClaimAttachment $attachment): array => [

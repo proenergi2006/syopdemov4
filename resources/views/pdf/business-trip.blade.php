@@ -668,8 +668,7 @@
                 <th style="width: 6%;">No</th>
                 <th style="width: 20%;">Hari &amp; Tanggal</th>
                 <th style="width: 17%;">Jam</th>
-                <th style="width: 38%;">Keterangan</th>
-                <th style="width: 19%;">PIC</th>
+                <th style="width: 57%;">Keterangan</th>
             </tr>
         </thead>
 
@@ -680,11 +679,10 @@
                     <td class="nowrap">{{ $hariTanggal($baris->date) }}</td>
                     <td class="nowrap">{{ $baris->time_text }}</td>
                     <td>{{ $baris->description }}</td>
-                    <td>{{ $baris->pic ?: '-' }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="itinerary-empty">
+                    <td colspan="4" class="itinerary-empty">
                         Belum ada rundown perjalanan.
                     </td>
                 </tr>

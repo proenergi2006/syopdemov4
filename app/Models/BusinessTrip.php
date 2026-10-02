@@ -208,6 +208,21 @@ class BusinessTrip extends Model
         )->orderBy('sort_no');
     }
 
+    /**
+     * Pemesanan hotel, tiket, dan transport untuk perjalanan ini.
+     *
+     * Terurut dari yang paling awal dicatat, dan yang dibatalkan ikut
+     * terbawa. Urutan itulah riwayatnya: pemesanan pertama, pembatalannya,
+     * lalu penggantinya -- terbaca dari atas ke bawah seperti percakapan.
+     */
+    public function arrangements()
+    {
+        return $this->hasMany(
+            BusinessTripArrangement::class,
+            'business_trip_id',
+        )->orderBy('id');
+    }
+
     public function employee()
     {
         return $this->belongsTo(User::class, 'user_id');

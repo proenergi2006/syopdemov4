@@ -20,12 +20,14 @@ class ClaimItem extends Model
         'date',
         'description',
         'amount',
+        'original_amount',
     ];
 
     protected $casts = [
         'claim_id' => 'integer',
         'date' => 'date',
         'amount' => 'decimal:2',
+        'original_amount' => 'decimal:2',
     ];
 
     public function claim()

@@ -212,6 +212,45 @@
             text-align: right;
         }
 
+        /* Rincian perjalanan dinas, dikelompokkan menurut kategori. */
+        .cat-row td {
+            padding: 5px 7px;
+            border: 1px solid #b9c6d6;
+            background: #eaf0f7;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .cat-ga {
+            float: right;
+            font-weight: normal;
+            font-size: 8px;
+            color: #6b7785;
+        }
+
+        .cat-empty td {
+            padding: 7px;
+            color: #7d8999;
+            font-style: italic;
+        }
+
+        .cat-subtotal td {
+            padding: 4px 7px;
+            border: 1px solid #d7dfea;
+            background: #f3f7fb;
+            font-size: 9px;
+        }
+
+        .item-qty {
+            width: 46px;
+            text-align: center;
+        }
+
+        .item-unit {
+            width: 96px;
+            text-align: right;
+        }
+
         .total-row td {
             padding: 6px 7px;
             border: 1px solid #b9c6d6;
@@ -433,40 +472,118 @@
     {{-- ============================================================
          RINCIAN PENGAJUAN
          ============================================================ --}}
+@php
+    $angka = function ($nilai): string {
+        if ($nilai === null || $nilai === '') {
+            return '-';
+        }
+
+        $angka = (float) $nilai;
+
+        return rtrim(rtrim(number_format($angka, 2, ',', '.'), '0'), ',');
+    };
+@endphp
     <div class="section-title">Rincian Pengajuan</div>
 
-    <table class="item-table">
-        <thead>
-            <tr>
-                <th class="item-no">No</th>
-                <th class="item-date">Tanggal</th>
-                <th>Deskripsi</th>
-                <th class="item-amount">Nominal</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            @forelse ($fpu->items as $index => $item)
+    {{-- Bentuk perjalanan dinas: dikelompokkan menurut kategori biaya. --}}
+    @if ($rincianPerdin !== null)
+        <table class="item-table">
+            <thead>
                 <tr>
-                    <td class="item-no">{{ $index + 1 }}</td>
-                    <td class="item-date">{{ $tanggal($item->date) }}</td>
-                    <td>{{ $item->description }}</td>
-                    <td class="item-amount nowrap">{{ $rupiah($item->amount) }}</td>
+                    <th class="item-no">No</th>
+                    <th>Item</th>
+                    <th class="item-qty">Qty</th>
+                    <th class="item-unit">Rincian Biaya</th>
+                    <th class="item-amount">Jumlah</th>
                 </tr>
-            @empty
-                <tr>
-                    <td colspan="4" class="text-center" style="padding: 14px;">
-                        Tidak ada rincian pengajuan.
-                    </td>
-                </tr>
-            @endforelse
+            </thead>
 
-            <tr class="total-row">
-                <td colspan="3" class="text-right">Total Pengajuan</td>
-                <td class="item-amount nowrap">{{ $rupiah($totalAmount) }}</td>
-            </tr>
-        </tbody>
-    </table>
+            <tbody>
+                @forelse ($rincianPerdin as $kelompok)
+                    <tr class="cat-row">
+                        <td colspan="5">
+                            {{ $kelompok['name'] }}
+
+                            @if ($kelompok['arranged'])
+                                <span class="cat-ga">Diurus GA</span>
+                            @endif
+                        </td>
+                    </tr>
+
+                    @if ($kelompok['arranged'])
+                        <tr class="cat-empty">
+                            <td colspan="5">
+                                Diurus General Affair, tidak ditagihkan pada FPU ini.
+                            </td>
+                        </tr>
+                    @else
+                        @forelse ($kelompok['rows'] as $urut => $item)
+                            <tr>
+                                <td class="item-no">{{ $urut + 1 }}</td>
+                                <td>{{ $item->description }}</td>
+                                <td class="item-qty">{{ $angka($item->qty) }}</td>
+                                <td class="item-unit nowrap">{{ $rupiah($item->unit_price) }}</td>
+                                <td class="item-amount nowrap">{{ $rupiah($item->amount) }}</td>
+                            </tr>
+                        @empty
+                            <tr class="cat-empty">
+                                <td colspan="5">Belum ada rincian pada kategori ini.</td>
+                            </tr>
+                        @endforelse
+
+                        <tr class="cat-subtotal">
+                            <td colspan="4" class="text-right">Subtotal {{ $kelompok['name'] }}</td>
+                            <td class="item-amount nowrap">{{ $rupiah($kelompok['total']) }}</td>
+                        </tr>
+                    @endif
+                @empty
+                    <tr>
+                        <td colspan="5" class="text-center" style="padding: 14px;">
+                            Tidak ada rincian pengajuan.
+                        </td>
+                    </tr>
+                @endforelse
+
+                <tr class="total-row">
+                    <td colspan="4" class="text-right">Total Pengajuan</td>
+                    <td class="item-amount nowrap">{{ $rupiah($totalAmount) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    @else
+        <table class="item-table">
+            <thead>
+                <tr>
+                    <th class="item-no">No</th>
+                    <th class="item-date">Tanggal</th>
+                    <th>Deskripsi</th>
+                    <th class="item-amount">Nominal</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @forelse ($fpu->items as $index => $item)
+                    <tr>
+                        <td class="item-no">{{ $index + 1 }}</td>
+                        <td class="item-date">{{ $tanggal($item->date) }}</td>
+                        <td>{{ $item->description }}</td>
+                        <td class="item-amount nowrap">{{ $rupiah($item->amount) }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4" class="text-center" style="padding: 14px;">
+                            Tidak ada rincian pengajuan.
+                        </td>
+                    </tr>
+                @endforelse
+
+                <tr class="total-row">
+                    <td colspan="3" class="text-right">Total Pengajuan</td>
+                    <td class="item-amount nowrap">{{ $rupiah($totalAmount) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
 
     <div class="terbilang-box">
         <span class="terbilang-label">Terbilang:</span> {{ $terbilang }}
@@ -569,5 +686,13 @@
     <div class="footer">
         Dokumen ini dicetak dari sistem SYOP pada {{ now()->format('d/m/Y H:i') }} WIB.
     </div>
+
+    {{--
+        Lampiran, bila pencetaknya memintanya digabung. Tanpa permintaan
+        itu, variabelnya kosong dan partial ini tidak menghasilkan
+        satu halaman pun.
+    --}}
+    @include('pdf.partials.attachments')
+
 </body>
 </html>

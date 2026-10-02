@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Models\FundRequestArrangedCategory;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -39,13 +40,24 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 */
 class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvents, WithTitle, WithStrictNullComparison
 {
-    protected const COLUMN_COUNT = 17;
+    protected const COLUMN_COUNT = 20;
 
-    /** Kolom milik Realisasi (1 = A). Kolom 9-12 adalah data rincian. */
-    protected const DOCUMENT_LEVEL_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16, 17];
+    /** Kolom milik Realisasi (1 = A). Kolom 9-15 adalah data rincian. */
+    protected const DOCUMENT_LEVEL_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 16, 17, 18, 19, 20];
 
     /** Kolom bernilai uang -> format ribuan, tetap numerik agar bisa di-SUM. */
-    protected const MONEY_COLUMNS = ['J', 'K', 'L', 'M', 'N', 'O'];
+    protected const MONEY_COLUMNS = ['L', 'M', 'N', 'O', 'P', 'Q', 'R'];
+
+    /**
+     * Kategori yang diurus GA, per id Realisasi.
+     *
+     * Dikumpulkan sekali di muka, bukan ditanyakan per dokumen: laporan ini
+     * bisa memuat ratusan realisasi, dan satu query per dokumen akan terasa
+     * persis ketika laporannya paling dibutuhkan.
+     *
+     * @var array<int, array<int, string>>
+     */
+    protected array $arrangedByDocument = [];
 
     protected $data;
 
@@ -78,6 +90,12 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
             __($c . 'transaction_category'),
             __($c . 'subject'),
             __($c . 'item_description'),
+
+            /* Terisi hanya pada rincian perjalanan dinas. */
+            __($c . 'expense_category'),
+            __($c . 'qty'),
+            __($c . 'unit_price'),
+
             __($c . 'item_advance_amount'),
             __($c . 'item_realization_amount'),
             __($c . 'item_difference'),
@@ -89,8 +107,47 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
         ];
     }
 
+    /**
+     * Kategori yang diurus GA pada seluruh realisasi perdin di laporan ini.
+     */
+    protected function collectArranged(): void
+    {
+        $ids = [];
+
+        foreach ($this->data as $realization) {
+            if (!empty($realization->cashAdvance?->business_trip_id)) {
+                $ids[] = (int) $realization->id;
+            }
+        }
+
+        if (!$ids) {
+            return;
+        }
+
+        $baris = FundRequestArrangedCategory::query()
+            ->where('document_type', FundRequestArrangedCategory::DOC_REALIZATION)
+            ->whereIn('document_id', $ids)
+            ->join(
+                'business_trip_expense_categories',
+                'business_trip_expense_categories.id',
+                '=',
+                'fund_request_arranged_categories.expense_category_id',
+            )
+            ->orderBy('business_trip_expense_categories.sort_order')
+            ->get([
+                'fund_request_arranged_categories.document_id',
+                'business_trip_expense_categories.name',
+            ]);
+
+        foreach ($baris as $satu) {
+            $this->arrangedByDocument[(int) $satu->document_id][] = (string) $satu->name;
+        }
+    }
+
     public function array(): array
     {
+        $this->collectArranged();
+
         $rows = [];
         $rowIndex = 2; // baris 1 dipakai heading
         $sequence = 1;
@@ -113,6 +170,9 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
             $differenceType = $this->formatDifferenceType($realization->difference_type ?? null);
             $status = $this->formatText($realization->status ?? null);
 
+            /* Bentuknya mengikuti FPU yang direalisasikan. */
+            $perdin = $realization->cashAdvance?->business_trip_id !== null;
+
             $items = $realization->items ?? collect();
 
             if ($items->isEmpty()) {
@@ -126,6 +186,9 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
                     $category,
                     $subject,
                     __('cash_advance_realization_messages.export.no_item'),
+                    null,
+                    null,
+                    null,
                     null,
                     null,
                     null,
@@ -152,6 +215,22 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
                         $category,
                         $subject,
                         $this->formatText($item->description ?? null),
+
+                        /*
+                        | Null, bukan '-', pada rincian bukan-perdin: sel kosong
+                        | lebih mudah disaring, dan tanda hubung di kolom angka
+                        | membuat selnya berhenti numerik.
+                        */
+                        /*
+                        | Pada perdin, baris yang tidak berkategori diberi
+                        | keterangan: kosongnya perlu terbaca sebagai keadaan,
+                        | bukan sebagai sel yang gagal terisi.
+                        */
+                        $item->expenseCategory->name
+                            ?? ($perdin ? __('cash_advance_realization_messages.export.no_expense_category') : null),
+                        $item->qty !== null ? (float) $item->qty : null,
+                        $item->unit_price !== null ? (float) $item->unit_price : null,
+
                         $this->formatMoney($itemAdvance),
                         $this->formatMoney($itemRealization),
 
@@ -171,6 +250,38 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
 
                     $rowIndex++;
                 }
+            }
+
+            /*
+            | Kategori yang diurus GA mendapat barisnya sendiri -- tanpa itu ia
+            | hilang sama sekali dari laporan, dan yang hilang dari laporan
+            | terbaca sebagai tidak pernah ada, bukan sebagai sengaja kosong.
+            */
+            foreach ($this->arrangedByDocument[(int) $realization->id] ?? [] as $namaKategori) {
+                $rows[] = [
+                    $sequence,
+                    $realization->realization_number ?? '-',
+                    $date,
+                    $advanceNumber,
+                    $branch,
+                    $department,
+                    $category,
+                    $subject,
+                    __('cash_advance_realization_messages.export.arranged_by_ga'),
+                    $namaKategori,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    $totalAdvance,
+                    $totalRealization,
+                    $difference,
+                    $differenceType,
+                    $status,
+                ];
+
+                $rowIndex++;
             }
 
             $endRow = $rowIndex - 1;
@@ -339,7 +450,7 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
                     /*
                     | No, nomor dokumen, tanggal, jenis selisih, status -> tengah.
                     */
-                    foreach ([1, 2, 3, 4, 16, 17] as $column) {
+                    foreach ([1, 2, 3, 4, 11, 19, 20] as $column) {
                         $letter = Coordinate::stringFromColumnIndex($column);
 
                         $sheet->getStyle($letter . $bodyStart . ':' . $letter . $lastRow)
@@ -376,14 +487,17 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
                     'G' => 22,
                     'H' => 30,
                     'I' => 34,
-                    'J' => 18,
-                    'K' => 18,
+                    'J' => 20,
+                    'K' => 8,
                     'L' => 16,
                     'M' => 18,
                     'N' => 18,
                     'O' => 16,
                     'P' => 18,
-                    'Q' => 14,
+                    'Q' => 18,
+                    'R' => 16,
+                    'S' => 18,
+                    'T' => 14,
                 ];
 
                 foreach ($widths as $column => $width) {
