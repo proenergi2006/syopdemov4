@@ -7,9 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Models\BusinessTrip;
 use App\Models\BusinessTripItinerary;
 use App\Models\CashAdvance;
+use App\Models\Claim;
 use App\Models\BusinessTripApproval;
 use App\Services\BusinessTrip\BusinessTripApprovalGeneratorService;
 use App\Services\BusinessTrip\BusinessTripApprovalService;
+use App\Services\FundRequest\CashAdvance\CashAdvanceNotificationService;
+use App\Services\FundRequest\Claim\ClaimNotificationService;
+use App\Services\BusinessTrip\BusinessTripDependentDocumentService;
 use App\Services\BusinessTrip\BusinessTripMailService;
 use App\Services\BusinessTrip\BusinessTripNotificationService;
 use App\Services\BusinessTrip\BusinessTripNumberService;
@@ -97,6 +101,13 @@ class BusinessTripController extends Controller
                 | pertanyaannya lain dari sekadar membukanya di layar.
                 */
                 'can_export' => $user->hasPermission('business_trip.export'),
+
+                /*
+                | Mengurus pemesanan hotel dan tiket. Bukan wewenang atas
+                | dokumennya sama sekali -- pemegangnya biasanya GA, yang
+                | tidak ikut menyetujui dan tidak ikut mengajukan apa pun.
+                */
+                'can_arrange' => $user->hasPermission('business_trip.arrange'),
             ];
 
             if (!$abilities['can_view']) {
@@ -251,18 +262,23 @@ class BusinessTripController extends Controller
         | menyunting -- kalau tidak, membuka FPU lama lalu menyimpannya kembali
         | akan kehilangan tautannya.
         */
-        $kecualikan = null;
+        $bacaId = function (string $kunci) use ($request): ?int {
+            if (!$request->filled($kunci)) {
+                return null;
+            }
 
-        if ($request->filled('cash_advance_public_id')) {
             try {
-                $kecualikan = (int) Crypt::decryptString(
-                    (string) $request->input('cash_advance_public_id'),
-                );
+                return (int) Crypt::decryptString((string) $request->input($kunci));
             } catch (\Throwable $e) {
                 /* Id yang tidak terbaca diperlakukan seolah tidak dikirim. */
-                $kecualikan = null;
+                return null;
             }
-        }
+        };
+
+        $kecualikan = $bacaId('cash_advance_public_id');
+
+        /* Layar Claim mengirim penandanya sendiri. */
+        $kecualikanClaim = $bacaId('claim_public_id');
 
         /*
         | Dua kumpulan, dan bedanya penting:
@@ -273,12 +289,12 @@ class BusinessTripController extends Controller
         | Yang layak dibaca dari eligibleQuery, sumber yang sama yang dipakai
         | memeriksa kiriman nanti. Daftarnya melebar, izinnya tidak.
         */
-        $rows = $this->candidateQuery($user->id, $kecualikan)
+        $rows = $this->candidateQuery($user->id, $kecualikan, $kecualikanClaim)
             ->orderByDesc('depart_date')
             ->limit(100)
             ->get();
 
-        $layak = $this->eligibleQuery($user->id, $kecualikan)
+        $layak = $this->eligibleQuery($user->id, $kecualikan, $kecualikanClaim)
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
@@ -326,28 +342,75 @@ class BusinessTripController extends Controller
      * DRAFT tidak ikut: selama belum diajukan, tidak ada yang bisa ditunggu,
      * dan yang perlu dilakukan pemohon adalah mengajukannya lebih dulu.
      */
-    public function candidateQuery(int $userId, ?int $kecualikanCashAdvanceId = null)
-    {
+    public function candidateQuery(
+        int $userId,
+        ?int $kecualikanCashAdvanceId = null,
+        ?int $kecualikanClaimId = null,
+    ) {
         return BusinessTrip::query()
             ->where('user_id', $userId)
             ->whereIn('status', [
                 BusinessTrip::STATUS_APPROVED,
                 BusinessTrip::STATUS_IN_PROGRESS,
             ])
-            ->whereNotExists(function ($q) use ($kecualikanCashAdvanceId): void {
-                $q->select(DB::raw(1))
-                    ->from('cash_advances as ca')
-                    ->whereColumn('ca.business_trip_id', 'business_trips.id')
-                    ->whereNull('ca.deleted_at')
-                    ->whereNotIn('ca.status', [
-                        CashAdvance::STATUS_REJECTED,
-                        CashAdvance::STATUS_CANCELLED,
-                    ]);
+            ->whereNotExists(fn ($q) => $this->dipegangFpuHidup($q, $kecualikanCashAdvanceId))
+            ->whereNotExists(fn ($q) => $this->dipegangClaimHidup($q, $kecualikanClaimId));
+    }
 
-                if ($kecualikanCashAdvanceId) {
-                    $q->where('ca.id', '!=', $kecualikanCashAdvanceId);
-                }
-            });
+    /**
+     * Perdin ini sedang dipegang FPU yang masih hidup.
+     *
+     * "Masih hidup" berarti belum ditolak dan belum dibatalkan. FPU yang
+     * gugur melepaskan perdinnya kembali -- kalau tidak, satu penolakan
+     * memaksa pemohon mengulang seluruh izin perjalanannya.
+     *
+     * @param  int|null  $kecualikan  FPU yang sedang disunting sendiri.
+     */
+    private function dipegangFpuHidup($q, ?int $kecualikan)
+    {
+        $q->select(DB::raw(1))
+            ->from('cash_advances as ca')
+            ->whereColumn('ca.business_trip_id', 'business_trips.id')
+            ->whereNull('ca.deleted_at')
+            ->whereNotIn('ca.status', [
+                CashAdvance::STATUS_REJECTED,
+                CashAdvance::STATUS_CANCELLED,
+            ]);
+
+        if ($kecualikan) {
+            $q->where('ca.id', '!=', $kecualikan);
+        }
+
+        return $q;
+    }
+
+    /**
+     * Perdin ini sedang dipegang Claim yang masih hidup.
+     *
+     * Kembaran aturan FPU di atas, dan sengaja dipisah sebagai method
+     * tersendiri: keduanya menyebut tabel dan tetapan status yang berbeda,
+     * dan menyatukannya lewat parameter hanya akan menyembunyikan itu.
+     *
+     * Perjalanan yang sudah ditagihkan lewat Claim tidak boleh muncul lagi
+     * pada pemilih FPU, dan sebaliknya. Tanpa penyaring ini, satu perjalanan
+     * bisa dibayar dua kali lewat dua pintu yang berbeda.
+     */
+    private function dipegangClaimHidup($q, ?int $kecualikan)
+    {
+        $q->select(DB::raw(1))
+            ->from('claims as cl')
+            ->whereColumn('cl.business_trip_id', 'business_trips.id')
+            ->whereNull('cl.deleted_at')
+            ->whereNotIn('cl.status', [
+                Claim::STATUS_REJECTED,
+                Claim::STATUS_CANCELLED,
+            ]);
+
+        if ($kecualikan) {
+            $q->where('cl.id', '!=', $kecualikan);
+        }
+
+        return $q;
     }
 
     /**
@@ -406,8 +469,11 @@ class BusinessTripController extends Controller
      *
      * @param  int|null  $kecualikanCashAdvanceId  FPU yang sedang disunting.
      */
-    public function eligibleQuery(int $userId, ?int $kecualikanCashAdvanceId = null)
-    {
+    public function eligibleQuery(
+        int $userId,
+        ?int $kecualikanCashAdvanceId = null,
+        ?int $kecualikanClaimId = null,
+    ) {
         return BusinessTrip::query()
             ->where('user_id', $userId)
             /*
@@ -432,20 +498,8 @@ class BusinessTripController extends Controller
                             );
                     });
             })
-            ->whereNotExists(function ($q) use ($kecualikanCashAdvanceId): void {
-                $q->select(DB::raw(1))
-                    ->from('cash_advances as ca')
-                    ->whereColumn('ca.business_trip_id', 'business_trips.id')
-                    ->whereNull('ca.deleted_at')
-                    ->whereNotIn('ca.status', [
-                        CashAdvance::STATUS_REJECTED,
-                        CashAdvance::STATUS_CANCELLED,
-                    ]);
-
-                if ($kecualikanCashAdvanceId) {
-                    $q->where('ca.id', '!=', $kecualikanCashAdvanceId);
-                }
-            });
+            ->whereNotExists(fn ($q) => $this->dipegangFpuHidup($q, $kecualikanCashAdvanceId))
+            ->whereNotExists(fn ($q) => $this->dipegangClaimHidup($q, $kecualikanClaimId));
     }
     /*
     |--------------------------------------------------------------------------
@@ -771,6 +825,30 @@ class BusinessTripController extends Controller
             }
 
             /*
+            | Perjalanan yang sudah dimulai tidak lagi bisa dimintakan izin.
+            |
+            | Formulirnya memang menolak tanggal mundur saat diisi, tetapi
+            | draft yang dibiarkan menggantung akan melewati tanggalnya
+            | sendiri. Yang salah bukan datanya melainkan waktunya -- jadi
+            | diperiksa di sini, saat mengajukan, bukan saat menyimpan.
+            |
+            | Yang dilihat tanggal berangkat, bukan tanggal kembali, dan
+            | dibandingkan per HARI: perjalanan yang berangkat sore ini masih
+            | boleh diajukan pagi ini.
+            */
+            if ($trip->depart_date && $trip->depart_date->startOfDay()->lt(now()->startOfDay())) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+
+                    'message' => __('business_trip_messages.submit_departure_passed', [
+                        'date' => $trip->depart_date->format('d/m/Y'),
+                    ]),
+                ], 422);
+            }
+
+            /*
             | Tanda tangan pemohon disyaratkan di sini, bukan saat menyimpan
             | draft: draft memang belum menyatakan apa-apa.
             */
@@ -951,6 +1029,15 @@ class BusinessTripController extends Controller
                 if ($adaLagi) {
                     $notificationService->notifyApprovalRequest($trip);
                 }
+
+                /*
+                | Perjalanan yang tuntas disetujui menimbulkan pekerjaan di tempat
+                | lain -- pemesanan hotel dan tiket. Yang mengerjakannya tidak
+                | pernah tersentuh alur approval, jadi ia dikabari di sini.
+                */
+                if (!$adaLagi) {
+                    $notificationService->notifyFinalApprovedSubscribers($trip);
+                }
             } catch (\Throwable $e) {
                 Log::error('[Perdin] Notifikasi approval gagal dibuat', [
                     'business_trip_id' => $trip->id,
@@ -963,6 +1050,10 @@ class BusinessTripController extends Controller
 
                 if ($adaLagi) {
                     $mailService->sendApprovalRequest($trip);
+                }
+
+                if (!$adaLagi) {
+                    $mailService->sendFinalApprovedSubscribers($trip);
                 }
             } catch (\Throwable $e) {
                 Log::error('[Perdin] Email approval gagal dikirim', [
@@ -1052,10 +1143,34 @@ class BusinessTripController extends Controller
                 ], 422);
             }
 
+            /*
+            | Diperiksa sebelum apa pun berubah -- aturan yang sama dengan
+            | pembatalan, dan sebabnya pun sama: dokumen yang sudah di tangan
+            | Finance tidak ditarik diam-diam.
+            */
+            $menahan = $this->dokumenMenahan($trip, 'reject');
+
+            if ($menahan) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $menahan,
+                ], 422);
+            }
+
             $approvalService->rejectCurrentStep($trip, $user, $validated['notes']);
             $approvalService->markTripRejected($trip, $user, $validated['notes']);
 
+            /*
+            | FPU dan Claim yang bergantung padanya ikut gugur. Perjalanannya
+            | tidak jadi ada, jadi tidak ada yang perlu dibiayai.
+            */
+            $gugur = $this->gugurkanTurunan($trip, $user, 'reject', $validated['notes']);
+
             DB::commit();
+
+            $this->kabarkanTurunanGugur($gugur, $trip, 'rejected');
 
             $trip->refresh();
 
@@ -1116,6 +1231,99 @@ class BusinessTripController extends Controller
     | melihatnya.
     |--------------------------------------------------------------------------
     */
+    /**
+     * Pesan penolakan bila ada dokumen yang sudah di tangan Finance.
+     *
+     * Mengembalikan null bila tidak ada yang menahan. Pesannya menyebut nomor
+     * dokumennya, penerimanya, dan jalan keluarnya -- penolakan yang tidak
+     * mengatakan apa yang harus dilakukan hanya memindahkan kebingungan.
+     */
+    private function dokumenMenahan(BusinessTrip $trip, string $aksi): ?string
+    {
+        $penahan = app(BusinessTripDependentDocumentService::class)->blocking($trip);
+
+        if (!$penahan) {
+            return null;
+        }
+
+        $dokumen = __(
+            'business_trip_messages.document_label_' . $penahan['kind'],
+            ['number' => $penahan['number']],
+        );
+
+        /*
+        | Yang baru diterima masih bisa dilepas Finance lewat batal terima.
+        | Yang uangnya sudah keluar tidak -- dan menyuruh orang mencoba jalan
+        | yang tidak ada lebih buruk daripada mengatakan tidak bisa.
+        */
+        return $penahan['reversible']
+            ? __("business_trip_messages.{$aksi}_blocked_received", [
+                'document' => $dokumen,
+                'receiver' => $penahan['receiver'],
+            ])
+            : __("business_trip_messages.{$aksi}_blocked_paid", [
+                'document' => $dokumen,
+            ]);
+    }
+
+    /**
+     * Menggugurkan dokumen turunannya, lalu mengabari yang berkepentingan.
+     *
+     * Pengguguran berada di dalam transaksi pemanggilnya; pengabaran tidak --
+     * ia dipanggil terpisah sesudah commit. Keduanya sengaja tidak disatukan
+     * supaya batas itu terlihat di tempat pemakaiannya.
+     *
+     * @return array<int, array{kind: string, model: mixed, approvals: \Illuminate\Support\Collection}>
+     */
+    private function gugurkanTurunan(
+        BusinessTrip $trip,
+        $user,
+        string $aksi,
+        string $alasan,
+    ): array {
+        $catatan = __(
+            "business_trip_messages.dependent_cancelled_by_{$aksi}",
+            [
+                'trip' => (string) $trip->trip_number,
+                'reason' => trim($alasan),
+            ],
+        );
+
+        return app(BusinessTripDependentDocumentService::class)
+            ->cascadeCancel($trip, $user, $catatan);
+    }
+
+    /**
+     * Mengabari pemohon dan penyetuju dokumen yang gugur.
+     *
+     * Kegagalan di sini tidak boleh menggagalkan pembatalan perdinnya: yang
+     * sudah tersimpan tetap benar, dan kabar yang gagal terkirim adalah
+     * kerugian yang jauh lebih kecil daripada perdin yang batal separuh.
+     */
+    private function kabarkanTurunanGugur(array $gugur, BusinessTrip $trip, string $aksi): void
+    {
+        foreach ($gugur as $satu) {
+            try {
+                $layanan = $satu['kind'] === 'claim'
+                    ? app(ClaimNotificationService::class)
+                    : app(CashAdvanceNotificationService::class);
+
+                $layanan->notifyLapsedByBusinessTrip(
+                    $satu['model'],
+                    (string) $trip->trip_number,
+                    $aksi,
+                    $satu['approvals'],
+                );
+            } catch (\Throwable $e) {
+                Log::error('[Perdin] Kabar dokumen gugur gagal dibuat', [
+                    'business_trip_id' => $trip->id,
+                    'kind' => $satu['kind'],
+                    'document_id' => $satu['model']->id ?? null,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
     public function cancel(
         string $publicId,
         Request $request,
@@ -1130,8 +1338,17 @@ class BusinessTripController extends Controller
             ], 403);
         }
 
+        /*
+        | Alasannya wajib, bukan sekadar boleh diisi.
+        |
+        | Penyetuju yang kehilangan dokumen dari daftar tugasnya berhak tahu
+        | kenapa. Tanpa alasan, yang tersisa hanya dokumen yang lenyap begitu
+        | saja -- dan yang menyetujui akan mengira sistemnya yang keliru.
+        */
         $validated = $request->validate([
-            'notes' => ['nullable', 'string', 'max:1000'],
+            'notes' => ['required', 'string', 'min:3', 'max:1000'],
+        ], [],  [
+            'notes' => __('business_trip_messages.cancel_notes_label'),
         ]);
 
         DB::beginTransaction();
@@ -1148,9 +1365,17 @@ class BusinessTripController extends Controller
                 ], 404);
             }
 
+            /*
+            | Draft TIDAK ikut di sini.
+            |
+            | Draft belum pernah dilihat siapa pun: tidak ada yang perlu diberi
+            | tahu, dan tidak ada jejak yang perlu ditinggalkan. Membatalkannya
+            | hanya melahirkan dokumen berstatus CANCELLED yang tidak
+            | menjelaskan apa-apa. Untuk draft, yang tersedia menghapusnya.
+            */
             if (!in_array(
                 strtoupper((string) $trip->status),
-                [BusinessTrip::STATUS_DRAFT, BusinessTrip::STATUS_IN_PROGRESS],
+                [BusinessTrip::STATUS_IN_PROGRESS],
                 true,
             )) {
                 DB::rollBack();
@@ -1158,6 +1383,25 @@ class BusinessTripController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => __('business_trip_messages.cancel_not_allowed'),
+                ], 422);
+            }
+
+            /*
+            | Diperiksa sebelum apa pun berubah.
+            |
+            | Dokumen yang sudah di tangan Finance menahan pembatalan ini:
+            | berkasnya sudah di meja orang, mungkin uangnya sudah disiapkan.
+            | Yang dilakukan bukan menariknya diam-diam, melainkan mengatakan
+            | siapa yang memegangnya dan apa jalan keluarnya.
+            */
+            $menahan = $this->dokumenMenahan($trip, 'cancel');
+
+            if ($menahan) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $menahan,
                 ], 422);
             }
 
@@ -1169,7 +1413,16 @@ class BusinessTripController extends Controller
                 ])
                 ->update([
                     'status' => BusinessTripApproval::STATUS_CANCELLED,
-                    'notes' => 'Cancelled karena Perdin dibatalkan.',
+
+                    /*
+                    | Alasannya ikut ke langkah persetujuannya. Penyetuju
+                    | membaca riwayat ini, dan kalimat tetap seperti
+                    | "dibatalkan" tidak menjawab pertanyaan kenapa.
+                    */
+                    'notes' => __('business_trip_messages.cancel_step_note', [
+                        'reason' => trim($validated['notes']),
+                    ]),
+
                     'updated_at' => now(),
                 ]);
 
@@ -1177,10 +1430,20 @@ class BusinessTripController extends Controller
                 'status' => BusinessTrip::STATUS_CANCELLED,
                 'cancelled_by' => $user->id,
                 'cancelled_at' => now(),
-                'cancellation_notes' => $validated['notes'] ?? null,
+                'cancellation_notes' => trim($validated['notes']),
             ]);
 
+            /*
+            | FPU dan Claim yang bergantung padanya ikut gugur, di dalam
+            | transaksi yang sama. Perjalanannya tidak jadi ada, jadi tidak ada
+            | yang perlu dibiayai -- dan dokumen yang ditinggalkan hidup akan
+            | membeku tanpa ada yang tahu ia perlu dibereskan.
+            */
+            $gugur = $this->gugurkanTurunan($trip, $user, 'cancel', $validated['notes']);
+
             DB::commit();
+
+            $this->kabarkanTurunanGugur($gugur, $trip, 'cancelled');
 
             $trip->refresh()->load(['itineraries', 'approvals']);
 
@@ -1462,7 +1725,6 @@ class BusinessTripController extends Controller
             'itineraries.*.time_end' => ['nullable', 'date_format:H:i'],
             'itineraries.*.timezone' => ['required', Rule::in(BusinessTripItinerary::TIMEZONES)],
             'itineraries.*.description' => ['required', 'string'],
-            'itineraries.*.pic' => ['nullable', 'string', 'max:150'],
         ];
     }
 
@@ -1488,7 +1750,6 @@ class BusinessTripController extends Controller
                 'time_end' => $b['time_end'] ?? null,
                 'timezone' => $b['timezone'],
                 'description' => trim((string) $b['description']),
-                'pic' => isset($b['pic']) ? trim((string) $b['pic']) : null,
             ]);
         }
     }
@@ -1552,7 +1813,16 @@ class BusinessTripController extends Controller
         return DB::table('roles')->where('id', (int) $roleId)->value('nama');
     }
 
-    private function findVisible(string $publicId, $user): ?BusinessTrip
+    /**
+     * Perdin yang boleh dilihat akun ini, dicari dari publicId-nya.
+     *
+     * Terbuka karena layar pemesanan memakainya juga. Aturan siapa boleh
+     * melihat perdin mana hanya boleh ditulis di satu tempat -- menyalinnya
+     * ke controller sebelah berarti dua aturan yang cepat atau lambat
+     * berbeda jawabannya, dan yang berbeda itu soal siapa boleh membaca
+     * dokumen siapa.
+     */
+    public function findVisible(string $publicId, $user): ?BusinessTrip
     {
         try {
             $id = (int) Crypt::decryptString($publicId);
@@ -1931,6 +2201,7 @@ class BusinessTripController extends Controller
             'can_cancel' => false,
             'can_print' => false,
             'can_export' => false,
+            'can_arrange' => false,
         ];
     }
 }

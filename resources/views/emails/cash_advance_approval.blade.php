@@ -49,6 +49,31 @@
     $rupiah = static fn ($value): string =>
         'Rp ' . number_format((float) $value, 0, ',', '.');
 
+    /*
+    | Jadwal pembayaran dan ketepatannya -- hanya untuk email pencairan.
+    |
+    | Pada email approval, jadwalnya belum tentu ada dan tidak ada gunanya:
+    | yang dibaca penyetuju adalah angkanya, bukan kapan kasir bekerja.
+    */
+    $paymentSchedule = null;
+
+    if ($currentMode === 'disbursed' && $fpu->scheduled_payment_date) {
+        $ketepatan = app(\App\Services\FundRequest\PaymentScheduleService::class)
+            ->timing($fpu->scheduled_payment_date, $fpu->disbursed_at);
+
+        $penanda = match ($ketepatan) {
+            'EARLY' => [__('mail.fpu.payment_early'), '#1b7f4f'],
+            'LATE' => [__('mail.fpu.payment_late'), '#8a6d1f'],
+            default => [null, null],
+        };
+
+        $paymentSchedule = [
+            'date' => \Carbon\Carbon::parse($fpu->scheduled_payment_date)->format('d/m/Y'),
+            'label' => $penanda[0],
+            'color' => $penanda[1],
+        ];
+    }
+
     $logoUrl = 'https://syop.proenergi.com/proEnergi/libraries/themes/images/logo-proenergi.png';
 @endphp
 
@@ -187,6 +212,25 @@
                                         </span>
                                     </td>
                                 </tr>
+
+
+                                {{-- Jadwal yang dijanjikan, beserta ketepatannya --}}
+                                @if ($paymentSchedule)
+                                    <tr>
+                                        <td style="padding:0 12px 11px; font-size:12px; color:#5b6b80;">
+                                            {{ __('mail.fpu.field_payment_schedule') }}
+                                        </td>
+                                        <td style="padding:0 12px 11px; font-size:12px;">
+                                            <span style="font-weight:bold;">{{ $paymentSchedule['date'] }}</span>
+
+                                            @if ($paymentSchedule['label'])
+                                                <span style="display:inline-block; margin-left:6px; padding:2px 9px; border-radius:10px; background:{{ $paymentSchedule['color'] }}; color:#ffffff; font-size:11px; font-weight:bold;">
+                                                    {{ $paymentSchedule['label'] }}
+                                                </span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
 
                                 @if (!empty($notes))
                                     <tr>

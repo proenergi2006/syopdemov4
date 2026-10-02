@@ -26,7 +26,6 @@ class BusinessTripItinerary extends Model
         'time_end',
         'timezone',
         'description',
-        'pic',
     ];
 
     protected $casts = [

@@ -104,6 +104,7 @@ class BusinessTripApprovalMail extends Mailable implements ShouldQueue
         $subjectKey = match ($this->mode) {
             'final_approved' => 'mail.business_trip.subject.final_approved',
             'rejected' => 'mail.business_trip.subject.rejected',
+            'travel_arrangement' => 'mail.business_trip.subject.travel_arrangement',
             default => 'mail.business_trip.subject.default',
         };
 

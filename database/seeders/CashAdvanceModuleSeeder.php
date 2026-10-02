@@ -120,6 +120,40 @@ class CashAdvanceModuleSeeder extends Seeder
                 'description' => 'Menandai FPU yang sudah disetujui sudah diterima, sebelum dicairkan.',
                 'requires_scope' => false,
             ],
+            /*
+            | Jalan mundur dari meja penerimaan.
+            |
+            | Dipisah dari receive karena bobotnya lain: menerima berkas
+            | menambah dokumen ke antrean pembayaran, menariknya kembali
+            | mencabut tanggal yang sudah dijanjikan ke pemohon lewat email.
+            |
+            | Tanpa aksi ini, dokumen yang terlanjur diterima keliru tidak
+            | punya pintu keluar selain dicairkan.
+            */
+            [
+                'action' => 'unreceive',
+                'name' => 'Undo Receive FPU',
+                'description' => 'Membatalkan penerimaan berkas FPU sehingga dokumennya kembali ke status disetujui. Tanggal pembayaran yang sudah dijanjikan ikut dibatalkan.',
+                'requires_scope' => false,
+            ],
+            /*
+            | Mengubah angka yang diajukan orang lain.
+            |
+            | Dipisah dari receive karena keduanya keputusan yang berbeda:
+            | menerima berkas itu pekerjaan administrasi, merevisi angkanya
+            | tidak. Yang memegangnya bisa menurunkan atau menaikkan nominal
+            | yang sudah disetujui berjenjang, jadi ia tidak diberikan hanya
+            | karena seseorang kebetulan bertugas di meja penerimaan.
+            |
+            | Tanpa scope: revisinya selalu dikerjakan pada dokumen yang
+            | sudah lolos penyaringan view.
+            */
+            [
+                'action' => 'revise_amount',
+                'name' => 'Revise FPU Amount',
+                'description' => 'Mengubah nominal rincian FPU saat menandai berkasnya diterima. Angka yang diajukan pemohon tetap tersimpan sebagai pembanding.',
+                'requires_scope' => false,
+            ],
             [
                 'action' => 'disburse',
                 'name' => 'Disburse FPU',

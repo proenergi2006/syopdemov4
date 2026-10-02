@@ -51,6 +51,8 @@ class CashAdvance extends Model
         'branch',
         'department_id',
         'total_amount',
+        'original_total_amount',
+        'amount_revision_notes',
         'notes',
         'status',
 
@@ -78,6 +80,9 @@ class CashAdvance extends Model
         'received_by',
         'received_at',
         'receipt_notes',
+        'receipt_reverted_by',
+        'receipt_reverted_at',
+        'receipt_reversal_notes',
         'scheduled_payment_date',
 
         'disbursed_by',
@@ -91,6 +96,7 @@ class CashAdvance extends Model
         'transaction_category_id' => 'integer',
         'business_trip_id' => 'integer',
         'total_amount' => 'decimal:2',
+        'original_total_amount' => 'decimal:2',
 
         'submitted_at' => 'datetime',
         'requester_signed_at' => 'datetime',
@@ -98,6 +104,7 @@ class CashAdvance extends Model
         'rejected_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'received_at' => 'datetime',
+        'receipt_reverted_at' => 'datetime',
         'scheduled_payment_date' => 'date',
         'disbursed_at' => 'datetime',
     ];

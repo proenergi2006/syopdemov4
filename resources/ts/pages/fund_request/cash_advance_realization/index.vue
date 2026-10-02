@@ -21,6 +21,13 @@ import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
 
 interface RealizationRow {
+
+  /*
+  | Jumlah lampiran. Dipakai satu hal saja: menentukan perlu tidaknya
+  | layar bertanya "gabungkan lampiran ke dalam cetakan?".
+  */
+  attachment_count?: number
+
   id: number
   public_id: string
   realization_number: string | null
@@ -180,6 +187,13 @@ const canUpdate = computed(() => permissionStore.can('cash_advance_realization.u
 const canDelete = computed(() => permissionStore.can('cash_advance_realization.delete'))
 const canCancel = computed(() => permissionStore.can('cash_advance_realization.cancel'))
 const canReceive = computed(() => permissionStore.can('cash_advance_realization.receive'))
+
+/*
+| Menarik kembali penerimaan berkas. Dipisah dari receive karena
+| bobotnya lain: yang satu menambah dokumen ke antrean pembayaran,
+| yang ini mencabut tanggal yang sudah dijanjikan ke pemohon.
+*/
+const canUnreceive = computed(() => permissionStore.can('cash_advance_realization.unreceive'))
 const canReturn = computed(() => permissionStore.can('cash_advance_realization.return'))
 const canReimburse = computed(() => permissionStore.can('cash_advance_realization.reimburse'))
 
@@ -228,6 +242,54 @@ const detailDialog = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
 const detail = ref<any | null>(null)
+
+/*
+|--------------------------------------------------------------------------
+
+| Rincian perjalanan dinas pada modal detail
+|--------------------------------------------------------------------------
+| Dikelompokkan menurut kategori, dan kategori yang diurus GA ikut masuk walau
+| tanpa baris: kosongnya disengaja, dan itu perlu terbaca. Tanpa ini, dokumen
+| yang seluruhnya diurus GA tampak seperti dokumen yang rinciannya belum
+| diisi.
+|
+| Urutan barisnya dibiarkan apa adanya dari server -- itulah urutan yang sama
+| dengan yang tercetak di kertas.
+*/
+const detailBreakdown = computed<{ name: string; arranged: boolean; rows: any[] }[]>(() => {
+  const barisRincian: any[] = detail.value?.items || []
+  const kelompok: { name: string; arranged: boolean; rows: any[] }[] = []
+
+  for (const row of barisRincian) {
+    const nama = String(row.expense_category_name || '').trim()
+
+    if (!nama)
+      continue
+
+    const adaKelompok = kelompok.find(satu => satu.name === nama)
+
+    if (adaKelompok)
+      adaKelompok.rows.push(row)
+    else
+      kelompok.push({ name: nama, arranged: false, rows: [row] })
+  }
+
+  for (const nama of (detail.value?.arranged_categories || [])) {
+    const teks = String(nama || '').trim()
+
+    if (teks && !kelompok.some(satu => satu.name === teks))
+      kelompok.push({ name: teks, arranged: true, rows: [] })
+  }
+
+  return kelompok
+})
+
+/*
+| Bentuknya dikenali dari isinya, bukan dari penanda terpisah: penanda yang
+| mengatakan "ini perdin" sementara rinciannya tidak berkategori akan
+| menggambar tabel kosong tanpa sebab yang kelihatan.
+*/
+const detailHasBreakdown = computed<boolean>(() => detailBreakdown.value.length > 0)
 
 /*
 |--------------------------------------------------------------------------
@@ -759,7 +821,21 @@ const printLoadingId = ref<string | null>(null)
 const canPrint = (row: RealizationRow): boolean =>
   isStatus(row, 'APPROVED') || isStatus(row, 'RECEIVED') || isStatus(row, 'SETTLED')
 
-const printDocument = async (row: RealizationRow): Promise<void> => {
+/*
+|--------------------------------------------------------------------------
+| Cetak, dengan atau tanpa lampiran
+|--------------------------------------------------------------------------
+| Lampiran gambar disatukan ke dalam PDF-nya, dua per halaman. Yang
+| berformat PDF tidak bisa disisipkan -- dompdf menggambar halaman dari
+| HTML, ia tidak bisa menempelkan halaman PDF yang sudah jadi. Namanya
+| tetap didaftarkan di halaman terakhir supaya tidak hilang tanpa jejak.
+|--------------------------------------------------------------------------
+*/
+const printAttachmentDialog = ref(false)
+const printTarget = ref<RealizationRow | null>(null)
+const printWithAttachments = ref(false)
+
+const runPrint = async (row: RealizationRow, withAttachments: boolean): Promise<void> => {
   if (!row.public_id || printLoadingId.value)
     return
 
@@ -788,7 +864,13 @@ const printDocument = async (row: RealizationRow): Promise<void> => {
      */
     const response = await axios.post(
       `/fund-request/cash-advance-realization/${encodeURIComponent(row.public_id)}/print-url`,
-      null,
+
+      /*
+      | Pilihannya ikut ditandatangani server bersama tautannya, jadi ia
+      | dikirim di sini -- bukan ditempelkan ke URL hasilnya, yang akan
+      | merusak tanda tangannya.
+      */
+      { with_attachments: withAttachments },
       { headers: { Accept: 'application/json' } },
     )
 
@@ -820,6 +902,37 @@ const printDocument = async (row: RealizationRow): Promise<void> => {
   finally {
     printLoadingId.value = null
   }
+}
+
+const printDocument = async (row: RealizationRow): Promise<void> => {
+  if (!row.public_id || printLoadingId.value)
+    return
+
+  /*
+  | Hanya ditanyakan kalau memang ada lampirannya. Pertanyaan yang
+  | jawabannya cuma satu bukan pilihan, ia hambatan -- dan cetakan adalah
+  | aksi yang paling sering diulang orang.
+  */
+  if ((row.attachment_count ?? 0) > 0) {
+    printTarget.value = row
+    printWithAttachments.value = false
+    printAttachmentDialog.value = true
+
+    return
+  }
+
+  await runPrint(row, false)
+}
+
+const confirmPrint = async (): Promise<void> => {
+  const row = printTarget.value
+
+  if (!row)
+    return
+
+  printAttachmentDialog.value = false
+
+  await runPrint(row, printWithAttachments.value)
 }
 
 const submitRealization = async (row: RealizationRow): Promise<void> => {
@@ -1354,6 +1467,77 @@ const runBulkAction = async (): Promise<void> => {
 | diunggah -- kolom catatan dan lampirannya tetap ada di database, layar ini
 | saja yang tidak mengirimnya.
 */
+/*
+|--------------------------------------------------------------------------
+| Batal terima
+|--------------------------------------------------------------------------
+| Jalan mundur dari meja Finance. Dokumennya kembali ke status disetujui,
+| dan dari sana bisa dibatalkan seperti biasa.
+|
+| Tanpa aksi ini, dokumen yang terlanjur diterima keliru tidak punya pintu
+| keluar selain dicairkan -- uang keluar hanya karena tidak ada tombol untuk
+| mengurungkannya.
+|--------------------------------------------------------------------------
+*/
+const unreceiveDialog = ref(false)
+const unreceiveLoading = ref(false)
+const unreceiveError = ref('')
+const unreceiveTarget = ref<RealizationRow | null>(null)
+const unreceiveNotes = ref('')
+
+const openUnreceive = (row: RealizationRow): void => {
+  unreceiveTarget.value = row
+  unreceiveNotes.value = ''
+  unreceiveError.value = ''
+  unreceiveDialog.value = true
+}
+
+const submitUnreceive = async (): Promise<void> => {
+  if (!unreceiveTarget.value?.public_id || unreceiveLoading.value)
+    return
+
+  /*
+  | Alasannya wajib. Tanggal pembayaran yang sudah dijanjikan ke pemohon
+  | ikut batal karenanya, dan pencabutan tanpa penjelasan hanya melahirkan
+  | pertanyaan yang tidak ada jawabannya.
+  */
+  if (!unreceiveNotes.value.trim()) {
+    unreceiveError.value = t('cashAdvanceRealization.list.unreceive.notesRequired')
+
+    return
+  }
+
+  unreceiveLoading.value = true
+
+  try {
+    const response = await axios.patch(
+      `/fund-request/cash-advance-realization/${unreceiveTarget.value.public_id}/unreceive`,
+      { notes: unreceiveNotes.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    unreceiveDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('cashAdvanceRealization.list.unreceive.successFallback'),
+    })
+
+    await fetchRealizations()
+  }
+  catch (error: unknown) {
+    /* Pesannya di dalam dialognya: alasannya masih terketik di sana. */
+    unreceiveError.value = getApiErrorMessage(
+      error,
+      t('cashAdvanceRealization.list.unreceive.failedFallback'),
+    )
+  }
+  finally {
+    unreceiveLoading.value = false
+  }
+}
+
 const openReceive = async (row: RealizationRow): Promise<void> => {
   if (!row?.public_id || receiveLoading.value)
     return
@@ -1416,8 +1600,20 @@ const openReceive = async (row: RealizationRow): Promise<void> => {
 |--------------------------------------------------------------------------
 */
 /** Ada baris yang menunggu dibayar tetapi hari ini bukan harinya. */
+/*
+| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia
+| hanya berarti bagi orang yang punya tombol itu. Hanya yang berwenang menyelesaikan selisihnya yang melihatnya.
+|
+| Barisnya disaring menurut status, bukan hanya menurut can_pay_today.
+| Jadwal pembayaran tetap menempel sesudah dokumennya dibayar, jadi tanpa
+| saringan ini dokumen yang sudah lunas pun ikut menjawab "hari ini bukan
+| hari pembayaran" -- dan spanduknya mengumumkan ada yang menunggu
+| dicairkan padahal tidak ada satu pun.
+*/
 const blockedByPaymentDay = computed<boolean>(() =>
-  rows.value.some(row => row.can_pay_today === false))
+  (canReturn.value || canReimburse.value)
+  && rows.value.some(row =>
+    row.can_pay_today === false && isStatus(row, 'RECEIVED')))
 
 const paymentDeviation = (row: RealizationRow): 'EARLY' | 'LATE' | null => {
   if (!row.scheduled_payment_date)
@@ -2622,6 +2818,29 @@ onMounted(async () => {
                   </VListItem>
 
                   <!--
+                    Jalan mundur dari meja Finance. Muncul hanya pada dokumen
+                    yang memang sudah diterima -- dan hanya bagi yang
+                    berwenang menariknya kembali.
+                  -->
+                  <VListItem
+                    v-if="isStatus(row, 'RECEIVED') && canUnreceive"
+                    href="javascript:void(0)"
+                    @click="openUnreceive(row)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-arrow-back-up"
+                        :size="20"
+                        class="me-3 text-warning"
+                      />
+                    </template>
+
+                    <VListItemTitle class="text-warning">
+                      {{ t('cashAdvanceRealization.list.unreceive.menu') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <!--
                     Aksi penyelesaian selisih hanya muncul bila memang ada uang
                     yang harus berpindah, dan labelnya mengikuti arahnya.
                   -->
@@ -2664,7 +2883,7 @@ onMounted(async () => {
                   </VListItem>
 
                   <VListItem
-                    v-if="(isStatus(row, 'APPROVED') || isStatus(row, 'RECEIVED')) && canCancel"
+                    v-if="isStatus(row, 'APPROVED') && canCancel"
                     href="javascript:void(0)"
                     @click="openCancel(row)"
                   >
@@ -3169,7 +3388,195 @@ onMounted(async () => {
               </VChip>
             </div>
 
-            <div class="car-detail__table">
+            <!--
+
+              Bentuk perjalanan dinas: dikelompokkan menurut kategori, tanpa
+              tanggal. Kolom Tanggal diganti Qty dan Rincian Biaya -- pada
+              bentuk ini tanggalnya selalu "-".
+            -->
+            <div
+              v-if="detailHasBreakdown"
+              class="car-detail__table"
+            >
+              <VTable density="compact">
+                <thead>
+                  <tr>
+                    <th style="inline-size: 3rem;">
+                      {{ t('cashAdvanceRealization.detail.itemNo') }}
+                    </th>
+                    <th>{{ t('cashAdvanceRealization.form.breakdown.tableItem') }}</th>
+                    <th
+                      class="text-center"
+                      style="inline-size: 5rem;"
+                    >
+                      {{ t('cashAdvanceRealization.form.breakdown.tableQty') }}
+                    </th>
+                    <th
+                      class="text-end"
+                      style="inline-size: 9rem;"
+                    >
+                      {{ t('cashAdvanceRealization.form.breakdown.tableUnitPrice') }}
+                    </th>
+                    <th
+                      class="text-end"
+                      style="inline-size: 10rem;"
+                    >
+                      {{ t('cashAdvanceRealization.detail.itemRealization') }}
+                    </th>
+                    <th
+                      class="text-end"
+                      style="inline-size: 10rem;"
+                    >
+                      {{ t('cashAdvanceRealization.detail.itemAdvance') }}
+                    </th>
+                    <th style="inline-size: 13rem;">
+                      {{ t('cashAdvanceRealization.detail.itemAttachment') }}
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <template
+                    v-for="kelompok in detailBreakdown"
+                    :key="`detail-kategori-${kelompok.name}`"
+                  >
+                    <tr class="car-detail__cat-row">
+                      <td colspan="7">
+                        {{ kelompok.name }}
+
+                        <VChip
+                          v-if="kelompok.arranged"
+                          size="x-small"
+                          variant="tonal"
+                          color="warning"
+                          class="ms-2"
+                        >
+                          {{ t('cashAdvanceRealization.form.breakdown.arrangedByGa') }}
+                        </VChip>
+                      </td>
+                    </tr>
+
+                    <tr v-if="kelompok.arranged">
+                      <td
+                        colspan="7"
+                        class="car-detail__meta"
+                      >
+                        {{ t('cashAdvanceRealization.form.breakdown.arrangedNotice') }}
+                      </td>
+                    </tr>
+
+                    <tr
+                      v-for="(item, index) in kelompok.rows"
+                      :key="`detail-item-${item.id}`"
+                    >
+                      <td class="text-medium-emphasis">
+                        {{ index + 1 }}
+                      </td>
+
+                      <td class="text-wrap">
+                        {{ item.description }}
+
+                        <VChip
+                          v-if="!item.cash_advance_item_id"
+                          size="x-small"
+                          variant="tonal"
+                          color="warning"
+                          class="ms-1"
+                        >
+                          {{ t('cashAdvanceRealization.form.items.extra') }}
+                        </VChip>
+                      </td>
+
+                      <td class="text-center">
+                        {{ item.qty ?? '-' }}
+                      </td>
+
+                      <td class="text-end">
+                        Rp {{ formatNumberWithoutRp(Number(item.unit_price || 0)) }}
+                      </td>
+
+                      <td class="text-end font-weight-medium">
+                        Rp {{ formatNumberWithoutRp(Number(item.realization_amount || 0)) }}
+                      </td>
+
+                      <!--
+                        Baris di luar rencana tidak punya pembanding: itu
+                        pengeluaran yang tidak direncanakan, bukan nol.
+                      -->
+                      <td class="text-end text-medium-emphasis">
+                        {{ item.cash_advance_item_id
+                          ? `Rp ${formatNumberWithoutRp(Number(item.advance_amount || 0))}`
+                          : '—' }}
+                      </td>
+
+                      <td>
+                        <div
+                          v-if="(item.attachments || []).length"
+                          class="d-flex flex-column gap-1"
+                        >
+                          <a
+                            v-for="attachment in item.attachments"
+                            :key="`detail-item-${item.id}-file-${attachment.id}`"
+                            class="car-detail__line-file"
+                            :href="attachment.url || undefined"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <VIcon
+                              :icon="getAttachmentIcon(attachment.mime_type)"
+                              size="18"
+                              color="primary"
+                            />
+
+                            <span class="car-detail__line-file-name">
+                              {{ attachment.original_filename || attachment.filename }}
+                            </span>
+                          </a>
+                        </div>
+
+                        <span
+                          v-else
+                          class="car-detail__meta"
+                        >—</span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+
+                <tfoot>
+                  <tr class="car-detail__table-total">
+                    <td colspan="4">
+                      {{ t('cashAdvanceRealization.detail.totalLabel') }}
+                    </td>
+
+                    <td class="text-end">
+                      Rp {{ formatNumberWithoutRp(Number(detail.total_realization_amount || 0)) }}
+                    </td>
+
+                    <td class="text-end">
+                      Rp {{ formatNumberWithoutRp(Number(detail.total_advance_amount || 0)) }}
+                    </td>
+
+                    <td />
+                  </tr>
+                </tfoot>
+              </VTable>
+            </div>
+
+            <!--
+              Bentuk biasa: satu tabel datar, bertanggal.
+
+              Syaratnya disebut, bukan v-else. v-else berpasangan dengan apa
+              pun yang kebetulan berdiri tepat di atasnya; sekali ada yang
+              menyisipkan sesuatu di antaranya, pasangannya berpindah tanpa
+              bersuara.
+            -->
+            <div
+              v-if="!detailHasBreakdown"
+
+              class="car-detail__table"
+
+            >
               <VTable density="compact">
                 <thead>
                   <tr>
@@ -3636,17 +4043,22 @@ onMounted(async () => {
       max-width="520"
     >
       <VCard>
+        <!--
+          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
+          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
+          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
+          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
+          dipastikan sebelum menjawab.
+        -->
         <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvanceRealization.list.approve.dialogTitle') }}
+          {{ t('cashAdvanceRealization.list.approve.dialogTitle', {
+            number: approveTarget?.realization_number || '-',
+          }) }}
         </VCardTitle>
 
         <VCardText>
           <div class="text-body-2 text-medium-emphasis mb-4">
             {{ t('cashAdvanceRealization.list.approve.dialogSubtitle') }}
-          </div>
-
-          <div class="font-weight-medium mb-4">
-            {{ approveTarget?.realization_number || '-' }}
           </div>
 
           <VTextarea
@@ -3687,17 +4099,22 @@ onMounted(async () => {
       max-width="520"
     >
       <VCard>
+        <!--
+          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
+          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
+          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
+          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
+          dipastikan sebelum menjawab.
+        -->
         <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvanceRealization.list.reject.dialogTitle') }}
+          {{ t('cashAdvanceRealization.list.reject.dialogTitle', {
+            number: rejectTarget?.realization_number || '-',
+          }) }}
         </VCardTitle>
 
         <VCardText>
           <div class="text-body-2 text-medium-emphasis mb-4">
             {{ t('cashAdvanceRealization.list.reject.dialogSubtitle') }}
-          </div>
-
-          <div class="font-weight-medium mb-4">
-            {{ rejectTarget?.realization_number || '-' }}
           </div>
 
           <VTextarea
@@ -3863,6 +4280,150 @@ onMounted(async () => {
     </VDialog>
     <!-- Penegasan pembayaran di luar jadwal -->
     <OffSchedulePaymentDialog ref="offScheduleDialog" />
+
+    <!--
+      BATAL TERIMA
+
+      Peringatannya menyebut akibatnya, bukan sekadar bertanya. Yang
+      menekannya perlu tahu bahwa tanggal pembayaran yang sudah dijanjikan
+      ikut batal -- itu bagian yang tidak terlihat dari namanya.
+    -->
+    <VDialog
+      v-model="unreceiveDialog"
+      max-width="520"
+    >
+      <VCard v-if="unreceiveTarget">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('cashAdvanceRealization.list.unreceive.title') }}
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <VAlert
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ t('cashAdvanceRealization.list.unreceive.warning') }}
+          </VAlert>
+
+          <VAlert
+            v-if="unreceiveError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ unreceiveError }}
+          </VAlert>
+
+          <div class="text-body-2 text-medium-emphasis mb-3">
+            {{ t('cashAdvanceRealization.list.unreceive.notesHint') }}
+          </div>
+
+          <VTextarea
+            v-model="unreceiveNotes"
+            :label="t('cashAdvanceRealization.list.unreceive.notes')"
+            rows="3"
+            density="comfortable"
+            autofocus
+          />
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="unreceiveLoading"
+            @click="unreceiveDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="warning"
+            class="text-none"
+            :loading="unreceiveLoading"
+            :disabled="!unreceiveNotes.trim()"
+            @click="submitUnreceive"
+          >
+            {{ t('cashAdvanceRealization.list.unreceive.confirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!--
+      CETAK: gabung lampiran atau tidak
+
+      Muncul hanya pada dokumen yang punya lampiran. Keterangan soal PDF
+      disebutkan di muka, bukan disembunyikan sampai cetakannya jadi --
+      orang yang mengira vouchernya ikut tercetak akan berhenti memeriksa.
+    -->
+    <VDialog
+      v-model="printAttachmentDialog"
+      max-width="480"
+    >
+      <VCard v-if="printTarget">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('cashAdvanceRealization.list.print.attachmentTitle') }}
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <div class="text-body-2 mb-3">
+            {{ t('cashAdvanceRealization.list.print.attachmentCount', {
+              count: printTarget.attachment_count ?? 0,
+            }) }}
+          </div>
+
+          <VCheckbox
+            v-model="printWithAttachments"
+            :label="t('cashAdvanceRealization.list.print.attachmentInclude')"
+            density="comfortable"
+            hide-details
+          />
+
+          <VAlert
+            v-if="printWithAttachments"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ t('cashAdvanceRealization.list.print.attachmentPdfNotice') }}
+          </VAlert>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            @click="printAttachmentDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="primary"
+            class="text-none"
+            prepend-icon="tabler-printer"
+            @click="confirmPrint"
+          >
+            {{ t('cashAdvanceRealization.list.print.attachmentConfirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </section>
 </template>
 
@@ -4141,6 +4702,14 @@ onMounted(async () => {
 
 .car-detail__section-title .v-icon {
   color: rgba(var(--v-theme-primary), 0.8);
+}
+
+/* Baris judul kategori pada rincian perjalanan dinas. */
+.car-detail__cat-row td {
+
+  background: rgba(var(--v-theme-primary), 0.06);
+
+  font-weight: 600;
 }
 
 .car-detail__table {

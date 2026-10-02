@@ -7,9 +7,14 @@ use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
+use App\Services\FundRequest\PrintAttachmentCollector;
+use App\Services\FundRequest\ReceiptReversalService;
 use App\Models\BusinessTrip;
 use App\Models\BusinessTripApproval;
 use App\Models\CashAdvance;
+use App\Models\FundRequestArrangedCategory;
+use App\Services\FundRequest\BusinessTripExpenseBreakdownService;
+use App\Services\FundRequest\AmountRevisionService;
 use App\Models\CashAdvanceApproval;
 use App\Models\CashAdvanceAttachment;
 use App\Models\CashAdvanceItem;
@@ -109,6 +114,20 @@ class CashAdvanceController extends Controller
                 'can_disburse' => $user->hasPermission('cash_advance.disburse'),
 
                 /*
+                | Menentukan bentuk layar penerimaan: sekadar pertanyaan
+                | "terima berkas ini?", atau modal berisi rincian yang
+                | nominalnya bisa dibetulkan.
+                */
+                'can_revise_amount' => $user->hasPermission('cash_advance.revise_amount'),
+
+                /*
+                | Menarik kembali penerimaan berkas. Dipisah dari receive
+                | karena bobotnya lain: yang satu menambah dokumen ke antrean
+                | pembayaran, yang ini mencabut tanggal yang sudah dijanjikan.
+                */
+                'can_unreceive' => $user->hasPermission('cash_advance.unreceive'),
+
+                /*
                 | Menentukan tampil-tidaknya pintasan "Buat Realisasi" pada
                 | daftar. Permission-nya milik modul Realisasi, bukan FPU.
                 */
@@ -118,6 +137,7 @@ class CashAdvanceController extends Controller
             ];
 
             $query = CashAdvance::query()
+                ->withCount('attachments')
                 ->with([
                     'branchData',
                     'departmentData',
@@ -279,8 +299,25 @@ class CashAdvanceController extends Controller
                         'department_id' => $cashAdvance->department_id,
 
                         'total_amount' => (float) $cashAdvance->total_amount,
+
+                        /*
+                        | Total yang diajukan pemohon, terisi hanya bila Finance pernah
+                        | membetulkannya. Null berarti angkanya apa adanya -- bukan nol,
+                        | dan bukan salinan dari total_amount.
+                        */
+                        'original_total_amount' => $cashAdvance->original_total_amount !== null
+                            ? (float) $cashAdvance->original_total_amount
+                            : null,
+                        'amount_revision_notes' => $cashAdvance->amount_revision_notes,
                         'notes' => $cashAdvance->notes,
                         'status' => $cashAdvance->status,
+
+                        /*
+                        | Jumlah lampiran, dipakai layar untuk menentukan perlu tidaknya
+                        | bertanya "gabungkan lampiran ke dalam cetakan?". Dokumen tanpa
+                        | lampiran tidak semestinya ditanyai.
+                        */
+                        'attachment_count' => (int) ($cashAdvance->attachments_count ?? 0),
 
                         'can_submit' => $rowCanSubmit,
                         'can_approve' => $currentApproval !== null,
@@ -446,7 +483,40 @@ class CashAdvanceController extends Controller
                 $request->input('department_id'),
             );
 
-            $items = $this->decodeItems($request->input('items'));
+            /*
+            | Bentuk rinciannya ditentukan keterangan transaksinya, jadi
+            | penandanya dibaca sebelum rinciannya dibaca.
+            |
+            | Rincian perdin berkategori dan berkuantitas, tanpa tanggal;
+            | nominalnya dihitung dari qty x harga satuan, bukan diterima
+            | dari layar.
+            */
+            $rincianPerdin = $this->isBusinessTripCategory($request);
+
+            /*
+            | Kategori yang ditandai diurus GA. Dikirim sebagai daftar id;
+            | kategori di dalamnya tidak boleh punya baris rincian.
+            |
+            | Dibaca SEBELUM rinciannya, karena ia yang menentukan boleh
+            | tidaknya rincian itu kosong.
+            */
+            $arrangedCategories = $rincianPerdin
+                ? (array) $request->input('arranged_categories', [])
+                : [];
+
+            $items = $this->decodeItems(
+                $request->input('items'),
+                $rincianPerdin,
+                $rincianPerdin && $arrangedCategories !== [],
+            );
+
+            if ($rincianPerdin) {
+                $items = app(BusinessTripExpenseBreakdownService::class)->normalize(
+                    $items,
+                    $arrangedCategories,
+                    'cash_advance_messages.breakdown',
+                );
+            }
 
             $totalAmount = round(
                 array_sum(array_map(fn(array $item) => (float) $item['amount'], $items)),
@@ -488,12 +558,22 @@ class CashAdvanceController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'expense_category_id' => $item['expense_category_id'] ?? null,
+                    'qty' => $item['qty'] ?? null,
+                    'unit_price' => $item['unit_price'] ?? null,
                 ]);
 
                 $itemIdsByIndex[(int) $index] = (int) $row->id;
             }
 
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, []);
+
+            /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
+            app(BusinessTripExpenseBreakdownService::class)->syncArranged(
+                FundRequestArrangedCategory::DOC_CASH_ADVANCE,
+                (int) $cashAdvance->id,
+                $arrangedCategories,
+            );
 
             $storedPaths = $this->storeLineAttachments(
                 $request,
@@ -584,7 +664,17 @@ class CashAdvanceController extends Controller
                 'businessTrip.approvals' => function ($tripApprovalQuery) {
                     $tripApprovalQuery->orderBy('step_order')->orderBy('id');
                 },
-                'items',
+
+                /*
+                | Berikut pemesanan hotel dan tiketnya. Pemohon lebih sering
+                | membuka layar FPU daripada layar perdin -- di sanalah
+                | angkanya. Tanpa ini, kabar bahwa hotelnya sudah dipesan
+                | berakhir di modal yang tidak pernah ia buka.
+                */
+                'businessTrip.arrangements.files',
+                'businessTrip.arrangements.creator:id,name',
+                'businessTrip.arrangements.canceller:id,name',
+                'items.expenseCategory',
                 'attachments',
                 'creator:id,name',
                 'submitter:id,name',
@@ -668,7 +758,7 @@ class CashAdvanceController extends Controller
                 ], 404);
             }
 
-            $cashAdvance->load(['items', 'attachments', 'transactionCategory:id,name']);
+            $cashAdvance->load(['items.expenseCategory', 'attachments', 'transactionCategory:id,name']);
 
             return response()->json([
                 'success' => true,
@@ -686,10 +776,32 @@ class CashAdvanceController extends Controller
                     'branch' => $cashAdvance->branch,
                     'department_id' => $cashAdvance->department_id,
                     'total_amount' => (float) $cashAdvance->total_amount,
+
+                    /*
+                    | Total yang diajukan pemohon, terisi hanya bila Finance pernah
+                    | membetulkannya. Null berarti angkanya apa adanya -- bukan nol,
+                    | dan bukan salinan dari total_amount.
+                    */
+                    'original_total_amount' => $cashAdvance->original_total_amount !== null
+                        ? (float) $cashAdvance->original_total_amount
+                        : null,
+                    'amount_revision_notes' => $cashAdvance->amount_revision_notes,
                     'notes' => $cashAdvance->notes,
                     'status' => $cashAdvance->status,
                     'items' => $this->transformItems($cashAdvance),
                     'attachments' => $this->transformAttachments($cashAdvance),
+
+                    /*
+                    | Kategori yang ditandai diurus GA. Tanpa ini, membuka FPU
+                    | lama lalu menyimpannya kembali akan mencabut penandanya --
+                    | dan kategori yang sengaja dikosongkan berubah menjadi
+                    | kategori yang lupa diisi.
+                    */
+                    'arranged_categories' => app(BusinessTripExpenseBreakdownService::class)
+                        ->arrangedFor(
+                            FundRequestArrangedCategory::DOC_CASH_ADVANCE,
+                            (int) $cashAdvance->id,
+                        ),
                 ],
             ], 200);
         } catch (\Throwable $e) {
@@ -793,7 +905,40 @@ class CashAdvanceController extends Controller
                 $request->input('department_id'),
             );
 
-            $items = $this->decodeItems($request->input('items'));
+            /*
+            | Bentuk rinciannya ditentukan keterangan transaksinya, jadi
+            | penandanya dibaca sebelum rinciannya dibaca.
+            |
+            | Rincian perdin berkategori dan berkuantitas, tanpa tanggal;
+            | nominalnya dihitung dari qty x harga satuan, bukan diterima
+            | dari layar.
+            */
+            $rincianPerdin = $this->isBusinessTripCategory($request);
+
+            /*
+            | Kategori yang ditandai diurus GA. Dikirim sebagai daftar id;
+            | kategori di dalamnya tidak boleh punya baris rincian.
+            |
+            | Dibaca SEBELUM rinciannya, karena ia yang menentukan boleh
+            | tidaknya rincian itu kosong.
+            */
+            $arrangedCategories = $rincianPerdin
+                ? (array) $request->input('arranged_categories', [])
+                : [];
+
+            $items = $this->decodeItems(
+                $request->input('items'),
+                $rincianPerdin,
+                $rincianPerdin && $arrangedCategories !== [],
+            );
+
+            if ($rincianPerdin) {
+                $items = app(BusinessTripExpenseBreakdownService::class)->normalize(
+                    $items,
+                    $arrangedCategories,
+                    'cash_advance_messages.breakdown',
+                );
+            }
 
             $totalAmount = round(
                 array_sum(array_map(fn(array $item) => (float) $item['amount'], $items)),
@@ -835,6 +980,13 @@ class CashAdvanceController extends Controller
             $deletedIds = $this->requestedDeletedAttachmentIds($request);
 
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, $deletedIds);
+
+            /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
+            app(BusinessTripExpenseBreakdownService::class)->syncArranged(
+                FundRequestArrangedCategory::DOC_CASH_ADVANCE,
+                (int) $cashAdvance->id,
+                $arrangedCategories,
+            );
 
             $this->deleteRequestedAttachments($request, $cashAdvance);
 
@@ -1483,17 +1635,19 @@ class CashAdvanceController extends Controller
                 ->findOrFail($id);
 
             /*
-            | Dokumen yang sudah diterima pun masih boleh dibatalkan -- dananya
-            | belum keluar. Yang tidak bisa dibatalkan adalah yang sudah
-            | dicairkan.
+            | Hanya yang BELUM diterima Finance.
+            |
+            | Begitu berkasnya diterima, dokumennya masuk antrean pembayaran
+            | dan sudah punya tanggal yang dijanjikan ke pemohon. Membatalkan
+            | dari luar antrean itu membuat janjinya lenyap tanpa ada yang
+            | memegang keputusannya -- Finance yang memegang berkasnya justru
+            | tidak dilibatkan.
+            |
+            | Yang terlanjur diterima keliru belum punya jalan mundur; itu
+            | lubang yang diketahui dan menunggu aksi "batal terima"
+            | tersendiri, bukan dititipkan ke tombol batal pemohon.
             */
-            if (
-                !in_array(
-                    strtoupper((string) $cashAdvance->status),
-                    [CashAdvance::STATUS_APPROVED, CashAdvance::STATUS_RECEIVED],
-                    true,
-                )
-            ) {
+            if (strtoupper((string) $cashAdvance->status) !== CashAdvance::STATUS_APPROVED) {
                 DB::rollBack();
 
                 return response()->json([
@@ -1636,7 +1790,8 @@ class CashAdvanceController extends Controller
 
             $query = CashAdvance::query()
                 ->with([
-                    'items',
+                    /* Kategori ikut dimuat: kolom Kategori Biaya membacanya. */
+                    'items.expenseCategory',
                     'branchData',
                     'departmentData',
                     'transactionCategory',
@@ -1931,6 +2086,23 @@ class CashAdvanceController extends Controller
                 'mimes:' . self::ATTACHMENT_MIMES,
                 'max:' . self::ATTACHMENT_MAX_KB,
             ],
+
+            /*
+            | Nominal hasil pembetulan Finance, bila ada.
+            |
+            | Boleh tidak dikirim sama sekali: yang tidak memegang izin
+            | revisi tetap menerima berkas seperti biasa, dan yang memegangnya
+            | pun boleh menutup modalnya tanpa mengubah apa-apa. Wewenang dan
+            | kewajiban alasannya diperiksa AmountRevisionService, dan hanya
+            | kalau angkanya memang berubah.
+            */
+            'items' => ['nullable', 'array'],
+            'items.*.id' => ['required', 'integer'],
+            'items.*.amount' => ['required', 'numeric', 'min:0'],
+
+            'revision_notes' => ['nullable', 'string', 'max:2000'],
+        ], [], [
+            'items.*.amount' => __('fund_request_messages.revision.amount_label'),
         ]);
 
         DB::beginTransaction();
@@ -1951,6 +2123,28 @@ class CashAdvanceController extends Controller
                     'success' => false,
                     'message' => __('cash_advance_messages.receive.only_approved'),
                 ], 422);
+            }
+
+            /*
+            | Nominalnya dibetulkan lebih dulu, selagi statusnya masih
+            | Approved. Kalau revisinya ditolak -- tanpa izin, atau tanpa
+            | alasan -- dokumennya tidak boleh terlanjur tercatat diterima.
+            */
+            $revisi = app(AmountRevisionService::class)->apply(
+                document: $cashAdvance,
+                permission: 'cash_advance.revise_amount',
+                user: $user,
+                requested: $validated['items'] ?? [],
+                notes: $validated['revision_notes'] ?? null,
+            );
+
+            if (!$revisi['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($revisi['message_key']),
+                ], $revisi['status']);
             }
 
             $diterimaPada = now();
@@ -1984,6 +2178,23 @@ class CashAdvanceController extends Controller
                 /* Pemohon diberi tahu dokumennya sudah diterima. */
                 $notificationService->notifyReceived($cashAdvance, $user);
                 $mailService->sendReceived($cashAdvance, $user);
+
+                /*
+                | Dan bila nominalnya dibetulkan, itu kabar tersendiri.
+                |
+                | Tidak dititipkan ke kabar "sudah diterima": yang satu
+                | perpindahan status biasa, yang ini memberitahukan bahwa
+                | angka yang ia tulis sendiri sudah tidak berlaku. Pemohon yang
+                | melewatkannya akan menyusun realisasinya memakai angka lama.
+                */
+                if ($revisi['changed']) {
+                    $notificationService->notifyAmountRevised(
+                        $cashAdvance,
+                        $user,
+                        $revisi['old_total'],
+                        $revisi['new_total'],
+                    );
+                }
 
                 /*
                 | Dan giliran Finance dimulai di sini -- bukan lagi sejak
@@ -2032,6 +2243,115 @@ class CashAdvanceController extends Controller
             ], 500);
         }
     }
+    /**
+     * Menarik kembali penerimaan berkas.
+     *
+     * Dokumennya kembali ke status disetujui, dan dari sana bisa dibatalkan
+     * seperti biasa. Tanpa jalan mundur ini, dokumen yang terlanjur diterima
+     * keliru tidak punya pintu keluar selain dicairkan -- uang keluar hanya
+     * karena tidak ada tombol untuk mengurungkannya.
+     *
+     * Aturannya ada di ReceiptReversalService, dipakai bersama tiga modul.
+     */
+    public function unreceive(string $publicId, Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        /*
+        | Diperiksa di sini SELAIN di layanannya.
+        |
+        | Kalau hanya di layanan, yang tidak berwenang akan lebih dulu
+        | menabrak validasi dan menerima "alasan wajib diisi" -- pesan yang
+        | mengajaknya mengisi formulir yang tidak akan pernah ia lewati.
+        */
+        if (!$user || !$user->hasPermission('cash_advance.unreceive')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.receipt_reversal.forbidden'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], [
+            'notes' => __('fund_request_messages.receipt_reversal.notes_label'),
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $id = Crypt::decryptString($publicId);
+
+            $cashAdvance = CashAdvance::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            $hasil = app(ReceiptReversalService::class)->revert(
+                document: $cashAdvance,
+                approvedStatus: CashAdvance::STATUS_APPROVED,
+                receivedStatus: CashAdvance::STATUS_RECEIVED,
+                user: $user,
+                permission: 'cash_advance.unreceive',
+                notes: $validated['notes'],
+            );
+
+            if (!$hasil['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($hasil['message_key']),
+                ], $hasil['status']);
+            }
+
+            DB::commit();
+
+            $cashAdvance->refresh();
+
+            /*
+            | Pemohon dikabari SESUDAH transaksinya tuntas.
+            |
+            | Tanggal pembayarannya sudah pernah dikirim ke dia lewat email;
+            | sekarang tanggal itu batal. Kalau ia tidak diberi tahu, yang
+            | terjadi adalah ia menunggu uang pada hari yang tidak akan
+            | pernah datang.
+            */
+            try {
+                app(CashAdvanceNotificationService::class)->notifyReceiptReverted(
+                    $cashAdvance,
+                    $user,
+                    $hasil['scheduled_date'],
+                    $validated['notes'],
+                );
+            } catch (\Throwable $notifyError) {
+                Log::error('[FPU] Notify batal terima gagal', [
+                    'id' => $cashAdvance->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('fund_request_messages.receipt_reversal.success'),
+                'data' => [
+                    'id' => $cashAdvance->id,
+                    'status' => $cashAdvance->status,
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[FPU] Batal terima gagal', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.receipt_reversal.failed'),
+            ], 500);
+        }
+    }
+
     public function disburse(string $publicId, Request $request): JsonResponse
     {
         $user = $request->user();
@@ -2207,10 +2527,22 @@ class CashAdvanceController extends Controller
 
             CashAdvance::query()->findOrFail($id);
 
+            /*
+            | Pilihan menggabung lampiran ikut masuk tanda tangan.
+            |
+            | Tautannya berlaku sepuluh menit dan bisa disimpan orang.
+            | Parameter di luar tanda tangan bisa diubah sesudah tautannya
+            | diberikan -- dan yang diubah di sini menentukan berkas siapa
+            | saja yang ikut tercetak.
+            */
+            $denganLampiran = $request->boolean('with_attachments');
+
             $relativeUrl = URL::temporarySignedRoute(
                 'fund-request.cash-advance.print-signed',
                 now()->addMinutes(10),
-                ['publicId' => $publicId],
+                $denganLampiran
+                    ? ['publicId' => $publicId, 'with_attachments' => 1]
+                    : ['publicId' => $publicId],
                 false,
             );
 
@@ -2255,7 +2587,7 @@ class CashAdvanceController extends Controller
                 'branchData:id,nama_cabang,inisial_cabang',
                 'departmentData:id,kode,nama',
                 'transactionCategory:id,code,name',
-                'items',
+                'items.expenseCategory',
                 'creator:id,name',
                 'submitter:id,name',
                 'receiver:id,name',
@@ -2294,12 +2626,56 @@ class CashAdvanceController extends Controller
                 ?: $fpu->items->sum(fn($item) => (float) ($item->amount ?? 0))
             );
 
+            /*
+            | Lampiran hanya diambil kalau memang diminta. Halaman cetak
+            | tanpa lampiran tidak perlu membayar pembacaan berkasnya.
+            */
+            $attachmentPages = [];
+            $attachmentOthers = [];
+
+            if ($request->boolean('with_attachments')) {
+                $fpu->loadMissing('attachments');
+
+                $terpilah = app(PrintAttachmentCollector::class)->collect(
+                    $fpu->attachments,
+                    [
+                        'REQUEST' => 'Lampiran Pengajuan',
+                        'RECEIPT' => 'Lampiran Penerimaan',
+                        'DISBURSEMENT' => 'Bukti Pencairan',
+                    ],
+                );
+
+                $attachmentPages = app(PrintAttachmentCollector::class)
+                    ->paginate($terpilah['images']);
+
+                $attachmentOthers = $terpilah['others'];
+            }
+
+            /*
+            | Rincian perjalanan dinas dicetak berkelompok menurut
+            | kategorinya, mengikuti formulir kertasnya. Null di luar perdin
+            | -- di sana rinciannya memang satu daftar bertanggal, dan tidak
+            | ada yang perlu diubah.
+            */
+            $rincianPerdin = $fpu->business_trip_id !== null
+                ? app(BusinessTripExpenseBreakdownService::class)->groupedForPrint(
+                    FundRequestArrangedCategory::DOC_CASH_ADVANCE,
+                    (int) $fpu->id,
+                    $fpu->items,
+                    'amount',
+                )
+                : null;
+
             $pdf = Pdf::loadView('pdf.cash-advance', [
                 'fpu' => $fpu,
+                'rincianPerdin' => $rincianPerdin,
                 'totalAmount' => $totalAmount,
                 'terbilang' => RupiahWords::of($totalAmount),
                 'requester' => $this->buildRequesterSigner($fpu),
                 'approvers' => $this->buildApproverSigners($fpu),
+
+                'attachmentPages' => $attachmentPages,
+                'attachmentOthers' => $attachmentOthers,
             ])->setPaper('a4', 'portrait');
 
             return $this->pdfResponse(
@@ -2892,16 +3268,27 @@ class CashAdvanceController extends Controller
                 'number' => (string) $trip->trip_number,
             ]);
     }
+    /**
+     * Apakah keterangan transaksi yang dipilih adalah perjalanan dinas.
+     *
+     * Dibaca dari kolom requires_business_trip, sumber yang sama yang
+     * menentukan wajib tidaknya melampirkan dokumen perdin. Dipakai dua hal
+     * yang berbeda -- tautan perdin dan kewajiban lampiran -- dan keduanya
+     * harus menjawab dari satu tempat, bukan dua yang bisa berbeda.
+     */
+    private function isBusinessTripCategory(Request $request): bool
+    {
+        return (bool) DB::table('fund_request_transaction_categories')
+            ->where('id', (int) $request->input('transaction_category_id'))
+            ->value('requires_business_trip');
+    }
+
     private function resolveBusinessTripId(
         Request $request,
         $user,
         ?int $cashAdvanceId = null,
     ): ?int {
-        $wajib = (bool) DB::table('fund_request_transaction_categories')
-            ->where('id', (int) $request->input('transaction_category_id'))
-            ->value('requires_business_trip');
-
-        if (!$wajib) {
+        if (!$this->isBusinessTripCategory($request)) {
             return null;
         }
 
@@ -3034,11 +3421,32 @@ class CashAdvanceController extends Controller
     | membawa lampiran sekaligus.
     |--------------------------------------------------------------------------
     */
-    private function decodeItems(mixed $rawItems): array
-    {
+    /**
+     * @param  bool  $perdin  Rinciannya berbentuk perjalanan dinas:
+     *                        berkategori, berkuantitas, tanpa tanggal.
+     */
+    /**
+     * @param  bool  $bolehKosong  Rinciannya boleh tidak ada sama sekali --
+     *                             dipakai FPU perdin yang seluruh kategorinya
+     *                             diurus GA, jadi tidak ada yang ditagihkan.
+     */
+    private function decodeItems(
+        mixed $rawItems,
+        bool $perdin = false,
+        bool $bolehKosong = false,
+    ): array {
         $items = json_decode((string) $rawItems, true);
 
-        if (!is_array($items) || count($items) === 0) {
+        if (!is_array($items)) {
+            $items = [];
+        }
+
+        /*
+        | Kosongnya harus beralasan. Tanpa satu pun kategori yang ditandai
+        | diurus GA, rincian kosong berarti formulir yang belum selesai --
+        | bukan dokumen yang memang tidak menagih apa pun.
+        */
+        if (count($items) === 0 && !$bolehKosong) {
             throw ValidationException::withMessages([
                 'items' => [__('cash_advance_messages.items.required')],
             ]);
@@ -3061,7 +3469,12 @@ class CashAdvanceController extends Controller
 
             $amount = (float) ($item['amount'] ?? 0);
 
-            if ($amount <= 0) {
+            /*
+            | Pada baris perdin nominalnya tidak diminta di sini: ia dihitung
+            | dari qty x harga satuan oleh BusinessTripExpenseBreakdownService,
+            | dan angka yang dikirim layar diabaikan sepenuhnya.
+            */
+            if (!$perdin && $amount <= 0) {
                 throw ValidationException::withMessages([
                     'items' => [
                         __('cash_advance_messages.items.amount_required', [
@@ -3073,7 +3486,17 @@ class CashAdvanceController extends Controller
 
             $date = trim((string) ($item['date'] ?? ''));
 
-            if ($date === '') {
+            /*
+            | Rincian perdin tidak bertanggal. Formulir kertasnya memang
+            | tidak berkolom tanggal -- tanggalnya tertulis di dalam nama
+            | itemnya sendiri, misalnya "Uang Saku Perdin tgl 1 Oktober".
+            |
+            | Akibatnya aturan "tanggal rincian harus di dalam periode
+            | perdin" tidak lagi berlaku di FPU: tidak ada tanggal untuk
+            | diperiksa. Aturan itu tetap hidup di Claim perdin, yang
+            | rinciannya masih bertanggal.
+            */
+            if (!$perdin && $date === '') {
                 throw ValidationException::withMessages([
                     'items' => [
                         __('cash_advance_messages.items.date_required', [
@@ -3094,6 +3517,17 @@ class CashAdvanceController extends Controller
                 'date' => $date !== '' ? $date : null,
                 'description' => $description,
                 'amount' => round($amount, 2),
+
+                /*
+                | Dibawa apa adanya; yang memeriksanya dan menghitung
+                | nominalnya adalah BusinessTripExpenseBreakdownService.
+                | Kosong pada baris non-perdin.
+                */
+                'expense_category_id' => $perdin
+                    ? ($item['expense_category_id'] ?? null)
+                    : null,
+                'qty' => $perdin ? ($item['qty'] ?? null) : null,
+                'unit_price' => $perdin ? ($item['unit_price'] ?? null) : null,
             ];
         }
 
@@ -3137,6 +3571,9 @@ class CashAdvanceController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'expense_category_id' => $item['expense_category_id'] ?? null,
+                    'qty' => $item['qty'] ?? null,
+                    'unit_price' => $item['unit_price'] ?? null,
                 ]);
             } else {
                 $row = CashAdvanceItem::create([
@@ -3144,6 +3581,9 @@ class CashAdvanceController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'expense_category_id' => $item['expense_category_id'] ?? null,
+                    'qty' => $item['qty'] ?? null,
+                    'unit_price' => $item['unit_price'] ?? null,
                 ]);
             }
 
@@ -3358,6 +3798,12 @@ class CashAdvanceController extends Controller
      * tidak dihapus, supaya menyunting draft tanpa menyentuh lampiran tidak
      * memaksa user mengunggah ulang.
      *
+     * TIDAK berlaku untuk FPU perjalanan dinas. Biaya perjalanan sebagian
+     * besar belum punya bukti saat diajukan -- tiket, penginapan, dan
+     * transport lokal baru ada kuitansinya setelah perjalanannya berlangsung.
+     * Buktinya menyusul di Realisasi, bukan di pengajuan. Mewajibkannya di
+     * sini hanya melahirkan lampiran asal ada.
+     *
      * @param  array<int, int>  $itemIdsByIndex  nomor urut baris -> id baris
      * @param  array<int, int>  $deletedIds
      *
@@ -3368,6 +3814,10 @@ class CashAdvanceController extends Controller
         array $itemIdsByIndex,
         array $deletedIds,
     ): void {
+        if ($this->isBusinessTripCategory($request)) {
+            return;
+        }
+
         $grouped = $request->file('line_attachments');
         $grouped = is_array($grouped) ? $grouped : [];
 
@@ -3544,6 +3994,16 @@ class CashAdvanceController extends Controller
             'department_id' => $cashAdvance->department_id,
 
             'total_amount' => (float) $cashAdvance->total_amount,
+
+            /*
+            | Total yang diajukan pemohon, terisi hanya bila Finance pernah
+            | membetulkannya. Null berarti angkanya apa adanya -- bukan nol,
+            | dan bukan salinan dari total_amount.
+            */
+            'original_total_amount' => $cashAdvance->original_total_amount !== null
+                ? (float) $cashAdvance->original_total_amount
+                : null,
+            'amount_revision_notes' => $cashAdvance->amount_revision_notes,
             'notes' => $cashAdvance->notes,
             'status' => $cashAdvance->status,
 
@@ -3603,6 +4063,22 @@ class CashAdvanceController extends Controller
             'has_realization' => $cashAdvance->realization()->exists(),
 
             'items' => $this->transformItems($cashAdvance),
+
+            /*
+            | Kategori yang ditandai diurus GA. Ia tidak punya baris -- itulah
+            | yang dijelaskannya -- jadi tanpa dikirim terpisah ia hilang sama
+            | sekali dari detail, dan FPU yang seluruhnya diurus GA terbaca
+            | sebagai FPU yang rinciannya belum diisi.
+            */
+            'arranged_categories' => $cashAdvance->business_trip_id !== null
+                ? collect(app(BusinessTripExpenseBreakdownService::class)->groupedForPrint(
+                    FundRequestArrangedCategory::DOC_CASH_ADVANCE,
+                    (int) $cashAdvance->id,
+                    [],
+                    'amount',
+                ))->pluck('name')->all()
+                : [],
+
             'attachments' => $this->transformAttachments($cashAdvance),
 
             /*
@@ -3654,6 +4130,27 @@ class CashAdvanceController extends Controller
                 'date' => optional($item->date)->toDateString(),
                 'description' => $item->description,
                 'amount' => (float) $item->amount,
+
+                /*
+                | Rincian berkategori, hanya pada dokumen perjalanan dinas.
+                | Null di tempat lain -- di sana rinciannya memang tidak
+                | dikelompokkan dan tidak berkuantitas.
+                */
+                'expense_category_id' => $item->expense_category_id,
+                'expense_category_name' => $item->relationLoaded('expenseCategory')
+                    ? optional($item->expenseCategory)->name
+                    : null,
+                'qty' => $item->qty !== null ? (float) $item->qty : null,
+                'unit_price' => $item->unit_price !== null ? (float) $item->unit_price : null,
+
+                /*
+                | Nominal yang diajukan pemohon, terisi hanya bila Finance
+                | pernah membetulkannya. Null berarti angkanya apa adanya --
+                | bukan nol, dan bukan salinan dari amount.
+                */
+                'original_amount' => $item->original_amount !== null
+                    ? (float) $item->original_amount
+                    : null,
 
                 'attachments' => collect($attachmentsByItem->get($item->id, []))
                     ->map(fn(CashAdvanceAttachment $attachment): array => [
@@ -3787,6 +4284,8 @@ class CashAdvanceController extends Controller
             'can_cancel' => false,
             'can_receive' => false,
             'can_disburse' => false,
+            'can_revise_amount' => false,
+            'can_unreceive' => false,
             'can_create_realization' => false,
         ];
     }

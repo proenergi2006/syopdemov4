@@ -578,8 +578,19 @@ class FundRequestTransactionCategoryController extends Controller
                 ? $bersihkan($validated['required_documents'] ?? null)
                 : null,
 
-            /* Dikosongkan pada baris Claim, seperti dua kolom Claim di atas. */
-            'requires_business_trip' => !$isClaim && $request->boolean('requires_business_trip'),
+            /*
+            | Berlaku untuk FPU MAUPUN Claim.
+            |
+            | Semula dikosongkan pada baris Claim, karena saat itu hanya FPU
+            | yang bisa menunjuk perdin. Claim kini bisa juga -- sebagian
+            | perjalanan tidak diminta uang mukanya, melainkan ditalangi dulu
+            | lalu ditagihkan.
+            |
+            | Dibiarkan dikosongkan, penandanya akan kembali mati tiap kali
+            | kategorinya disunting dari layar master -- dan pemiliknya tidak
+            | akan tahu kenapa formulirnya berhenti meminta nomor perdin.
+            */
+            'requires_business_trip' => $request->boolean('requires_business_trip'),
 
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => $request->has('is_active')

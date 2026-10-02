@@ -136,4 +136,19 @@ return [
         'no_access_branch_department' => 'You do not have access to that branch and department.',
         'no_access_create' => 'You do not have access to create a claim for that branch and department.',
     ],
+
+    /*
+    | Claim yang menagihkan perjalanan dinas.
+    |
+    | Satu perdin hanya boleh dipegang satu dokumen yang masih hidup --
+    | FPU atau Claim, tidak keduanya. Tanpa itu, satu perjalanan bisa
+    | dibayar dua kali lewat dua pintu yang berbeda.
+    */
+    'business_trip' => [
+        'required' => 'A claim with a business trip transaction category must reference an approved Business Trip document.',
+        'not_eligible' => 'The selected Business Trip cannot be used: make sure it is yours, already approved, and not already taken by another live cash advance or claim.',
+        'trip_not_approved' => 'This claim cannot be paid yet: business trip :number is still awaiting management approval.',
+        'trip_not_valid' => 'This claim cannot be paid: business trip :number has been cancelled or rejected.',
+        'item_date_outside_trip' => 'Row :row: the date falls outside Business Trip :number (:from to :to). Travel costs cannot be dated outside the trip itself.',
+    ],
 ];

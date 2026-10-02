@@ -145,6 +145,9 @@ return [
         'field_step_value' => 'Step :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Notes',
+        'field_payment_schedule' => 'Payment Schedule',
+        'payment_early' => 'PAID EARLY',
+        'payment_late' => 'PAST SCHEDULE',
         'instruction' => 'Please click the button below to open the cash advance page in SYOP v4.',
         'button' => 'Open Cash Advance',
     ],
@@ -216,18 +219,59 @@ return [
             'default' => 'Business trip :trip_number needs your approval',
             'final_approved' => 'Business trip :trip_number has been approved',
             'rejected' => 'Business trip :trip_number was rejected',
+            'travel_arrangement' => 'Business trip :trip_number approved — please arrange the booking',
         ],
 
         'title' => [
             'default' => 'Business Trip Approval Request',
             'final_approved' => 'Business Trip Approved',
             'rejected' => 'Business Trip Rejected',
+            'travel_arrangement' => 'Trip Ready for Arrangements',
         ],
 
         'description' => [
             'default' => 'A business trip request is waiting for your approval. Please review the itinerary below.',
             'final_approved' => 'Your business trip request has been fully approved by :actor_name. You may now submit the cash advance for this trip.',
             'rejected' => 'Your business trip request was rejected by :actor_name. Please review the notes, revise it, and submit again.',
+            'travel_arrangement' => 'The business trip below is fully approved and ready to be arranged. The itinerary is included — the arrival and departure times determine which nights need accommodation.',
+        ],
+        /*
+        |----------------------------------------------------------------------
+        | Travel arrangement emails
+        |----------------------------------------------------------------------
+        | Kept apart from the subject/title/description above: those belong to
+        | the approval flow and vary by mode, these are two fixed notices.
+        */
+        'arrangement' => [
+            'subject_created' => 'Travel arrangement made for business trip :trip_number',
+            'subject_cancelled' => 'Travel arrangement cancelled for business trip :trip_number',
+
+            'title_created' => 'Arrangement Booked',
+            'title_cancelled' => 'Arrangement Cancelled',
+
+            'description_created' => 'General Affair has made the following arrangement for your business trip. Please check it and keep the details with you when you travel.',
+            'description_cancelled' => 'The following arrangement for your business trip has been cancelled. Please do not rely on these booking details any more.',
+
+            'field_type' => 'Arrangement Type',
+            'field_vendor' => 'Provider',
+            'field_reference' => 'Booking Number',
+            'field_dates' => 'Dates',
+            'field_notes' => 'Notes',
+            'field_cancel_reason' => 'Cancellation Reason',
+            'field_files' => 'Files',
+
+            'badge_cancelled' => 'CANCELLED',
+
+            'type_penginapan' => 'Accommodation',
+            'type_tiket' => 'Flight Ticket',
+            'type_transport' => 'Local Transport',
+            'type_lainnya' => 'Other',
+
+            'replaces_notice' => 'This booking replaces the earlier one (:vendor), which was cancelled for this reason: :reason',
+
+            'trip_title' => 'The Trip Concerned',
+            'instruction' => 'The supporting files can be opened from the trip details in the app.',
+            'button' => 'Open Trip Details',
         ],
 
         'field_no' => 'Trip Number',

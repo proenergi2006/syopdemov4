@@ -297,6 +297,62 @@ class CashAdvanceNotificationService
     /**
      * Dikirim ke pemohon setelah PIC menandai dokumennya diterima.
      */
+    /**
+     * Dikirim ke pemohon ketika Finance menarik kembali penerimaan berkasnya.
+     *
+     * Tanggal pembayaran yang batal disebut terang-terangan: itulah yang
+     * sudah ia catat dari email sebelumnya, dan tanpa menyebutnya kabar ini
+     * hanya memberi tahu bahwa "ada sesuatu yang berubah".
+     *
+     * Dokumennya sendiri tidak hilang -- ia kembali ke status disetujui dan
+     * masih bisa diterima ulang. Itu pun perlu dikatakan, kalau tidak pemohon
+     * akan mengira pengajuannya batal.
+     */
+    public function notifyReceiptReverted(
+        CashAdvance $cashAdvance,
+        User $actor,
+        ?string $scheduledDate,
+        string $reason,
+    ): void {
+        $requesterId = $this->getRequesterUserId($cashAdvance);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        /*
+        | Dokumen lama bisa saja tidak pernah punya tanggal pembayaran.
+        | Kalimatnya dipilih menurut itu, bukan diisi tanda hubung -- "tanggal
+        | pembayaran - dibatalkan" tidak berarti apa-apa bagi pembacanya.
+        */
+        $bagian = $scheduledDate ? 'with_date' : 'without_date';
+
+        $messageParams = [
+            'advance_number' => $cashAdvance->advance_number,
+            'actor_name' => $actor->name ?? '-',
+            'scheduled_date' => $scheduledDate ?? '-',
+            'reason' => trim($reason),
+        ];
+
+        $titleKey = 'notification_messages.cash_advance.receipt_reverted.title';
+        $messageKey = 'notification_messages.cash_advance.receipt_reverted.' . $bagian;
+
+        Notification::create([
+            'user_id' => $requesterId,
+            'type' => 'cash_advance_receipt_reverted',
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'module' => self::MODULE,
+            'reference_type' => CashAdvance::class,
+            'reference_id' => $cashAdvance->id,
+            'reference_public_id' => $cashAdvance->encrypted_id,
+            'url' => self::URL,
+        ]);
+    }
+
     public function notifyReceived(
         CashAdvance $cashAdvance,
         User $receiver,
@@ -393,6 +449,59 @@ class CashAdvanceNotificationService
     }
 
     /**
+     * Dikirim ke pemohon ketika Finance membetulkan nominalnya.
+     *
+     * Angka lama dan angka barunya ikut disebut, bukan hanya "ada revisi".
+     * Kabar yang menyuruh orang membuka aplikasi untuk tahu berapa yang
+     * berubah sama saja dengan tidak mengabarkan apa-apa: yang membacanya
+     * di sela pekerjaan akan menundanya, lalu lupa.
+     *
+     * Alasannya ikut, karena itu satu-satunya hal yang tidak bisa ia
+     * simpulkan sendiri dari dua angka itu.
+     */
+    public function notifyAmountRevised(
+        CashAdvance $cashAdvance,
+        User $reviser,
+        ?string $totalLama,
+        ?string $totalBaru,
+    ): void {
+        $requesterId = $this->getRequesterUserId($cashAdvance);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        $rupiah = static fn ($nilai): string =>
+            'Rp ' . number_format((float) $nilai, 0, ',', '.');
+
+        $messageParams = [
+            'advance_number' => $cashAdvance->advance_number,
+            'reviser_name' => $reviser->name ?? '-',
+            'old_total' => $rupiah($totalLama),
+            'new_total' => $rupiah($totalBaru),
+            'reason' => trim((string) $cashAdvance->amount_revision_notes),
+        ];
+
+        $titleKey = 'notification_messages.cash_advance.amount_revised.title';
+        $messageKey = 'notification_messages.cash_advance.amount_revised.message';
+
+        Notification::create([
+            'user_id' => $requesterId,
+            'type' => 'cash_advance_amount_revised',
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'module' => self::MODULE,
+            'reference_type' => CashAdvance::class,
+            'reference_id' => $cashAdvance->id,
+            'reference_public_id' => $cashAdvance->encrypted_id,
+            'url' => self::URL,
+        ]);
+    }
+
+    /**
      * Dikirim ke pemohon setelah Finance mencairkan dana.
      */
     public function notifyDisbursed(
@@ -405,18 +514,41 @@ class CashAdvanceNotificationService
             return;
         }
 
+        $jadwal = $cashAdvance->scheduled_payment_date;
+
+        $alasan = trim((string) $cashAdvance->disbursement_notes);
+
         $messageParams = [
             'advance_number' => $cashAdvance->advance_number,
             'disburser_name' => $disburser->name ?? '-',
+
+            /*
+            | d/m/Y, bukan nama hari yang dirangkai.
+            |
+            | Parameternya ikut tersimpan dan dipakai lagi saat kalimatnya
+            | dirender ulang dalam bahasa lain. Tanggal yang sudah terlanjur
+            | dirangkai jadi "Rabu, 30 September" akan tetap berbahasa
+            | Indonesia di layar berbahasa Inggris.
+            */
+            'scheduled_date' => $jadwal
+                ? \Carbon\Carbon::parse($jadwal)->format('d/m/Y')
+                : '-',
+
+            'reason' => $alasan,
         ];
+
+        $messageKey = 'notification_messages.cash_advance.' . $this->disbursedMessageKey(
+            app(PaymentScheduleService::class)->timing($jadwal, $cashAdvance->disbursed_at),
+            $alasan !== '',
+        );
 
         Notification::create([
             'user_id' => $requesterId,
             'type' => 'cash_advance_disbursed',
             'title' => __('notification_messages.cash_advance.disbursed.title'),
             'title_key' => 'notification_messages.cash_advance.disbursed.title',
-            'message' => __('notification_messages.cash_advance.disbursed.message', $messageParams),
-            'message_key' => 'notification_messages.cash_advance.disbursed.message',
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
             'message_params' => $messageParams,
             'module' => self::MODULE,
             'reference_type' => CashAdvance::class,
@@ -424,6 +556,114 @@ class CashAdvanceNotificationService
             'reference_public_id' => $cashAdvance->encrypted_id,
             'url' => self::URL,
         ]);
+    }
+
+    /**
+     * Kalimat mana yang dipakai untuk mengabarkan pencairan.
+     *
+     * Enam kemungkinan, bukan satu kalimat berparameter. Kalimat yang
+     * disusun dari potongan -- "telah dibayarkan" ditambah "lebih awal"
+     * ditambah "karena ..." -- hanya bisa dirangkai dengan tata bahasa satu
+     * bahasa, dan pecah begitu bahasa keduanya menyusun kalimatnya berbeda.
+     *
+     * ON_TIME dan keadaan tanpa jadwal sama-sama memakai kalimat dasar:
+     * yang tepat waktu tidak perlu penjelasan, dan yang tidak terjadwal
+     * tidak punya apa pun untuk dibandingkan.
+     */
+    private function disbursedMessageKey(?string $timing, bool $adaAlasan): string
+    {
+        $dasar = match ($timing) {
+            'EARLY' => 'disbursed.message_early',
+            'LATE' => 'disbursed.message_late',
+            default => 'disbursed.message',
+        };
+
+        /*
+        | Alasannya hanya disebut kalau memang menjelaskan sesuatu. Pada
+        | pembayaran tepat waktu, catatan Finance tetap terbaca di rincian
+        | dokumennya -- kabar sebarisnya tidak perlu ikut memuatnya.
+        */
+        return $adaAlasan && $dasar !== 'disbursed.message'
+            ? $dasar . '_reason'
+            : $dasar;
+    }
+
+    /**
+     * Dokumen gugur karena perjalanan dinasnya ditolak atau dibatalkan.
+     *
+     * Dipisah dari notifyRejected() justru karena tidak ada yang menolaknya:
+     * pesan yang menyebut penolak akan mengarang orang. Yang berhenti bukan
+     * permintaannya, melainkan sebabnya.
+     *
+     * Dipanggil SESUDAH transaksi pembatalan perdinnya tuntas. Notifikasi
+     * yang terkirim lalu transaksinya gagal akan memberitahukan sesuatu yang
+     * tidak pernah terjadi.
+     *
+     * @param  string  $tripAction  'cancelled' atau 'rejected' -- memilih kalimatnya
+     * @param  \Illuminate\Support\Collection  $cancelledApprovals  langkah yang tugasnya ikut hilang
+     */
+    public function notifyLapsedByBusinessTrip(
+        CashAdvance $cashAdvance,
+        string $tripNumber,
+        string $tripAction,
+        $cancelledApprovals,
+    ): void {
+        $messageParams = [
+            'advance_number' => $cashAdvance->advance_number,
+            'trip_number' => $tripNumber,
+        ];
+
+        $dasar = "notification_messages.cash_advance.lapsed_by_trip";
+
+        $requesterId = $this->getRequesterUserId($cashAdvance);
+
+        if ($requesterId) {
+            Notification::create([
+                'user_id' => $requesterId,
+                'type' => 'cash_advance_lapsed_by_trip',
+                'title' => __("{$dasar}.requester.{$tripAction}.title"),
+                'title_key' => "{$dasar}.requester.{$tripAction}.title",
+                'message' => __("{$dasar}.requester.{$tripAction}.message", $messageParams),
+                'message_key' => "{$dasar}.requester.{$tripAction}.message",
+                'message_params' => $messageParams,
+                'module' => self::MODULE,
+                'reference_type' => CashAdvance::class,
+                'reference_id' => $cashAdvance->id,
+                'reference_public_id' => $cashAdvance->encrypted_id,
+                'url' => self::URL,
+            ]);
+        }
+
+        /*
+        | Penyetuju yang tugasnya lenyap dari daftar.
+        |
+        | unique() mencegah kabar ganda bila satu orang ditunjuk langsung
+        | sekaligus ter-resolve lewat peran; pemohonnya dikeluarkan karena ia
+        | sudah menerima kabar versinya sendiri di atas.
+        */
+        $penyetuju = collect($cancelledApprovals)
+            ->flatMap(fn(CashAdvanceApproval $approval): Collection => $this->resolveApproverUsers($approval))
+            ->filter(fn($user) => $user instanceof User)
+            ->unique('id')
+            ->reject(fn($user): bool => (int) $user->id === (int) $requesterId)
+            ->values();
+
+        foreach ($penyetuju as $user) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'cash_advance_lapsed_by_trip',
+                'title' => __("{$dasar}.approver.{$tripAction}.title"),
+                'title_key' => "{$dasar}.approver.{$tripAction}.title",
+                'message' => __("{$dasar}.approver.{$tripAction}.message", $messageParams),
+                'message_key' => "{$dasar}.approver.{$tripAction}.message",
+                'message_params' => $messageParams,
+                'module' => self::MODULE,
+                'reference_type' => CashAdvance::class,
+                'reference_id' => $cashAdvance->id,
+                'reference_public_id' => $cashAdvance->encrypted_id,
+                'url' => self::URL,
+            ]);
+        }
     }
 
     public function resolveApproverUsers(

@@ -6,6 +6,7 @@ use App\Mail\BusinessTripApprovalMail;
 use App\Models\BusinessTrip;
 use App\Models\BusinessTripApproval;
 use App\Models\User;
+use App\Services\Permission\PermissionRecipientService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -131,6 +132,47 @@ class BusinessTripMailService
             $trip,
             'final approved',
         );
+    }
+
+    /**
+     * Email ke pihak yang berkepentingan atas perdin yang tuntas disetujui.
+     *
+     * Penerimanya pemegang permission notifikasinya -- lihat keterangan pada
+     * BusinessTripNotificationService::notifyFinalApprovedSubscribers().
+     *
+     * Rundownnya ikut dikirim karena justru itu yang dibutuhkan: jam sampai
+     * dan jam pulang menentukan malam mana saja yang perlu dipesankan hotel.
+     */
+    public function sendFinalApprovedSubscribers(BusinessTrip $trip): void
+    {
+        $penerima = app(PermissionRecipientService::class)
+            ->mailableUsersWithPermission(BusinessTripNotificationService::PERMISSION_NOTIFY_APPROVED);
+
+        if ($penerima->isEmpty()) {
+            return;
+        }
+
+        $requester = $this->resolveRequester($trip);
+
+        $trip->loadMissing('itineraries');
+
+        foreach ($penerima as $user) {
+            /* Pemohonnya sudah menerima email disetujui; tidak perlu dua kali. */
+            if ($requester && (int) $user->id === (int) $requester->id) {
+                continue;
+            }
+
+            $this->queue(
+                $user,
+                new BusinessTripApprovalMail(
+                    trip: $trip,
+                    recipient: $user,
+                    mode: 'travel_arrangement',
+                ),
+                $trip,
+                'travel arrangement',
+            );
+        }
     }
 
     public function sendRejected(

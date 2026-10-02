@@ -34,6 +34,13 @@ import { usePermissionStore } from '@/stores/permission'
 */
 
 interface ClaimRow {
+
+  /*
+  | Jumlah lampiran. Dipakai satu hal saja: menentukan perlu tidaknya
+  | layar bertanya "gabungkan lampiran ke dalam cetakan?".
+  */
+  attachment_count?: number
+
   id: number
   public_id: string
   claim_number: string | null
@@ -182,6 +189,19 @@ const canCreate = computed(() => permissionStore.can('claim.create'))
 const canUpdate = computed(() => permissionStore.can('claim.update'))
 const canDelete = computed(() => permissionStore.can('claim.delete'))
 const canReceive = computed(() => permissionStore.can('claim.receive'))
+
+/*
+| Menarik kembali penerimaan berkas. Dipisah dari receive karena
+| bobotnya lain: yang satu menambah dokumen ke antrean pembayaran,
+| yang ini mencabut tanggal yang sudah dijanjikan ke pemohon.
+*/
+const canUnreceive = computed(() => permissionStore.can('claim.unreceive'))
+
+/*
+| Menentukan bentuk layar penerimaan: sekadar pertanyaan "terima berkas
+| ini?", atau modal berisi rincian yang nominalnya bisa dibetulkan.
+*/
+const canReviseAmount = computed(() => permissionStore.can('claim.revise_amount'))
 const canPay = computed(() => permissionStore.can('claim.pay'))
 const canCancel = computed(() => permissionStore.can('claim.cancel'))
 const canExport = computed(() => permissionStore.can('claim.export'))
@@ -411,8 +431,13 @@ const canPayNowRow = (row: ClaimRow): boolean =>
  * ditarik kembali. Diperiksa ulang di backend -- pemeriksaan di sini semata
  * agar menu yang pasti ditolak tidak ditawarkan.
  */
+/*
+| Batalkan berhenti begitu Finance menerima berkasnya. Yang sudah diterima
+| ditarik dulu penerimaannya, baru dibatalkan -- aturannya sama dengan FPU,
+| dan dijaga juga di ClaimController::cancel().
+*/
 const canCancelRow = (row: ClaimRow): boolean =>
-  canCancel.value && (isStatus(row, 'APPROVED') || isStatus(row, 'RECEIVED'))
+  canCancel.value && isStatus(row, 'APPROVED')
 
 /*
  * Penanda tindakan Finance yang masih ditunggu. Approved saja belum berarti
@@ -1316,9 +1341,246 @@ const runBulkAction = async (): Promise<void> => {
 | diunggah -- kolom catatan dan lampirannya tetap ada di database, layar ini
 | saja yang tidak mengirimnya.
 */
+/*
+|--------------------------------------------------------------------------
+| Revisi nominal saat menerima berkas
+|--------------------------------------------------------------------------
+| Finance memegang notanya ketika berkasnya sampai di mejanya, dan di situlah
+| selisihnya ketahuan. Bentuknya sama persis dengan layar FPU.
+|--------------------------------------------------------------------------
+*/
+interface ReviseLine {
+  id: number
+  date: string | null
+  description: string
+
+  /* Angka yang diajukan pemohon -- pembanding yang tidak ikut berubah. */
+  submitted: number
+
+  /* Isian yang sedang disunting. Teks, bukan angka: kotak yang dikosongkan
+  | harus boleh kosong sejenak tanpa berubah sendiri menjadi nol. */
+  amount: string
+}
+
+const reviseDialog = ref(false)
+const reviseLoading = ref(false)
+const reviseSaving = ref(false)
+const reviseError = ref('')
+const reviseRow = ref<ClaimRow | null>(null)
+const reviseLines = ref<ReviseLine[]>([])
+const reviseNotes = ref('')
+
+const reviseSubmittedTotal = computed<number>(() =>
+  reviseLines.value.reduce((jumlah, baris) => jumlah + baris.submitted, 0))
+
+const reviseNewTotal = computed<number>(() =>
+  reviseLines.value.reduce((jumlah, baris) => jumlah + (Number(baris.amount) || 0), 0))
+
+/*
+| Dibandingkan sebagai rupiah bulat. Selisih sepersekian sen yang lahir dari
+| pembacaan teks bukan revisi; menganggapnya revisi akan meminta alasan atas
+| perubahan yang tidak pernah terjadi.
+*/
+const reviseChanged = computed<boolean>(() =>
+  reviseLines.value.some(baris =>
+    Math.round(Number(baris.amount) || 0) !== Math.round(baris.submitted)))
+
+const reviseLineChanged = (baris: ReviseLine): boolean =>
+  Math.round(Number(baris.amount) || 0) !== Math.round(baris.submitted)
+
+/**
+ * Membuka modal rincian untuk dibetulkan nominalnya.
+ *
+ * Gagal memuat berarti modalnya tidak dibuka sama sekali -- modal kosong
+ * bertuliskan "gagal memuat" mengundang orang menekan Simpan atas rincian
+ * yang tidak pernah ia lihat.
+ */
+const openRevise = async (row: ClaimRow): Promise<void> => {
+  if (!row?.public_id || reviseLoading.value)
+    return
+
+  reviseLoading.value = true
+
+  try {
+    const response = await axios.get(`/fund-request/claim/${row.public_id}`, {
+      headers: { Accept: 'application/json' },
+    })
+
+    const isi = response.data?.data
+
+    if (!isi)
+      throw new Error(t('claim.detail.loadFailed'))
+
+    reviseLines.value = (isi.items ?? []).map((baris: Record<string, unknown>): ReviseLine => ({
+      id: Number(baris.id),
+      date: (baris.date as string | null) ?? null,
+      description: String(baris.description ?? ''),
+      submitted: Number(baris.amount ?? 0),
+      amount: String(Number(baris.amount ?? 0)),
+    }))
+
+    reviseRow.value = row
+    reviseNotes.value = ''
+    reviseError.value = ''
+    reviseDialog.value = true
+  }
+  catch (error: unknown) {
+    showErrorToast({
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(error, t('claim.detail.loadFailed')),
+    })
+  }
+  finally {
+    reviseLoading.value = false
+  }
+}
+
+const submitRevise = async (): Promise<void> => {
+  if (!reviseRow.value)
+    return
+
+  reviseError.value = ''
+
+  const salah = reviseLines.value.find(baris =>
+    baris.amount.trim() === '' || Number.isNaN(Number(baris.amount)) || Number(baris.amount) < 0)
+
+  if (salah) {
+    reviseError.value = t('claim.list.revise.invalidAmount', { name: salah.description })
+
+    return
+  }
+
+  /* Alasannya diminta hanya kalau angkanya memang berubah. */
+  if (reviseChanged.value && !reviseNotes.value.trim()) {
+    reviseError.value = t('claim.list.revise.notesRequired')
+
+    return
+  }
+
+  reviseSaving.value = true
+
+  try {
+    const response = await axios.patch(
+      `/fund-request/claim/${reviseRow.value.public_id}/receive`,
+      {
+        items: reviseLines.value.map(baris => ({
+          id: baris.id,
+          amount: Number(baris.amount),
+        })),
+        revision_notes: reviseNotes.value.trim() || undefined,
+      },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    reviseDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('claim.list.receive.successFallback'),
+    })
+
+    await fetchClaims()
+  }
+  catch (error: unknown) {
+    /* Pesannya di dalam modalnya: formulirnya masih terbuka dan masih berisi. */
+    reviseError.value = getApiErrorMessage(
+      error,
+      t('claim.list.receive.failedFallback'),
+    )
+  }
+  finally {
+    reviseSaving.value = false
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Batal terima
+|--------------------------------------------------------------------------
+| Jalan mundur dari meja Finance. Dokumennya kembali ke status disetujui,
+| dan dari sana bisa dibatalkan seperti biasa.
+|
+| Tanpa aksi ini, dokumen yang terlanjur diterima keliru tidak punya pintu
+| keluar selain dicairkan -- uang keluar hanya karena tidak ada tombol untuk
+| mengurungkannya.
+|--------------------------------------------------------------------------
+*/
+const unreceiveDialog = ref(false)
+const unreceiveLoading = ref(false)
+const unreceiveError = ref('')
+const unreceiveTarget = ref<ClaimRow | null>(null)
+const unreceiveNotes = ref('')
+
+const openUnreceive = (row: ClaimRow): void => {
+  unreceiveTarget.value = row
+  unreceiveNotes.value = ''
+  unreceiveError.value = ''
+  unreceiveDialog.value = true
+}
+
+const submitUnreceive = async (): Promise<void> => {
+  if (!unreceiveTarget.value?.public_id || unreceiveLoading.value)
+    return
+
+  /*
+  | Alasannya wajib. Tanggal pembayaran yang sudah dijanjikan ke pemohon
+  | ikut batal karenanya, dan pencabutan tanpa penjelasan hanya melahirkan
+  | pertanyaan yang tidak ada jawabannya.
+  */
+  if (!unreceiveNotes.value.trim()) {
+    unreceiveError.value = t('claim.list.unreceive.notesRequired')
+
+    return
+  }
+
+  unreceiveLoading.value = true
+
+  try {
+    const response = await axios.patch(
+      `/fund-request/claim/${unreceiveTarget.value.public_id}/unreceive`,
+      { notes: unreceiveNotes.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    unreceiveDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('claim.list.unreceive.successFallback'),
+    })
+
+    await fetchClaims()
+  }
+  catch (error: unknown) {
+    /* Pesannya di dalam dialognya: alasannya masih terketik di sana. */
+    unreceiveError.value = getApiErrorMessage(
+      error,
+      t('claim.list.unreceive.failedFallback'),
+    )
+  }
+  finally {
+    unreceiveLoading.value = false
+  }
+}
+
 const openReceive = async (row: ClaimRow): Promise<void> => {
   if (!row?.public_id || receiveLoading.value)
     return
+
+  /*
+  | Yang berwenang merevisi melihat rinciannya, bukan pertanyaan.
+  |
+  | Pertanyaan "terima berkas ini?" mengandaikan tidak ada yang perlu
+  | diperiksa. Bagi yang memegang notanya, justru itulah yang perlu
+  | diperiksa.
+  */
+  if (canReviseAmount.value) {
+    await openRevise(row)
+
+    return
+  }
 
   const konfirmasi = await showConfirmAlert({
     title: t('claim.list.receive.confirmTitle'),
@@ -1378,8 +1640,20 @@ const openReceive = async (row: ClaimRow): Promise<void> => {
 |--------------------------------------------------------------------------
 */
 /** Ada baris yang menunggu dibayar tetapi hari ini bukan harinya. */
+/*
+| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia
+| hanya berarti bagi orang yang punya tombol itu. Hanya yang berwenang membayarkan yang melihatnya.
+|
+| Barisnya disaring menurut status, bukan hanya menurut can_pay_today.
+| Jadwal pembayaran tetap menempel sesudah dokumennya dibayar, jadi tanpa
+| saringan ini dokumen yang sudah lunas pun ikut menjawab "hari ini bukan
+| hari pembayaran" -- dan spanduknya mengumumkan ada yang menunggu
+| dicairkan padahal tidak ada satu pun.
+*/
 const blockedByPaymentDay = computed<boolean>(() =>
-  rows.value.some(row => row.can_pay_today === false))
+  canPay.value
+  && rows.value.some(row =>
+    row.can_pay_today === false && isStatus(row, 'RECEIVED')))
 
 const paymentDeviation = (row: ClaimRow): 'EARLY' | 'LATE' | null => {
   if (!row.scheduled_payment_date)
@@ -1645,7 +1919,21 @@ const exportExcel = async (): Promise<void> => {
 */
 const printLoadingId = ref<string | null>(null)
 
-const printDocument = async (row: ClaimRow): Promise<void> => {
+/*
+|--------------------------------------------------------------------------
+| Cetak, dengan atau tanpa lampiran
+|--------------------------------------------------------------------------
+| Lampiran gambar disatukan ke dalam PDF-nya, dua per halaman. Yang
+| berformat PDF tidak bisa disisipkan -- dompdf menggambar halaman dari
+| HTML, ia tidak bisa menempelkan halaman PDF yang sudah jadi. Namanya
+| tetap didaftarkan di halaman terakhir supaya tidak hilang tanpa jejak.
+|--------------------------------------------------------------------------
+*/
+const printAttachmentDialog = ref(false)
+const printTarget = ref<ClaimRow | null>(null)
+const printWithAttachments = ref(false)
+
+const runPrint = async (row: ClaimRow, withAttachments: boolean): Promise<void> => {
   if (!row.public_id || printLoadingId.value)
     return
 
@@ -1674,7 +1962,13 @@ const printDocument = async (row: ClaimRow): Promise<void> => {
      */
     const response = await axios.post(
       `/fund-request/claim/${encodeURIComponent(row.public_id)}/print-url`,
-      null,
+
+      /*
+      | Pilihannya ikut ditandatangani server bersama tautannya, jadi ia
+      | dikirim di sini -- bukan ditempelkan ke URL hasilnya, yang akan
+      | merusak tanda tangannya.
+      */
+      { with_attachments: withAttachments },
       { headers: { Accept: 'application/json' } },
     )
 
@@ -1704,6 +1998,37 @@ const printDocument = async (row: ClaimRow): Promise<void> => {
   finally {
     printLoadingId.value = null
   }
+}
+
+const printDocument = async (row: ClaimRow): Promise<void> => {
+  if (!row.public_id || printLoadingId.value)
+    return
+
+  /*
+  | Hanya ditanyakan kalau memang ada lampirannya. Pertanyaan yang
+  | jawabannya cuma satu bukan pilihan, ia hambatan -- dan cetakan adalah
+  | aksi yang paling sering diulang orang.
+  */
+  if ((row.attachment_count ?? 0) > 0) {
+    printTarget.value = row
+    printWithAttachments.value = false
+    printAttachmentDialog.value = true
+
+    return
+  }
+
+  await runPrint(row, false)
+}
+
+const confirmPrint = async (): Promise<void> => {
+  const row = printTarget.value
+
+  if (!row)
+    return
+
+  printAttachmentDialog.value = false
+
+  await runPrint(row, printWithAttachments.value)
 }
 
 const openDelete = async (row: ClaimRow): Promise<void> => {
@@ -2465,6 +2790,29 @@ onMounted(async () => {
                     </VListItemTitle>
                   </VListItem>
 
+                  <!--
+                    Jalan mundur dari meja Finance. Muncul hanya pada dokumen
+                    yang memang sudah diterima -- dan hanya bagi yang
+                    berwenang menariknya kembali.
+                  -->
+                  <VListItem
+                    v-if="isStatus(row, 'RECEIVED') && canUnreceive"
+                    href="javascript:void(0)"
+                    @click="openUnreceive(row)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-arrow-back-up"
+                        :size="20"
+                        class="me-3 text-warning"
+                      />
+                    </template>
+
+                    <VListItemTitle class="text-warning">
+                      {{ t('claim.list.unreceive.menu') }}
+                    </VListItemTitle>
+                  </VListItem>
+
                   <VListItem
                     v-if="canPayRow(row)"
                     :disabled="payLoading || !canPayTodayRow(row)"
@@ -3159,17 +3507,22 @@ onMounted(async () => {
       max-width="520"
     >
       <VCard>
+        <!--
+          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
+          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
+          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
+          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
+          dipastikan sebelum menjawab.
+        -->
         <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('claim.list.approve.dialogTitle') }}
+          {{ t('claim.list.approve.dialogTitle', {
+            number: approveTarget?.claim_number || '-',
+          }) }}
         </VCardTitle>
 
         <VCardText>
           <div class="text-body-2 text-medium-emphasis mb-4">
             {{ t('claim.list.approve.dialogSubtitle') }}
-          </div>
-
-          <div class="font-weight-medium mb-4">
-            {{ approveTarget?.claim_number || '-' }}
           </div>
 
           <VTextarea
@@ -3205,22 +3558,208 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG TOLAK -->
+    <!--
+      TERIMA BERKAS, SEKALIGUS MEMBETULKAN NOMINALNYA
+
+      Hanya untuk yang memegang izin revisi. Yang lain tetap melihat
+      pertanyaan penegasan biasa -- lihat openReceive().
+
+      Angka pemohon tetap terpampang di samping kotak isian, bukan
+      digantikan olehnya: salah ketik satu digit hanya bisa ketahuan kalau
+      ada pembandingnya di sebelahnya.
+    -->
+    <VDialog
+      v-model="reviseDialog"
+      max-width="880"
+      scrollable
+    >
+      <VCard v-if="reviseRow">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('claim.list.revise.title', { nomor: reviseRow.claim_number || '-' }) }}
+        </VCardTitle>
+
+        <VCardSubtitle class="pb-3">
+          {{ t('claim.list.revise.subtitle') }}
+        </VCardSubtitle>
+
+        <VDivider />
+
+        <VCardText>
+          <VAlert
+            v-if="reviseError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ reviseError }}
+          </VAlert>
+
+          <div class="cl-revise-scroll">
+            <VTable density="compact">
+              <thead>
+                <tr>
+                  <th class="text-no-wrap">
+                    {{ t('claim.list.revise.colDate') }}
+                  </th>
+                  <th>
+                    {{ t('claim.list.revise.colDescription') }}
+                  </th>
+                  <th class="text-end text-no-wrap">
+                    {{ t('claim.list.revise.colSubmitted') }}
+                  </th>
+                  <th
+                    class="text-end text-no-wrap"
+                    style="inline-size: 190px;"
+                  >
+                    {{ t('claim.list.revise.colRevised') }}
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr
+                  v-for="baris in reviseLines"
+                  :key="`revisi-${baris.id}`"
+                >
+                  <td class="text-no-wrap">
+                    {{ formatDate(baris.date) }}
+                  </td>
+
+                  <td>{{ baris.description }}</td>
+
+                  <td class="text-end text-no-wrap text-medium-emphasis">
+                    Rp {{ formatNumberWithoutRp(baris.submitted) }}
+                  </td>
+
+                  <td>
+                    <VTextField
+                      v-model="baris.amount"
+                      type="number"
+                      min="0"
+                      step="1"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      class="cl-revise-input"
+                      :class="[{ 'cl-revise-input--changed': reviseLineChanged(baris) }]"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+
+          <!-- Kedua totalnya berdampingan, supaya selisihnya tidak perlu dihitung -->
+          <div class="cl-revise-total">
+            <div>
+              <div class="text-caption text-medium-emphasis">
+                {{ t('claim.list.revise.totalSubmitted') }}
+              </div>
+
+              <div class="text-body-1">
+                Rp {{ formatNumberWithoutRp(reviseSubmittedTotal) }}
+              </div>
+            </div>
+
+            <VIcon
+              icon="tabler-arrow-right"
+              size="18"
+              class="text-disabled"
+            />
+
+            <div>
+              <div class="text-caption text-medium-emphasis">
+                {{ t('claim.list.revise.totalRevised') }}
+              </div>
+
+              <div
+                class="text-h6 font-weight-bold"
+                :class="[reviseChanged ? 'text-warning' : 'text-high-emphasis']"
+              >
+                Rp {{ formatNumberWithoutRp(reviseNewTotal) }}
+              </div>
+            </div>
+          </div>
+
+          <!--
+            Alasannya muncul hanya ketika angkanya memang berubah. Kotak yang
+            selalu terpampang mengajak orang mengisinya walau tidak ada yang
+            perlu dijelaskan.
+          -->
+          <VExpandTransition>
+            <div v-if="reviseChanged">
+              <VAlert
+                type="warning"
+                variant="tonal"
+                density="compact"
+                class="mt-4 mb-3"
+              >
+                {{ t('claim.list.revise.warning') }}
+              </VAlert>
+
+              <VTextarea
+                v-model="reviseNotes"
+                :label="t('claim.list.revise.notes')"
+                :hint="t('claim.list.revise.notesHint')"
+                persistent-hint
+                rows="2"
+                density="comfortable"
+              />
+            </div>
+          </VExpandTransition>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="reviseSaving"
+            @click="reviseDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            :color="reviseChanged ? 'warning' : 'primary'"
+            class="text-none"
+            :loading="reviseSaving"
+            @click="submitRevise"
+          >
+            {{
+              reviseChanged
+                ? t('claim.list.revise.confirmRevised')
+                : t('claim.list.revise.confirmUnchanged')
+            }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <VDialog
       v-model="rejectDialog"
       max-width="520"
     >
       <VCard>
+        <!--
+          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
+          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
+          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
+          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
+          dipastikan sebelum menjawab.
+        -->
         <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('claim.list.reject.dialogTitle') }}
+          {{ t('claim.list.reject.dialogTitle', {
+            number: rejectTarget?.claim_number || '-',
+          }) }}
         </VCardTitle>
 
         <VCardText>
           <div class="text-body-2 text-medium-emphasis mb-4">
             {{ t('claim.list.reject.dialogSubtitle') }}
-          </div>
-
-          <div class="font-weight-medium mb-4">
-            {{ rejectTarget?.claim_number || '-' }}
           </div>
 
           <VTextarea
@@ -3385,10 +3924,185 @@ onMounted(async () => {
     </VDialog>
     <!-- Penegasan pembayaran di luar jadwal -->
     <OffSchedulePaymentDialog ref="offScheduleDialog" />
+
+    <!--
+      BATAL TERIMA
+
+      Peringatannya menyebut akibatnya, bukan sekadar bertanya. Yang
+      menekannya perlu tahu bahwa tanggal pembayaran yang sudah dijanjikan
+      ikut batal -- itu bagian yang tidak terlihat dari namanya.
+    -->
+    <VDialog
+      v-model="unreceiveDialog"
+      max-width="520"
+    >
+      <VCard v-if="unreceiveTarget">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('claim.list.unreceive.title') }}
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <VAlert
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ t('claim.list.unreceive.warning') }}
+          </VAlert>
+
+          <VAlert
+            v-if="unreceiveError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{ unreceiveError }}
+          </VAlert>
+
+          <div class="text-body-2 text-medium-emphasis mb-3">
+            {{ t('claim.list.unreceive.notesHint') }}
+          </div>
+
+          <VTextarea
+            v-model="unreceiveNotes"
+            :label="t('claim.list.unreceive.notes')"
+            rows="3"
+            density="comfortable"
+            autofocus
+          />
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="unreceiveLoading"
+            @click="unreceiveDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="warning"
+            class="text-none"
+            :loading="unreceiveLoading"
+            :disabled="!unreceiveNotes.trim()"
+            @click="submitUnreceive"
+          >
+            {{ t('claim.list.unreceive.confirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!--
+      CETAK: gabung lampiran atau tidak
+
+      Muncul hanya pada dokumen yang punya lampiran. Keterangan soal PDF
+      disebutkan di muka, bukan disembunyikan sampai cetakannya jadi --
+      orang yang mengira vouchernya ikut tercetak akan berhenti memeriksa.
+    -->
+    <VDialog
+      v-model="printAttachmentDialog"
+      max-width="480"
+    >
+      <VCard v-if="printTarget">
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('claim.list.print.attachmentTitle') }}
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <div class="text-body-2 mb-3">
+            {{ t('claim.list.print.attachmentCount', {
+              count: printTarget.attachment_count ?? 0,
+            }) }}
+          </div>
+
+          <VCheckbox
+            v-model="printWithAttachments"
+            :label="t('claim.list.print.attachmentInclude')"
+            density="comfortable"
+            hide-details
+          />
+
+          <VAlert
+            v-if="printWithAttachments"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ t('claim.list.print.attachmentPdfNotice') }}
+          </VAlert>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            @click="printAttachmentDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="primary"
+            class="text-none"
+            prepend-icon="tabler-printer"
+            @click="confirmPrint"
+          >
+            {{ t('claim.list.print.attachmentConfirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </section>
 </template>
 
 <style scoped>
+/*
+| Tabel revisinya bisa panjang; yang boleh menggeser hanya tabelnya, bukan
+| seluruh modal -- kedua totalnya harus tetap terlihat selagi angkanya
+| disunting.
+*/
+.cl-revise-scroll {
+  overflow-y: auto;
+  max-block-size: 44vh;
+}
+
+.cl-revise-input {
+  inline-size: 170px;
+}
+
+/* Baris yang disentuh ditandai, supaya yang berubah tidak perlu dicari. */
+.cl-revise-input--changed :deep(.v-field) {
+  border-color: rgb(var(--v-theme-warning));
+  background: rgba(var(--v-theme-warning), 0.06);
+}
+
+.cl-revise-total {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 10px;
+  gap: 1.25rem;
+  margin-block-start: 1rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+}
+
 .cl-number-action {
   cursor: pointer;
 }

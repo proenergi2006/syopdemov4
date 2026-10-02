@@ -206,6 +206,45 @@
             font-size: 8px;
         }
 
+        /* Rincian perjalanan dinas, dikelompokkan menurut kategori. */
+        .cat-row td {
+            padding: 5px 7px;
+            border: 1px solid #b9c6d6;
+            background: #eaf0f7;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .cat-ga {
+            float: right;
+            font-weight: normal;
+            font-size: 8px;
+            color: #6b7785;
+        }
+
+        .cat-empty td {
+            padding: 7px;
+            color: #7d8999;
+            font-style: italic;
+        }
+
+        .cat-subtotal td {
+            padding: 4px 7px;
+            border: 1px solid #d7dfea;
+            background: #f3f7fb;
+            font-size: 9px;
+        }
+
+        .item-qty {
+            width: 46px;
+            text-align: center;
+        }
+
+        .item-unit {
+            width: 96px;
+            text-align: right;
+        }
+
         .total-row td {
             padding: 6px;
             border: 1px solid #b9c6d6;
@@ -467,72 +506,172 @@
     {{-- ============================================================
          RINCIAN REALISASI
          ============================================================ --}}
+@php
+    $angka = function ($nilai): string {
+        if ($nilai === null || $nilai === '') {
+            return '-';
+        }
+
+        $angka = (float) $nilai;
+
+        return rtrim(rtrim(number_format($angka, 2, ',', '.'), '0'), ',');
+    };
+@endphp
     <div class="section-title">Rincian Realisasi</div>
 
-    <table class="item-table">
-        <thead>
-            <tr>
-                <th class="item-no">No</th>
-                <th class="item-date">Tanggal</th>
-                <th>Deskripsi</th>
-                <th class="item-amount">Pengajuan</th>
-                <th class="item-amount">Realisasi</th>
-                <th class="item-amount">Selisih</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            @forelse ($realization->items as $index => $item)
-                @php
-                    $dariFpu = !empty($item->cash_advance_item_id);
-                    $selisihBaris = (float) $item->advance_amount - (float) $item->realization_amount;
-                @endphp
-
+    {{-- Bentuk perjalanan dinas: dikelompokkan menurut kategori biaya. --}}
+    @if ($rincianPerdin !== null)
+        <table class="item-table">
+            <thead>
                 <tr>
-                    <td class="item-no">{{ $index + 1 }}</td>
-                    <td class="item-date">{{ $tanggal($item->date) }}</td>
-
-                    <td>
-                        {{ $item->description }}
-
-                        @unless ($dariFpu)
-                            <span class="item-extra-tag">(di luar rencana)</span>
-                        @endunless
-
-                        @if (!empty($item->notes))
-                            <div style="color: #7d8999; font-size: 8px;">
-                                {{ $item->notes }}
-                            </div>
-                        @endif
-                    </td>
-
-                    <td class="item-amount nowrap">
-                        {{ $dariFpu ? $rupiah($item->advance_amount) : '-' }}
-                    </td>
-
-                    <td class="item-amount nowrap">
-                        {{ $rupiah($item->realization_amount) }}
-                    </td>
-
-                    <td class="item-amount nowrap">
-                        {{ $dariFpu ? $rupiah(abs($selisihBaris)) : '-' }}
-                    </td>
+                    <th class="item-no">No</th>
+                    <th>Item</th>
+                    <th class="item-qty">Qty</th>
+                    <th class="item-unit">Rincian Biaya</th>
+                    <th class="item-amount">Realisasi</th>
+                    <th class="item-amount">Pengajuan</th>
                 </tr>
-            @empty
+            </thead>
+
+            <tbody>
+                @forelse ($rincianPerdin as $kelompok)
+                    <tr class="cat-row">
+                        <td colspan="6">
+                            {{ $kelompok['name'] }}
+
+                            @if ($kelompok['arranged'])
+                                <span class="cat-ga">Diurus GA</span>
+                            @endif
+                        </td>
+                    </tr>
+
+                    @if ($kelompok['arranged'])
+                        <tr class="cat-empty">
+                            <td colspan="6">
+                                Diurus General Affair, tidak dikeluarkan pemohon.
+                            </td>
+                        </tr>
+                    @else
+                        @forelse ($kelompok['rows'] as $urut => $item)
+                            <tr>
+                                <td class="item-no">{{ $urut + 1 }}</td>
+
+                                <td>
+                                    {{ $item->description }}
+
+                                    @unless ($item->cash_advance_item_id)
+                                        <span class="item-extra-tag">(di luar rencana)</span>
+                                    @endunless
+
+                                    @if (!empty($item->notes))
+                                        <div style="color: #7d8999; font-size: 8px;">
+                                            {{ $item->notes }}
+                                        </div>
+                                    @endif
+                                </td>
+
+                                <td class="item-qty">{{ $angka($item->qty) }}</td>
+                                <td class="item-unit nowrap">{{ $rupiah($item->unit_price) }}</td>
+                                <td class="item-amount nowrap">{{ $rupiah($item->realization_amount) }}</td>
+
+                                {{-- Baris di luar rencana tidak punya pembanding: itu bukan nol. --}}
+                                <td class="item-amount nowrap">
+                                    {{ $item->cash_advance_item_id ? $rupiah($item->advance_amount) : '-' }}
+                                </td>
+                            </tr>
+                        @empty
+                            <tr class="cat-empty">
+                                <td colspan="6">Belum ada rincian pada kategori ini.</td>
+                            </tr>
+                        @endforelse
+
+                        <tr class="cat-subtotal">
+                            <td colspan="4" class="text-right">Subtotal {{ $kelompok['name'] }}</td>
+                            <td class="item-amount nowrap">{{ $rupiah($kelompok['total']) }}</td>
+                            <td class="item-amount"></td>
+                        </tr>
+                    @endif
+                @empty
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 14px;">
+                            Tidak ada rincian realisasi.
+                        </td>
+                    </tr>
+                @endforelse
+
+                <tr class="total-row">
+                    <td colspan="4" class="text-right">Total Realisasi</td>
+                    <td class="item-amount nowrap">{{ $rupiah($realization->total_realization_amount) }}</td>
+                    <td class="item-amount"></td>
+                </tr>
+            </tbody>
+        </table>
+    @else
+        <table class="item-table">
+            <thead>
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 14px;">
-                        Tidak ada rincian realisasi.
-                    </td>
+                    <th class="item-no">No</th>
+                    <th class="item-date">Tanggal</th>
+                    <th>Deskripsi</th>
+                    <th class="item-amount">Pengajuan</th>
+                    <th class="item-amount">Realisasi</th>
+                    <th class="item-amount">Selisih</th>
                 </tr>
-            @endforelse
+            </thead>
 
-            <tr class="total-row">
-                <td colspan="4" class="text-right">Total Realisasi</td>
-                <td class="item-amount nowrap">{{ $rupiah($realization->total_realization_amount) }}</td>
-                <td class="item-amount"></td>
-            </tr>
-        </tbody>
-    </table>
+            <tbody>
+                @forelse ($realization->items as $index => $item)
+                    @php
+                        $dariFpu = !empty($item->cash_advance_item_id);
+                        $selisihBaris = (float) $item->advance_amount - (float) $item->realization_amount;
+                    @endphp
+
+                    <tr>
+                        <td class="item-no">{{ $index + 1 }}</td>
+                        <td class="item-date">{{ $tanggal($item->date) }}</td>
+
+                        <td>
+                            {{ $item->description }}
+
+                            @unless ($dariFpu)
+                                <span class="item-extra-tag">(di luar rencana)</span>
+                            @endunless
+
+                            @if (!empty($item->notes))
+                                <div style="color: #7d8999; font-size: 8px;">
+                                    {{ $item->notes }}
+                                </div>
+                            @endif
+                        </td>
+
+                        <td class="item-amount nowrap">
+                            {{ $dariFpu ? $rupiah($item->advance_amount) : '-' }}
+                        </td>
+
+                        <td class="item-amount nowrap">
+                            {{ $rupiah($item->realization_amount) }}
+                        </td>
+
+                        <td class="item-amount nowrap">
+                            {{ $dariFpu ? $rupiah(abs($selisihBaris)) : '-' }}
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 14px;">
+                            Tidak ada rincian realisasi.
+                        </td>
+                    </tr>
+                @endforelse
+
+                <tr class="total-row">
+                    <td colspan="4" class="text-right">Total Realisasi</td>
+                    <td class="item-amount nowrap">{{ $rupiah($realization->total_realization_amount) }}</td>
+                    <td class="item-amount"></td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
 
     {{-- ============================================================
          RINGKASAN SELISIH
@@ -660,5 +799,13 @@
     <div class="footer">
         Dokumen ini dicetak dari sistem SYOP pada {{ now()->format('d/m/Y H:i') }} WIB.
     </div>
+
+    {{--
+        Lampiran, bila pencetaknya memintanya digabung. Tanpa permintaan
+        itu, variabelnya kosong dan partial ini tidak menghasilkan
+        satu halaman pun.
+    --}}
+    @include('pdf.partials.attachments')
+
 </body>
 </html>

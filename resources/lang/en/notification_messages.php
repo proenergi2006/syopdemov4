@@ -49,6 +49,42 @@ return [
     |--------------------------------------------------------------------------
     */
     'claim' => [
+        /*
+        | Gugur karena perdinnya, bukan karena ada yang menolaknya.
+        |
+        | Dipisah dari 'rejected' justru karena itu: tidak ada penolak,
+        | dan pesan yang menyebut penolak akan mengarang orang.
+        |
+        | Satu kalimat utuh per sebab, bukan satu kalimat bertambal kata
+        | kerja. Notifikasi diterjemahkan ulang saat DIBACA, memakai kunci
+        | dan parameter yang tersimpan -- dan parameternya tidak ikut
+        | diterjemahkan. Kata kerja yang dikirim sebagai parameter akan
+        | membeku dalam bahasa penulisnya, dan pembaca bahasa lain
+        | menerima kalimat yang separuh benar.
+        */
+        'lapsed_by_trip' => [
+            'requester' => [
+                'cancelled' => [
+                    'title' => 'Claim Lapsed',
+                    'message' => 'Claim :claim_number has lapsed because business trip :trip_number was cancelled.',
+                ],
+                'rejected' => [
+                    'title' => 'Claim Lapsed',
+                    'message' => 'Claim :claim_number has lapsed because business trip :trip_number was rejected.',
+                ],
+            ],
+            'approver' => [
+                'cancelled' => [
+                    'title' => 'Claim Approval Stopped',
+                    'message' => 'The approval of claim :claim_number was stopped because business trip :trip_number was cancelled.',
+                ],
+                'rejected' => [
+                    'title' => 'Claim Approval Stopped',
+                    'message' => 'The approval of claim :claim_number was stopped because business trip :trip_number was rejected.',
+                ],
+            ],
+        ],
+
         'receipt_request' => [
             'title' => 'Claim Awaiting Receipt',
             'message' => 'Claim :claim_number worth Rp :total_amount is waiting for you to receive it.',
@@ -92,8 +128,70 @@ return [
             'title' => 'Claim Rejected',
             'message' => 'Claim :claim_number was rejected by :rejecter_name.',
         ],
+
+        /*
+        | Angka yang ditulis pemohon sendiri berubah di tangan orang
+        | lain. Kedua angkanya disebut terang-terangan, beserta
+        | alasannya -- kembaran kalimat yang sama di FPU.
+        */
+        'amount_revised' => [
+            'title' => 'Claim Amount Revised',
+            'message' => 'The amount of claim :claim_number was changed by :reviser_name from :old_total to :new_total. Reason: :reason',
+        ],
+
+        /*
+        | Tanggal pembayaran yang sudah dijanjikan ikut batal. Disebut
+        | terang-terangan karena itulah yang sudah dicatat pemohon dari
+        | email sebelumnya -- dan tanpa menyebutnya, kabar ini hanya
+        | memberi tahu bahwa ada sesuatu yang berubah.
+        |
+        | Dua kalimat karena dokumen lama bisa saja tidak pernah punya
+        | tanggal pembayaran.
+        */
+        'receipt_reverted' => [
+            'title' => 'Claim Receipt Undone',
+            'with_date' => 'The receipt of claim :claim_number was undone by :actor_name. The :scheduled_date payment date is cancelled with it, and the document is back to approved. Reason: :reason',
+            'without_date' => 'The receipt of claim :claim_number was undone by :actor_name. The document is back to approved. Reason: :reason',
+        ],
     ],
+
     'cash_advance' => [
+        /*
+        | Gugur karena perdinnya, bukan karena ada yang menolaknya.
+        |
+        | Dipisah dari 'rejected' justru karena itu: tidak ada penolak,
+        | dan pesan yang menyebut penolak akan mengarang orang.
+        |
+        | Satu kalimat utuh per sebab, bukan satu kalimat bertambal kata
+        | kerja. Notifikasi diterjemahkan ulang saat DIBACA, memakai kunci
+        | dan parameter yang tersimpan -- dan parameternya tidak ikut
+        | diterjemahkan. Kata kerja yang dikirim sebagai parameter akan
+        | membeku dalam bahasa penulisnya, dan pembaca bahasa lain
+        | menerima kalimat yang separuh benar.
+        */
+        'lapsed_by_trip' => [
+            'requester' => [
+                'cancelled' => [
+                    'title' => 'Cash Advance Lapsed',
+                    'message' => 'Cash Advance :advance_number has lapsed because business trip :trip_number was cancelled.',
+                ],
+                'rejected' => [
+                    'title' => 'Cash Advance Lapsed',
+                    'message' => 'Cash Advance :advance_number has lapsed because business trip :trip_number was rejected.',
+                ],
+            ],
+            'approver' => [
+                'cancelled' => [
+                    'title' => 'Cash Advance Approval Stopped',
+                    'message' => 'The approval of cash advance :advance_number was stopped because business trip :trip_number was cancelled.',
+                ],
+                'rejected' => [
+                    'title' => 'Cash Advance Approval Stopped',
+                    'message' => 'The approval of cash advance :advance_number was stopped because business trip :trip_number was rejected.',
+                ],
+            ],
+        ],
+
         /*
         | Outside the approval flow: recipients are the disburse permission
         | holders, not this document's approvers.
@@ -133,6 +231,44 @@ return [
         'disbursed' => [
             'title' => 'Cash Advance Disbursed',
             'message' => 'Cash Advance :advance_number has been disbursed by :disburser_name.',
+
+
+            /*
+            | Yang menyimpang dari jadwal dikabarkan apa adanya, beserta
+            | keterangan Finance bila ada. Pemohon yang dijanjikan Rabu
+            | lalu menerima uangnya Senin berikutnya berhak tahu tanpa
+            | harus membuka rincian dokumennya sendiri.
+            */
+            'message_early' => 'Cash advance :advance_number was paid by :disburser_name, ahead of the :scheduled_date schedule.',
+            'message_early_reason' => 'Cash advance :advance_number was paid by :disburser_name, ahead of the :scheduled_date schedule. Finance notes: :reason',
+            'message_late' => 'Cash advance :advance_number was paid by :disburser_name, past the :scheduled_date schedule.',
+            'message_late_reason' => 'Cash advance :advance_number was paid by :disburser_name, past the :scheduled_date schedule. Finance notes: :reason',
+        ],
+
+        /*
+        | Angka yang ditulis pemohon sendiri berubah di tangan orang
+        | lain. Kedua angkanya disebut terang-terangan, beserta
+        | alasannya -- yang membacanya tidak semestinya perlu membuka
+        | aplikasi hanya untuk tahu berapa selisihnya.
+        */
+        'amount_revised' => [
+            'title' => 'Cash Advance Amount Revised',
+            'message' => 'The amount of cash advance :advance_number was changed by :reviser_name from :old_total to :new_total. Reason: :reason',
+        ],
+
+        /*
+        | Tanggal pembayaran yang sudah dijanjikan ikut batal. Disebut
+        | terang-terangan karena itulah yang sudah dicatat pemohon dari
+        | email sebelumnya -- dan tanpa menyebutnya, kabar ini hanya
+        | memberi tahu bahwa ada sesuatu yang berubah.
+        |
+        | Dua kalimat karena dokumen lama bisa saja tidak pernah punya
+        | tanggal pembayaran.
+        */
+        'receipt_reverted' => [
+            'title' => 'Cash Advance Receipt Undone',
+            'with_date' => 'The receipt of cash advance :advance_number was undone by :actor_name. The :scheduled_date payment date is cancelled with it, and the document is back to approved. Reason: :reason',
+            'without_date' => 'The receipt of cash advance :advance_number was undone by :actor_name. The document is back to approved. Reason: :reason',
         ],
     ],
 
@@ -185,6 +321,21 @@ return [
             'title' => 'Realization Difference Settled',
             'message' => 'The difference on realization :realization_number has been settled by :settler_name.',
         ],
+
+        /*
+        | Tanggal pembayaran yang sudah dijanjikan ikut batal. Disebut
+        | terang-terangan karena itulah yang sudah dicatat pemohon dari
+        | email sebelumnya -- dan tanpa menyebutnya, kabar ini hanya
+        | memberi tahu bahwa ada sesuatu yang berubah.
+        |
+        | Dua kalimat karena dokumen lama bisa saja tidak pernah punya
+        | tanggal pembayaran.
+        */
+        'receipt_reverted' => [
+            'title' => 'Cash Advance Realization Receipt Undone',
+            'with_date' => 'The receipt of cash advance realization :realization_number was undone by :actor_name. The :scheduled_date payment date is cancelled with it, and the document is back to approved. Reason: :reason',
+            'without_date' => 'The receipt of cash advance realization :realization_number was undone by :actor_name. The document is back to approved. Reason: :reason',
+        ],
     ],
     'business_trip' => [
         'approval_request' => [
@@ -206,6 +357,47 @@ return [
         'rejected' => [
             'title' => 'Business Trip Rejected',
             'message' => 'Business trip :trip_number was rejected by :approver_name. Notes: :notes',
+        ],
+
+        /*
+        | Untuk pihak yang mengurus pemesanan, bukan untuk pemohon.
+        | Nada dan isinya berbeda: yang dibutuhkan pembacanya adalah
+        | siapa yang berangkat, ke mana, dan kapan.
+        */
+        'travel_arrangement' => [
+            'title' => 'Business trip ready for arrangements',
+            'message' => 'Business trip :trip_number for :employee_name is fully approved. Destination :destination, departing :depart_date.',
+        ],
+        /*
+        | One notice per arrangement, for whoever is travelling.
+        |
+        | Three sentences rather than one: booked, replaced and cancelled have
+        | different consequences for the reader. A uniform "an arrangement
+        | changed" forces them to open the app just to find out whether they
+        | need to do anything.
+        */
+        'arrangement' => [
+            'created' => [
+                'title' => 'Travel Arrangement Booked',
+                'message' => 'For business trip :trip_number, :type has been booked (:vendor). The details are on the trip page.',
+            ],
+
+            'replaced' => [
+                'title' => 'Replacement Arrangement Booked',
+                'message' => 'For business trip :trip_number, :type has been rebooked (:vendor), replacing the cancelled one. Please use this latest booking.',
+            ],
+
+            'cancelled' => [
+                'title' => 'Travel Arrangement Cancelled',
+                'message' => 'For business trip :trip_number, :type (:vendor) has been cancelled. The reason is on the trip page.',
+            ],
+
+            'type_penginapan' => 'accommodation',
+            'type_tiket' => 'flight ticket',
+            'type_transport' => 'local transport',
+            'type_lainnya' => 'other arrangement',
+
+            'vendor_unset' => 'provider not stated',
         ],
     ],
 ];

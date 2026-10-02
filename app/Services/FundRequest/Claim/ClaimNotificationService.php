@@ -295,6 +295,111 @@ class ClaimNotificationService
     /**
      * Dikirim ke pemohon setelah PIC menandai dokumennya diterima.
      */
+    /**
+     * Dikirim ke pemohon ketika Finance membetulkan nominalnya.
+     *
+     * Kembarannya di FPU -- lihat
+     * CashAdvanceNotificationService::notifyAmountRevised() untuk alasan
+     * kenapa kedua angkanya disebut terang-terangan di kabarnya.
+     */
+    public function notifyAmountRevised(
+        Claim $claim,
+        User $reviser,
+        ?string $totalLama,
+        ?string $totalBaru,
+    ): void {
+        $requesterId = $this->getRequesterUserId($claim);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        $rupiah = static fn ($nilai): string =>
+            'Rp ' . number_format((float) $nilai, 0, ',', '.');
+
+        $messageParams = [
+            'claim_number' => $claim->claim_number,
+            'reviser_name' => $reviser->name ?? '-',
+            'old_total' => $rupiah($totalLama),
+            'new_total' => $rupiah($totalBaru),
+            'reason' => trim((string) $claim->amount_revision_notes),
+        ];
+
+        $titleKey = 'notification_messages.claim.amount_revised.title';
+        $messageKey = 'notification_messages.claim.amount_revised.message';
+
+        Notification::create([
+            'user_id' => $requesterId,
+            'type' => 'claim_amount_revised',
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'module' => self::MODULE,
+            'reference_type' => Claim::class,
+            'reference_id' => $claim->id,
+            'reference_public_id' => $claim->encrypted_id,
+            'url' => self::URL,
+        ]);
+    }
+
+    /**
+     * Dikirim ke pemohon ketika Finance menarik kembali penerimaan berkasnya.
+     *
+     * Tanggal pembayaran yang batal disebut terang-terangan: itulah yang
+     * sudah ia catat dari email sebelumnya, dan tanpa menyebutnya kabar ini
+     * hanya memberi tahu bahwa "ada sesuatu yang berubah".
+     *
+     * Dokumennya sendiri tidak hilang -- ia kembali ke status disetujui dan
+     * masih bisa diterima ulang. Itu pun perlu dikatakan, kalau tidak pemohon
+     * akan mengira pengajuannya batal.
+     */
+    public function notifyReceiptReverted(
+        Claim $claim,
+        User $actor,
+        ?string $scheduledDate,
+        string $reason,
+    ): void {
+        $requesterId = $this->getRequesterUserId($claim);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        /*
+        | Dokumen lama bisa saja tidak pernah punya tanggal pembayaran.
+        | Kalimatnya dipilih menurut itu, bukan diisi tanda hubung -- "tanggal
+        | pembayaran - dibatalkan" tidak berarti apa-apa bagi pembacanya.
+        */
+        $bagian = $scheduledDate ? 'with_date' : 'without_date';
+
+        $messageParams = [
+            'claim_number' => $claim->claim_number,
+            'actor_name' => $actor->name ?? '-',
+            'scheduled_date' => $scheduledDate ?? '-',
+            'reason' => trim($reason),
+        ];
+
+        $titleKey = 'notification_messages.claim.receipt_reverted.title';
+        $messageKey = 'notification_messages.claim.receipt_reverted.' . $bagian;
+
+        Notification::create([
+            'user_id' => $requesterId,
+            'type' => 'claim_receipt_reverted',
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
+            'message' => __($messageKey, $messageParams),
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'module' => self::MODULE,
+            'reference_type' => Claim::class,
+            'reference_id' => $claim->id,
+            'reference_public_id' => $claim->encrypted_id,
+            'url' => self::URL,
+        ]);
+    }
+
     public function notifyReceived(
         Claim $claim,
         User $receiver,
@@ -421,6 +526,84 @@ class ClaimNotificationService
             'url' => self::URL,
         ]);
     }
+    /**
+     * Dokumen gugur karena perjalanan dinasnya ditolak atau dibatalkan.
+     *
+     * Dipisah dari notifyRejected() justru karena tidak ada yang menolaknya:
+     * pesan yang menyebut penolak akan mengarang orang. Yang berhenti bukan
+     * permintaannya, melainkan sebabnya.
+     *
+     * Dipanggil SESUDAH transaksi pembatalan perdinnya tuntas. Notifikasi
+     * yang terkirim lalu transaksinya gagal akan memberitahukan sesuatu yang
+     * tidak pernah terjadi.
+     *
+     * @param  string  $tripAction  'cancelled' atau 'rejected' -- memilih kalimatnya
+     * @param  \Illuminate\Support\Collection  $cancelledApprovals  langkah yang tugasnya ikut hilang
+     */
+    public function notifyLapsedByBusinessTrip(
+        Claim $claim,
+        string $tripNumber,
+        string $tripAction,
+        $cancelledApprovals,
+    ): void {
+        $messageParams = [
+            'claim_number' => $claim->claim_number,
+            'trip_number' => $tripNumber,
+        ];
+
+        $dasar = "notification_messages.claim.lapsed_by_trip";
+
+        $requesterId = $this->getRequesterUserId($claim);
+
+        if ($requesterId) {
+            Notification::create([
+                'user_id' => $requesterId,
+                'type' => 'claim_lapsed_by_trip',
+                'title' => __("{$dasar}.requester.{$tripAction}.title"),
+                'title_key' => "{$dasar}.requester.{$tripAction}.title",
+                'message' => __("{$dasar}.requester.{$tripAction}.message", $messageParams),
+                'message_key' => "{$dasar}.requester.{$tripAction}.message",
+                'message_params' => $messageParams,
+                'module' => self::MODULE,
+                'reference_type' => Claim::class,
+                'reference_id' => $claim->id,
+                'reference_public_id' => $claim->encrypted_id,
+                'url' => self::URL,
+            ]);
+        }
+
+        /*
+        | Penyetuju yang tugasnya lenyap dari daftar.
+        |
+        | unique() mencegah kabar ganda bila satu orang ditunjuk langsung
+        | sekaligus ter-resolve lewat peran; pemohonnya dikeluarkan karena ia
+        | sudah menerima kabar versinya sendiri di atas.
+        */
+        $penyetuju = collect($cancelledApprovals)
+            ->flatMap(fn(ClaimApproval $approval): Collection => $this->resolveApproverUsers($approval))
+            ->filter(fn($user) => $user instanceof User)
+            ->unique('id')
+            ->reject(fn($user): bool => (int) $user->id === (int) $requesterId)
+            ->values();
+
+        foreach ($penyetuju as $user) {
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'claim_lapsed_by_trip',
+                'title' => __("{$dasar}.approver.{$tripAction}.title"),
+                'title_key' => "{$dasar}.approver.{$tripAction}.title",
+                'message' => __("{$dasar}.approver.{$tripAction}.message", $messageParams),
+                'message_key' => "{$dasar}.approver.{$tripAction}.message",
+                'message_params' => $messageParams,
+                'module' => self::MODULE,
+                'reference_type' => Claim::class,
+                'reference_id' => $claim->id,
+                'reference_public_id' => $claim->encrypted_id,
+                'url' => self::URL,
+            ]);
+        }
+    }
+
     public function resolveApproverUsers(
         ClaimApproval $approval,
     ): Collection {

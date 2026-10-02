@@ -145,6 +145,9 @@ return [
         'field_step_value' => 'Tahap :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Catatan',
+        'field_payment_schedule' => 'Jadwal Pembayaran',
+        'payment_early' => 'DIBAYAR LEBIH AWAL',
+        'payment_late' => 'MELEWATI JADWAL',
         'instruction' => 'Silakan klik tombol berikut untuk membuka halaman FPU di SYOP v4.',
         'button' => 'Buka FPU',
     ],
@@ -216,18 +219,59 @@ return [
             'default' => 'Persetujuan Perjalanan Dinas :trip_number',
             'final_approved' => 'Perjalanan Dinas :trip_number telah disetujui',
             'rejected' => 'Perjalanan Dinas :trip_number ditolak',
+            'travel_arrangement' => 'Perdin :trip_number disetujui — mohon diurus pemesanannya',
         ],
 
         'title' => [
             'default' => 'Permintaan Persetujuan Perdin',
             'final_approved' => 'Perdin Disetujui',
             'rejected' => 'Perdin Ditolak',
+            'travel_arrangement' => 'Perdin Siap Diurus',
         ],
 
         'description' => [
             'default' => 'Ada pengajuan perjalanan dinas yang menunggu persetujuan Anda. Mohon diperiksa rencana perjalanannya di bawah ini.',
             'final_approved' => 'Pengajuan perjalanan dinas Anda telah disetujui seluruhnya oleh :actor_name. Anda dapat melanjutkan dengan mengajukan FPU untuk perjalanan ini.',
             'rejected' => 'Pengajuan perjalanan dinas Anda ditolak oleh :actor_name. Silakan periksa catatannya, perbaiki, lalu ajukan kembali.',
+            'travel_arrangement' => 'Perjalanan dinas berikut sudah disetujui seluruhnya dan siap diurus pemesanannya. Rundownnya disertakan di bawah — jam tiba dan jam pulang menentukan malam mana saja yang perlu dipesankan penginapan.',
+        ],
+        /*
+        |----------------------------------------------------------------------
+        | Email pemesanan perjalanan
+        |----------------------------------------------------------------------
+        | Terpisah dari subject/title/description di atas: yang di atas milik
+        | alur persetujuan dan bermode, yang di sini hanya dua kabar tetap.
+        */
+        'arrangement' => [
+            'subject_created' => 'Pemesanan perjalanan untuk perdin :trip_number sudah diurus',
+            'subject_cancelled' => 'Pemesanan perjalanan untuk perdin :trip_number dibatalkan',
+
+            'title_created' => 'Pemesanan Sudah Diurus',
+            'title_cancelled' => 'Pemesanan Dibatalkan',
+
+            'description_created' => 'General Affair sudah mengurus pemesanan berikut untuk perjalanan dinas Anda. Mohon diperiksa dan disimpan keterangannya untuk dibawa saat berangkat.',
+            'description_cancelled' => 'Pemesanan berikut untuk perjalanan dinas Anda dibatalkan. Mohon jangan memakai keterangan pemesanan ini lagi.',
+
+            'field_type' => 'Jenis Pemesanan',
+            'field_vendor' => 'Penyedia',
+            'field_reference' => 'Nomor Booking',
+            'field_dates' => 'Tanggal',
+            'field_notes' => 'Catatan',
+            'field_cancel_reason' => 'Alasan Pembatalan',
+            'field_files' => 'Berkas',
+
+            'badge_cancelled' => 'DIBATALKAN',
+
+            'type_penginapan' => 'Penginapan',
+            'type_tiket' => 'Tiket Pesawat',
+            'type_transport' => 'Transport Lokal',
+            'type_lainnya' => 'Lainnya',
+
+            'replaces_notice' => 'Pemesanan ini menggantikan pemesanan sebelumnya (:vendor) yang dibatalkan dengan alasan: :reason',
+
+            'trip_title' => 'Perjalanan yang Dimaksud',
+            'instruction' => 'Berkas buktinya dapat dibuka pada detail perdin di aplikasi.',
+            'button' => 'Buka Detail Perdin',
         ],
 
         'field_no' => 'Nomor Perdin',

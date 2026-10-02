@@ -35,10 +35,13 @@ class Claim extends Model
         | Ikut menentukan approval flow, bersama area, department, dan nominal.
         */
         'transaction_category_id',
+        'business_trip_id',
 
         'branch',
         'department_id',
         'total_amount',
+        'original_total_amount',
+        'amount_revision_notes',
         'notes',
         'status',
 
@@ -66,6 +69,9 @@ class Claim extends Model
         'received_by',
         'received_at',
         'receipt_notes',
+        'receipt_reverted_by',
+        'receipt_reverted_at',
+        'receipt_reversal_notes',
         'scheduled_payment_date',
         'paid_by',
         'paid_at',
@@ -76,7 +82,9 @@ class Claim extends Model
         'date' => 'date',
         'department_id' => 'integer',
         'transaction_category_id' => 'integer',
+        'business_trip_id' => 'integer',
         'total_amount' => 'decimal:2',
+        'original_total_amount' => 'decimal:2',
 
         'submitted_at' => 'datetime',
         'requester_signed_at' => 'datetime',
@@ -84,6 +92,7 @@ class Claim extends Model
         'rejected_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'received_at' => 'datetime',
+        'receipt_reverted_at' => 'datetime',
         'scheduled_payment_date' => 'date',
         'paid_at' => 'datetime',
     ];
@@ -149,6 +158,16 @@ class Claim extends Model
     /**
      * Cabang disimpan sebagai teks -- mengikuti cash_advances.
      */
+    /**
+     * Perjalanan dinas yang ditagihkan lewat Claim ini.
+     *
+     * Kosong untuk keterangan transaksi yang tidak menuntut perdin.
+     */
+    public function businessTrip()
+    {
+        return $this->belongsTo(BusinessTrip::class, 'business_trip_id');
+    }
+
     public function branchData()
     {
         return $this->belongsTo(Cabang::class, 'branch', 'id');

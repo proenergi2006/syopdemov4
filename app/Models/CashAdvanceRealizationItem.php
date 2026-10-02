@@ -24,6 +24,9 @@ class CashAdvanceRealizationItem extends Model
         'cash_advance_item_id',
         'date',
         'description',
+        'expense_category_id',
+        'qty',
+        'unit_price',
         'advance_amount',
         'realization_amount',
         'notes',
@@ -35,7 +38,24 @@ class CashAdvanceRealizationItem extends Model
         'date' => 'date',
         'advance_amount' => 'decimal:2',
         'realization_amount' => 'decimal:2',
+        'expense_category_id' => 'integer',
+        'qty' => 'decimal:2',
+        'unit_price' => 'decimal:2',
     ];
+
+    /**
+     * Kategori biaya perjalanan dinas.
+     *
+     * Kosong untuk baris yang keterangan transaksinya bukan perdin --
+     * di sana rinciannya memang tidak dikelompokkan.
+     */
+    public function expenseCategory()
+    {
+        return $this->belongsTo(
+            BusinessTripExpenseCategory::class,
+            'expense_category_id',
+        );
+    }
 
     public function realization()
     {

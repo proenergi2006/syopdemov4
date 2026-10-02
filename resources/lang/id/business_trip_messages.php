@@ -34,6 +34,7 @@ return [
     'forbidden_cancel' => 'Anda tidak memiliki akses untuk membatalkan Perjalanan Dinas.',
     'submit_only_draft' => 'Hanya Perjalanan Dinas berstatus draft atau ditolak yang dapat diajukan.',
     'submit_itinerary_missing' => 'Isi dulu rundown perjalanannya sebelum mengajukan.',
+    'submit_departure_passed' => 'Tanggal berangkat perdin ini sudah lewat (:date), jadi tidak bisa diajukan lagi. Ubah dulu tanggal perjalanannya, atau hapus perdin ini dan buat yang baru.',
     'submit_signature_missing' => 'Anda belum memiliki tanda tangan digital. Unggah dulu pada profil Anda.',
     'submitted' => 'Perjalanan Dinas berhasil diajukan.',
     'submit_failed' => 'Perjalanan Dinas gagal diajukan.',
@@ -42,7 +43,17 @@ return [
     'approve_failed' => 'Perjalanan Dinas gagal disetujui.',
     'rejected' => 'Perjalanan Dinas berhasil ditolak.',
     'reject_failed' => 'Perjalanan Dinas gagal ditolak.',
-    'cancel_not_allowed' => 'Hanya Perjalanan Dinas berstatus draft atau sedang berjalan yang dapat dibatalkan.',
+    'cancel_not_allowed' => 'Hanya Perjalanan Dinas yang sudah diajukan dan masih berjalan yang dapat dibatalkan. Draft cukup dihapus.',
+    'cancel_blocked_received' => 'Perjalanan Dinas ini belum bisa dibatalkan: :document sudah diterima oleh :receiver. Minta Finance membatalkan penerimaannya dulu, lalu perjalanan ini bisa dibatalkan dan dokumennya ikut gugur.',
+    'cancel_blocked_paid' => 'Perjalanan Dinas ini tidak bisa dibatalkan: :document sudah dicairkan. Uangnya sudah keluar, jadi yang menyelesaikannya realisasi atau pengembalian dana -- bukan pembatalan perjalanannya.',
+    'reject_blocked_received' => 'Perjalanan Dinas ini belum bisa ditolak: :document sudah diterima oleh :receiver. Minta Finance membatalkan penerimaannya dulu, lalu perjalanan ini bisa ditolak dan dokumennya ikut gugur.',
+    'reject_blocked_paid' => 'Perjalanan Dinas ini tidak bisa ditolak: :document sudah dicairkan. Uangnya sudah keluar, jadi yang menyelesaikannya realisasi atau pengembalian dana -- bukan penolakan perjalanannya.',
+    'dependent_cancelled_by_cancel' => 'Gugur otomatis karena Perjalanan Dinas :trip dibatalkan. Alasan pembatalan perjalanan: :reason',
+    'dependent_cancelled_by_reject' => 'Gugur otomatis karena Perjalanan Dinas :trip ditolak. Alasan penolakan perjalanan: :reason',
+    'document_label_cash_advance' => 'FPU :number',
+    'document_label_claim' => 'Claim :number',
+    'cancel_step_note' => 'Perdin dibatalkan pemohonnya. Alasan: :reason',
+    'cancel_notes_label' => 'alasan pembatalan',
     'cancelled' => 'Perjalanan Dinas berhasil dibatalkan.',
     'cancel_failed' => 'Perjalanan Dinas gagal dibatalkan.',
 
@@ -76,4 +87,28 @@ return [
             'cash_advance_status' => 'Status FPU',
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pemesanan perjalanan
+    |--------------------------------------------------------------------------
+    */
+    'forbidden_arrange' => 'Anda tidak memiliki akses untuk mengelola pemesanan Perjalanan Dinas.',
+    'arrange_not_approved' => 'Pemesanan hanya bisa dicatat setelah Perjalanan Dinas disetujui seluruhnya.',
+    'arrange_trip_cancelled' => 'Perjalanan Dinas ini sudah dibatalkan, pemesanannya tidak bisa diubah lagi.',
+    'arrange_not_found' => 'Data pemesanan tidak ditemukan.',
+    'arrange_already_cancelled' => 'Pemesanan ini sudah dibatalkan sebelumnya.',
+    'arrange_replaces_invalid' => 'Pemesanan yang ingin diganti tidak valid: harus pemesanan yang sudah dibatalkan dan belum punya pengganti.',
+    'arrange_created' => 'Pemesanan berhasil dicatat dan pemberitahuannya sudah dikirim.',
+    'arrange_cancelled' => 'Pemesanan berhasil dibatalkan dan pemberitahuannya sudah dikirim.',
+    'arrange_failed' => 'Pemesanan gagal disimpan. Silakan coba lagi.',
+
+    'arrange_type_label' => 'jenis pemesanan',
+    'arrange_vendor_label' => 'nama penyedia',
+    'arrange_reference_label' => 'nomor booking',
+    'arrange_start_label' => 'tanggal mulai',
+    'arrange_end_label' => 'tanggal selesai',
+    'arrange_notes_label' => 'catatan',
+    'arrange_files_label' => 'berkas bukti',
+    'arrange_cancel_notes_label' => 'alasan pembatalan',
 ];

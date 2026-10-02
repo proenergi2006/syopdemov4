@@ -98,10 +98,15 @@
             "popupBlocked": "Popup diblokir browser. Mohon izinkan popup untuk situs ini.",
             "windowClosed": "Jendela cetak telah ditutup.",
             "urlFailed": "URL cetak gagal dibuat.",
-            "failed": "Cetakan Realisasi FPU gagal dibuka."
+            "failed": "Cetakan Realisasi FPU gagal dibuka.",
+            "attachmentTitle": "Cetak dokumen",
+            "attachmentCount": "Dokumen ini punya {count} lampiran.",
+            "attachmentInclude": "Gabungkan lampiran ke dalam satu PDF",
+            "attachmentPdfNotice": "Lampiran berupa gambar akan dimasukkan ke halaman berikutnya, dua per halaman. Lampiran yang sudah berformat PDF tidak bisa digabung — namanya tetap didaftarkan pada halaman terakhir agar bisa dibuka terpisah.",
+            "attachmentConfirm": "Cetak"
         },
         "approve": {
-            "dialogTitle": "Setujui Realisasi FPU",
+            "dialogTitle": "Setujui Realisasi {number}?",
             "dialogSubtitle": "Pastikan angka realisasi sudah sesuai bukti sebelum menyetujui.",
             "notesLabel": "Catatan (opsional)",
             "notesPlaceholder": "Tulis catatan approval bila perlu",
@@ -110,7 +115,7 @@
             "failedFallback": "Realisasi FPU gagal disetujui."
         },
         "reject": {
-            "dialogTitle": "Tolak Realisasi FPU",
+            "dialogTitle": "Tolak Realisasi {number}?",
             "dialogSubtitle": "Penolakan menghentikan seluruh proses approval dokumen ini.",
             "notesLabel": "Alasan penolakan",
             "notesPlaceholder": "Jelaskan alasan penolakan",
@@ -220,6 +225,17 @@
         },
         "paymentDay": {
             "blockedNotice": "Pembayaran hanya bisa dilakukan pada hari {days}. Ada dokumen yang menunggu dibayarkan, tetapi hari ini bukan hari pembayaran — tombolnya akan aktif kembali pada hari tersebut."
+        },
+        "unreceive": {
+            "menu": "Batalkan Terima",
+            "title": "Batalkan penerimaan berkas ini?",
+            "warning": "Dokumen kembali ke status disetujui, dan jadwal pembayaran yang sudah dijanjikan ke pemohon ikut dibatalkan. Setelah ini Realisasi FPU bisa dibatalkan atau diterima ulang.",
+            "notes": "Alasan Pembatalan Penerimaan",
+            "notesHint": "Dibaca pemohon. Jelaskan singkat kenapa penerimaannya ditarik kembali.",
+            "notesRequired": "Alasan pembatalan penerimaan wajib diisi.",
+            "confirm": "Ya, Batalkan Terima",
+            "successFallback": "Penerimaan berkas berhasil dibatalkan.",
+            "failedFallback": "Penerimaan berkas gagal dibatalkan."
         }
     },
     "form": {
@@ -322,6 +338,22 @@
             "discardTitle": "Tutup tanpa menyimpan?",
             "discardText": "Perubahan pada rincian belum disimpan dan akan hilang.",
             "discardButton": "Ya, tutup"
+        },
+        "breakdown": {
+            "noCategory": "Belum ada kategori biaya perdin yang aktif. Hubungi admin untuk menambahkannya di master Kategori Biaya Perdin.",
+            "arrangedByGa": "Diurus GA",
+            "arrangedNotice": "Kategori ini diurus General Affair, jadi tidak dikeluarkan pemohon pada realisasi ini dan tidak perlu diisi.",
+            "tableItem": "Item",
+            "tableQty": "Qty",
+            "tableUnitPrice": "Rincian Biaya",
+            "categoryEmpty": "Belum ada rincian pada kategori ini.",
+            "itemPlaceholder": "Contoh: BBM Dexlite (616 KM) Pool plb - Bayung Lencir",
+            "addRowTo": "Tambah baris {name}",
+            "totalReadonly": "Total dihitung dari Qty x Rincian Biaya.",
+            "toastNoRows": "Belum ada rincian sama sekali. Isi minimal satu baris, atau tandai kategorinya diurus GA.",
+            "toastCategory": "Baris {number}: kategori biayanya belum dipilih.",
+            "toastQty": "Baris {number}: Qty wajib diisi dan harus lebih dari nol.",
+            "toastUnitPrice": "Baris {number}: Rincian Biaya wajib diisi dan harus lebih dari nol."
         }
     },
     "detail": {

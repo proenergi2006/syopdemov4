@@ -19,7 +19,32 @@ interface ItineraryRow {
   date: string | null
   time_text: string | null
   description: string
-  pic: string | null
+}
+
+interface ArrangementFile {
+  id: number
+  original_filename: string
+  mime_type: string | null
+  file_size: number | null
+  url: string | null
+}
+
+interface ArrangementRow {
+  id: number
+  type: string
+  vendor_name: string | null
+  reference_no: string | null
+  starts_at: string | null
+  ends_at: string | null
+  notes: string | null
+  status: string
+  cancelled_at: string | null
+  cancellation_notes: string | null
+  cancelled_by_name: string | null
+  replaces_id: number | null
+  created_by_name: string | null
+  created_at: string | null
+  files: ArrangementFile[]
 }
 
 interface ApprovalRow {
@@ -58,6 +83,13 @@ interface TripDetail {
   notes: string | null
   itineraries: ItineraryRow[]
   approvals: ApprovalRow[]
+
+  /*
+  | Boleh tidak ada sama sekali: yang belum disetujui memang belum pernah
+  | diurus pemesanannya, dan halaman lama yang belum meminta datanya tidak
+  | semestinya jadi rusak karenanya.
+  */
+  arrangements?: ArrangementRow[]
 }
 
 const props = defineProps<{ trip: TripDetail | null }>()
@@ -146,6 +178,43 @@ const approvalIcon = (status: string): string => {
   return status === 'WAITING' ? 'tabler-clock' : 'tabler-minus'
 }
 
+/*
+| Ikon tiap jenis pemesanan. Dipetakan, bukan dipercabangkan -- menambah
+| jenis baru cukup menambah satu baris di sini dan satu kalimat di berkas
+| bahasanya.
+*/
+const ARRANGEMENT_ICONS: Record<string, string> = {
+  PENGINAPAN: 'tabler-bed',
+  TIKET: 'tabler-plane',
+  TRANSPORT: 'tabler-car',
+  LAINNYA: 'tabler-package',
+}
+
+const arrangementIcon = (jenis: string): string =>
+  ARRANGEMENT_ICONS[jenis] ?? 'tabler-package'
+
+const arrangements = computed<ArrangementRow[]>(() => props.trip?.arrangements ?? [])
+
+/*
+| Bagiannya disembunyikan selama perdinnya belum disetujui DAN belum ada
+| pemesanan apa pun. Judul kosong pada dokumen yang memang belum sampai ke
+| tahap itu hanya menimbulkan pertanyaan kenapa ia kosong.
+*/
+const showArrangements = computed<boolean>(() =>
+  arrangements.value.length > 0 || props.trip?.status === 'APPROVED')
+
+/** "2,4 MB" -- ukuran berkas yang terbaca orang. */
+const formatFileSize = (bytes?: number | null): string => {
+  if (!bytes)
+    return ''
+
+  const mb = bytes / 1024 / 1024
+
+  return mb >= 1
+    ? `${mb.toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
 const formatDate = (nilai?: string | null): string => {
   if (!nilai)
     return '-'
@@ -160,6 +229,21 @@ const formatDate = (nilai?: string | null): string => {
     month: 'short',
     year: 'numeric',
   })
+}
+
+/*
+| Rentang tanggalnya dirangkai jadi satu kalimat. Keduanya boleh kosong --
+| transport lokal sering tidak punya tanggal sendiri.
+*/
+const arrangementPeriod = (baris: ArrangementRow): string => {
+  if (!baris.starts_at)
+    return ''
+
+  const mulai = formatDate(baris.starts_at)
+
+  return baris.ends_at && baris.ends_at !== baris.starts_at
+    ? `${mulai} - ${formatDate(baris.ends_at)}`
+    : mulai
 }
 </script>
 
@@ -409,16 +493,6 @@ const formatDate = (nilai?: string | null): string => {
           <div class="bt-day__desc">
             {{ baris.description }}
           </div>
-
-          <VChip
-            v-if="baris.pic"
-            size="x-small"
-            variant="tonal"
-            color="secondary"
-            prepend-icon="tabler-user-check"
-          >
-            {{ baris.pic }}
-          </VChip>
         </div>
       </div>
 
@@ -428,6 +502,173 @@ const formatDate = (nilai?: string | null): string => {
       >
         {{ t('businessTrip.list.empty') }}
       </div>
+
+      <!--
+        PEMESANAN
+
+        Yang dibatalkan ikut ditampilkan, tidak disembunyikan. Justru itu
+        yang perlu dibaca: hotel yang batal dan sudah diganti lebih penting
+        diketahui daripada yang berjalan mulus. Yang batal diredupkan dan
+        diberi alasannya, supaya terbaca sebagai riwayat, bukan sebagai
+        pemesanan yang masih berlaku.
+      -->
+      <template v-if="showArrangements">
+        <div class="bt-detail__section-title mt-5">
+          <VIcon
+            icon="tabler-luggage"
+            size="18"
+          />
+          {{ t('businessTrip.arrangement.title') }}
+
+          <!-- Tombol Catat dititipkan halaman yang memang berwenang -->
+          <div class="ms-auto">
+            <slot name="arrangement-actions" />
+          </div>
+        </div>
+
+        <div
+          v-for="baris in arrangements"
+          :key="`pesan-${baris.id}`"
+          class="bt-book"
+          :class="[{ 'bt-book--cancelled': baris.status === 'DIBATALKAN' }]"
+        >
+          <VAvatar
+            size="32"
+            :color="baris.status === 'DIBATALKAN' ? 'secondary' : 'success'"
+            variant="tonal"
+            class="flex-shrink-0"
+          >
+            <VIcon
+              :icon="arrangementIcon(baris.type)"
+              size="18"
+            />
+          </VAvatar>
+
+          <div class="min-w-0 flex-grow-1">
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+              <div class="bt-book__name">
+                {{ t(`businessTrip.arrangement.type.${baris.type}`) }}
+
+                <span
+                  v-if="baris.vendor_name"
+                  class="bt-book__vendor"
+                >&middot; {{ baris.vendor_name }}</span>
+              </div>
+
+              <div class="d-flex align-center gap-2">
+                <VChip
+                  v-if="baris.status === 'DIBATALKAN'"
+                  size="x-small"
+                  variant="tonal"
+                  color="error"
+                >
+                  {{ t('businessTrip.arrangement.cancelled') }}
+                </VChip>
+
+                <!-- Tombol Batalkan, sekali lagi milik halamannya -->
+                <slot
+                  name="arrangement-row"
+                  :arrangement="baris"
+                />
+              </div>
+            </div>
+
+            <div class="bt-book__meta">
+              <span v-if="baris.reference_no">
+                {{ t('businessTrip.arrangement.reference') }}: <strong>{{ baris.reference_no }}</strong>
+              </span>
+
+              <span v-if="arrangementPeriod(baris)">
+                &middot; {{ arrangementPeriod(baris) }}
+              </span>
+
+              <span v-if="baris.created_by_name">
+                &middot; {{ t('businessTrip.arrangement.by', { name: baris.created_by_name }) }}
+              </span>
+            </div>
+
+            <div
+              v-if="baris.notes"
+              class="bt-book__note"
+            >
+              {{ baris.notes }}
+            </div>
+
+            <!-- Sudah pernah dibatalkan dan ini penggantinya -->
+            <div
+              v-if="baris.replaces_id"
+              class="bt-book__note bt-book__note--replace"
+            >
+              <VIcon
+                icon="tabler-refresh"
+                size="14"
+              />
+              {{ t('businessTrip.arrangement.replacesNotice') }}
+            </div>
+
+            <!-- Alasan pembatalannya, supaya tidak perlu ditanyakan ke GA -->
+            <div
+              v-if="baris.status === 'DIBATALKAN' && baris.cancellation_notes"
+              class="bt-book__note bt-book__note--cancel"
+            >
+              <VIcon
+                icon="tabler-alert-circle"
+                size="14"
+              />
+              {{ baris.cancellation_notes }}
+
+              <span
+                v-if="baris.cancelled_by_name"
+                class="text-disabled"
+              >&middot; {{ baris.cancelled_by_name }}</span>
+
+              <span
+                v-if="baris.cancelled_at"
+                class="text-disabled"
+              >&middot; {{ formatDateTime(baris.cancelled_at) }}</span>
+            </div>
+
+            <!--
+              Berkasnya dibuka di tab baru. Berkas pemesanan yang dibatalkan
+              tetap bisa dibuka -- ia bukti tagihan pembatalannya.
+            -->
+            <div
+              v-if="baris.files.length"
+              class="bt-book__files"
+            >
+              <VChip
+                v-for="berkas in baris.files"
+                :key="`berkas-${berkas.id}`"
+                size="small"
+                variant="outlined"
+                color="primary"
+                :href="berkas.url ?? undefined"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <VIcon
+                  start
+                  icon="tabler-paperclip"
+                  size="14"
+                />
+                {{ berkas.original_filename }}
+
+                <span
+                  v-if="formatFileSize(berkas.file_size)"
+                  class="text-disabled ms-1"
+                >({{ formatFileSize(berkas.file_size) }})</span>
+              </VChip>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="!arrangements.length"
+          class="text-body-2 text-medium-emphasis py-3"
+        >
+          {{ t('businessTrip.arrangement.empty') }}
+        </div>
+      </template>
 
       <!--
         PERSETUJUAN
@@ -648,6 +889,70 @@ const formatDate = (nilai?: string | null): string => {
 .bt-detail__body {
   padding-block: 1.25rem;
   padding-inline: 1.5rem;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Baris pemesanan
+|--------------------------------------------------------------------------
+| Yang dibatalkan diredupkan, bukan dicoret. Coretan pada nomor booking
+| justru membuatnya sulit dibaca, padahal nomor itulah yang dibutuhkan
+| saat menagih biaya pembatalannya.
+*/
+.bt-book {
+  display: flex;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 10px;
+  gap: 0.875rem;
+  margin-block-end: 0.625rem;
+  padding-block: 0.75rem;
+  padding-inline: 0.875rem;
+}
+
+.bt-book--cancelled {
+  background: rgba(var(--v-theme-on-surface), 0.02);
+  opacity: 0.72;
+}
+
+.bt-book__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.bt-book__vendor {
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  font-weight: 400;
+}
+
+.bt-book__meta {
+  margin-block-start: 0.125rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-size: 0.78rem;
+}
+
+.bt-book__note {
+  display: flex;
+  align-items: flex-start;
+  margin-block-start: 0.375rem;
+  color: rgba(var(--v-theme-on-surface), 0.76);
+  font-size: 0.82rem;
+  gap: 0.375rem;
+  line-height: 1.45;
+}
+
+.bt-book__note--cancel {
+  color: rgb(var(--v-theme-error));
+}
+
+.bt-book__note--replace {
+  color: rgb(var(--v-theme-warning));
+}
+
+.bt-book__files {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block-start: 0.5rem;
+  gap: 0.375rem;
 }
 
 .bt-detail__section-title {

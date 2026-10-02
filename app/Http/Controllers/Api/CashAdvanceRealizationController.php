@@ -7,7 +7,11 @@ use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
+use App\Services\FundRequest\PrintAttachmentCollector;
+use App\Services\FundRequest\ReceiptReversalService;
 use App\Models\CashAdvance;
+use App\Models\FundRequestArrangedCategory;
+use App\Services\FundRequest\BusinessTripExpenseBreakdownService;
 use App\Models\CashAdvanceRealization;
 use App\Models\CashAdvanceRealizationApproval;
 use App\Models\CashAdvanceRealizationAttachment;
@@ -118,6 +122,7 @@ class CashAdvanceRealizationController extends Controller
             ];
 
             $query = CashAdvanceRealization::query()
+                ->withCount('attachments')
                 ->with([
                     'cashAdvance:id,advance_number',
                     'branchData',
@@ -231,6 +236,13 @@ class CashAdvanceRealizationController extends Controller
 
                         'status' => $realization->status,
 
+                        /*
+                        | Jumlah lampiran, dipakai layar untuk menentukan perlu tidaknya
+                        | bertanya "gabungkan lampiran ke dalam cetakan?". Dokumen tanpa
+                        | lampiran tidak semestinya ditanyai.
+                        */
+                        'attachment_count' => (int) ($realization->attachments_count ?? 0),
+
                         'can_submit' => $rowCanSubmit,
                         'can_approve' => $currentApproval !== null,
                         'approval_label' => $currentApproval?->label,
@@ -321,7 +333,18 @@ class CashAdvanceRealizationController extends Controller
             $context = $this->resolveViewContext($user, 'cash_advance.view');
 
             $query = CashAdvance::query()
-                ->with(['branchData', 'departmentData', 'transactionCategory', 'items'])
+                ->with([
+                    'branchData',
+                    'departmentData',
+                    'transactionCategory',
+
+                    /*
+                    | Kategorinya ikut dimuat di sini, bukan diambil per baris:
+                    | daftar ini bisa panjang, dan satu query per baris akan
+                    | terasa persis ketika FPU yang menunggu realisasi menumpuk.
+                    */
+                    'items.expenseCategory',
+                ])
                 ->where('status', CashAdvance::STATUS_DISBURSED)
                 ->whereDoesntHave('realization');
 
@@ -346,6 +369,15 @@ class CashAdvanceRealizationController extends Controller
                 ->orderByDesc('disbursed_at')
                 ->limit(100)
                 ->get();
+
+            $pemecah = app(BusinessTripExpenseBreakdownService::class);
+
+            $penandaGa = fn(CashAdvance $cashAdvance): array => $cashAdvance->business_trip_id !== null
+                ? $pemecah->arrangedFor(
+                    FundRequestArrangedCategory::DOC_CASH_ADVANCE,
+                    (int) $cashAdvance->id,
+                )
+                : [];
 
             return response()->json([
                 'success' => true,
@@ -373,6 +405,20 @@ class CashAdvanceRealizationController extends Controller
                         'disbursed_at' => $cashAdvance->disbursed_at,
 
                         /*
+                        | Asal perdinnya. Bukan sekadar keterangan: dari sinilah
+                        | form realisasi tahu rinciannya harus digambar
+                        | berkelompok, bukan sebagai daftar datar bertanggal.
+                        */
+                        'business_trip_id' => $cashAdvance->business_trip_id,
+
+                        /*
+                        | Kategori yang pada FPU-nya ditandai diurus GA. Penandanya
+                        | ikut tersalin supaya realisasi tidak menagihkan kembali
+                        | apa yang memang tidak pernah dibayar pemohon.
+                        */
+                        'arranged_categories' => $penandaGa($cashAdvance),
+
+                        /*
                          * Baris FPU dikirim sekalian supaya form realisasi bisa
                          * langsung menyalinnya tanpa permintaan kedua.
                          */
@@ -382,6 +428,12 @@ class CashAdvanceRealizationController extends Controller
                                 'date' => optional($item->date)->toDateString(),
                                 'description' => $item->description,
                                 'amount' => (float) $item->amount,
+
+                                /* Null di luar perdin: di sana rinciannya memang tidak berkelompok. */
+                                'expense_category_id' => $item->expense_category_id,
+                                'expense_category_name' => optional($item->expenseCategory)->name,
+                                'qty' => $item->qty !== null ? (float) $item->qty : null,
+                                'unit_price' => $item->unit_price !== null ? (float) $item->unit_price : null,
                             ])
                             ->values(),
                     ])
@@ -447,6 +499,37 @@ class CashAdvanceRealizationController extends Controller
 
             $items = $this->decodeItems($request->input('items'), $cashAdvance);
 
+            /*
+            | Rincian perdin dikelompokkan per kategori, dan nominalnya
+            | dihitung dari Qty x Rincian Biaya. Hasilnya dipindahkan ke
+            | realization_amount -- kolom yang sudah dibaca seluruh sistem.
+            */
+            $rincianPerdin = $cashAdvance->business_trip_id !== null;
+
+            $arrangedCategories = $rincianPerdin
+                ? (array) $request->input('arranged_categories', [])
+                : [];
+
+            if ($rincianPerdin) {
+                $items = app(BusinessTripExpenseBreakdownService::class)->normalize(
+                    $items,
+                    $arrangedCategories,
+                    'cash_advance_realization_messages.breakdown',
+                );
+
+                foreach ($items as $i => $baris) {
+                    $items[$i]['realization_amount'] = $baris['amount'];
+
+                    /*
+                    | amount dibuang sesudah dipindahkan. Ia bukan kolom pada
+                    | tabel ini, dan membiarkannya berarti bergantung pada
+                    | kemurahan hati Eloquent yang mengabaikan kunci asing
+                    | secara diam-diam -- kemurahan yang bisa dimatikan.
+                    */
+                    unset($items[$i]['amount']);
+                }
+            }
+
             $totals = $this->calculateTotals($cashAdvance, $items);
 
             $realization = CashAdvanceRealization::create([
@@ -478,6 +561,13 @@ class CashAdvanceRealizationController extends Controller
             $itemIdsByIndex = $this->writeItems($realization, $items);
 
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, []);
+
+            /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
+            app(BusinessTripExpenseBreakdownService::class)->syncArranged(
+                FundRequestArrangedCategory::DOC_REALIZATION,
+                (int) $realization->id,
+                $arrangedCategories,
+            );
 
             $storedPaths = $this->storeLineAttachments(
                 $request,
@@ -559,7 +649,7 @@ class CashAdvanceRealizationController extends Controller
                 'branchData',
                 'departmentData',
                 'transactionCategory',
-                'items',
+                'items.expenseCategory',
                 'attachments',
                 'creator:id,name',
                 'submitter:id,name',
@@ -632,7 +722,7 @@ class CashAdvanceRealizationController extends Controller
                 'branchData',
                 'departmentData',
                 'transactionCategory',
-                'items',
+                'items.expenseCategory',
                 'attachments',
             ]);
 
@@ -662,6 +752,26 @@ class CashAdvanceRealizationController extends Controller
 
                     'items' => $this->transformItems($realization),
                     'attachments' => $this->transformAttachments($realization),
+
+                    /*
+                    | Asal perdinnya, diambil dari FPU-nya. Realisasi tidak
+                    | menyimpannya sendiri: ia selalu lahir dari satu FPU, dan
+                    | dua tempat yang menyimpan jawaban sama cepat atau lambat
+                    | menjawab berbeda.
+                    */
+                    'business_trip_id' => $realization->cashAdvance?->business_trip_id,
+
+                    /*
+                    | Kategori yang ditandai diurus GA. Tanpa ini, membuka
+                    | realisasi lama lalu menyimpannya kembali akan mencabut
+                    | penandanya -- dan kategori yang sengaja dikosongkan
+                    | berubah menjadi kategori yang lupa diisi.
+                    */
+                    'arranged_categories' => app(BusinessTripExpenseBreakdownService::class)
+                        ->arrangedFor(
+                            FundRequestArrangedCategory::DOC_REALIZATION,
+                            (int) $realization->id,
+                        ),
                 ],
             ], 200);
         } catch (\Throwable $e) {
@@ -743,6 +853,37 @@ class CashAdvanceRealizationController extends Controller
 
             $items = $this->decodeItems($request->input('items'), $cashAdvance);
 
+            /*
+            | Rincian perdin dikelompokkan per kategori, dan nominalnya
+            | dihitung dari Qty x Rincian Biaya. Hasilnya dipindahkan ke
+            | realization_amount -- kolom yang sudah dibaca seluruh sistem.
+            */
+            $rincianPerdin = $cashAdvance->business_trip_id !== null;
+
+            $arrangedCategories = $rincianPerdin
+                ? (array) $request->input('arranged_categories', [])
+                : [];
+
+            if ($rincianPerdin) {
+                $items = app(BusinessTripExpenseBreakdownService::class)->normalize(
+                    $items,
+                    $arrangedCategories,
+                    'cash_advance_realization_messages.breakdown',
+                );
+
+                foreach ($items as $i => $baris) {
+                    $items[$i]['realization_amount'] = $baris['amount'];
+
+                    /*
+                    | amount dibuang sesudah dipindahkan. Ia bukan kolom pada
+                    | tabel ini, dan membiarkannya berarti bergantung pada
+                    | kemurahan hati Eloquent yang mengabaikan kunci asing
+                    | secara diam-diam -- kemurahan yang bisa dimatikan.
+                    */
+                    unset($items[$i]['amount']);
+                }
+            }
+
             $totals = $this->calculateTotals($cashAdvance, $items);
 
             $realization->update([
@@ -769,6 +910,13 @@ class CashAdvanceRealizationController extends Controller
             $deletedIds = $this->requestedDeletedAttachmentIds($request);
 
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, $deletedIds);
+
+            /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
+            app(BusinessTripExpenseBreakdownService::class)->syncArranged(
+                FundRequestArrangedCategory::DOC_REALIZATION,
+                (int) $realization->id,
+                $arrangedCategories,
+            );
 
             $this->deleteRequestedAttachments($request, $realization);
 
@@ -1320,18 +1468,19 @@ class CashAdvanceRealizationController extends Controller
                 ->findOrFail($id);
 
             /*
-            | Dokumen yang sudah diterima tetapi belum tuntas masih boleh
-            | dibatalkan -- sama seperti FPU.
+            | Hanya yang BELUM diterima Finance.
+            |
+            | Begitu berkasnya diterima, dokumennya masuk antrean pembayaran
+            | dan sudah punya tanggal yang dijanjikan ke pemohon. Yang sudah
+            | telanjur diterima dibatalkan lewat dua langkah: Finance menarik
+            | penerimaannya dulu, baru dokumennya dibatalkan -- supaya yang
+            | memegang berkasnya ikut tahu, bukan dilangkahi.
+            |
+            | Aturan yang sama berlaku di FPU dan Claim.
             */
             if (
-                !in_array(
-                    strtoupper((string) $realization->status),
-                    [
-                        CashAdvanceRealization::STATUS_APPROVED,
-                        CashAdvanceRealization::STATUS_RECEIVED,
-                    ],
-                    true,
-                )
+                strtoupper((string) $realization->status)
+                !== CashAdvanceRealization::STATUS_APPROVED
             ) {
                 DB::rollBack();
 
@@ -1431,7 +1580,8 @@ class CashAdvanceRealizationController extends Controller
 
             $query = CashAdvanceRealization::query()
                 ->with([
-                    'items',
+                    /* Kategori ikut dimuat: kolom Kategori Biaya membacanya. */
+                    'items.expenseCategory',
                     'branchData',
                     'departmentData',
                     'transactionCategory',
@@ -1646,6 +1796,115 @@ class CashAdvanceRealizationController extends Controller
     /**
      * Menandai banyak dokumen sekaligus sebagai sudah diterima.
      */
+    /**
+     * Menarik kembali penerimaan berkas.
+     *
+     * Dokumennya kembali ke status disetujui, dan dari sana bisa dibatalkan
+     * seperti biasa. Tanpa jalan mundur ini, dokumen yang terlanjur diterima
+     * keliru tidak punya pintu keluar selain dicairkan -- uang keluar hanya
+     * karena tidak ada tombol untuk mengurungkannya.
+     *
+     * Aturannya ada di ReceiptReversalService, dipakai bersama tiga modul.
+     */
+    public function unreceive(string $publicId, Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        /*
+        | Diperiksa di sini SELAIN di layanannya.
+        |
+        | Kalau hanya di layanan, yang tidak berwenang akan lebih dulu
+        | menabrak validasi dan menerima "alasan wajib diisi" -- pesan yang
+        | mengajaknya mengisi formulir yang tidak akan pernah ia lewati.
+        */
+        if (!$user || !$user->hasPermission('cash_advance_realization.unreceive')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.receipt_reversal.forbidden'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], [
+            'notes' => __('fund_request_messages.receipt_reversal.notes_label'),
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $id = Crypt::decryptString($publicId);
+
+            $realization = CashAdvanceRealization::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            $hasil = app(ReceiptReversalService::class)->revert(
+                document: $realization,
+                approvedStatus: CashAdvanceRealization::STATUS_APPROVED,
+                receivedStatus: CashAdvanceRealization::STATUS_RECEIVED,
+                user: $user,
+                permission: 'cash_advance_realization.unreceive',
+                notes: $validated['notes'],
+            );
+
+            if (!$hasil['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($hasil['message_key']),
+                ], $hasil['status']);
+            }
+
+            DB::commit();
+
+            $realization->refresh();
+
+            /*
+            | Pemohon dikabari SESUDAH transaksinya tuntas.
+            |
+            | Tanggal pembayarannya sudah pernah dikirim ke dia lewat email;
+            | sekarang tanggal itu batal. Kalau ia tidak diberi tahu, yang
+            | terjadi adalah ia menunggu uang pada hari yang tidak akan
+            | pernah datang.
+            */
+            try {
+                app(CashAdvanceRealizationNotificationService::class)->notifyReceiptReverted(
+                    $realization,
+                    $user,
+                    $hasil['scheduled_date'],
+                    $validated['notes'],
+                );
+            } catch (\Throwable $notifyError) {
+                Log::error('[Realisasi] Notify batal terima gagal', [
+                    'id' => $realization->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('fund_request_messages.receipt_reversal.success'),
+                'data' => [
+                    'id' => $realization->id,
+                    'status' => $realization->status,
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[Realisasi] Batal terima gagal', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.receipt_reversal.failed'),
+            ], 500);
+        }
+    }
+
     public function bulkReceive(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -2146,10 +2405,22 @@ class CashAdvanceRealizationController extends Controller
 
             CashAdvanceRealization::query()->findOrFail($id);
 
+            /*
+            | Pilihan menggabung lampiran ikut masuk tanda tangan.
+            |
+            | Tautannya berlaku sepuluh menit dan bisa disimpan orang.
+            | Parameter di luar tanda tangan bisa diubah sesudah tautannya
+            | diberikan -- dan yang diubah di sini menentukan berkas siapa
+            | saja yang ikut tercetak.
+            */
+            $denganLampiran = $request->boolean('with_attachments');
+
             $relativeUrl = URL::temporarySignedRoute(
                 'fund-request.cash-advance-realization.print-signed',
                 now()->addMinutes(10),
-                ['publicId' => $publicId],
+                $denganLampiran
+                    ? ['publicId' => $publicId, 'with_attachments' => 1]
+                    : ['publicId' => $publicId],
                 false,
             );
 
@@ -2191,7 +2462,13 @@ class CashAdvanceRealizationController extends Controller
             $id = Crypt::decryptString($publicId);
 
             $realization = CashAdvanceRealization::with([
-                'cashAdvance:id,advance_number,date,subject,request_type',
+                /*
+                | business_trip_id ikut diambil: dari situlah cetakan tahu
+                | rinciannya harus dikelompokkan. Tanpa kolom itu di daftar
+                | pilih, nilainya selalu null dan perdin tercetak dengan
+                | bentuk yang bukan miliknya.
+                */
+                'cashAdvance:id,advance_number,date,subject,request_type,business_trip_id',
                 'branchData:id,nama_cabang,inisial_cabang',
                 'departmentData:id,kode,nama',
                 'transactionCategory:id,code,name',
@@ -2200,6 +2477,7 @@ class CashAdvanceRealizationController extends Controller
                 'submitter:id,name',
                 'receiver:id,name',
                 'settler:id,name',
+                'items.expenseCategory',
                 'approvals' => function ($query) {
                     $query->orderBy('step_order')->orderBy('id');
                 },
@@ -2229,13 +2507,56 @@ class CashAdvanceRealizationController extends Controller
                 ], 422);
             }
 
+            /*
+            | Lampiran hanya diambil kalau memang diminta. Halaman cetak
+            | tanpa lampiran tidak perlu membayar pembacaan berkasnya.
+            */
+            $attachmentPages = [];
+            $attachmentOthers = [];
+
+            if ($request->boolean('with_attachments')) {
+                $realization->loadMissing('attachments');
+
+                $terpilah = app(PrintAttachmentCollector::class)->collect(
+                    $realization->attachments,
+                    [
+                        'REQUEST' => 'Lampiran Pengajuan',
+                        'RECEIPT' => 'Lampiran Penerimaan',
+                        'SETTLEMENT' => 'Bukti Penyelesaian',
+                    ],
+                );
+
+                $attachmentPages = app(PrintAttachmentCollector::class)
+                    ->paginate($terpilah['images']);
+
+                $attachmentOthers = $terpilah['others'];
+            }
+
+            /*
+            | Rincian perjalanan dinas dicetak berkelompok menurut
+            | kategorinya, mengikuti FPU yang direalisasikan. Null di luar
+            | perdin -- di sana rinciannya memang satu daftar bertanggal.
+            */
+            $rincianPerdin = $realization->cashAdvance?->business_trip_id !== null
+                ? app(BusinessTripExpenseBreakdownService::class)->groupedForPrint(
+                    FundRequestArrangedCategory::DOC_REALIZATION,
+                    (int) $realization->id,
+                    $realization->items,
+                    'realization_amount',
+                )
+                : null;
+
             $pdf = Pdf::loadView('pdf.cash-advance-realization', [
                 'realization' => $realization,
+                'rincianPerdin' => $rincianPerdin,
                 'terbilang' => RupiahWords::of(
                     (float) $realization->total_realization_amount,
                 ),
                 'requester' => $this->buildRequesterSigner($realization),
                 'approvers' => $this->buildApproverSigners($realization),
+
+                'attachmentPages' => $attachmentPages,
+                'attachmentOthers' => $attachmentOthers,
             ])->setPaper('a4', 'portrait');
 
             /*
@@ -2408,8 +2729,18 @@ class CashAdvanceRealizationController extends Controller
     | Helper: baris realisasi
     |--------------------------------------------------------------------------
     */
+    /**
+     * Bentuk rinciannya ditentukan FPU induknya.
+     *
+     * FPU yang bertaut perdin berbentuk berkategori dan berkuantitas; yang
+     * lain tetap seperti semula. Dibaca dari business_trip_id FPU-nya,
+     * bukan dari kiriman layar -- dokumen yang sudah tersimpan sudah
+     * memutuskan perkaranya.
+     */
     private function decodeItems(mixed $rawItems, CashAdvance $cashAdvance): array
     {
+        $rincianPerdin = $cashAdvance->business_trip_id !== null;
+
         $items = json_decode((string) $rawItems, true);
 
         if (!is_array($items) || count($items) === 0) {
@@ -2492,7 +2823,11 @@ class CashAdvanceRealizationController extends Controller
 
             $date = trim((string) ($item['date'] ?? ''));
 
-            if ($date === '') {
+            /*
+            | Rincian perdin tidak bertanggal, mengikuti FPU-nya -- formulir
+            | kertasnya memang tidak berkolom tanggal.
+            */
+            if (!$rincianPerdin && $date === '') {
                 throw ValidationException::withMessages([
                     'items' => [
                         __('cash_advance_realization_messages.items.date_required', [
@@ -2517,6 +2852,17 @@ class CashAdvanceRealizationController extends Controller
                 'advance_amount' => $advanceAmount,
                 'realization_amount' => $realizationAmount,
                 'notes' => $this->clean($item['notes'] ?? '') ?: null,
+
+                /*
+                | Dibawa apa adanya; yang memeriksanya dan menghitung
+                | nominalnya adalah BusinessTripExpenseBreakdownService.
+                | Kosong pada baris non-perdin.
+                */
+                'expense_category_id' => $rincianPerdin
+                    ? ($item['expense_category_id'] ?? null)
+                    : null,
+                'qty' => $rincianPerdin ? ($item['qty'] ?? null) : null,
+                'unit_price' => $rincianPerdin ? ($item['unit_price'] ?? null) : null,
             ];
         }
 
@@ -3396,6 +3742,27 @@ class CashAdvanceRealizationController extends Controller
                 ? (float) $realization->settlement_amount
                 : null,
 
+            /*
+            | Asal perdinnya, dibaca dari FPU-nya. Dari sinilah detail tahu
+            | rinciannya harus digambar berkelompok.
+            */
+            'business_trip_id' => $realization->cashAdvance?->business_trip_id,
+
+            /*
+            | Kategori yang ditandai diurus GA. Ia tidak punya baris -- itulah
+            | yang dijelaskannya -- jadi tanpa dikirim terpisah ia hilang sama
+            | sekali dari detail, dan realisasi yang seluruhnya diurus GA
+            | terbaca sebagai realisasi yang rinciannya belum diisi.
+            */
+            'arranged_categories' => $realization->cashAdvance?->business_trip_id !== null
+                ? collect(app(BusinessTripExpenseBreakdownService::class)->groupedForPrint(
+                    FundRequestArrangedCategory::DOC_REALIZATION,
+                    (int) $realization->id,
+                    [],
+                    'realization_amount',
+                ))->pluck('name')->all()
+                : [],
+
             'items' => $this->transformItems($realization),
             'attachments' => $this->transformAttachments($realization),
 
@@ -3446,6 +3813,18 @@ class CashAdvanceRealizationController extends Controller
                 'realization_amount' => (float) $item->realization_amount,
                 'difference_amount' => $item->difference_amount,
                 'notes' => $item->notes,
+
+                /*
+                | Rincian berkategori, hanya pada dokumen perjalanan dinas.
+                | Null di tempat lain -- di sana rinciannya memang tidak
+                | dikelompokkan dan tidak berkuantitas.
+                */
+                'expense_category_id' => $item->expense_category_id,
+                'expense_category_name' => $item->relationLoaded('expenseCategory')
+                    ? optional($item->expenseCategory)->name
+                    : null,
+                'qty' => $item->qty !== null ? (float) $item->qty : null,
+                'unit_price' => $item->unit_price !== null ? (float) $item->unit_price : null,
 
                 'attachments' => collect($attachmentsByItem->get($item->id, []))
                     ->map(fn(CashAdvanceRealizationAttachment $attachment): array => [

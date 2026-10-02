@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Models\FundRequestArrangedCategory;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -39,13 +40,24 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 */
 class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitle, WithStrictNullComparison
 {
-    protected const COLUMN_COUNT = 16;
+    protected const COLUMN_COUNT = 19;
 
-    /** Kolom milik FPU (1 = A). Kolom 9-11 adalah data rincian. */
-    protected const DOCUMENT_LEVEL_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14, 15, 16];
+    /** Kolom milik FPU (1 = A). Kolom 9-14 adalah data rincian. */
+    protected const DOCUMENT_LEVEL_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 17, 18, 19];
 
     /** Kolom bernilai uang -> format ribuan, tetap numerik agar bisa di-SUM. */
-    protected const MONEY_COLUMNS = ['K', 'L'];
+    protected const MONEY_COLUMNS = ['M', 'N', 'O'];
+
+    /**
+     * Kategori yang diurus GA, per id FPU.
+     *
+     * Dikumpulkan sekali di muka, bukan ditanyakan per dokumen: laporan ini
+     * bisa memuat ratusan FPU, dan satu query per dokumen akan terasa
+     * persis ketika laporannya paling dibutuhkan.
+     *
+     * @var array<int, array<int, string>>
+     */
+    protected array $arrangedByDocument = [];
 
     protected $data;
 
@@ -79,6 +91,12 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
             __($c . 'subject'),
             __($c . 'item_date'),
             __($c . 'item_description'),
+
+            /* Terisi hanya pada rincian perjalanan dinas. */
+            __($c . 'expense_category'),
+            __($c . 'qty'),
+            __($c . 'unit_price'),
+
             __($c . 'item_amount'),
             __($c . 'total_amount'),
             __($c . 'status'),
@@ -88,8 +106,47 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
         ];
     }
 
+    /**
+     * Kategori yang diurus GA pada seluruh FPU perdin di laporan ini.
+     */
+    protected function collectArranged(): void
+    {
+        $ids = [];
+
+        foreach ($this->data as $cashAdvance) {
+            if (!empty($cashAdvance->business_trip_id)) {
+                $ids[] = (int) $cashAdvance->id;
+            }
+        }
+
+        if (!$ids) {
+            return;
+        }
+
+        $baris = FundRequestArrangedCategory::query()
+            ->where('document_type', FundRequestArrangedCategory::DOC_CASH_ADVANCE)
+            ->whereIn('document_id', $ids)
+            ->join(
+                'business_trip_expense_categories',
+                'business_trip_expense_categories.id',
+                '=',
+                'fund_request_arranged_categories.expense_category_id',
+            )
+            ->orderBy('business_trip_expense_categories.sort_order')
+            ->get([
+                'fund_request_arranged_categories.document_id',
+                'business_trip_expense_categories.name',
+            ]);
+
+        foreach ($baris as $satu) {
+            $this->arrangedByDocument[(int) $satu->document_id][] = (string) $satu->name;
+        }
+    }
+
     public function array(): array
     {
+        $this->collectArranged();
+
         $rows = [];
         $rowIndex = 2; // baris 1 dipakai heading
         $sequence = 1;
@@ -116,6 +173,13 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
             $realizationNumber = $realization->realization_number ?? null;
             $realizationStatus = $realization->status ?? null;
 
+            /*
+            | Bentuk rinciannya ditentukan dokumennya, bukan barisnya: satu
+            | baris yang kebetulan tidak berkategori tidak membuat FPU-nya
+            | berhenti menjadi perdin.
+            */
+            $perdin = $cashAdvance->business_trip_id !== null;
+
             $items = $cashAdvance->items ?? collect();
 
             if ($items->isEmpty()) {
@@ -130,6 +194,9 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
                     $subject,
                     null,
                     __('cash_advance_messages.export.no_item'),
+                    null,
+                    null,
+                    null,
                     null,
                     $total,
                     $status,
@@ -150,8 +217,31 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
                         $category,
                         $requestType,
                         $subject,
-                        $this->formatDate($item->date ?? null),
+                        /*
+                        | Rincian perdin tidak bertanggal. Tanggal peninggalan
+                        | rincian lama dikosongkan di sini, bukan ditampilkan:
+                        | angka yang tidak lagi berarti tetapi masih terbaca
+                        | sebagai berarti lebih buruk daripada sel kosong.
+                        */
+                        $perdin ? null : $this->formatDate($item->date ?? null),
+
                         $this->formatText($item->description ?? null),
+
+                        /*
+                        | Null, bukan '-', pada rincian bukan-perdin: sel kosong
+                        | lebih mudah disaring, dan tanda hubung di kolom angka
+                        | membuat selnya berhenti numerik.
+                        |
+                        | Pada perdin, baris yang tidak berkategori justru diberi
+                        | keterangan: ia rincian lama dari sebelum FPU-nya menjadi
+                        | perdin, dan kosongnya perlu terbaca sebagai keadaan,
+                        | bukan sebagai sel yang gagal terisi.
+                        */
+                        $item->expenseCategory->name
+                            ?? ($perdin ? __('cash_advance_messages.export.no_expense_category') : null),
+                        $item->qty !== null ? (float) $item->qty : null,
+                        $item->unit_price !== null ? (float) $item->unit_price : null,
+
                         $this->formatMoney($item->amount ?? 0),
                         $total,
                         $status,
@@ -162,6 +252,37 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
 
                     $rowIndex++;
                 }
+            }
+
+            /*
+            | Kategori yang diurus GA mendapat barisnya sendiri -- tanpa itu ia
+            | hilang sama sekali dari laporan, dan yang hilang dari laporan
+            | terbaca sebagai tidak pernah ada, bukan sebagai sengaja kosong.
+            */
+            foreach ($this->arrangedByDocument[(int) $cashAdvance->id] ?? [] as $namaKategori) {
+                $rows[] = [
+                    $sequence,
+                    $cashAdvance->advance_number ?? '-',
+                    $date,
+                    $branch,
+                    $department,
+                    $category,
+                    $requestType,
+                    $subject,
+                    null,
+                    __('cash_advance_messages.export.arranged_by_ga'),
+                    $namaKategori,
+                    null,
+                    null,
+                    null,
+                    $total,
+                    $status,
+                    $realizationNumber,
+                    $realizationStatus,
+                    $createdBy,
+                ];
+
+                $rowIndex++;
             }
 
             $endRow = $rowIndex - 1;
@@ -318,7 +439,7 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
                     /*
                     | No, tanggal, jenis pengajuan, status, nomor dokumen -> tengah.
                     */
-                    foreach ([1, 2, 3, 7, 9, 13, 14, 15] as $column) {
+                    foreach ([1, 2, 3, 7, 9, 12, 16, 17, 18] as $column) {
                         $letter = Coordinate::stringFromColumnIndex($column);
 
                         $sheet->getStyle($letter . $bodyStart . ':' . $letter . $lastRow)
@@ -356,12 +477,15 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
                     'H' => 30,
                     'I' => 13,
                     'J' => 34,
-                    'K' => 18,
-                    'L' => 18,
-                    'M' => 14,
-                    'N' => 26,
-                    'O' => 16,
-                    'P' => 22,
+                    'K' => 20,
+                    'L' => 8,
+                    'M' => 16,
+                    'N' => 18,
+                    'O' => 18,
+                    'P' => 14,
+                    'Q' => 26,
+                    'R' => 16,
+                    'S' => 22,
                 ];
 
                 foreach ($widths as $column => $width) {

@@ -56,7 +56,8 @@
             "department": "Department",
             "notes": "Notes",
             "subject": "Subject",
-            "transactionCategory": "Transaction Category"
+            "transactionCategory": "Transaction Category",
+            "businessTrip": "Business Trip Document"
         },
         "itemDialog": {
             "addRowButton": "Add Row",
@@ -86,7 +87,8 @@
         "noData": {
             "branch": "No branch available",
             "department": "Select a branch first",
-            "transactionCategory": "No transaction category available"
+            "transactionCategory": "No transaction category available",
+            "businessTrip": "No usable Business Trip. Make sure yours is approved and not already taken by another cash advance or claim."
         },
         "placeholders": {
             "branch": "Select a branch",
@@ -94,7 +96,8 @@
             "department": "Select a department",
             "notes": "Additional notes for the approvers",
             "subject": "e.g. Business trip expenses to Palembang",
-            "transactionCategory": "Select a transaction category"
+            "transactionCategory": "Select a transaction category",
+            "businessTrip": "Choose an approved Business Trip"
         },
         "reload": {
             "branch": "Reload branch list"
@@ -117,7 +120,8 @@
             "saveFailed": "Failed to save the claim.",
             "savingData": "Saving data...",
             "updateConfirmText": "The changes to this claim will be saved.",
-            "updateConfirmTitle": "Save the changes?"
+            "updateConfirmTitle": "Save the changes?",
+            "linesClearedByCategory": "The expense lines were cleared because the transaction category changed. The two are filled in differently, so the lines start over."
         },
         "validation": {
             "branch": "Branch is required.",
@@ -128,14 +132,27 @@
             "itemDate": "Date is required.",
             "itemDescription": "Description is required.",
             "subject": "Subject is required.",
-            "transactionCategory": "Transaction category is required."
+            "transactionCategory": "Transaction category is required.",
+            "businessTrip": "A Business Trip document is required.",
+            "itemDateOutsideTrip": "Outside the trip period."
+        },
+        "hints": {
+            "businessTrip": "Only your own Business Trips that are approved and not already taken by a live cash advance or claim.",
+            "businessTripPeriod": "Trip period: {from} to {to}. Line dates can only be chosen within that range."
+        },
+        "businessTripState": {
+            "approved": "Approved",
+            "pending": "Awaiting approval",
+            "locked": "Not selectable: this trip is not approved yet, or is already taken by another document.",
+            "waitingStep": "Locked — awaiting approval at step {step}: {who}",
+            "someone": "the next approver"
         }
     },
     "list": {
         "approve": {
             "confirmButton": "Approve",
             "dialogSubtitle": "Make sure the request lines are correct before approving.",
-            "dialogTitle": "Approve Claim",
+            "dialogTitle": "Approve claim {number}?",
             "failedFallback": "Failed to approve the claim.",
             "notesLabel": "Notes (optional)",
             "notesPlaceholder": "Add an approval note if needed",
@@ -204,12 +221,17 @@
             "loading": "Preparing the claim printout...",
             "popupBlocked": "The popup was blocked. Please allow popups for this site.",
             "urlFailed": "Failed to create the print URL.",
-            "windowClosed": "The print window was closed."
+            "windowClosed": "The print window was closed.",
+            "attachmentTitle": "Print document",
+            "attachmentCount": "This document has {count} attachment(s).",
+            "attachmentInclude": "Merge attachments into a single PDF",
+            "attachmentPdfNotice": "Image attachments are added on the following pages, two per page. Attachments that are already PDFs cannot be merged — their names are still listed on the last page so they can be opened separately.",
+            "attachmentConfirm": "Print"
         },
         "reject": {
             "confirmButton": "Reject",
             "dialogSubtitle": "Rejecting stops the entire approval process for this document.",
-            "dialogTitle": "Reject Claim",
+            "dialogTitle": "Reject claim {number}?",
             "failedFallback": "Failed to reject the claim.",
             "notesLabel": "Rejection reason",
             "notesPlaceholder": "Explain why this is rejected",
@@ -299,6 +321,34 @@
         },
         "paymentDay": {
             "blockedNotice": "Payment is only possible on {days}. Some claims are waiting, but today is not a payment day — the button becomes available again on those days."
+        },
+        "revise": {
+            "title": "Receive Claim {nomor}",
+            "subtitle": "Check the line items. If an amount needs correcting, change it in the right-hand column — the amount the requester submitted is kept for comparison.",
+            "colDate": "Date",
+            "colDescription": "Description",
+            "colSubmitted": "Submitted",
+            "colRevised": "Accepted Amount",
+            "totalSubmitted": "Total submitted",
+            "totalRevised": "Total accepted",
+            "warning": "The amount has changed. The requester will be notified with the old figure, the new figure, and the reason below.",
+            "notes": "Revision Reason",
+            "notesHint": "The requester reads this. Briefly explain why the amount was corrected.",
+            "notesRequired": "A revision reason is required because an amount has changed.",
+            "invalidAmount": "The amount on the \"{name}\" line is not filled in correctly.",
+            "confirmUnchanged": "Receive Document",
+            "confirmRevised": "Receive & Revise Amount"
+        },
+        "unreceive": {
+            "menu": "Undo Receive",
+            "title": "Undo the receipt of this document?",
+            "warning": "The document goes back to approved, and the payment date already promised to the requester is cancelled with it. The claim can then be cancelled or received again.",
+            "notes": "Reason for Undoing Receipt",
+            "notesHint": "The requester reads this. Briefly explain why the receipt was undone.",
+            "notesRequired": "A reason is required.",
+            "confirm": "Yes, Undo Receipt",
+            "successFallback": "The receipt was undone.",
+            "failedFallback": "The receipt could not be undone."
         }
     },
     "status": {

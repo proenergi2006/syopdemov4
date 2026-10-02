@@ -4,6 +4,7 @@ namespace App\Services\BusinessTrip;
 
 use App\Models\BusinessTrip;
 use App\Models\BusinessTripApproval;
+use App\Models\BusinessTripArrangement;
 use App\Models\BusinessTripItinerary;
 use Illuminate\Support\Facades\Crypt;
 
@@ -34,6 +35,14 @@ class BusinessTripPresenter
 
             /* Menjelaskan kenapa FPU-nya sudah boleh atau masih terkunci. */
             'is_on_time' => $trip->is_on_time,
+
+            /*
+            | Tanggal berangkatnya sudah lewat. Draft yang begini tidak bisa
+            | diajukan lagi -- dikabarkan supaya layar bisa menandainya, bukan
+            | menunggu tombolnya ditekan lalu ditolak.
+            */
+            'is_departure_passed' => (bool) $trip->depart_date
+                && $trip->depart_date->startOfDay()->lt(now()->startOfDay()),
             'allows_parallel_cash_advance' => $trip->allows_parallel_cash_advance,
             'can_approve' => $canApprove,
             'submitted_at' => $trip->submitted_at,
@@ -66,7 +75,6 @@ class BusinessTripPresenter
                     'timezone' => $b->timezone,
                     'time_text' => $b->time_text,
                     'description' => $b->description,
-                    'pic' => $b->pic,
                 ])
                 ->values()
                 ->all(),
@@ -87,8 +95,76 @@ class BusinessTripPresenter
                     ->all()
                 : [],
 
+            /*
+            | Pemesanan hotel, tiket, dan transport.
+            |
+            | Yang dibatalkan ikut terbawa, lengkap dengan alasannya. Justru
+            | itu yang perlu dibaca pemohon: hotel yang batal dan sudah
+            | diganti lebih penting diketahui daripada yang berjalan mulus.
+            */
+            'arrangements' => $trip->relationLoaded('arrangements')
+                ? $trip->arrangements
+                    ->map(fn (BusinessTripArrangement $a): array => self::arrangement($a))
+                    ->values()
+                    ->all()
+                : [],
+
             'created_at' => $trip->created_at,
             'updated_at' => $trip->updated_at,
+        ];
+    }
+
+    /**
+     * Satu pemesanan beserta berkas buktinya.
+     *
+     * Jenisnya dikirim sebagai kode, bukan kalimat jadi. Layarnya yang
+     * menerjemahkan -- pengguna berbahasa Inggris tidak semestinya membaca
+     * "PENGINAPAN" hanya karena kalimatnya sudah dibentuk di server.
+     *
+     * @return array<string, mixed>
+     */
+    public static function arrangement(BusinessTripArrangement $a): array
+    {
+        return [
+            'id' => $a->id,
+            'type' => $a->type,
+            'vendor_name' => $a->vendor_name,
+            'reference_no' => $a->reference_no,
+            'starts_at' => optional($a->starts_at)->toDateString(),
+            'ends_at' => optional($a->ends_at)->toDateString(),
+            'notes' => $a->notes,
+
+            'status' => $a->status,
+            'cancelled_at' => $a->cancelled_at,
+            'cancellation_notes' => $a->cancellation_notes,
+            'cancelled_by_name' => $a->relationLoaded('canceller')
+                ? optional($a->canceller)->name
+                : null,
+
+            /*
+            | Pemesanan lama yang digantikan baris ini. Cukup id-nya: layarnya
+            | mencari pasangannya di daftar yang sama, jadi keterangannya tidak
+            | perlu disalin dan tidak bisa berbeda dari aslinya.
+            */
+            'replaces_id' => $a->replaces_id,
+
+            'created_by_name' => $a->relationLoaded('creator')
+                ? optional($a->creator)->name
+                : null,
+            'created_at' => $a->created_at,
+
+            'files' => $a->relationLoaded('files')
+                ? $a->files
+                    ->map(fn ($f): array => [
+                        'id' => $f->id,
+                        'original_filename' => $f->original_filename,
+                        'mime_type' => $f->mime_type,
+                        'file_size' => $f->file_size,
+                        'url' => $f->url,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
         ];
     }
 }

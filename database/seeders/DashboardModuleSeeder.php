@@ -185,18 +185,25 @@ class DashboardModuleSeeder extends Seeder
                 'code' => 'GOODS_RETURN',
                 'title' => 'Goods Return',
                 'short_title' => 'GR Return',
-                'description' => 'Pantau pengembalian barang, refund, replacement, dan status penyelesaiannya.',
+                'description' => 'Pantau barang yang dikembalikan ke vendor: berapa nilainya, kenapa, dan siapa yang paling sering.',
                 'icon' => 'mdi-package-variant-closed-minus',
                 'color' => 'warning',
                 'route_path' => '/dashboards/goods-return',
                 'permission_name' => 'dashboard.goods-return.view',
+                /*
+                | Empat hal yang benar-benar ada datanya. Refund dan
+                | replacement sempat tercantum di sini, padahal tidak pernah
+                | ada kolomnya -- menjanjikan yang tidak ada lebih buruk
+                | daripada tidak menyebutnya.
+                */
                 'features' => [
-                    'Jumlah return',
-                    'Refund',
-                    'Replacement',
+                    'Nilai pengembalian',
+                    'Alasan pengembalian',
+                    'Kinerja vendor',
+                    'Draft menggantung',
                 ],
                 'is_active' => true,
-                'is_available' => false,
+                'is_available' => true,
                 'sort_order' => 40,
             ],
         ];

@@ -1,10 +1,12 @@
 import auth from './auth.json'
 import businessTrip from './businessTrip.json'
+import businessTripExpenseCategory from './businessTripExpenseCategory.json'
 import cashAdvance from './cashAdvance.json'
 import cashAdvanceRealization from './cashAdvanceRealization.json'
 import claim from './claim.json'
 import common from './common.json'
 import dashboard from './dashboard.json'
+import errorPage from './errorPage.json'
 import fundRequestLimit from './fundRequestLimit.json'
 import navigation from './navigation.json'
 import paymentSchedule from './paymentSchedule.json'
@@ -19,6 +21,7 @@ export default {
   auth,
   common,
   dashboard,
+  errorPage,
   purchaseRequest,
   purchaseOrder,
   goodsReceive,
@@ -31,6 +34,7 @@ export default {
   paymentSchedule,
   fundRequestLimit,
   businessTrip,
+  businessTripExpenseCategory,
 
   /*
    * navigation.json di-spread di root (bukan dinamai `navigation: {...}`)

@@ -116,6 +116,30 @@ class BusinessTripModuleSeeder extends Seeder
             ['cancel', 'Cancel Perdin', 'Membatalkan Perjalanan Dinas yang sudah diajukan.', false],
             ['print', 'Print Perdin', 'Mencetak formulir Perjalanan Dinas yang sudah disetujui.', false],
             ['export', 'Export Perdin', 'Menarik data Perjalanan Dinas ke berkas Excel.', false],
+
+            /*
+            | Bukan permission aksi: memegangnya tidak memberi wewenang apa pun
+            | atas dokumennya, hanya menempatkan orangnya pada daftar penerima
+            | kabar saat sebuah perdin tuntas disetujui.
+            |
+            | Dipisah dari view dengan sengaja: yang perlu diberi tahu belum
+            | tentu sama dengan yang boleh melihat, dan menyamakannya berarti
+            | membanjiri enam role dengan surat yang hanya diperlukan satu.
+            */
+            ['notify_approved', 'Notifikasi Perdin Disetujui', 'Menerima pemberitahuan dan email saat sebuah Perjalanan Dinas tuntas disetujui, untuk keperluan pemesanan hotel dan tiket.', false],
+
+            /*
+            | Mencatat dan membatalkan pemesanan hotel, tiket, dan transport
+            | pada perdin yang sudah disetujui.
+            |
+            | Dipisah dari notify_approved karena yang dikabari dan yang
+            | mengerjakan tidak harus orang yang sama -- atasannya bisa perlu
+            | tahu tanpa perlu ikut mengunggah vouchernya.
+            |
+            | Tanpa scope: pemesanan selalu dikerjakan pada perdin yang sudah
+            | lolos penyaringan view, jadi cakupannya sudah ditentukan di sana.
+            */
+            ['arrange', 'Kelola Pemesanan Perdin', 'Mencatat dan membatalkan pemesanan hotel, tiket, dan transport pada Perjalanan Dinas yang sudah disetujui.', false],
         ];
 
         foreach ($permissions as [$action, $name, $description, $requiresScope]) {
@@ -201,6 +225,10 @@ class BusinessTripModuleSeeder extends Seeder
         }
 
         $this->grantExport($now);
+
+        $this->grantNotifyApproved($now);
+
+        $this->grantArrange($now);
     }
 
     private function seedMenu($now): void
@@ -355,6 +383,80 @@ class BusinessTripModuleSeeder extends Seeder
      * Berjalan sekali, seperti grantInitial(): begitu permission ini sudah
      * punya pemegang, seeder tidak menyentuhnya lagi.
      */
+    /**
+     * Pemberian awal permission notifikasi perdin disetujui.
+     *
+     * Diberikan ke role yang mengurus pemesanan hotel dan tiket. Tidak
+     * memakai acuan permission lain: tidak ada permission yang sudah ada yang
+     * berarti "orang inilah yang mengurus perjalanan".
+     *
+     * Sesudah ini pengaturannya sepenuhnya lewat layar master -- per role di
+     * Role Permissions, atau per orang di User Permission. Berjalan sekali:
+     * begitu permissionnya punya pemegang, seeder tidak menyentuhnya lagi.
+     */
+    private function grantNotifyApproved($now): void
+    {
+        $this->grantToGeneralAffair('notify_approved', $now);
+    }
+
+    /**
+     * Pemegang awal wewenang mencatat pemesanan.
+     *
+     * Sama seperti notify_approved: sekadar titik berangkat supaya fiturnya
+     * tidak lahir tanpa satu pun yang bisa memakainya. Sesudah itu siapa yang
+     * memegangnya sepenuhnya urusan layar master.
+     */
+    private function grantArrange($now): void
+    {
+        $this->grantToGeneralAffair('arrange', $now);
+    }
+
+    /**
+     * Memberikan sebuah permission perdin ke role GA, sekali saja.
+     *
+     * Berhenti begitu permissionnya sudah punya pemegang mana pun -- termasuk
+     * bila pemegangnya sudah diubah lewat layar master. Seeder yang tetap
+     * memaksakan pemberian awalnya akan mengembalikan pengaturan yang sudah
+     * sengaja diubah orang.
+     */
+    private function grantToGeneralAffair(string $action, $now): void
+    {
+        $permissionId = DB::table('permissions')
+            ->where('code', self::MODULE_CODE . '.' . $action)
+            ->value('id');
+
+        if (!$permissionId) {
+            return;
+        }
+
+        if (DB::table('role_permissions')->where('permission_id', $permissionId)->exists()) {
+            return;
+        }
+
+        $roleId = DB::table('roles')
+            ->where('kode', 'Spv GA')
+            ->orWhere('nama', 'Supervisor General Affair')
+            ->value('id');
+
+        if (!$roleId) {
+            $this->command?->warn("  {$action}: role Supervisor General Affair tidak ditemukan.");
+
+            return;
+        }
+
+        DB::table('role_permissions')->updateOrInsert(
+            ['role_id' => $roleId, 'permission_id' => $permissionId],
+            [
+                'scope' => 'NONE',
+                'is_active' => true,
+                'updated_at' => $now,
+                'created_at' => $now,
+            ],
+        );
+
+        $this->command?->info("  {$action}: diberikan ke Supervisor General Affair.");
+    }
+
     private function grantExport($now): void
     {
         $permissionId = DB::table('permissions')

@@ -343,8 +343,8 @@ const submitForm = async (): Promise<void> => {
         ? (form.required_documents.trim() || null)
         : null,
 
-      /* Tidak berlaku pada baris Claim -- Claim tidak mengenal Perdin. */
-      requires_business_trip: isClaimForm.value ? false : form.requires_business_trip,
+      /* Berlaku untuk FPU maupun Claim: keduanya kini bisa menunjuk Perdin. */
+      requires_business_trip: form.requires_business_trip,
 
       sort_order: Number(form.sort_order || 0),
       is_active: form.is_active,
@@ -1124,14 +1124,13 @@ onMounted(async () => {
             </VCol>
 
             <!--
-              Penanda perjalanan dinas. Hanya untuk baris FPU: Claim tidak
-              mengenal Perdin, dan menampilkannya di sana hanya akan
-              mengundang isian yang lalu diabaikan server.
+              Penanda perjalanan dinas, untuk FPU maupun Claim.
+
+              Semula hanya FPU. Sebagian perjalanan memang tidak diminta uang
+              mukanya -- pegawainya menalangi dulu, lalu menagihnya lewat
+              Claim -- dan perjalanan semacam itu perlu tetap tertaut.
             -->
-            <VCol
-              v-if="!isClaimForm"
-              cols="12"
-            >
+            <VCol cols="12">
               <VSwitch
                 v-model="form.requires_business_trip"
                 color="primary"
@@ -1141,8 +1140,9 @@ onMounted(async () => {
               />
 
               <div class="text-caption text-medium-emphasis mt-1">
-                FPU dengan keterangan transaksi ini wajib menunjuk Perjalanan Dinas
-                yang sudah disetujui milik pemohonnya sendiri.
+                Dokumen dengan keterangan transaksi ini wajib menunjuk Perjalanan
+                Dinas yang sudah disetujui milik pemohonnya sendiri. Satu Perdin
+                hanya boleh dipakai satu dokumen &mdash; FPU atau Claim, tidak keduanya.
               </div>
             </VCol>
           </VRow>

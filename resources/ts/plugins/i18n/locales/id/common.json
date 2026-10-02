@@ -1,73 +1,75 @@
 {
-  "actions": {
-    "reset": "Reset",
-    "apply": "Terapkan",
-    "refresh": "Perbarui",
-    "confirm": "Ya",
-    "cancel": "Batal",
-    "delete": "Hapus",
-    "close": "Tutup",
-    "save": "Simpan"
-  },
-  "attachment": {
-    "title": "Lampiran",
-    "addButton": "+ Tambah Lampiran",
-    "empty": "Belum ada lampiran yang diunggah.",
-    "remove": "Hapus",
-    "invalidTitle": "File tidak valid",
-    "invalidType": "\"{file}\" bukan file PDF/JPG/JPEG/PNG.",
-    "tooLarge": "\"{file}\" lebih dari 3MB."
-  },
-  "alert": {
-    "success": "Berhasil",
-    "error": "Gagal",
-    "errorGeneric": "Terjadi kesalahan.",
-    "warning": "Peringatan",
-    "processing": "Memproses...",
-    "pleaseWait": "Mohon tunggu sebentar",
-    "deleteConfirmTitle": "Hapus data?",
-    "deleteConfirmText": "{item} akan dihapus permanen.",
-    "deleteConfirmButton": "Ya, hapus",
-    "defaultItemName": "data ini"
-  },
-  "itemTable": {
-    "no": "No",
-    "namaItem": "Nama Item",
-    "keterangan": "Keterangan",
-    "satuan": "Satuan",
-    "qty": "Qty",
-    "qtyPo": "Qty PO",
-    "outstanding": "Outstanding",
-    "hargaUnit": "Harga Unit",
-    "subtotal": "Subtotal"
-  },
-  "notifications": {
-    "toastTitle": "Notifikasi baru",
-    "toastText": "Anda mendapatkan notifikasi baru.",
-    "header": "Notifications",
-    "newChip": "{count} New",
-    "viewButton": "Lihat",
-    "emptyTitle": "Belum ada notifikasi",
-    "emptySubtitle": "Notifikasi terbaru akan muncul di sini.",
-    "readAllButton": "READ ALL NOTIFICATIONS"
-  },
-  "httpStatus": {
-    "noConnection": "Tidak dapat terhubung ke server.",
-    "badRequest": "Permintaan tidak valid.",
-    "sessionExpired": "Sesi Anda telah berakhir. Silakan login kembali.",
-    "forbidden": "Anda tidak memiliki akses.",
-    "notFound": "Data tidak ditemukan.",
-    "validationError": "Data yang dikirim tidak valid.",
-    "serverError": "Terjadi kesalahan pada server."
-  },
-  "days": {
-    "1": "Senin",
-    "2": "Selasa",
-    "3": "Rabu",
-    "4": "Kamis",
-    "5": "Jumat",
-    "6": "Sabtu",
-    "7": "Minggu"
-  },
-  "and": "dan"
+    "actions": {
+        "reset": "Reset",
+        "apply": "Terapkan",
+        "refresh": "Perbarui",
+        "confirm": "Ya",
+        "cancel": "Batal",
+        "delete": "Hapus",
+        "close": "Tutup",
+        "save": "Simpan",
+        "edit": "Ubah"
+    },
+    "attachment": {
+        "title": "Lampiran",
+        "addButton": "+ Tambah Lampiran",
+        "empty": "Belum ada lampiran yang diunggah.",
+        "remove": "Hapus",
+        "invalidTitle": "File tidak valid",
+        "invalidType": "\"{file}\" bukan file PDF/JPG/JPEG/PNG.",
+        "tooLarge": "\"{file}\" lebih dari 3MB."
+    },
+    "alert": {
+        "success": "Berhasil",
+        "error": "Gagal",
+        "errorGeneric": "Terjadi kesalahan.",
+        "warning": "Peringatan",
+        "processing": "Memproses...",
+        "pleaseWait": "Mohon tunggu sebentar",
+        "deleteConfirmTitle": "Hapus data?",
+        "deleteConfirmText": "{item} akan dihapus permanen.",
+        "deleteConfirmButton": "Ya, hapus",
+        "defaultItemName": "data ini",
+        "info": "Informasi"
+    },
+    "itemTable": {
+        "no": "No",
+        "namaItem": "Nama Item",
+        "keterangan": "Keterangan",
+        "satuan": "Satuan",
+        "qty": "Qty",
+        "qtyPo": "Qty PO",
+        "outstanding": "Outstanding",
+        "hargaUnit": "Harga Unit",
+        "subtotal": "Subtotal"
+    },
+    "notifications": {
+        "toastTitle": "Notifikasi baru",
+        "toastText": "Anda mendapatkan notifikasi baru.",
+        "header": "Notifications",
+        "newChip": "{count} New",
+        "viewButton": "Lihat",
+        "emptyTitle": "Belum ada notifikasi",
+        "emptySubtitle": "Notifikasi terbaru akan muncul di sini.",
+        "readAllButton": "READ ALL NOTIFICATIONS"
+    },
+    "httpStatus": {
+        "noConnection": "Tidak dapat terhubung ke server.",
+        "badRequest": "Permintaan tidak valid.",
+        "sessionExpired": "Sesi Anda telah berakhir. Silakan login kembali.",
+        "forbidden": "Anda tidak memiliki akses.",
+        "notFound": "Data tidak ditemukan.",
+        "validationError": "Data yang dikirim tidak valid.",
+        "serverError": "Terjadi kesalahan pada server."
+    },
+    "days": {
+        "1": "Senin",
+        "2": "Selasa",
+        "3": "Rabu",
+        "4": "Kamis",
+        "5": "Jumat",
+        "6": "Sabtu",
+        "7": "Minggu"
+    },
+    "and": "dan"
 }

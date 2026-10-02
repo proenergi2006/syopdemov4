@@ -54,8 +54,10 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\CashAdvanceController;
 use App\Http\Controllers\Api\CashAdvanceRealizationController;
+use App\Http\Controllers\Api\BusinessTripArrangementController;
 use App\Http\Controllers\Api\BusinessTripController;
 use App\Http\Controllers\Api\ClaimController;
+use App\Http\Controllers\Api\Master\BusinessTripExpenseCategoryController;
 use App\Http\Controllers\Api\Master\FundRequestTransactionCategoryController;
 use App\Http\Controllers\Api\Master\FundRequestLimitController;
 use App\Http\Controllers\Api\Master\PaymentScheduleController;
@@ -68,6 +70,7 @@ use App\Http\Controllers\Api\GoodsReturnController;
 use App\Http\Controllers\Api\Dashboard\DashboardModuleController;
 use App\Http\Controllers\Api\Dashboard\PurchaseOrderDashboardController;
 use App\Http\Controllers\Api\Dashboard\GoodsReceiptDashboardController;
+use App\Http\Controllers\Api\Dashboard\GoodsReturnDashboardController;
 use App\Http\Controllers\Api\Dashboard\PurchaseRequestDashboardController;
 use App\Http\Controllers\Api\Monitoring\QueueHealthController;
 use App\Http\Controllers\Monitoring\LogViewerController;
@@ -288,6 +291,11 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 '/goods-receipt',
                 [GoodsReceiptDashboardController::class, 'index'],
             )->name('goods-receipt');
+
+            Route::get(
+                '/goods-return',
+                [GoodsReturnDashboardController::class, 'index'],
+            )->name('goods-return');
         });
 
     // ===================== DATA MASTER =====================
@@ -721,6 +729,34 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 ->parameters(['transaction-categories' => 'id']);
 
             /*
+            |------------------------------------------------------------------
+            | Master kategori biaya perjalanan dinas
+            |------------------------------------------------------------------
+            | Transportasi, Penginapan, Uang Saku -- pengelompokan rincian FPU
+            | dan Realisasi berketerangan perdin.
+            |
+            | dropdown-select didaftarkan sebelum apiResource, kalau tidak
+            | "dropdown-select" akan tertangkap sebagai {id}.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'business-trip-expense-categories/dropdown-select',
+                [BusinessTripExpenseCategoryController::class, 'dropdownSelect'],
+            );
+
+            Route::patch(
+                'business-trip-expense-categories/{id}/toggle-status',
+                [BusinessTripExpenseCategoryController::class, 'toggleStatus'],
+            );
+
+            Route::apiResource(
+                'business-trip-expense-categories',
+                BusinessTripExpenseCategoryController::class,
+            )
+                ->only(['index', 'store', 'update', 'destroy'])
+                ->parameters(['business-trip-expense-categories' => 'id']);
+
+            /*
             | Didaftarkan sebelum apiResource, kalau tidak segmen "export-excel"
             | akan tertangkap sebagai publicId.
             */
@@ -772,6 +808,15 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             Route::patch(
                 'cash-advance/{publicId}/receive',
                 [CashAdvanceController::class, 'receive'],
+            );
+
+            /*
+            | Jalan mundur dari meja penerimaan: dokumennya kembali ke
+            | status disetujui, dan tanggal pembayarannya dibatalkan.
+            */
+            Route::patch(
+                'cash-advance/{publicId}/unreceive',
+                [CashAdvanceController::class, 'unreceive'],
             );
 
             Route::patch(
@@ -846,6 +891,15 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             Route::patch(
                 'cash-advance-realization/{publicId}/receive',
                 [CashAdvanceRealizationController::class, 'receive'],
+            );
+
+            /*
+            | Jalan mundur dari meja penerimaan: dokumennya kembali ke
+            | status disetujui, dan tanggal pembayarannya dibatalkan.
+            */
+            Route::patch(
+                'cash-advance-realization/{publicId}/unreceive',
+                [CashAdvanceRealizationController::class, 'unreceive'],
             );
 
             /*
@@ -939,6 +993,15 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [ClaimController::class, 'receive'],
             );
 
+            /*
+            | Jalan mundur dari meja penerimaan: dokumennya kembali ke
+            | status disetujui, dan tanggal pembayarannya dibatalkan.
+            */
+            Route::patch(
+                'claim/{publicId}/unreceive',
+                [ClaimController::class, 'unreceive'],
+            );
+
             Route::post(
                 'claim/bulk-pay',
                 [ClaimController::class, 'bulkPay'],
@@ -1013,6 +1076,29 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             Route::patch(
                 'perdin/{publicId}/cancel',
                 [BusinessTripController::class, 'cancel'],
+            );
+
+            /*
+            | Pemesanan hotel, tiket, dan transport.
+            |
+            | Hanya melihat, mencatat, dan membatalkan. Tidak ada PUT dan
+            | tidak ada DELETE, dan ketiadaannya disengaja -- sebuah
+            | pemesanan yang sudah dikabarkan ke yang berangkat tidak boleh
+            | berubah diam-diam. Lihat BusinessTripArrangementController.
+            */
+            Route::get(
+                'perdin/{publicId}/arrangements',
+                [BusinessTripArrangementController::class, 'index'],
+            );
+
+            Route::post(
+                'perdin/{publicId}/arrangements',
+                [BusinessTripArrangementController::class, 'store'],
+            );
+
+            Route::patch(
+                'perdin/{publicId}/arrangements/{arrangementId}/cancel',
+                [BusinessTripArrangementController::class, 'cancel'],
             );
 
             /*

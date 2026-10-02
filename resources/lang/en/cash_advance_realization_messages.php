@@ -129,6 +129,8 @@ return [
         'failed' => 'Failed to export the realization data.',
         'filename' => 'Realization',
         'sheet_title' => 'Realization',
+        'no_expense_category' => '(no category)',
+        'arranged_by_ga' => 'Arranged by GA (nothing spent)',
         'no_item' => '(no lines)',
 
         'difference_none' => 'No difference',
@@ -145,6 +147,9 @@ return [
             'transaction_category' => 'Transaction Category',
             'subject' => 'Subject',
             'item_description' => 'Line Description',
+            'expense_category' => 'Expense Category',
+            'qty' => 'Qty',
+            'unit_price' => 'Unit Cost',
             'item_advance_amount' => 'Requested Amount',
             'item_realization_amount' => 'Realized Amount',
             'item_difference' => 'Line Difference',
@@ -171,5 +176,19 @@ return [
         'attachment_required' => 'Row :row requires at least one attachment.',
         'unknown_source' => 'Row :row refers to an unknown cash advance line.',
         'duplicate_source' => 'Row :row refers to a cash advance line already used by another row.',
+    ],
+
+    /*
+    | Rincian berkategori pada dokumen perjalanan dinas.
+    |
+    | Nominal tiap baris dihitung dari Qty x Rincian Biaya, bukan diterima
+    | dari layar -- nominal yang bisa datang dari dua tempat cepat atau
+    | lambat akan datang berbeda.
+    */
+    'breakdown' => [
+        'category_required' => 'Row :row: the expense category is not selected. Business trip lines are grouped by category.',
+        'qty_required' => 'Row :row: Qty is required and must be greater than zero.',
+        'unit_price_required' => 'Row :row: Unit cost is required and must be greater than zero.',
+        'arranged_has_items' => 'Category :category is marked as arranged by GA, so it cannot have any lines. Remove the lines, or turn the marker off.',
     ],
 ];

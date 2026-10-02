@@ -209,29 +209,42 @@ const handleNavScroll = (evt: Event) => {
     block-size: 100%;
   }
 
+  /*
+    Nama menu datang dari basis data dan boleh diubah admin, jadi panjangnya
+    tidak bisa dipastikan. Dulu dipotong elipsis begitu ruangnya kurang, dan
+    lencana angka memakan ruang itu -- "Pengajuan Dana" jadi "Pengajuan D...".
+
+    Sekarang boleh turun ke baris kedua, dan hanya dipotong bila dua baris
+    pun tidak cukup. Tinggi barisnya tidak berubah: dua baris pada
+    line-height 1,2 masih muat di dalam 2,75rem.
+  */
   .nav-item-title {
+    display: -webkit-box;
     overflow: hidden;
     min-inline-size: 0;
     margin-inline-end: auto;
+    line-height: 1.2;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .nav-item-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-inline-size: 20px;
-    block-size: 20px;
+    min-inline-size: 18px;
+    block-size: 18px;
     flex-shrink: 0;
     padding-block: 0;
-    padding-inline: 6px;
+    padding-inline: 5px;
     border-radius: 999px;
     color: #fff;
     font-size: 11px;
     font-weight: 700;
-    line-height: 20px;
-    margin-inline-start: 8px;
+    line-height: 18px;
+    margin-inline-start: 6px;
   }
 
   .nav-item-badge.bg-error {

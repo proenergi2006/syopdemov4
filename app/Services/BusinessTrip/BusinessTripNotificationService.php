@@ -6,6 +6,7 @@ use App\Models\BusinessTrip;
 use App\Models\BusinessTripApproval;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\Permission\PermissionRecipientService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,6 +35,14 @@ use Illuminate\Support\Facades\Schema;
 class BusinessTripNotificationService
 {
     private const MODULE = 'business_trip';
+
+    /**
+     * Permission penentu siapa yang dikabari saat perdin tuntas disetujui.
+     *
+     * Bukan permission aksi: memegangnya tidak memberi wewenang apa pun atas
+     * dokumennya, hanya menempatkan orangnya pada daftar penerima kabar.
+     */
+    public const PERMISSION_NOTIFY_APPROVED = 'business_trip.notify_approved';
 
     private const URL = '/business_trip/perdin';
 
@@ -213,6 +222,66 @@ class BusinessTripNotificationService
             'reference_public_id' => $trip->encrypted_id,
             'url' => self::URL,
         ]);
+    }
+
+    /**
+     * Pemberitahuan untuk pihak yang berkepentingan atas perdin yang tuntas.
+     *
+     * Perjalanan yang sudah disetujui menimbulkan pekerjaan di tempat lain --
+     * pemesanan hotel dan tiket. Yang mengerjakannya bukan pemohon dan bukan
+     * penyetuju, jadi ia tidak pernah tersentuh alur approval.
+     *
+     * Penerimanya tidak ditulis di sini, melainkan siapa pun yang memegang
+     * permission notifikasinya -- lewat role maupun pemberian langsung ke
+     * akun. Kalau belum ada yang memegangnya, tidak ada yang dikirimi, dan
+     * perdinnya tetap berjalan seperti biasa.
+     */
+    public function notifyFinalApprovedSubscribers(BusinessTrip $trip): void
+    {
+        $penerima = app(PermissionRecipientService::class)
+            ->usersWithPermission(self::PERMISSION_NOTIFY_APPROVED);
+
+        if ($penerima->isEmpty()) {
+            return;
+        }
+
+        $requesterId = $this->getRequesterUserId($trip);
+
+        $messageParams = [
+            'trip_number' => $trip->trip_number,
+            'employee_name' => $trip->employee_name ?: '-',
+            'destination' => $trip->destination ?: '-',
+            'depart_date' => optional($trip->depart_date)->format('d/m/Y') ?: '-',
+        ];
+
+        $titleKey = 'notification_messages.business_trip.travel_arrangement.title';
+        $messageKey = 'notification_messages.business_trip.travel_arrangement.message';
+
+        foreach ($penerima as $user) {
+            /*
+            | Pemohonnya sendiri dilewati bila kebetulan ikut memegang
+            | permission ini: ia sudah menerima kabar disetujui, dan dua
+            | pemberitahuan untuk satu peristiwa hanya membingungkan.
+            */
+            if ($requesterId && (int) $user->id === (int) $requesterId) {
+                continue;
+            }
+
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'business_trip_travel_arrangement',
+                'title' => __($titleKey),
+                'title_key' => $titleKey,
+                'message' => __($messageKey, $messageParams),
+                'message_key' => $messageKey,
+                'message_params' => $messageParams,
+                'module' => self::MODULE,
+                'reference_type' => BusinessTrip::class,
+                'reference_id' => $trip->id,
+                'reference_public_id' => $trip->encrypted_id,
+                'url' => self::URL,
+            ]);
+        }
     }
 
     /**
