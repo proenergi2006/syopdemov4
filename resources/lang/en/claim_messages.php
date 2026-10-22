@@ -151,4 +151,25 @@ return [
         'trip_not_valid' => 'This claim cannot be paid: business trip :number has been cancelled or rejected.',
         'item_date_outside_trip' => 'Row :row: the date falls outside Business Trip :number (:from to :to). Travel costs cannot be dated outside the trip itself.',
     ],
+    /*
+    | Himpunan keterangan transaksi sebuah Claim.
+    |
+    | Headernya menyatakan himpunan yang boleh dipakai baris rinciannya;
+    | barisnya memilih dari himpunan itu, bukan dari seluruh master.
+    |
+    | single_for_non_routine dan request_type_mismatch tidak pernah terpakai
+    | di Claim -- ia tidak punya sifat pengajuan. Tetap disediakan karena
+    | layanannya dipakai bersama FPU, dan kunci yang hilang akan tampil
+    | sebagai nama kuncinya sendiri di layar orang.
+    */
+    'transaction_category_set' => [
+        'required' => 'At least one transaction category must be selected.',
+        'single_for_non_routine' => 'Only one transaction category is allowed.',
+        'unknown' => 'One of the transaction categories is not recognised. Reload the page and select again.',
+        'request_type_mismatch' => 'Transaction category :categories does not apply to :request_type requests.',
+        'item_required' => 'Row :row: the transaction category has not been selected.',
+        'item_not_in_set' => 'Row :row: its transaction category is not among those selected at the top of the claim.',
+        'category_without_item' => 'Transaction category :categories has no detail lines at all. Add a line for it, or remove that transaction category at the top of the claim.',
+    ],
+
 ];

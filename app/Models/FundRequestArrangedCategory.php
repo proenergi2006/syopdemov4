@@ -25,6 +25,7 @@ class FundRequestArrangedCategory extends Model
         'document_type',
         'document_id',
         'expense_category_id',
+        'notes',
     ];
 
     protected $casts = [

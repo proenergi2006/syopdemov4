@@ -72,6 +72,17 @@ class CashAdvanceApprovalMail extends Mailable implements ShouldQueue
         public ?string $notes = null,
         public ?int $stepOrder = null,
         public ?string $stepLabel = null,
+
+        /*
+        | Nomor revisi, hanya untuk mode returned_for_revision.
+        |
+        | Disebut di dalam kalimatnya supaya pemohon tahu ini
+        | pengembalian yang keberapa; dokumen yang bolak-balik tiga
+        | kali adalah keadaan yang berbeda dari yang pertama kali
+        | dikembalikan, dan email yang tidak menyebutnya membuat
+        | keduanya terbaca sama.
+        */
+        public ?int $revisionNumber = null,
     ) {
         /*
         | Job baru dilepas setelah transaksi commit -- kalau tidak, worker bisa
@@ -111,6 +122,7 @@ class CashAdvanceApprovalMail extends Mailable implements ShouldQueue
                 'notes' => $this->notes,
                 'stepOrder' => $this->stepOrder,
                 'stepLabel' => $this->stepLabel,
+                'revisionNumber' => $this->revisionNumber,
                 'approvalUrl' => $this->approvalUrl,
             ],
         );
@@ -130,6 +142,7 @@ class CashAdvanceApprovalMail extends Mailable implements ShouldQueue
             'received' => 'mail.fpu.subject.received',
             'receipt_request' => 'mail.fpu.subject.receipt_request',
             'disbursement_request' => 'mail.fpu.subject.disbursement_request',
+            'returned_for_revision' => 'mail.fpu.subject.returned_for_revision',
             default => 'mail.fpu.subject.default',
         };
 

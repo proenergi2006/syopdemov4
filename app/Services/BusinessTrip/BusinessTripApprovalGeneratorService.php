@@ -8,6 +8,7 @@ use App\Models\BusinessTrip;
 use App\Models\BusinessTripApproval;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\FundRequest\ApprovalStepRuleService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -30,7 +31,9 @@ use Illuminate\Validation\ValidationException;
 |    membuat dokumen kehilangan flow.
 |
 | 2. Pemohon tidak boleh menyetujui pengajuannya sendiri, dan approval-nya
-|    naik satu tingkat. Lihat applySelfApprovalRule().
+|    STEP-nya dilewati -- bukan rantainya dipotong. Step lain tetap
+|    berjalan, termasuk yang nomornya lebih kecil. Aturannya ditulis
+|    sekali di ApprovalStepRuleService dan dipakai keempat modul.
 |--------------------------------------------------------------------------
 */
 class BusinessTripApprovalGeneratorService
@@ -90,9 +93,79 @@ class BusinessTripApprovalGeneratorService
         | rantai sebelum memutuskan step mana yang gugur, jadi tidak bisa
         | ditulis sambil jalan seperti pada FPU.
         */
-        $candidates = $this->buildCandidates($trip, $approvalFlow, $flowSteps);
+        $aturan = app(ApprovalStepRuleService::class);
 
-        $candidates = $this->applySelfApprovalRule($trip, $candidates, $requesterId);
+        $requesterRoleIds = $aturan->roleIdsOf($requesterId);
+
+        /*
+        | Nasib tiap step dihitung lebih dulu, memakai aturan yang sama
+        | dengan FPU dan Realisasi:
+        |
+        | - step yang memuat pemohon DILEWATI seluruhnya,
+        | - step lain tetap berjalan, termasuk yang nomornya lebih kecil,
+        | - step yang boleh disetujui rekan setingkat hanya mengeluarkan
+        |   pemohonnya.
+        |
+        | Step bercakupan cabang ikut dicairkan supaya keputusannya diambil
+        | atas orang yang benar-benar akan menjadi approver dokumen ini.
+        */
+        $rencanaStep = $aturan->planSteps(
+            $flowSteps,
+            $requesterId,
+            $requesterRoleIds,
+            function (ApprovalFlowStep $step) use ($trip) {
+                $scope = strtoupper(trim(
+                    (string) ($step->approver_scope ?: ApprovalFlowStep::APPROVER_SCOPE_GLOBAL),
+                ));
+
+                $tipe = strtoupper(trim((string) $step->approver_type));
+
+                if ($scope === ApprovalFlowStep::APPROVER_SCOPE_SAME_BRANCH) {
+                    return $this->resolveSameBranchApprovers($step, $trip, $tipe);
+                }
+
+                if ($scope === ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES) {
+                    return $this->resolveSelectedBranchApprovers($step, $trip, $tipe);
+                }
+
+                return null;
+            },
+        );
+
+        /*
+        | Tingkat yang bertahan tetapi tidak punya seorang pun di dalamnya.
+        |
+        | Ditahan di sini, bukan dibiarkan tersimpan: dokumen yang masuk ke
+        | tingkat tanpa approver akan berstatus menunggu selamanya, tanpa
+        | pesan, dan baru ketahuan ketika seseorang bertanya kenapa
+        | dokumennya tidak maju-maju.
+        */
+        $aturan->assertApproverAda($rencanaStep, 'Perdin');
+
+        $candidates = $this->buildCandidates(
+            $trip,
+            $approvalFlow,
+            $flowSteps,
+            $requesterId,
+            $requesterRoleIds,
+            $rencanaStep,
+        );
+
+        /*
+        | Seluruh step terlewati berarti tidak ada yang menyetujui.
+        |
+        | Dokumen tanpa satu pun approver akan berdiri selamanya tanpa ada
+        | yang bisa menggerakkannya -- ditahan di sini, bukan dibiarkan
+        | tersimpan diam-diam.
+        */
+        if ($candidates === []) {
+            throw ValidationException::withMessages([
+                'approval_flow' => [
+                    'Tidak ada approver yang tersisa pada approval flow Perdin ini untuk Anda.'
+                    . ' Hubungi admin untuk memeriksa matriks approval-nya.',
+                ],
+            ]);
+        }
 
         $this->assertEveryStepHasApprover($candidates, $flowSteps);
 
@@ -112,7 +185,12 @@ class BusinessTripApprovalGeneratorService
         BusinessTrip $trip,
         ApprovalFlow $approvalFlow,
         Collection $flowSteps,
+        int $requesterId = 0,
+        array $requesterRoleIds = [],
+        array $rencanaStep = ['skipped' => [], 'users' => []],
     ): array {
+        $aturan = app(ApprovalStepRuleService::class);
+
         $candidates = [];
 
         // Mencegah baris ganda pada step yang sama.
@@ -147,6 +225,27 @@ class BusinessTripApprovalGeneratorService
 
             $this->assertApproverTypeSupported($approverType, $flowStep);
 
+            /*
+            | Step yang gugur menurut rencana di atas: karena pemohon ada di
+            | dalamnya, karena rekan sejawatnya ada di tingkat yang sama,
+            | karena rekan setingkatnya habis, atau karena role pemohon
+            | memang dikecualikan pada step itu.
+            */
+            $sebabGugur = $rencanaStep['skipped'][(int) $flowStep->id] ?? null;
+
+            if ($sebabGugur !== null) {
+                Log::info('[Perdin Approval Generator] Step dilewati', [
+                    'business_trip_id' => $trip->id,
+                    'step_order' => $stepOrder,
+                    'label' => $flowStep->label,
+                    'sebab' => $sebabGugur,
+                ]);
+
+                continue;
+            }
+
+            $rekan = $aturan->peerApproval($flowStep);
+
             $dasar = [
                 'business_trip_id' => $trip->id,
                 'approval_flow_id' => $approvalFlow->id,
@@ -165,11 +264,28 @@ class BusinessTripApprovalGeneratorService
                 $resolved = $this->resolveSameBranchApprovers($flowStep, $trip, $approverType);
             } elseif ($approverScope === ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES) {
                 $resolved = $this->resolveSelectedBranchApprovers($flowStep, $trip, $approverType);
+            } elseif (
+                $approverType === ApprovalFlowStep::APPROVER_TYPE_DEPARTMENT
+                || ($rekan && $approverType === ApprovalFlowStep::APPROVER_TYPE_ROLE)
+            ) {
+                /*
+                | Dicairkan menjadi USER konkret.
+                |
+                | DEPARTMENT memang tidak punya bentuk lain -- tidak ada baris
+                | approval bertipe department di hilir.
+                |
+                | ROLE pada step rekan setingkat juga harus dicairkan: baris
+                | ROLE tidak bisa mengeluarkan satu orang dari dalamnya, dan
+                | membuang barisnya berarti membuang seluruh pemegang role itu.
+                */
+                $resolved = $aturan->resolveConcreteApprovers($flowStep);
             } else {
                 $resolved = null;
             }
 
             if ($resolved !== null) {
+                $barisStep = [];
+
                 foreach ($resolved as $user) {
                     $userId = (int) $user->id;
 
@@ -177,7 +293,24 @@ class BusinessTripApprovalGeneratorService
                         continue;
                     }
 
-                    $key = sprintf('%d-USER-%d', $stepOrder, $userId);
+                    $barisStep[] = $dasar + [
+                        'approver_type' => BusinessTripApproval::APPROVER_TYPE_USER,
+                        'approver_id' => $userId,
+                        'approver_name_snapshot' => $user->name ?? null,
+                    ];
+                }
+
+                $barisStep = $this->saringRekan(
+                    $barisStep,
+                    $rekan,
+                    $requesterId,
+                    $trip,
+                    $flowStep,
+                    $aturan,
+                );
+
+                foreach ($barisStep as $baris) {
+                    $key = sprintf('%d-USER-%d', $stepOrder, (int) $baris['approver_id']);
 
                     if (isset($seen[$key])) {
                         continue;
@@ -185,11 +318,7 @@ class BusinessTripApprovalGeneratorService
 
                     $seen[$key] = true;
 
-                    $candidates[$stepOrder][] = $dasar + [
-                        'approver_type' => BusinessTripApproval::APPROVER_TYPE_USER,
-                        'approver_id' => $userId,
-                        'approver_name_snapshot' => $user->name ?? null,
-                    ];
+                    $candidates[$stepOrder][] = $baris;
                 }
 
                 continue;
@@ -214,160 +343,28 @@ class BusinessTripApprovalGeneratorService
                 continue;
             }
 
-            $seen[$key] = true;
-
-            $candidates[$stepOrder][] = $dasar + [
+            $baris = [$dasar + [
                 'approver_type' => $approverType,
                 'approver_id' => $approverId,
                 'approver_name_snapshot' => $this->resolveApproverName($flowStep),
-            ];
+            ]];
+
+            /* Step rekan setingkat yang approvernya satu orang: ia pemohonnya. */
+            $baris = $this->saringRekan($baris, $rekan, $requesterId, $trip, $flowStep, $aturan);
+
+            if ($baris === []) {
+                continue;
+            }
+
+            $seen[$key] = true;
+
+            $candidates[$stepOrder][] = $baris[0];
         }
 
         ksort($candidates);
 
         return $candidates;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Aturan: pemohon tidak boleh menyetujui pengajuannya sendiri
-    |--------------------------------------------------------------------------
-    | Bunyi aturannya: "Bila pemohon adalah salah satu atasan, approval naik
-    | satu tingkat di atasnya. Tidak boleh menyetujui pengajuan sendiri.
-    | Jumlah tetap maksimal 3."
-    |
-    | Penerapannya: cari step TERTINGGI tempat pemohon muncul, lalu buang step
-    | itu beserta semua step di bawahnya. Yang tersisa hanyalah tingkat di atas
-    | pemohon.
-    |
-    | Dua hal yang membuat pembuangannya tidak berhenti pada baris pemohon saja:
-    |
-    | - Rekan setingkat bukan atasan. Bila satu step berisi pemohon dan rekan
-    |   sejawatnya, membiarkan rekan itu menyetujui berarti approval tidak
-    |   benar-benar naik. Karena itu seluruh step digugurkan, bukan hanya
-    |   barisnya.
-    |
-    | - Step di bawahnya adalah bawahan. Bila hanya step pemohon yang dibuang,
-    |   step yang lebih rendah tetap hidup dan pengajuan justru disetujui
-    |   bawahannya sendiri.
-    |
-    | PENTING: aturan ini bersandar pada step_order sebagai urutan senioritas
-    | (step 1 paling junior). Flow Perdin wajib disusun dari bawah ke atas --
-    | mis. ADH, lalu atasan 1, lalu atasan 2. Bila urutannya dibalik, aturan
-    | ini akan membuang tingkat yang salah.
-    |
-    | @param  array<int, array<int, array<string, mixed>>>  $candidates
-    | @return array<int, array<int, array<string, mixed>>>
-    */
-    private function applySelfApprovalRule(
-        BusinessTrip $trip,
-        array $candidates,
-        int $requesterId,
-    ): array {
-        if ($requesterId <= 0 || $candidates === []) {
-            return $candidates;
-        }
-
-        $requesterRoleIds = $this->resolveUserRoleIds($requesterId);
-
-        $highestSelfStep = null;
-
-        foreach ($candidates as $stepOrder => $rows) {
-            foreach ($rows as $row) {
-                if (!$this->rowRefersToUser($row, $requesterId, $requesterRoleIds)) {
-                    continue;
-                }
-
-                $highestSelfStep = max($highestSelfStep ?? $stepOrder, $stepOrder);
-
-                break;
-            }
-        }
-
-        if ($highestSelfStep === null) {
-            return $candidates;
-        }
-
-        $sisa = array_filter(
-            $candidates,
-            fn(int $stepOrder): bool => $stepOrder > $highestSelfStep,
-            ARRAY_FILTER_USE_KEY,
-        );
-
-        Log::info('[Perdin Approval Generator] Pemohon adalah approver, rantai dinaikkan', [
-            'business_trip_id' => $trip->id,
-            'trip_number' => $trip->trip_number,
-            'requester_id' => $requesterId,
-            'step_pemohon' => $highestSelfStep,
-            'step_dibuang' => array_values(array_diff(array_keys($candidates), array_keys($sisa))),
-            'step_tersisa' => array_keys($sisa),
-        ]);
-
-        if ($sisa === []) {
-            $trip->loadMissing('departmentData');
-
-            /*
-            | Tidak ada tingkat di atas pemohon. Dokumen ditahan di sini, bukan
-            | diloloskan tanpa approver -- meloloskannya berarti pemohon
-            | menyetujui pengajuannya sendiri secara diam-diam.
-            */
-            throw ValidationException::withMessages([
-                'approval_flow' => [
-                    sprintf(
-                        'Anda adalah approver tertinggi pada approval flow Perdin untuk area %s'
-                        . ' dan department %s, sehingga tidak ada atasan yang dapat menyetujui'
-                        . ' pengajuan ini. Hubungi admin untuk menambahkan tingkat approval'
-                        . ' di atas Anda pada matriks approval Perdin.',
-                        $trip->getApprovalAreaType() ?: '-',
-                        $trip->departmentData?->nama ?? '-',
-                    ),
-                ],
-            ]);
-        }
-
-        return $sisa;
-    }
-
-    /**
-     * Apakah satu baris kandidat menunjuk pemohon.
-     *
-     * Baris hasil resolve scope cabang selalu berupa USER konkret, sedangkan
-     * baris GLOBAL bisa berupa ROLE -- keduanya harus diperiksa, kalau tidak
-     * pemohon yang masuk lewat role akan lolos.
-     *
-     * @param  array<string, mixed>  $row
-     * @param  array<int, int>  $requesterRoleIds
-     */
-    private function rowRefersToUser(array $row, int $requesterId, array $requesterRoleIds): bool
-    {
-        $type = strtoupper(trim((string) ($row['approver_type'] ?? '')));
-        $id = (int) ($row['approver_id'] ?? 0);
-
-        if ($type === BusinessTripApproval::APPROVER_TYPE_USER) {
-            return $id === $requesterId;
-        }
-
-        if ($type === BusinessTripApproval::APPROVER_TYPE_ROLE) {
-            return in_array($id, $requesterRoleIds, true);
-        }
-
-        return false;
-    }
-
-    /**
-     * @return array<int, int>
-     */
-    private function resolveUserRoleIds(int $userId): array
-    {
-        return User::query()
-            ->whereKey($userId)
-            ->first()
-            ?->roles
-            ->pluck('id')
-            ->map(fn($id): int => (int) $id)
-            ->all() ?? [];
-    }
-
     /*
     |--------------------------------------------------------------------------
     | Penyimpanan
@@ -397,6 +394,41 @@ class BusinessTripApprovalGeneratorService
      *
      * @param  array<int, array<int, array<string, mixed>>>  $candidates
      */
+    /**
+     * Mengeluarkan pemohon dari sebuah step yang boleh disetujui rekannya.
+     *
+     * Step biasa ($rekan = false) dikembalikan apa adanya -- inilah yang
+     * membuat seluruh alur yang berjalan sekarang tidak berubah sama sekali.
+     *
+     * @param  array<int, array<string, mixed>>  $baris
+     * @return array<int, array<string, mixed>>
+     */
+    private function saringRekan(
+        array $baris,
+        bool $rekan,
+        int $requesterId,
+        BusinessTrip $trip,
+        ApprovalFlowStep $flowStep,
+        ApprovalStepRuleService $aturan,
+    ): array {
+        if (!$rekan) {
+            return $baris;
+        }
+
+        $sesudah = $aturan->withoutRequester($baris, $requesterId);
+
+        if (count($sesudah) !== count($baris)) {
+            Log::info('[Perdin Approval Generator] Pemohon dikeluarkan dari step rekan setingkat', [
+                'business_trip_id' => $trip->id,
+                'step_order' => (int) $flowStep->step_order,
+                'label' => $flowStep->label,
+                'tersisa' => count($sesudah),
+            ]);
+        }
+
+        return $sesudah;
+    }
+
     private function assertEveryStepHasApprover(array $candidates, Collection $flowSteps): void
     {
         foreach ($candidates as $stepOrder => $rows) {
@@ -621,13 +653,11 @@ class BusinessTripApprovalGeneratorService
 
     private function assertApproverTypeSupported(string $approverType, ApprovalFlowStep $flowStep): void
     {
-        if (
-            in_array(
-                $approverType,
-                [BusinessTripApproval::APPROVER_TYPE_USER, BusinessTripApproval::APPROVER_TYPE_ROLE],
-                true,
-            )
-        ) {
+        /*
+        | DEPARTMENT sah di step, walau tidak pernah sampai ke baris approval:
+        | ia selalu dicairkan menjadi USER lebih dulu.
+        */
+        if (in_array($approverType, ApprovalFlowStep::APPROVER_TYPES, true)) {
             return;
         }
 

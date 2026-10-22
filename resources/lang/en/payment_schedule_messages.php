@@ -39,6 +39,9 @@ return [
 
     'duplicate_scope' => 'Another schedule already covers exactly the same scope. Change the module or transaction category, or edit the existing schedule instead.',
 
+    'category_requires_module' => 'Pick the module first. FPU and Claim use different transaction categories, so the scope cannot be decided before the module is named.',
+    'category_module_mismatch' => 'That transaction category does not belong to :module, so this schedule would never be used. Pick one of the categories offered after the module is selected.',
+
     'index' => [
         'forbidden' => 'You do not have access to view payment schedules.',
     ],

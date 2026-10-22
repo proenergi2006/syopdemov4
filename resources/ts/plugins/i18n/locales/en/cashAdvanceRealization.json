@@ -7,7 +7,9 @@
         "rejected": "Rejected",
         "cancelled": "Cancelled",
         "settled": "Settled",
-        "received": "Received"
+        "received": "Received",
+        "verified": "Awaiting Payment",
+        "needRevision": "Needs Revision"
     },
     "difference": {
         "all": "All Differences",
@@ -36,7 +38,8 @@
                 "all": "All Documents",
                 "return": "Awaiting Return",
                 "reimburse": "Awaiting Payment",
-                "notReceived": "Not Yet Received"
+                "notReceived": "Not Yet Received",
+                "verify": "Waiting for my check"
             },
             "pendingActionLabel": "Needs Action",
             "resetButton": "Reset Filters",
@@ -103,7 +106,10 @@
             "attachmentCount": "This document has {count} attachment(s).",
             "attachmentInclude": "Merge attachments into a single PDF",
             "attachmentPdfNotice": "Image attachments are added on the following pages, two per page. Attachments that are already PDFs cannot be merged — their names are still listed on the last page so they can be opened separately.",
-            "attachmentConfirm": "Print"
+            "attachmentConfirm": "Print",
+            "combineTripInclude": "Combine with the business trip document",
+            "combineTripNotice": "The business trip will be printed after this document, along with the GA booking files if attachments are combined.",
+            "combineTripUnavailable": "This document is not linked to a business trip, or the trip is not fully approved yet."
         },
         "approve": {
             "dialogTitle": "Approve realization {number}?",
@@ -136,7 +142,8 @@
         },
         "pending": {
             "return": "Return Pending",
-            "reimburse": "Finance Payment Pending"
+            "reimburse": "Finance Payment Pending",
+            "verify": "Awaiting check"
         },
         "settleAmount": {
             "label": "Amount handed over",
@@ -236,6 +243,17 @@
             "confirm": "Yes, Undo Receipt",
             "successFallback": "The receipt was undone.",
             "failedFallback": "The receipt could not be undone."
+        },
+        "action": {
+            "verify": "Forward for payment"
+        },
+        "verify": {
+            "confirmTitle": "Forward for payment?",
+            "confirmText": "Realization {nomor} will be forwarded to the payment holder so the shortfall can be paid.",
+            "success": "The realization has been forwarded for payment.",
+            "failed": "The realization could not be forwarded for payment.",
+            "notesLabel": "Check notes (optional)",
+            "confirmButton": "Forward"
         }
     },
     "form": {
@@ -264,7 +282,8 @@
             "itemDate": "Date is required.",
             "itemDescription": "Description is required.",
             "itemAmount": "The realized amount cannot be negative.",
-            "itemAttachment": "At least one file."
+            "itemAttachment": "At least one file.",
+            "itemTransactionCategory": "A transaction category is required"
         },
         "source": {
             "sectionTitle": "Source Cash Advance",
@@ -297,11 +316,12 @@
             "tableNo": "No",
             "tableRealization": "Realized",
             "totalAdvance": "Total Disbursed",
-            "totalRealization": "Total Realized"
+            "totalRealization": "Total Realized",
+            "tableTransactionCategory": "Transaction Category"
         },
         "attachment": {
             "title": "Receipts",
-            "addButton": "Add Receipt",
+            "addButton": "Upload Evidence",
             "empty": "No receipts yet. Accepted formats: PDF, JPG, JPEG, PNG, up to 3MB each.",
             "deleteButton": "Remove",
             "existingTitle": "Saved Receipts"
@@ -329,7 +349,9 @@
             "savingData": "Saving data...",
             "cancelConfirmTitle": "Discard this form?",
             "cancelConfirmText": "Anything you have filled in will be lost.",
-            "saveFailed": "Failed to save the realization."
+            "saveFailed": "Failed to save the realization.",
+            "itemTransactionCategoryRequired": "Row {number}: its transaction category has not been selected.",
+            "categoryWithoutItem": "Transaction category {categories} has no lines yet. Add one -- every transaction category on the FPU must be answered by at least one item."
         },
         "itemDialog": {
             "title": "Realization Lines",
@@ -353,7 +375,10 @@
             "toastNoRows": "There are no lines at all. Fill in at least one, or mark the category as arranged by GA.",
             "toastCategory": "Row {number}: the expense category is not selected.",
             "toastQty": "Row {number}: Qty is required and must be greater than zero.",
-            "toastUnitPrice": "Row {number}: Unit cost is required and must be greater than zero."
+            "toastUnitPrice": "Row {number}: Unit cost is required and must be greater than zero.",
+            "arrangedNotesLabel": "Note for GA (optional)",
+            "arrangedNotesPlaceholder": "e.g. morning departure, return the same day",
+            "arrangedNotesHint": "A specific request to GA for this category. It also shows in the document detail."
         }
     },
     "detail": {
@@ -410,6 +435,7 @@
         "paymentOverdue": "Past its schedule and the shortfall has not been paid.",
         "paymentEarly": "Paid ahead of schedule.",
         "paymentOnTime": "Paid exactly on schedule.",
-        "paymentLate": "Paid after its schedule."
+        "paymentLate": "Paid after its schedule.",
+        "itemTransactionCategory": "Transaction Category"
     }
 }

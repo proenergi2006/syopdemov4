@@ -36,6 +36,15 @@ interface RealizationItemForm {
   expense_category_id: number | null
   qty: number | null
   unit_price: number | null
+
+  /*
+  | Keterangan transaksi barisnya, dibatasi himpunan FPU sumbernya.
+  |
+  | Bukan expense_category_id di atas: yang ini Telpon atau Listrik, yang
+  | itu Tiket atau Penginapan. Dua kolom berkata "kategori" pada satu
+  | baris memang mudah tertukar -- karena itu disebut beda.
+  */
+  transaction_category_id: number | null
   date: string | null
   description: string
   advance_amount: number
@@ -59,6 +68,12 @@ interface CashAdvanceOption {
   branch: string
   department: string
   transaction_category: string | null
+
+  /*
+  | Himpunan keterangan transaksi FPU ini. Baca saja di realisasi -- yang
+  | menentukannya FPU sumbernya, dan realisasi hanya menjawabnya.
+  */
+  transaction_categories?: { id: number; name: string }[]
   request_type: string | null
   total_amount: number
   disbursed_at: string | null
@@ -154,6 +169,29 @@ const businessTripId = ref<number | null>(null)
 
 /* Kategori yang ditandai diurus GA -- tidak ditagihkan, tanpa baris. */
 const arrangedCategories = ref<number[]>([])
+
+/*
+| Catatan pemohon untuk GA, per kategori. Opsional.
+|
+| "Diurus GA" belum menjawab APA yang diminta -- berangkat pagi atau
+| malam, kereta atau pesawat. Tanpa tempat menuliskannya, keterangan itu
+| berpindah lewat pesan terpisah yang tidak menempel pada dokumennya, dan
+| yang menyetujui tidak pernah melihatnya.
+|
+| Terpisah dari daftar penandanya, bukan dilebur: yang menentukan tetap
+| daftar idnya, dan catatan hanyalah keterangan yang menempel padanya.
+*/
+const arrangedNotes = ref<Record<number, string>>({})
+
+const arrangedNote = (categoryId: number): string =>
+  arrangedNotes.value[Number(categoryId)] ?? ''
+
+const setArrangedNote = (categoryId: number, value: unknown): void => {
+  arrangedNotes.value = {
+    ...arrangedNotes.value,
+    [Number(categoryId)]: String(value ?? ''),
+  }
+}
 
 const needsBusinessTrip = computed<boolean>(() => businessTripId.value !== null)
 
@@ -253,6 +291,19 @@ const loadCashAdvances = async (showAlert = true): Promise<void> => {
       branch: String(item.branch || '-'),
       department: String(item.department || '-'),
       transaction_category: item.transaction_category || null,
+
+      /*
+      | Himpunan keterangan transaksinya. Tanpa disalin di sini, kepala
+      | formulir hanya menampilkan yang pertama dan kolom per barisnya
+      | tidak pernah muncul -- tanpa satu pun galat, karena bentuknya
+      | opsional.
+      */
+      transaction_categories: Array.isArray(item.transaction_categories)
+        ? item.transaction_categories.map((satu: any) => ({
+          id: Number(satu.id),
+          name: String(satu.name ?? ''),
+        }))
+        : [],
       request_type: item.request_type || null,
       total_amount: Number(item.total_amount || 0),
       disbursed_at: item.disbursed_at || null,
@@ -270,6 +321,12 @@ const loadCashAdvances = async (showAlert = true): Promise<void> => {
           date: line.date || null,
           description: String(line.description || ''),
           amount: Number(line.amount || 0),
+
+          /* Keterangan transaksi baris FPU-nya, dibawa supaya tidak dipilih ulang. */
+          transaction_category_id: line.transaction_category_id !== null
+            && line.transaction_category_id !== undefined
+            ? Number(line.transaction_category_id)
+            : null,
 
           /* Null di luar perdin: di sana rinciannya memang tidak berkelompok. */
           expense_category_id: line.expense_category_id !== null && line.expense_category_id !== undefined
@@ -334,6 +391,16 @@ const applyCashAdvanceItems = (): void => {
   */
   arrangedCategories.value = [...source.arranged_categories]
 
+  /*
+  | Catatannya ikut tersalin bersama penandanya -- ia yang menjelaskan
+  | penanda itu. Masih bisa disunting di sini: yang tersalin nilai awal,
+  | bukan keputusan akhir.
+  */
+  arrangedNotes.value = Object.fromEntries(
+    Object.entries(source.arranged_notes || {})
+      .map(([id, catatan]) => [Number(id), String(catatan ?? '')]),
+  )
+
   form.items = source.items.map(line => ({
     cash_advance_item_id: line.id,
     date: line.date,
@@ -342,6 +409,13 @@ const applyCashAdvanceItems = (): void => {
     realization_amount: line.amount,
     notes: '',
     attachments: [],
+
+    /*
+    | Keterangan transaksinya ikut tersalin -- jawabannya sudah ada di
+    | FPU-nya, dan memintanya ulang hanya menambah pekerjaan yang tidak
+    | menambah keterangan. Tetap bisa diganti di modal rinciannya.
+    */
+    transaction_category_id: line.transaction_category_id ?? null,
 
     expense_category_id: line.expense_category_id,
     qty: line.qty,
@@ -386,6 +460,13 @@ interface ExpenseCategoryOption {
   id: number
   name: string
   sort_order: number
+
+  /*
+  | Kategori ini boleh ditandai diurus GA. Datang dari master, bukan
+  | ditetapkan di sini: daftar "GA mengurus apa" adalah kesepakatan
+  | kerja, dan ia berubah tanpa menunggu rilis.
+  */
+  ga_arrangeable: boolean
 }
 
 const expenseCategoryList = ref<ExpenseCategoryOption[]>([])
@@ -428,6 +509,7 @@ watch(needsBusinessTrip, () => {
   */
   if (!needsBusinessTrip.value) {
     arrangedCategories.value = []
+    arrangedNotes.value = {}
 
     for (const item of form.items) {
       item.expense_category_id = null
@@ -444,6 +526,109 @@ watch(needsBusinessTrip, () => {
  * angka yang dikirim layar -- yang di sini hanya menampilkan hasil yang
  * sama supaya yang mengisi tahu apa yang akan tersimpan.
  */
+/*
+|--------------------------------------------------------------------------
+| Keterangan transaksi: milik FPU sumbernya
+|--------------------------------------------------------------------------
+| Realisasi tidak bisa mengubah himpunannya. Yang bisa dipilih hanya pada
+| tiap baris rincian, dan hanya dari himpunan itu -- dengan ketentuan tiap
+| anggotanya punya minimal satu baris.
+|--------------------------------------------------------------------------
+*/
+const transactionCategoryOptions = computed<{ id: number; title: string }[]>(() =>
+  (selectedCashAdvance.value?.transaction_categories ?? [])
+    .map(satu => ({ id: Number(satu.id), title: String(satu.name) })))
+
+/** Dipisah koma di kepala formulir -- seluruhnya, bukan yang pertama saja. */
+const transactionCategoryLabel = computed<string>(() => {
+  const daftar = transactionCategoryOptions.value.map(satu => satu.title)
+
+  if (daftar.length)
+    return daftar.join(', ')
+
+  /*
+  | Jatuh ke keterangan tunggalnya untuk FPU yang dibuat sebelum himpunan
+  | ini ada -- dan untuk jawaban lama yang tersimpan di cache peramban.
+  */
+  return String(selectedCashAdvance.value?.transaction_category ?? '') || '-'
+})
+
+/** Baris rincian perlu menyebut keterangan transaksinya sendiri. */
+const lineNeedsCategory = computed<boolean>(() =>
+  transactionCategoryOptions.value.length > 1)
+
+/**
+ * Kolom keterangan transaksi digambar pada rinciannya.
+ *
+ * Berbeda dari lineNeedsCategory, yang menjawab "perlukah pengguna
+ * memilih". Pada keterangan tunggal tidak ada yang perlu dipilih --
+ * tetapi tetap perlu TERLIHAT, supaya rincian yang sedang diisi
+ * menyebutkan untuk apa ia dibuat tanpa menggulung ke atas.
+ */
+const lineShowsCategory = computed<boolean>(() =>
+  transactionCategoryOptions.value.length > 0)
+
+/**
+ * Nama keterangan transaksi sebuah baris.
+ *
+ * Dicari di himpunan FPU sumbernya, bukan di daftar master: yang di luar
+ * himpunan memang tidak sah di baris ini, dan menuliskan namanya hanya akan
+ * membuat isian yang salah terlihat benar.
+ */
+const lineCategoryName = (categoryId: number | null): string => {
+  const ketemu = transactionCategoryOptions.value.find(
+    satu => Number(satu.id) === Number(categoryId),
+  )
+
+  return ketemu ? ketemu.title : ''
+}
+
+/**
+ * Keterangan transaksi yang belum punya satu baris pun.
+ *
+ * Realisasi yang tidak menjawab salah satu keterangan pada FPU-nya
+ * meninggalkan pertanyaan yang tidak terlihat sebagai pertanyaan: angkanya
+ * lengkap, satu keterangan hilang diam-diam.
+ */
+const categoriesWithoutItem = (daftar: RealizationItemForm[]): string[] => {
+  if (!lineNeedsCategory.value)
+    return []
+
+  return transactionCategoryOptions.value
+    .filter(satu => !daftar.some(
+      baris => Number(baris.transaction_category_id) === Number(satu.id),
+    ))
+    .map(satu => satu.title)
+}
+
+/**
+ * Apa yang salah dengan keterangan transaksi pada rinciannya, bila ada.
+ *
+ * Mengembalikan kalimatnya, bukan sekadar benar-salah: yang menanyakannya
+ * tidak perlu tahu keluhan mana yang keluar.
+ */
+const breakdownCategoryIssue = (daftar: RealizationItemForm[]): string | null => {
+  if (lineNeedsCategory.value) {
+    const tanpaKategori = daftar.findIndex(
+      baris => !Number(baris.transaction_category_id),
+    )
+
+    if (tanpaKategori !== -1) {
+      return t('cashAdvanceRealization.form.toast.itemTransactionCategoryRequired', {
+        number: tanpaKategori + 1,
+      })
+    }
+  }
+
+  const tanpaBaris = categoriesWithoutItem(daftar)
+
+  return tanpaBaris.length
+    ? t('cashAdvanceRealization.form.toast.categoryWithoutItem', {
+      categories: tanpaBaris.join(', '),
+    })
+    : null
+}
+
 const lineTotal = (item: RealizationItemForm): number =>
   Math.round((Number(item.qty) || 0) * (Number(item.unit_price) || 0) * 100) / 100
 
@@ -518,11 +703,25 @@ const tempItemsTotal = computed<number>(() =>
 const toggleArranged = (categoryId: number): void => {
   const id = Number(categoryId)
 
+  /* Mematikannya selalu boleh -- lihat jalan keluar di bawah. */
   if (arrangedCategories.value.includes(id)) {
     arrangedCategories.value = arrangedCategories.value.filter(satu => satu !== id)
 
     return
   }
+
+  /*
+  | Menyalakannya hanya pada kategori yang disebut masternya.
+  |
+  | Tombolnya memang sudah disembunyikan, jadi ini bukan jalan yang
+  | biasa dilewati. Tetap diperiksa karena daftar kategorinya bisa
+  | termuat ulang sesudah modalnya terbuka, dan saat itu penandanya
+  | bisa berubah di bawah tangan yang sedang mengisi.
+  */
+  const kategori = expenseCategoryList.value.find(satu => Number(satu.id) === id)
+
+  if (!kategori?.ga_arrangeable)
+    return
 
   arrangedCategories.value = [...arrangedCategories.value, id]
 
@@ -712,6 +911,26 @@ const saveItemsFromDialog = (): void => {
    * Tanggal wajib pada setiap baris. Dipisah dari pemeriksaan deskripsi
    * dan nominal supaya pesannya menunjuk langsung ke kolom yang kosong.
    */
+  /*
+  | Keterangan transaksi tiap baris, dan cakupannya.
+  |
+  | Berdiri sebelum pemeriksaan tanggal: yang kehilangan seluruh barisnya
+  | pada sebuah keterangan perlu tahu itu lebih dulu, bukan sesudah
+  | membetulkan tanggal pada baris yang ternyata tidak lengkap kelompoknya.
+  */
+  const keluhanKategori = breakdownCategoryIssue(tempItems.value)
+
+  if (keluhanKategori) {
+    isSubmitted.value = true
+
+    showWarningToast({
+      title: t('common.alert.warning'),
+      text: keluhanKategori,
+    })
+
+    return
+  }
+
   const withoutDate = tempItems.value.findIndex(item => !String(item.date ?? '').trim())
 
   if (withoutDate !== -1) {
@@ -887,6 +1106,25 @@ const removeLineAttachment = (index: number, fileIndex: number): void => {
 const lineMissingAttachment = (index: number): boolean =>
   !tempItems.value[index]?.attachments.length
 
+/**
+ * Membuka berkas yang BARU DIPILIH, yang belum pernah diunggah.
+ *
+ * Ia masih objek File di memori peramban dan tidak punya alamat apa pun,
+ * jadi alamat sementaranya dibuatkan lebih dulu.
+ *
+ * Alamatnya dibebaskan BELAKANGAN, bukan seketika: membebaskannya tepat
+ * sesudah window.open membatalkan alamat yang baru saja dipakai, dan tab
+ * yang terbuka mendapati halaman kosong. Semenit cukup lama untuk dibuka,
+ * cukup singkat untuk tidak menumpuk.
+ */
+const openPickedFile = (file: File): void => {
+  const alamat = URL.createObjectURL(file)
+
+  window.open(alamat, '_blank', 'noopener')
+
+  window.setTimeout(() => URL.revokeObjectURL(alamat), 60000)
+}
+
 const formatFileSize = (bytes: number): string =>
   `${(bytes / 1024 / 1024).toFixed(2)} MB`
 
@@ -932,6 +1170,22 @@ const validateForm = (): boolean => {
   const withoutDate = needsBusinessTrip.value
     ? -1
     : form.items.findIndex(item => !String(item.date ?? '').trim())
+
+  /*
+  | Diperiksa lagi di sini: headernya tidak bisa diganti di realisasi,
+  | tetapi barisnya bisa dihapus sesudah modalnya ditutup -- dan modalnya
+  | belum tentu dibuka lagi.
+  */
+  const keluhanKategoriSimpan = breakdownCategoryIssue(form.items)
+
+  if (keluhanKategoriSimpan) {
+    showWarningToast({
+      title: t('common.alert.warning'),
+      text: keluhanKategoriSimpan,
+    })
+
+    return false
+  }
 
   if (withoutDate !== -1) {
     showWarningToast({
@@ -994,6 +1248,12 @@ const buildFormData = (): FormData => {
         realization_amount: Number(item.realization_amount || 0),
         notes: item.notes || null,
 
+        /*
+        | Keterangan transaksi barisnya. Berlaku pada baris perdin maupun
+        | bukan -- keterangan transaksi bukan bagian dari bentuk rinciannya.
+        */
+        transaction_category_id: item.transaction_category_id,
+
         /* Null di luar perdin; server pun hanya membacanya di sana. */
         expense_category_id: item.expense_category_id,
         qty: item.qty,
@@ -1010,6 +1270,22 @@ const buildFormData = (): FormData => {
   if (needsBusinessTrip.value) {
     arrangedCategories.value.forEach(id => {
       formData.append('arranged_categories[]', String(id))
+
+      /*
+      | Catatannya hanya terkirim untuk kategori yang sedang ditandai.
+      |
+      | Yang penandanya dimatikan tetap tersimpan di layar -- supaya salah
+      | klik tidak menghapus apa yang sudah diketik -- tetapi tidak ikut
+      | berangkat: catatan tanpa penanda bukan keterangan apa pun lagi.
+      |
+      | Yang kosong pun dilewati, bukan dikirim sebagai string kosong:
+      | server menyimpan kosong sebagai null, dan dua bentuk untuk satu
+      | arti memaksa setiap pembacanya memeriksa dua-duanya.
+      */
+      const catatan = arrangedNote(Number(id)).trim()
+
+      if (catatan)
+        formData.append(`arranged_notes[${id}]`, catatan)
     })
   }
 
@@ -1265,7 +1541,11 @@ onMounted(async () => {
                 <div class="text-caption text-medium-emphasis">
                   {{ t('cashAdvanceRealization.form.source.transactionCategory') }}
                 </div>
-                <div>{{ selectedCashAdvance.transaction_category || '-' }}</div>
+                <!--
+                  Seluruh keterangan transaksi FPU-nya, dipisah koma. Baca
+                  saja: yang menentukannya FPU sumbernya.
+                -->
+                <div>{{ transactionCategoryLabel }}</div>
               </VCol>
 
               <VCol
@@ -1410,6 +1690,22 @@ onMounted(async () => {
                     {{ t('cashAdvanceRealization.form.breakdown.arrangedNotice') }}
                   </div>
 
+                  <!--
+                    Catatannya ikut terbaca di ringkasan halamannya. Tanpa ini
+                    yang mengisi harus membuka modalnya lagi hanya untuk
+                    memastikan apa yang sudah ia tulis.
+                  -->
+                  <div
+                    v-if="kelompok.arranged && arrangedNote(kelompok.category.id).trim()"
+                    class="car-cat-note-read"
+                  >
+                    <span class="text-caption text-medium-emphasis">
+                      {{ t('cashAdvanceRealization.form.breakdown.arrangedNotesLabel') }}
+                    </span>
+
+                    <div>{{ arrangedNote(kelompok.category.id) }}</div>
+                  </div>
+
                   <template v-else>
                     <div
                       v-for="(item, index) in kelompok.rows"
@@ -1495,6 +1791,8 @@ onMounted(async () => {
                           variant="tonal"
                           color="success"
                           prepend-icon="tabler-paperclip"
+                          link
+                          @click="openPickedFile(file)"
                         >
                           {{ file.name }}
                         </VChip>
@@ -1690,7 +1988,20 @@ onMounted(async () => {
                       {{ t('cashAdvanceRealization.form.items.tableDate') }}
                       <span class="text-error">*</span>
                     </th>
-                    <th>
+                    <!--
+                      Keterangan transaksi barisnya. Muncul hanya bila FPU-nya
+                      memilih lebih dari satu -- kolom berpilihan tunggal hanya
+                      menambah lebar tanpa menambah keterangan.
+                    -->
+                    <th
+                      v-if="lineShowsCategory"
+                      class="car-col-trxcat"
+                    >
+                      {{ t('cashAdvanceRealization.form.items.tableTransactionCategory') }}
+                      <span class="text-error">*</span>
+                    </th>
+
+                    <th class="car-col-desc">
                       {{ t('cashAdvanceRealization.form.items.tableDescription') }}
                     </th>
                     <th class="car-col-money text-end">
@@ -1729,6 +2040,24 @@ onMounted(async () => {
                         :config="lineDateConfig"
                         :error="isSubmitted && !item.date"
                         :error-messages="isSubmitted && !item.date ? [t('cashAdvanceRealization.form.validation.itemDate')] : []"
+                      />
+                    </td>
+
+                    <td v-if="lineShowsCategory">
+                      <VSelect
+                        v-model="item.transaction_category_id"
+                        :items="transactionCategoryOptions"
+                        item-title="title"
+                        item-value="id"
+                        density="compact"
+                        variant="outlined"
+                        hide-details="auto"
+                        :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300, minWidth: 320 }"
+                        :title="lineCategoryName(item.transaction_category_id)"
+                        :error="isSubmitted && !item.transaction_category_id"
+                        :error-messages="isSubmitted && !item.transaction_category_id
+                          ? [t('cashAdvanceRealization.form.validation.itemTransactionCategory')]
+                          : []"
                       />
                     </td>
 
@@ -1824,7 +2153,20 @@ onMounted(async () => {
                           />
 
                           <div class="car-line-file__body">
-                            <div class="car-line-file__name">
+                            <!--
+                              Namanya yang bisa ditekan, bukan seluruh barisnya:
+                              barisnya memuat tombol hapus, dan baris yang
+                              seluruhnya bisa ditekan membuat orang membuka berkas
+                              padahal hendak menghapusnya.
+                            -->
+                            <div
+                              class="car-line-file__name car-line-file__name--open"
+                              role="button"
+                              tabindex="0"
+                              :title="file.name"
+                              @click="openPickedFile(file)"
+                              @keydown.enter="openPickedFile(file)"
+                            >
                               {{ file.name }}
                             </div>
 
@@ -1912,7 +2254,19 @@ onMounted(async () => {
                   meniadakan, dan server menolak dokumen yang mengatakan
                   dua-duanya.
                 -->
+
+                <!--
+                  Hanya pada kategori yang disebut masternya. GA tidak mengurus
+                  semuanya; yang di luarnya diisi pemohon sendiri, dan penanda
+                  yang ditawarkan di sana menyatakan ada yang akan mengurusnya
+                  padahal tidak ada siapa pun.
+
+                  Yang SUDAH ditandai tetap menampilkannya walau masternya kini
+                  melarang -- tanpa itu, dokumen yang ditandai sebelum
+                  peraturannya berubah tidak bisa diperbaiki siapa pun.
+                -->
                 <VSwitch
+                  v-if="kelompok.category.ga_arrangeable || kelompok.arranged"
                   :model-value="kelompok.arranged"
                   color="warning"
                   density="compact"
@@ -1938,6 +2292,30 @@ onMounted(async () => {
                 {{ t('cashAdvanceRealization.form.breakdown.arrangedNotice') }}
               </div>
 
+              <!--
+                Catatan untuk GA. Opsional: penandanya sudah sah berdiri
+                sendiri, dan mewajibkannya hanya melahirkan isian berisi
+                tanda hubung.
+              -->
+              <div
+                v-if="kelompok.arranged"
+                class="car-cat-note"
+              >
+                <VTextarea
+                  :model-value="arrangedNote(kelompok.category.id)"
+                  :label="t('cashAdvanceRealization.form.breakdown.arrangedNotesLabel')"
+                  :placeholder="t('cashAdvanceRealization.form.breakdown.arrangedNotesPlaceholder')"
+                  :hint="t('cashAdvanceRealization.form.breakdown.arrangedNotesHint')"
+                  persistent-hint
+                  rows="2"
+                  auto-grow
+                  counter="1000"
+                  maxlength="1000"
+                  density="compact"
+                  @update:model-value="nilai => setArrangedNote(kelompok.category.id, nilai)"
+                />
+              </div>
+
               <template v-else>
                 <div class="car-table-wrapper">
                   <VTable class="car-item-table car-breakdown-table">
@@ -1946,19 +2324,19 @@ onMounted(async () => {
                         <th class="car-col-no">
                           {{ t('cashAdvanceRealization.form.items.tableNo') }}
                         </th>
-                        <th>
+                        <th class="car-col-bd-item">
                           {{ t('cashAdvanceRealization.form.breakdown.tableItem') }}
                         </th>
-                        <th class="car-col-qty">
+                        <th class="car-col-bd-qty">
                           {{ t('cashAdvanceRealization.form.breakdown.tableQty') }}
                         </th>
-                        <th class="car-col-money">
+                        <th class="car-col-bd-unit">
                           {{ t('cashAdvanceRealization.form.breakdown.tableUnitPrice') }}
                         </th>
-                        <th class="car-col-money text-end">
+                        <th class="car-col-bd-real text-end">
                           {{ t('cashAdvanceRealization.form.items.tableRealization') }}
                         </th>
-                        <th class="car-col-money text-end">
+                        <th class="car-col-bd-adv text-end">
                           {{ t('cashAdvanceRealization.form.items.tableAdvance') }}
                         </th>
                         <th class="car-col-attachment">
@@ -2232,6 +2610,22 @@ onMounted(async () => {
   gap: 0.5rem;
 }
 
+/* Isian catatan GA di dalam modal. */
+.car-cat-note {
+  padding-block: 0 0.75rem;
+  padding-inline: 0.875rem;
+}
+
+/* Dan bacaannya pada ringkasan di halamannya. */
+.car-cat-note-read {
+  border-inline-start: 2px solid rgba(var(--v-theme-warning), 0.5);
+  margin-block-end: 0.5rem;
+  margin-inline: 0.875rem;
+  padding-inline-start: 0.625rem;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+
 .car-cat-arranged {
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
   font-size: 0.875rem;
@@ -2248,30 +2642,91 @@ onMounted(async () => {
   padding-inline: 1rem;
 }
 
-.car-breakdown-table {
-  min-inline-size: 1100px;
-}
-
-.car-col-qty {
-  inline-size: 6rem;
-}
-
+/*
+| Lebar kolom modal rincian.
+|
+| SETIAP kolom berbatas bawah, bukan hanya berlebar usul. Tabel ber-layout
+| otomatis menyusutkan kolom yang hanya ber-inline-size begitu ruangnya
+| kurang, dan yang menyusut itu isinya yang terpotong -- bukan tabelnya yang
+| menggeser. Dengan batas bawah, kekurangan ruang jatuh ke pembungkusnya yang
+| memang bisa digeser.
+*/
+/*
+| TIDAK ber-overflow sendiri.
+|
+| VTable sudah membawa penggulirnya pada .v-table__wrapper. Menambah satu
+| lagi di sini memunculkan dua batang penggulir bertumpuk -- dan yang atas
+| menggulir yang bawah, bukan isinya.
+|
+| min-inline-size: 0 tetap perlu: tanpa itu, pembungkus yang menjadi anak
+| flex atau grid tidak boleh menyusut di bawah lebar isinya, dan penggulir
+| di dalamnya tidak pernah mendapat ruang untuk bekerja.
+*/
 .car-table-wrapper {
-  overflow-x: auto;
+  min-inline-size: 0;
 }
 
-.car-item-table {
+/*
+| Lebar minimumnya pada TABELNYA, bukan pada akar VTable.
+|
+| Dipasang di akarnya, akar itu yang melebar dan pembungkus di luarnya ikut
+| menggulir -- sementara tabel di dalamnya masih bisa melebar lagi karena
+| jumlah lebar minimum kolomnya tidak terikat angka ini. Dua wadah
+| menggulir sekaligus, dan dua batang penggulir muncul bertumpuk.
+|
+| Di tabelnya, akarnya tetap selebar induknya dan hanya .v-table__wrapper
+| milik Vuetify yang menggulir. Satu batang, dan kepalanya ikut bergeser
+| bersama isinya -- ia memang satu tabel.
+*/
+/*
+| Teks pilihan keterangan transaksi dipotong, tidak dibungkus.
+|
+| Nama di master bisa panjang. Dibiarkan membungkus, satu sel tumbuh
+| beberapa baris dan isinya melampaui tinggi selnya sendiri -- menimpa
+| kolom sebelahnya.
+|
+| min-inline-size: 0 pada wadahnya bukan hiasan: anak flex tidak boleh
+| menyusut di bawah lebar isinya tanpa itu, dan ellipsis-nya tidak pernah
+| dapat giliran.
+*/
+.car-item-table :deep(.v-select .v-field__input) {
+  flex-wrap: nowrap;
+  min-inline-size: 0;
+}
+
+.car-item-table :deep(.v-select .v-select__selection) {
+  overflow: hidden;
+  min-inline-size: 0;
+}
+
+.car-item-table :deep(.v-select .v-select__selection-text) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.car-item-table :deep(table) {
+  min-inline-size: 1500px;
+}
+
+/*
+| Bentuk perdin: tanpa tanggal, tetapi dengan Qty, Rincian Biaya, dan dua
+| kolom nominal berdampingan. Kekhususannya dinaikkan dengan menyebut kedua
+| kelasnya -- ditulis sebagai satu kelas saja, aturan .car-item-table di
+| atasnya yang menang, dan lebar ini tidak pernah berlaku.
+*/
+.car-item-table.car-breakdown-table {
   min-inline-size: 1300px;
 }
 
 .car-col-no {
   inline-size: 3.5rem;
+  min-inline-size: 3.5rem;
 }
 
 /*
 | Kolom tanggal butuh ruang untuk "2026-08-30" beserta padding field dan
-| tombol clear-nya. Tanpa min-inline-size, tata letak tabel otomatis
-| menyusutkan kolom ini demi kolom deskripsi dan tanggalnya terpotong.
+| tombol clear-nya.
 */
 .car-col-date {
   inline-size: 14rem;
@@ -2281,6 +2736,70 @@ onMounted(async () => {
 .car-col-attachment {
   inline-size: 17rem;
   min-inline-size: 17rem;
+}
+
+.car-col-money {
+  inline-size: 12rem;
+  min-inline-size: 12rem;
+}
+
+.car-col-action {
+  inline-size: 5rem;
+  min-inline-size: 5rem;
+}
+
+/*
+| Kolom khusus bentuk perdin.
+|
+| Dipisah dari .car-col-money, yang semula dipakai bertiga sekaligus untuk
+| Rincian Biaya, Realisasi, dan Pengajuan. Ketiganya 12rem padahal tugasnya
+| berbeda: yang pertama kotak isian ber-awalan "Rp", dua sisanya teks
+| baca-saja. Menyamakannya menghabiskan 36rem untuk isi yang muat dalam 30rem,
+| dan kekurangannya diambil dari kolom Item.
+*/
+/*
+| Kolom deskripsi tabel datar: lentur, tetapi berbatas bawah -- ia
+| satu-satunya yang boleh melar, dan karena itu pula yang pertama diambil
+| ketika ruangnya kurang.
+*/
+/*
+| Keterangan transaksi per baris.
+|
+| min-inline-size, bukan inline-size: tabel auto-layout memperlakukan
+| inline-size sebagai saran dan tetap memeras kolomnya saat ruangnya
+| kurang -- dan pemilih yang terperas tidak terbaca isinya.
+*/
+.car-col-trxcat {
+  inline-size: 11rem;
+  min-inline-size: 11rem;
+}
+
+.car-col-desc {
+  min-inline-size: 18rem;
+}
+
+.car-col-bd-item {
+  min-inline-size: 18rem;
+}
+
+.car-col-bd-qty {
+  inline-size: 7rem;
+  min-inline-size: 7rem;
+}
+
+.car-col-bd-unit {
+  inline-size: 11rem;
+  min-inline-size: 11rem;
+}
+
+.car-col-bd-real {
+  inline-size: 10rem;
+  min-inline-size: 10rem;
+}
+
+.car-col-bd-adv {
+  inline-size: 9.5rem;
+  min-inline-size: 9.5rem;
 }
 
 /* Kartu berkas yang menempel pada satu baris rincian. */
@@ -2299,20 +2818,19 @@ onMounted(async () => {
   min-inline-size: 0;
 }
 
+/* Nama yang bisa ditekan -- dan terlihat begitu. */
+.car-line-file__name--open {
+  color: rgb(var(--v-theme-primary));
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .car-line-file__name {
   overflow: hidden;
   font-size: 0.8rem;
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.car-col-money {
-  inline-size: 12rem;
-}
-
-.car-col-action {
-  inline-size: 5rem;
 }
 
 .car-total-box {

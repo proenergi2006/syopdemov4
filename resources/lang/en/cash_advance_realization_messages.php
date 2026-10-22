@@ -90,6 +90,20 @@ return [
     | reimburse : Finance pays the shortfall, proof is optional.
     |--------------------------------------------------------------------------
     */
+    /*
+    | Meneruskan ke pembayaran kekurangan.
+    |
+    | Hanya ada pada cabang kelebihan: dua cabang lain tidak berpindah meja,
+    | jadi tidak ada yang perlu diteruskan ke siapa pun.
+    */
+    'verify' => [
+        'forbidden' => 'You do not have access to forward this realization for payment.',
+        'only_received' => 'Only a realization whose documents have been received can be forwarded for payment.',
+        'only_reimburse' => 'Only a realization with a shortfall needs forwarding. One that matches exactly is already closed on receipt, and one with money left over closes when that money comes back.',
+        'success' => 'The realization has been forwarded for payment of its shortfall.',
+        'failed' => 'The realization could not be forwarded for payment.',
+    ],
+
     'receive' => [
         'forbidden' => 'You do not have access to receive realizations.',
         'only_approved' => 'Only approved realizations can be marked as received.',
@@ -190,5 +204,6 @@ return [
         'qty_required' => 'Row :row: Qty is required and must be greater than zero.',
         'unit_price_required' => 'Row :row: Unit cost is required and must be greater than zero.',
         'arranged_has_items' => 'Category :category is marked as arranged by GA, so it cannot have any lines. Remove the lines, or turn the marker off.',
+        'arranged_not_allowed' => 'Category :category is not handled by GA, so the marker cannot be set. Its lines are filled in by the requester. This is configured in the Business Trip Expense Category master.',
     ],
 ];

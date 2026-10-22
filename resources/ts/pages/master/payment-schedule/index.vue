@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from '@axios'
 import { useDayNames } from '@core/composable/useDayNames'
@@ -7,6 +7,7 @@ import {
   closeAlert,
   showConfirmAlert,
   showErrorToast,
+  showInfoToast,
   showLoadingAlert,
   showSuccessToast,
 } from '@/utils/alert'
@@ -93,7 +94,21 @@ const { dayName } = useDayNames()
 const days = computed<PilihanOpsi[]>(() =>
   [1, 2, 3, 4, 5, 6, 7].map(iso => ({ value: iso, label: dayName(iso) })))
 
-const categories = ref<{ id: number; name: string }[]>([])
+/*
+| Seluruh keterangan transaksi, berikut modul pemiliknya.
+|
+| 'ADVANCE' milik FPU, 'CLAIM' milik Claim -- satu tabel, dua daftar.
+*/
+const categories = ref<{ id: number; name: string; document_type: string }[]>([])
+
+/*
+| Modul mana memakai daftar siapa, dibaca dari server.
+|
+| Tidak ditulis ulang di sini: aturan yang sama ditulis dua kali cepat atau
+| lambat berbeda di salah satunya, dan yang berbeda itu menentukan pilihan
+| mana yang boleh.
+*/
+const categoryScope = ref<Record<string, string>>({})
 
 const canView = computed(() => permissionStore.can('master_payment_schedule.view'))
 
@@ -117,6 +132,7 @@ const fetchRows = async (): Promise<void> => {
 
     documentTypes.value = opsi.document_types ?? []
     categories.value = opsi.transaction_categories ?? []
+    categoryScope.value = opsi.category_scope ?? {}
   }
   catch (error: unknown) {
     showErrorToast({
@@ -150,6 +166,71 @@ const form = reactive({
   is_active: true,
   notes: '',
   cutoffs: [] as Cutoff[],
+})
+
+/*
+| Keterangan transaksi yang boleh dipilih untuk modul yang sedang dipilih.
+|
+| Kosong selama modulnya belum disebut -- cakupan "seluruh modul" tidak
+| punya satu daftar yang bisa mewakili kedua modulnya.
+|
+| Yang sudah tersimpan pada jadwal ini tetap diikutkan walau di luar
+| daftarnya: pilihan yang hilang dari layar akan terhapus diam-diam begitu
+| jadwalnya disimpan ulang, tanpa seorang pun memintanya.
+*/
+const categoryOptions = computed<{ id: number; name: string }[]>(() => {
+  const pemilik = form.document_type
+    ? categoryScope.value[form.document_type] ?? null
+    : null
+
+  const daftar = pemilik === null
+    ? []
+    : categories.value.filter(satu => satu.document_type === pemilik)
+
+  const terpilih = form.transaction_category_id
+
+  if (terpilih && !daftar.some(satu => Number(satu.id) === Number(terpilih))) {
+    const tersimpan = categories.value.find(satu => Number(satu.id) === Number(terpilih))
+
+    if (tersimpan)
+      return [tersimpan, ...daftar]
+  }
+
+  return daftar
+})
+
+/*
+| Modulnya berganti, keterangan transaksinya ikut diperiksa.
+|
+| Yang sudah dipilih dilepas bila bukan milik modul barunya. Dibiarkan,
+| jadwalnya tersimpan dengan cakupan yang tidak akan pernah cocok dengan
+| dokumen mana pun -- servernya memang menolaknya sekarang, tetapi
+| penolakan yang baru datang di tombol simpan menyuruh orangnya menebak
+| bagian mana yang salah.
+|
+| Dikabarkan, bukan dilepas diam-diam.
+*/
+watch(() => form.document_type, () => {
+  const terpilih = form.transaction_category_id
+
+  if (!terpilih)
+    return
+
+  const pemilik = form.document_type
+    ? categoryScope.value[form.document_type] ?? null
+    : null
+
+  const kategori = categories.value.find(satu => Number(satu.id) === Number(terpilih))
+
+  if (pemilik !== null && kategori?.document_type === pemilik)
+    return
+
+  form.transaction_category_id = null
+
+  showInfoToast({
+    title: t('common.alert.info'),
+    text: t('paymentSchedule.form.categoryClearedByModule'),
+  })
 })
 
 /* Computed, bukan konstanta: labelnya harus ikut berubah saat bahasa diganti. */
@@ -661,17 +742,30 @@ onMounted(() => {
               cols="12"
               md="6"
             >
+              <!--
+                Modulnya dulu, baru keterangan transaksinya.
+
+                Daftar keterangan transaksi FPU dan Claim berbeda, dan
+                mencampurnya melahirkan jadwal yang tersimpan tetapi tidak
+                pernah terpakai. Urutannya dijadikan terlihat, bukan sekadar
+                ditulis pada keterangan di bawah isiannya.
+              -->
               <VAutocomplete
                 v-model="form.transaction_category_id"
                 :label="t('paymentSchedule.form.category')"
-                :items="categories"
+                :items="categoryOptions"
                 item-title="name"
                 item-value="id"
                 density="comfortable"
                 clearable
-                :placeholder="t('paymentSchedule.form.categoryPlaceholder')"
+                :disabled="!form.document_type"
+                :placeholder="form.document_type
+                  ? t('paymentSchedule.form.categoryPlaceholder')
+                  : t('paymentSchedule.form.categoryPlaceholderNoModule')"
                 persistent-placeholder
-                :hint="t('paymentSchedule.form.categoryHint')"
+                :hint="form.document_type
+                  ? t('paymentSchedule.form.categoryHint')
+                  : t('paymentSchedule.form.categoryHintPickModule')"
                 persistent-hint
               />
             </VCol>

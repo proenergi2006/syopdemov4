@@ -71,5 +71,35 @@
         "6": "Sabtu",
         "7": "Minggu"
     },
-    "and": "dan"
+    "and": "dan",
+    "revision": {
+        "badge": "Revisi ke-{n}",
+        "returnedStatus": "Butuh Revisi",
+        "menuReturn": "Kembalikan untuk revisi",
+        "dialogTitle": "Kembalikan {number} ke pemohon?",
+        "dialogSubtitle": "Dokumennya kembali ke pemohon, dan approval dimulai lagi dari tahap pertama setelah ia diajukan ulang.",
+        "reasonLabel": "Alasan pengembalian",
+        "reasonPlaceholder": "Sebutkan apa yang harus diperbaiki, sejelas mungkin.",
+        "reasonRequired": "Alasan wajib diisi. Tanpa itu pemohon tidak punya cara menebak mana yang harus diperbaiki.",
+        "confirmButton": "Kembalikan",
+        "successFallback": "Dokumen dikembalikan ke pemohon.",
+        "failedFallback": "Dokumen gagal dikembalikan.",
+        "historyTitle": "Riwayat Revisi",
+        "historyEmpty": "Dokumen ini belum pernah dikembalikan untuk revisi.",
+        "returnedBy": "Dikembalikan oleh",
+        "returnedAtStep": "pada tahap {step}",
+        "fromReceipt": "dari meja penerimaan berkas",
+        "reason": "Alasan",
+        "revisedAt": "Mulai dikerjakan",
+        "resubmittedBy": "Diajukan ulang oleh",
+        "changesTitle": "Yang berubah",
+        "changesNone": "Tidak ada kolom yang berubah; yang berubah hanya lampirannya, atau tidak ada sama sekali.",
+        "changeRow": "{label}: {old} → {new}",
+        "empty": "(kosong)",
+        "rowsAdded": "{n} baris ditambahkan",
+        "rowsRemoved": "{n} baris dihapus",
+        "rowsChanged": "{n} baris diubah",
+        "previousApprovals": "Persetujuan pada putaran itu",
+        "waitingForRevision": "Menunggu pemohon merevisinya."
+    }
 }

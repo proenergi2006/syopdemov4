@@ -163,10 +163,27 @@ return [
     | dari layar -- nominal yang bisa datang dari dua tempat cepat atau
     | lambat akan datang berbeda.
     */
+    /*
+    | Himpunan keterangan transaksi sebuah FPU.
+    |
+    | Headernya menyatakan himpunan yang boleh dipakai baris rinciannya;
+    | barisnya memilih dari himpunan itu, bukan dari seluruh master.
+    */
+    'transaction_category_set' => [
+        'required' => 'Keterangan transaksi wajib dipilih minimal satu.',
+        'single_for_non_routine' => 'Pengajuan Non Rutin hanya boleh memakai satu keterangan transaksi. Pisahkan menjadi beberapa FPU, atau ubah sifat pengajuannya menjadi Rutin.',
+        'unknown' => 'Ada keterangan transaksi yang tidak dikenali. Muat ulang halamannya, lalu pilih kembali.',
+        'request_type_mismatch' => 'Keterangan transaksi :categories tidak berlaku untuk pengajuan :request_type. Pengaturannya ada di master Keterangan Transaksi.',
+        'item_required' => 'Baris :row: keterangan transaksinya belum dipilih.',
+        'item_not_in_set' => 'Baris :row: keterangan transaksinya tidak termasuk yang dipilih di bagian atas FPU.',
+        'category_without_item' => 'Keterangan transaksi :categories belum punya satu pun baris rincian. Tambahkan barisnya, atau cabut keterangan transaksi itu dari bagian atas FPU.',
+    ],
+
     'breakdown' => [
         'category_required' => 'Baris :row: kategori biayanya belum dipilih. Rincian perjalanan dinas dikelompokkan per kategori.',
         'qty_required' => 'Baris :row: Qty wajib diisi dan harus lebih dari nol.',
         'unit_price_required' => 'Baris :row: Rincian Biaya wajib diisi dan harus lebih dari nol.',
         'arranged_has_items' => 'Kategori :category ditandai diurus GA, jadi tidak boleh punya baris rincian. Hapus barisnya, atau matikan penandanya.',
+        'arranged_not_allowed' => 'Kategori :category tidak diurus GA, jadi penandanya tidak bisa dipasang. Rinciannya diisi pemohon sendiri. Pengaturannya ada di master Kategori Biaya Perjalanan Dinas.',
     ],
 ];

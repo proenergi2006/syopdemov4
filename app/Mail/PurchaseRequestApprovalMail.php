@@ -66,6 +66,14 @@ class PurchaseRequestApprovalMail extends Mailable implements ShouldQueue
         public bool $isFinalApproved = false,
         public ?int $stepOrder = null,
         public ?string $stepLabel = null,
+
+        /*
+        | Nomor revisi, hanya untuk mode returned_for_revision.
+        |
+        | Disebut di dalam kalimatnya supaya pemohon tahu ini
+        | pengembalian yang keberapa.
+        */
+        public ?int $revisionNumber = null,
     ) {
         /*
         |--------------------------------------------------------------------------
@@ -125,6 +133,7 @@ class PurchaseRequestApprovalMail extends Mailable implements ShouldQueue
                 'isFinalApproved' => $this->isFinalApproved,
                 'stepOrder' => $this->stepOrder,
                 'stepLabel' => $this->stepLabel,
+                'revisionNumber' => $this->revisionNumber,
                 'totalAmount' => $this->totalAmount,
                 'approvalUrl' => $this->approvalUrl,
             ],
@@ -144,6 +153,7 @@ class PurchaseRequestApprovalMail extends Mailable implements ShouldQueue
             'step_approved' => 'mail.pr.subject.step_approved',
             'final_approved' => 'mail.pr.subject.final_approved',
             'rejected' => 'mail.pr.subject.rejected',
+            'returned_for_revision' => 'mail.pr.subject.returned_for_revision',
             default => 'mail.pr.subject.default',
         };
 

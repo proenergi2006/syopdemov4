@@ -12,6 +12,8 @@ import {
   closeAlert,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
+import type { RevisionEntry } from '@/components/fund_request/revision'
 import {
   onlyNumberKeypress,
   formatSanitizedNumberInput,
@@ -605,6 +607,15 @@ const normalizeItem = (item: any): PrItem => {
   }
 }
 
+/*
+| Revisi yang sedang berjalan, bila dokumen ini dikembalikan.
+|
+| Ditampilkan di atas formnya. Alasan yang hanya bisa dibaca di layar
+| lain sama saja dengan tidak ada: pemohon akan menutup formnya,
+| mencari alasannya, lalu membukanya lagi.
+*/
+const revisiTerbuka = ref<RevisionEntry | null>(null)
+
 const loadPurchaseRequestDetail = async (): Promise<void> => {
   if (!publicId.value) {
     loadError.value = t('purchaseRequest.edit.publicIdNotFound')
@@ -624,6 +635,8 @@ const loadPurchaseRequestDetail = async (): Promise<void> => {
     if (!detail) {
       throw new Error('Data purchase requisition tidak ditemukan.')
     }
+
+    revisiTerbuka.value = detail.revision_open || null
 
     form.tanggal_pr = detail.tanggal_pr ?? ''
 
@@ -1313,6 +1326,18 @@ onMounted(async () => {
 </script>
 
 <template>
+    <!--
+      Alasan pengembaliannya, paling atas.
+
+      Hanya bagian "sedang berjalan" dari komponen riwayat: di form
+      edit yang dibutuhkan bukan riwayat, melainkan satu hal yang harus
+      diperbaiki sekarang.
+    -->
+    <RevisionHistory
+      v-if="revisiTerbuka"
+      :open-revision="revisiTerbuka"
+    />
+
     <VCard
       v-if="pageLoading || isLoadingDetail"
       class="mb-6 rounded-lg"

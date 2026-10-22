@@ -3,18 +3,21 @@
 return [
     'po' => [
         'subject' => [
+            'returned_for_revision' => 'Purchase Order Returned for Revision - :nomor_po',
             'final_approved' => 'Purchase Order Approved - :nomor_po',
             'step_approved' => 'Purchase Order Approval Update - :nomor_po',
             'rejected' => 'Purchase Order Rejected - :nomor_po',
             'default' => 'Purchase Order Approval - :nomor_po',
         ],
         'title' => [
+            'returned_for_revision' => 'Purchase Order Returned for Revision',
             'final_approved' => 'Purchase Order Has Been Approved',
             'step_approved' => 'Purchase Order Approval Update',
             'rejected' => 'Purchase Order Rejected',
             'default' => 'Purchase Order Approval',
         ],
         'description' => [
+            'returned_for_revision' => 'Your purchase order was returned by :actor_name for correction (revision :revision). Please correct it as explained below, then submit it again.',
             'final_approved' => 'Your Purchase Order has received final approval from :actor_name.',
             'step_approved' => 'Your Purchase Order has been approved by :actor_name and is still awaiting further approval.',
             'rejected' => 'Your Purchase Order has been rejected by :actor_name.',
@@ -26,24 +29,28 @@ return [
         'field_total' => 'Total Amount',
         'field_status' => 'Status',
         'field_rejection_notes' => 'Rejection Notes',
+        'field_return_reason' => 'Return Reason',
         'instruction' => 'Please click the button below to open the Purchase Order page in SYOP v4.',
         'button' => 'Open Purchase Order',
     ],
 
     'pr' => [
         'subject' => [
+            'returned_for_revision' => 'Purchase Requisition Returned for Revision - :nomor_pr',
             'step_approved' => 'Purchase Requisition Approval Step Approved - :nomor_pr',
             'final_approved' => 'Purchase Requisition Approved - :nomor_pr',
             'rejected' => 'Purchase Requisition Rejected - :nomor_pr',
             'default' => 'Purchase Requisition Approval Request - :nomor_pr',
         ],
         'title' => [
+            'returned_for_revision' => 'Purchase Requisition Returned for Revision',
             'final_approved' => 'Purchase Requisition Has Been Approved',
             'step_approved' => 'Purchase Requisition Approval Update',
             'rejected' => 'Purchase Requisition Rejected',
             'default' => 'Purchase Requisition Approval',
         ],
         'description' => [
+            'returned_for_revision' => 'Your purchase requisition was returned by :actor_name for correction (revision :revision). Please correct it as explained below, then submit it again.',
             'final_approved' => 'Your Purchase Requisition has received final approval from :actor_name.',
             'step_approved' => 'Your Purchase Requisition has been approved by :actor_name and is still awaiting further approval.',
             'rejected' => 'Your Purchase Requisition has been rejected by :actor_name.',
@@ -56,12 +63,14 @@ return [
         'field_step_value' => 'Step :step_order',
         'field_status' => 'Status',
         'field_rejection_notes' => 'Rejection Notes',
+        'field_return_reason' => 'Return Reason',
         'instruction' => 'Please click the button below to open the Purchase Requisition page in SYOP v4.',
         'button' => 'Open Purchase Requisition',
     ],
 
     'claim' => [
         'subject' => [
+            'returned_for_revision' => 'Claim Returned for Revision - :claim_number',
             'final_approved' => 'Claim Approved - :claim_number',
             'rejected' => 'Claim Rejected - :claim_number',
             'paid' => 'Claim Reimbursed - :claim_number',
@@ -72,6 +81,7 @@ return [
             'default' => 'Claim Approval Request - :claim_number',
         ],
         'title' => [
+            'returned_for_revision' => 'Claim Returned for Revision',
             'final_approved' => 'Claim Approved',
             'rejected' => 'Claim Rejected',
             'paid' => 'Claim Reimbursed',
@@ -82,6 +92,7 @@ return [
             'default' => 'Claim Approval',
         ],
         'description' => [
+            'returned_for_revision' => 'Your claim was returned by :actor_name for correction (revision :revision). Please correct it as explained below, then submit it again.',
             'final_approved' => 'Your claim has received final approval from :actor_name.',
             'rejected' => 'Your claim was rejected by :actor_name.',
             'paid' => 'Your claim has been reimbursed by :actor_name.',
@@ -101,11 +112,13 @@ return [
         'field_step_value' => 'Step :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Notes',
+        'field_return_reason' => 'Return Reason',
         'instruction' => 'Please click the button below to open the claim in SYOP v4.',
         'button' => 'Open Claim',
     ],
     'fpu' => [
         'subject' => [
+            'returned_for_revision' => 'Cash Advance Returned for Revision - :advance_number',
             'final_approved' => 'Cash Advance Approved - :advance_number',
             'rejected' => 'Cash Advance Rejected - :advance_number',
             'disbursed' => 'Cash Advance Disbursed - :advance_number',
@@ -116,6 +129,7 @@ return [
             'default' => 'Cash Advance Approval Request - :advance_number',
         ],
         'title' => [
+            'returned_for_revision' => 'Cash Advance Returned for Revision',
             'final_approved' => 'Cash Advance Approved',
             'rejected' => 'Cash Advance Rejected',
             'disbursed' => 'Cash Advance Disbursed',
@@ -126,6 +140,7 @@ return [
             'default' => 'Cash Advance Approval',
         ],
         'description' => [
+            'returned_for_revision' => 'Your cash advance was returned by :actor_name for correction (revision :revision). Please correct it as explained below, then submit it again.',
             'final_approved' => 'Your cash advance has been fully approved by :actor_name.',
             'rejected' => 'Your cash advance has been rejected by :actor_name.',
             'disbursed' => 'Your cash advance has been disbursed by :actor_name.',
@@ -145,6 +160,7 @@ return [
         'field_step_value' => 'Step :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Notes',
+        'field_return_reason' => 'Return Reason',
         'field_payment_schedule' => 'Payment Schedule',
         'payment_early' => 'PAID EARLY',
         'payment_late' => 'PAST SCHEDULE',
@@ -154,6 +170,7 @@ return [
 
     'realisasi' => [
         'subject' => [
+            'returned_for_revision' => 'Realization Returned for Revision - :realization_number',
             'final_approved' => 'Realization Approved - :realization_number',
             'rejected' => 'Realization Rejected - :realization_number',
             'settled' => 'Realization Difference Settled - :realization_number',
@@ -165,6 +182,7 @@ return [
             'default' => 'Realization Approval Request - :realization_number',
         ],
         'title' => [
+            'returned_for_revision' => 'Realization Returned for Revision',
             'final_approved' => 'Realization Approved',
             'rejected' => 'Realization Rejected',
             'settled' => 'Realization Difference Settled',
@@ -176,6 +194,7 @@ return [
             'default' => 'Realization Approval',
         ],
         'description' => [
+            'returned_for_revision' => 'Your realization was returned by :actor_name for correction (revision :revision). Please correct it as explained below, then submit it again.',
             'final_approved' => 'Your realization has been fully approved by :actor_name.',
             'rejected' => 'Your realization has been rejected by :actor_name.',
             'settled' => 'The difference on your realization has been settled by :actor_name.',
@@ -202,6 +221,7 @@ return [
         'field_step_value' => 'Step :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Notes',
+        'field_return_reason' => 'Return Reason',
         'instruction' => 'Please click the button below to open the realization page in SYOP v4.',
         'button' => 'Open Realization',
     ],
@@ -216,6 +236,7 @@ return [
     */
     'business_trip' => [
         'subject' => [
+            'returned_for_revision' => 'Business Trip Returned for Revision - :trip_number',
             'default' => 'Business trip :trip_number needs your approval',
             'final_approved' => 'Business trip :trip_number has been approved',
             'rejected' => 'Business trip :trip_number was rejected',
@@ -223,6 +244,7 @@ return [
         ],
 
         'title' => [
+            'returned_for_revision' => 'Business Trip Returned for Revision',
             'default' => 'Business Trip Approval Request',
             'final_approved' => 'Business Trip Approved',
             'rejected' => 'Business Trip Rejected',
@@ -230,6 +252,7 @@ return [
         ],
 
         'description' => [
+            'returned_for_revision' => 'Your business trip was returned by :actor_name for correction (revision :revision). Please correct it as explained below, then submit it again.',
             'default' => 'A business trip request is waiting for your approval. Please review the itinerary below.',
             'final_approved' => 'Your business trip request has been fully approved by :actor_name. You may now submit the cash advance for this trip.',
             'rejected' => 'Your business trip request was rejected by :actor_name. Please review the notes, revise it, and submit again.',
@@ -283,6 +306,7 @@ return [
         'field_step_value' => 'Step :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Notes',
+        'field_return_reason' => 'Return Reason',
 
         'itinerary_title' => 'Itinerary',
         'itinerary_date' => 'Day & Date',

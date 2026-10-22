@@ -60,14 +60,23 @@ trait SchedulesPayment
      * tanpa ada aturan yang sebenarnya dilanggar.
      */
     protected function canPayToday(
-        mixed $scheduledDate,
         string $documentType,
         ?int $transactionCategoryId = null,
     ): bool {
-        if (!$scheduledDate) {
-            return true;
-        }
-
+        /*
+        | Yang ditanya JADWALNYA, bukan tanggal pada dokumennya.
+        |
+        | isPaymentDay() menjawab true bila modulnya memang tidak punya hari
+        | kerja -- itulah pintu keluar bagi modul yang jadwalnya belum dibuat.
+        | Dokumen yang lebih tua dari jadwalnya tidak ikut lewat pintu itu:
+        | modulnya sudah berjadwal, dan hari kerja kasir berlaku untuk dokumen
+        | mana pun yang dibayarkannya.
+        |
+        | Tanggal pada dokumennya sengaja tidak diterima di sini. Ia tetap dipakai
+        | di tempat lain untuk menilai pembayarannya lebih awal atau terlambat
+        | -- itu pertanyaan yang berbeda, dan menyatukan keduanya membuat
+        | dokumen tanpa janji ikut bebas dari hari kerjanya.
+        */
         return app(PaymentScheduleService::class)
             ->isPaymentDay(null, $documentType, $transactionCategoryId);
     }

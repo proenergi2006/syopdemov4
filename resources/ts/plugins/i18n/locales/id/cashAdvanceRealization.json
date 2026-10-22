@@ -7,7 +7,9 @@
         "rejected": "Rejected",
         "cancelled": "Cancelled",
         "settled": "Selesai",
-        "received": "Diterima"
+        "received": "Diterima",
+        "verified": "Menunggu Pembayaran",
+        "needRevision": "Butuh Revisi"
     },
     "difference": {
         "all": "Semua Selisih",
@@ -36,7 +38,8 @@
                 "all": "Semua Dokumen",
                 "return": "Menunggu Pengembalian",
                 "reimburse": "Menunggu Pembayaran",
-                "notReceived": "Belum Diterima"
+                "notReceived": "Belum Diterima",
+                "verify": "Menunggu saya periksa"
             },
             "pendingActionLabel": "Butuh Aksi",
             "resetButton": "Reset Filter",
@@ -103,7 +106,10 @@
             "attachmentCount": "Dokumen ini punya {count} lampiran.",
             "attachmentInclude": "Gabungkan lampiran ke dalam satu PDF",
             "attachmentPdfNotice": "Lampiran berupa gambar akan dimasukkan ke halaman berikutnya, dua per halaman. Lampiran yang sudah berformat PDF tidak bisa digabung — namanya tetap didaftarkan pada halaman terakhir agar bisa dibuka terpisah.",
-            "attachmentConfirm": "Cetak"
+            "attachmentConfirm": "Cetak",
+            "combineTripInclude": "Satukan dengan dokumen Perjalanan Dinas",
+            "combineTripNotice": "Perjalanan Dinas akan dicetak menyusul di belakang dokumen ini, berikut berkas pemesanan GA bila lampiran ikut digabung.",
+            "combineTripUnavailable": "Dokumen ini tidak terikat Perjalanan Dinas, atau perdinnya belum disetujui sepenuhnya."
         },
         "approve": {
             "dialogTitle": "Setujui Realisasi {number}?",
@@ -136,7 +142,8 @@
         },
         "pending": {
             "return": "Perlu Dikembalikan",
-            "reimburse": "Perlu Dibayar Finance"
+            "reimburse": "Perlu Dibayar Finance",
+            "verify": "Menunggu diperiksa"
         },
         "settleAmount": {
             "label": "Nominal yang diserahkan",
@@ -236,6 +243,17 @@
             "confirm": "Ya, Batalkan Terima",
             "successFallback": "Penerimaan berkas berhasil dibatalkan.",
             "failedFallback": "Penerimaan berkas gagal dibatalkan."
+        },
+        "action": {
+            "verify": "Teruskan ke pembayaran"
+        },
+        "verify": {
+            "confirmTitle": "Teruskan ke pembayaran?",
+            "confirmText": "Realisasi {nomor} akan diteruskan ke pemegang izin pembayaran untuk dibayarkan kekurangannya.",
+            "success": "Realisasi diteruskan ke pembayaran kekurangan.",
+            "failed": "Realisasi gagal diteruskan ke pembayaran.",
+            "notesLabel": "Catatan pemeriksaan (opsional)",
+            "confirmButton": "Teruskan"
         }
     },
     "form": {
@@ -264,7 +282,8 @@
             "itemDate": "Tanggal wajib diisi.",
             "itemDescription": "Deskripsi wajib diisi.",
             "itemAmount": "Nominal realisasi tidak boleh kurang dari 0.",
-            "itemAttachment": "Minimal satu berkas."
+            "itemAttachment": "Minimal satu berkas.",
+            "itemTransactionCategory": "Keterangan transaksi wajib dipilih"
         },
         "source": {
             "sectionTitle": "FPU Sumber",
@@ -297,11 +316,12 @@
             "tableNo": "No",
             "tableRealization": "Realisasi",
             "totalAdvance": "Total Dicairkan",
-            "totalRealization": "Total Realisasi"
+            "totalRealization": "Total Realisasi",
+            "tableTransactionCategory": "Keterangan Transaksi"
         },
         "attachment": {
             "title": "Bukti Pengeluaran",
-            "addButton": "Tambah Bukti",
+            "addButton": "Unggah Bukti",
             "empty": "Belum ada bukti. Format yang diterima: PDF, JPG, JPEG, PNG, maksimal 3MB per file.",
             "deleteButton": "Hapus",
             "existingTitle": "Bukti Tersimpan"
@@ -329,7 +349,9 @@
             "savingData": "Menyimpan data...",
             "cancelConfirmTitle": "Batalkan pengisian?",
             "cancelConfirmText": "Data yang sudah diisi akan hilang.",
-            "saveFailed": "Realisasi FPU gagal disimpan."
+            "saveFailed": "Realisasi FPU gagal disimpan.",
+            "itemTransactionCategoryRequired": "Baris {number}: keterangan transaksinya belum dipilih.",
+            "categoryWithoutItem": "Keterangan transaksi {categories} belum punya satu pun baris. Tambahkan barisnya -- tiap keterangan transaksi pada FPU wajib dijawab minimal satu item."
         },
         "itemDialog": {
             "title": "Rincian Realisasi",
@@ -353,7 +375,10 @@
             "toastNoRows": "Belum ada rincian sama sekali. Isi minimal satu baris, atau tandai kategorinya diurus GA.",
             "toastCategory": "Baris {number}: kategori biayanya belum dipilih.",
             "toastQty": "Baris {number}: Qty wajib diisi dan harus lebih dari nol.",
-            "toastUnitPrice": "Baris {number}: Rincian Biaya wajib diisi dan harus lebih dari nol."
+            "toastUnitPrice": "Baris {number}: Rincian Biaya wajib diisi dan harus lebih dari nol.",
+            "arrangedNotesLabel": "Catatan untuk GA (opsional)",
+            "arrangedNotesPlaceholder": "Misal: berangkat pagi, pulang hari yang sama",
+            "arrangedNotesHint": "Permintaan khusus untuk GA pada kategori ini. Ikut terbaca di detail dokumen."
         }
     },
     "detail": {
@@ -410,6 +435,7 @@
         "paymentOverdue": "Sudah melewati jadwalnya dan kekurangannya belum dibayarkan.",
         "paymentEarly": "Dibayarkan lebih awal dari jadwalnya.",
         "paymentOnTime": "Dibayarkan tepat pada jadwalnya.",
-        "paymentLate": "Dibayarkan setelah jadwalnya."
+        "paymentLate": "Dibayarkan setelah jadwalnya.",
+        "itemTransactionCategory": "Keterangan Transaksi"
     }
 }

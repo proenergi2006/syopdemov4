@@ -15,6 +15,7 @@ import {
 } from '@/utils/alert'
 import { useNavigationStore } from '@/stores/navigation'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
 import { useNativeDatePicker } from '@core/composable/useNativeDatePicker'
 import { useDeleteConfirm } from '@core/composable/useDeleteConfirm'
 import { formatDate, formatStatusPKP, formatNumberWithoutRp, toTitleCase, formatDecimalQty } from '@/utils/textFormatter'
@@ -54,6 +55,7 @@ interface PurchaseOrderItem {
   total_nilai: number | null
   status: string | null
   can_approve?: boolean
+  revision_count?: number
   can_update?: boolean
   can_delete?: boolean
   can_submit?: boolean
@@ -461,6 +463,7 @@ const statusItems = computed(() => [
   { title: t('purchaseOrder.list.filters.statusApproved'), value: 'Approved' },
   { title: t('purchaseOrder.list.filters.statusRejected'), value: 'Rejected' },
   { title: t('purchaseOrder.list.filters.statusCancelled'), value: 'Cancelled' },
+  { title: t('purchaseOrder.list.filters.statusNeedRevision'), value: 'Need Revision' },
 ])
 
 const paginationData = computed(() => {
@@ -482,6 +485,7 @@ const formatStatus = (status: string | null): string => {
   if (normalized === 'approved') return 'Approved'
   if (normalized === 'rejected') return 'Rejected'
   if (normalized === 'cancelled') return 'Cancelled'
+  if (normalized === 'need revision') return 'Needs Revision'
 
   return status
 }
@@ -506,6 +510,7 @@ const getStatusColor = (status: string | null): string => {
   if (normalized === 'approved') return 'success'
   if (normalized === 'rejected') return 'error'
   if (normalized === 'cancelled') return 'error'
+  if (normalized === 'need revision') return 'warning'
 
   return 'secondary'
 }
@@ -640,6 +645,86 @@ const checkUserSignature = async (): Promise<boolean> => {
   })
 
   return response.data?.has_signature === true
+}
+
+/*
+|--------------------------------------------------------------------------
+| Kembalikan dokumen ke pemohon untuk direvisi
+|--------------------------------------------------------------------------
+| Pilihan KETIGA di meja approver, di samping menyetujui dan menolak, dan
+| bukan salah satu dari keduanya: dokumennya tidak ditolak -- ia dikembalikan
+| untuk diperbaiki, lalu berjalan lagi dari tahap pertama.
+|
+| Alasannya wajib, dan di situ seluruh gunanya. Dokumen yang kembali tanpa
+| sepatah kata pun akan diajukan ulang apa adanya, lalu berputar sekali lagi
+| melewati seluruh rantai approval.
+|
+| Penjaganya memakai hal yang sama dengan tombol Setujui -- can_approve dari
+| server, dihitung dari baris approval, dan sudah menolak pemohon atas
+| dokumennya sendiri.
+|--------------------------------------------------------------------------
+*/
+const returnDialog = ref(false)
+const returnTarget = ref<PurchaseOrderItem | null>(null)
+const returnReason = ref('')
+const returnError = ref('')
+const returnLoading = ref(false)
+
+const openReturn = (row: PurchaseOrderItem): void => {
+  returnTarget.value = row
+  returnReason.value = ''
+  returnError.value = ''
+  returnDialog.value = true
+}
+
+const returnForRevision = async (): Promise<void> => {
+  if (!returnTarget.value?.public_id || returnLoading.value)
+    return
+
+  /* Sama dengan penjaga di server: tiga huruf. */
+  if (returnReason.value.trim().length < 3) {
+    returnError.value = t('common.revision.reasonRequired')
+
+    return
+  }
+
+  returnLoading.value = true
+
+  try {
+    showLoadingAlert(
+      t('common.alert.processing'),
+      t('common.alert.pleaseWait'),
+    )
+
+    const response = await axios.patch(
+      `/non-stock/purchase-order/${encodeURIComponent(returnTarget.value.public_id)}/return-for-revision`,
+      { reason: returnReason.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    closeAlert()
+
+    returnDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('common.revision.successFallback'),
+    })
+
+    await fetchPurchaseOrders()
+  }
+  catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(error, t('common.revision.failedFallback')),
+    })
+  }
+  finally {
+    returnLoading.value = false
+  }
 }
 
 const openRejectPO = (po: any): void => {
@@ -1935,6 +2020,20 @@ onBeforeUnmount(() => {
                       />
                     </div>
 
+                    <!--
+                      Nama vendornya, di bawah nomornya.
+
+                      Hanya bila ada: yang kosong tidak perlu diumumkan, dan
+                      baris daftar yang padat tidak pantas diisi tanda hubung
+                      yang tidak mengatakan apa-apa.
+                    -->
+                    <div
+                      v-if="v.vendor && v.vendor !== '-'"
+                      class="text-caption text-medium-emphasis"
+                    >
+                      {{ v.vendor }}
+                    </div>
+
                     <VChip
                       v-if="canApprovePO(v)"
                       size="x-small"
@@ -2112,13 +2211,30 @@ onBeforeUnmount(() => {
             </td>
 
             <td class="text-center">
-              <VChip
-                :color="getStatusColor(v.status)"
-                size="small"
-                class="text-capitalize"
-              >
-                {{ formatStatus(v.status) }}
-              </VChip>
+              <div class="d-flex flex-column align-start gap-1">
+                <VChip
+                  :color="getStatusColor(v.status)"
+                  size="small"
+                  class="text-capitalize"
+                >
+                  {{ formatStatus(v.status) }}
+                </VChip>
+
+                <!--
+                  Lencana revisi, pada dokumen yang pernah dikembalikan.
+                  Tetap tampil walau dokumennya sudah berjalan lagi:
+                  inilah yang memberi tahu approver bahwa isinya sudah
+                  berubah.
+                -->
+                <VChip
+                  v-if="(v.revision_count || 0) > 0"
+                  size="x-small"
+                  color="warning"
+                  variant="outlined"
+                >
+                  {{ t('common.revision.badge', { n: v.revision_count }) }}
+                </VChip>
+              </div>
             </td>
             
             <td class="text-center">
@@ -2233,6 +2349,26 @@ onBeforeUnmount(() => {
 
                       <VListItemTitle class="text-error">
                         {{ t('purchaseOrder.list.menu.reject') }}
+                      </VListItemTitle>
+                    </VListItem>
+
+                    <VListItem
+                      v-if="canApprovePO(v)"
+                      href="javascript:void(0)"
+                      :disabled="returnLoading"
+                      @click="openReturn(v)"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-undo-variant"
+                          :size="20"
+                          color="warning"
+                          class="me-3"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-warning">
+                        {{ t('common.revision.menuReturn') }}
                       </VListItemTitle>
                     </VListItem>
 
@@ -3139,6 +3275,19 @@ onBeforeUnmount(() => {
               </VCardText>
             </VCard>
           </div>
+          <!--
+            Revisi: yang sedang berjalan, dan riwayatnya.
+
+            Ditaruh paling bawah dengan sengaja. Yang dibaca lebih dulu
+            adalah dokumennya sendiri; riwayat revisi dibaca sesudahnya,
+            oleh orang yang ingin mengerti kenapa isinya seperti itu.
+          -->
+          <div class="mt-5">
+            <RevisionHistory
+              :revisions="detailPurchaseOrder?.revisions || []"
+              :open-revision="detailPurchaseOrder?.revision_open || null"
+            />
+          </div>
         </VCardText>
 
         <VDivider />
@@ -3166,6 +3315,18 @@ onBeforeUnmount(() => {
             @click="openRejectPO(detailPurchaseOrder)"
           >
             Reject
+          </VBtn>
+
+          <VBtn
+            v-if="detailPurchaseOrder && canApprovePO(detailPurchaseOrder)"
+            color="warning"
+            variant="tonal"
+            prepend-icon="mdi-undo-variant"
+            class="text-none"
+            :disabled="returnLoading"
+            @click="openReturn(detailPurchaseOrder)"
+          >
+            {{ t('common.revision.menuReturn') }}
           </VBtn>
 
           <VBtn
@@ -3364,6 +3525,66 @@ onBeforeUnmount(() => {
             @click="approvePurchaseOrder"
           >
             {{ t('purchaseOrder.list.toast.approveButton') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!--
+      DIALOG KEMBALIKAN
+
+      Judulnya bertanya dan menyebut nomornya sekaligus. Yang menekan
+      tombol ini sedang memindahkan dokumen orang lain kembali ke
+      mejanya, dan nomornya adalah hal pertama yang perlu dipastikan.
+
+      Warnanya bukan merah. Mengembalikan bukan menolak: dokumennya
+      masih hidup, dan yang diminta adalah perbaikan.
+    -->
+    <VDialog
+      v-model="returnDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('common.revision.dialogTitle', {
+            number: returnTarget?.nomor_po || '-',
+          }) }}
+        </VCardTitle>
+
+        <VCardText>
+          <div class="text-body-2 text-medium-emphasis mb-4">
+            {{ t('common.revision.dialogSubtitle') }}
+          </div>
+
+          <VTextarea
+            v-model="returnReason"
+            :label="t('common.revision.reasonLabel')"
+            :placeholder="t('common.revision.reasonPlaceholder')"
+            rows="3"
+            auto-grow
+            :error="!!returnError"
+            :error-messages="returnError ? [returnError] : []"
+          />
+        </VCardText>
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="returnLoading"
+            @click="returnDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="warning"
+            class="text-none"
+            :loading="returnLoading"
+            @click="returnForRevision"
+          >
+            {{ t('common.revision.confirmButton') }}
           </VBtn>
         </VCardActions>
       </VCard>

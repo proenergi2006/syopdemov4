@@ -17,11 +17,27 @@ class ClaimItem extends Model
 
     protected $fillable = [
         'claim_id',
+        'transaction_category_id',
         'date',
         'description',
         'amount',
         'original_amount',
     ];
+
+    /**
+     * Keterangan transaksi baris ini.
+     *
+     * null berarti IKUT HEADERNYA, bukan belum diisi -- baris yang dibuat
+     * sebelum keterangan transaksi pindah ke baris memang tidak punya
+     * pilihannya sendiri.
+     */
+    public function transactionCategory()
+    {
+        return $this->belongsTo(
+            \App\Models\FundRequestTransactionCategory::class,
+            'transaction_category_id',
+        );
+    }
 
     protected $casts = [
         'claim_id' => 'integer',

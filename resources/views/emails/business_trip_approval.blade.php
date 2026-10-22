@@ -16,7 +16,7 @@
 
     $translationMode = in_array(
         $currentMode,
-        ['final_approved', 'rejected', 'travel_arrangement'],
+        ['returned_for_revision', 'final_approved', 'rejected', 'travel_arrangement'],
         true,
     )
         ? $currentMode
@@ -28,17 +28,20 @@
 
     $description = __('mail.business_trip.description.' . $translationMode, [
         'actor_name' => $actorName,
+        'revision' => $revisionNumber ?? 0,
     ]);
 
     $displayStatus = match ($currentMode) {
         'final_approved', 'travel_arrangement' => 'APPROVED',
         'rejected' => 'REJECTED',
+        'returned_for_revision' => 'NEED REVISION',
         default => 'IN PROGRESS',
     };
 
     $statusColor = match ($currentMode) {
         'final_approved', 'travel_arrangement' => '#1b7f4f',
         'rejected' => '#b3261e',
+        'returned_for_revision' => '#b26a00',
         default => '#8a6d1f',
     };
 
@@ -186,7 +189,9 @@
                                 @if (!empty($notes))
                                     <tr>
                                         <td style="padding:0 12px 11px; font-size:12px; color:#5b6b80;">
-                                            {{ __('mail.business_trip.field_notes') }}
+                                            {{ $currentMode === 'returned_for_revision'
+                                                ? __('mail.business_trip.field_return_reason')
+                                                : __('mail.business_trip.field_notes') }}
                                         </td>
                                         <td style="padding:0 12px 11px; font-size:12px;">
                                             {{ $notes }}

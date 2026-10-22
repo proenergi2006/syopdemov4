@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasRevisions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\Crypt;
 */
 class BusinessTrip extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasRevisions, SoftDeletes;
 
     protected $table = 'business_trips';
 
@@ -35,9 +36,24 @@ class BusinessTrip extends Model
     public const STATUS_REJECTED = 'REJECTED';
     public const STATUS_CANCELLED = 'CANCELLED';
 
+    /*
+    | Dikembalikan approver ke pemohon untuk diperbaiki.
+    |
+    | Statusnya HIDUP, dan justru di situ ia berbeda dari REJECTED yang
+    | sudah selesai: dokumennya masih berjalan dan masih akan menjadi
+    | uang, hanya sedang ada di tangan pemohonnya.
+    |
+    | Nomornya sengaja TIDAK dikembalikan ke DRAFT. Dokumen ini sudah
+    | pernah beredar; approver yang pernah membukanya harus masih bisa
+    | menemukannya dengan nomor yang sama, dan nomor yang dipakai ulang
+    | adalah nomor yang menunjuk dua dokumen sekaligus.
+    */
+    public const STATUS_NEED_REVISION = 'NEED REVISION';
+
     protected $fillable = [
         'trip_number',
         'status',
+        'revision_count',
         'submitted_by',
         'submitted_at',
         'requester_signed_by',
@@ -70,6 +86,7 @@ class BusinessTrip extends Model
     ];
 
     protected $casts = [
+        'revision_count' => 'integer',
         'date' => 'date',
         'user_id' => 'integer',
         'department_id' => 'integer',
@@ -195,9 +212,66 @@ class BusinessTrip extends Model
     {
         return in_array(
             $this->status,
-            [self::STATUS_DRAFT, self::STATUS_REJECTED],
+            [self::STATUS_DRAFT, self::STATUS_REJECTED, self::STATUS_NEED_REVISION],
             true,
         );
+    }
+
+    /**
+     * Yang ikut dipotret saat dokumennya dikembalikan.
+     *
+     * Itinerary dan peserta ikut: keduanya diisi pemohon, dan keduanya bisa
+     * menjadi sebab dokumennya dikembalikan -- "pesertanya kurang satu
+     * orang" adalah alasan pengembalian yang wajar, dan riwayat revisi harus
+     * bisa menunjukkan siapa yang ditambahkan.
+     *
+     * Arrangement TIDAK. Pemesanan tiket dan hotel adalah pekerjaan GA atas
+     * perdin ini, bukan isi yang diketik pemohon -- memotretnya akan membuat
+     * daftar perubahan menyalahkan pemohon atas pemesanan yang bukan
+     * pekerjaannya.
+     *
+     * @return array<int, string>
+     */
+    public function revisionSnapshotRelations(): array
+    {
+        return ['itineraries', 'participants'];
+    }
+
+    /**
+     * Pengenal baris anak pada potret revisi.
+     *
+     * Berbeda dari modul pengajuan dana, kedua relasi perdin DITULIS ULANG
+     * seluruhnya setiap kali dokumennya disimpan -- id barisnya berganti
+     * pada setiap penyimpanan. Memasangkan menurut id akan membuat satu jam
+     * yang digeser terbaca sebagai seluruh rundown dihapus lalu dibuat
+     * kembali.
+     *
+     * Peserta dikenali dari AKUN orangnya: itu memang identitasnya, dan
+     * urutan pilihnya tidak bermakna apa-apa. Rundown dikenali dari
+     * URUTANNYA, karena di sana urutan itulah yang bermakna -- "baris
+     * ketiga jamnya berubah" adalah kalimat yang bisa dibaca orang.
+     */
+    public function revisionSnapshotRowKey(string $relasi): string
+    {
+        return match ($relasi) {
+            'participants' => 'user_id',
+            'itineraries' => 'sort_no',
+            default => $this->getKeyName(),
+        };
+    }
+
+    /**
+     * Orang lain yang ikut dalam perjalanan ini, selain pemohonnya.
+     *
+     * Urutannya mengikuti urutan saat dipilih pemohon, supaya cetakan yang
+     * sama tidak tercetak berbeda dua kali.
+     */
+    public function participants()
+    {
+        return $this->hasMany(
+            BusinessTripParticipant::class,
+            'business_trip_id',
+        )->orderBy('sort_no')->orderBy('id');
     }
 
     public function itineraries()

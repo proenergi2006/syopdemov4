@@ -19,6 +19,7 @@ class CashAdvanceItem extends Model
         'cash_advance_id',
         'date',
         'description',
+        'transaction_category_id',
         'expense_category_id',
         'qty',
         'unit_price',
@@ -42,6 +43,22 @@ class CashAdvanceItem extends Model
      * Kosong untuk baris yang keterangan transaksinya bukan perdin --
      * di sana rinciannya memang tidak dikelompokkan.
      */
+    /**
+     * Keterangan transaksi baris ini.
+     *
+     * null berarti IKUT HEADERNYA, bukan belum diisi -- baris yang dibuat
+     * sebelum keterangan transaksi pindah ke baris memang tidak punya
+     * pilihannya sendiri. Jangan tertukar dengan expenseCategory(), yang
+     * mengelompokkan biaya perjalanan dinas.
+     */
+    public function transactionCategory()
+    {
+        return $this->belongsTo(
+            \App\Models\FundRequestTransactionCategory::class,
+            'transaction_category_id',
+        );
+    }
+
     public function expenseCategory()
     {
         return $this->belongsTo(

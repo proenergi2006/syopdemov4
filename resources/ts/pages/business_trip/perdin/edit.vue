@@ -8,10 +8,11 @@ import {
   showConfirmAlert,
   showErrorToast,
   showLoadingAlert,
-  showSuccessToast,
   showWarningToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
+import type { RevisionEntry } from '@/components/fund_request/revision'
 import { usePermissionStore } from '@/stores/permission'
 import { useDialogDatePicker } from '@core/composable/useDialogDatePicker'
 
@@ -82,7 +83,48 @@ const form = reactive({
    * dibuka.
    */
   itineraries: [] as ItineraryForm[],
+
+  /*
+   * Peserta lain yang ikut, sebagai daftar id akun.
+   *
+   * Boleh kosong: perjalanan yang dijalani sendiri adalah keadaan yang
+   * paling biasa, dan memaksa memilih seseorang hanya akan melahirkan
+   * nama yang dipilih asal ada.
+   */
+  participants: [] as number[],
 })
+
+/*
+|--------------------------------------------------------------------------
+| Peserta lain yang ikut
+|--------------------------------------------------------------------------
+| Pilihannya datang dari endpoint options bersama identitas pemohon, dan
+| sudah TIDAK memuat akun pemohonnya sendiri -- dokumennya menyebut dirinya
+| di bagian identitas, dan menawarkan namanya hanya akan melahirkan dokumen
+| yang menyebutnya dua kali.
+|
+| Judul pilihannya memuat department dan jabatan, bukan nama saja: dua orang
+| bernama mirip hanya bisa dibedakan dari keduanya. Pada chip yang sudah
+| terpilih cukup namanya, supaya medannya tidak menjadi dinding teks.
+|--------------------------------------------------------------------------
+*/
+interface ParticipantCandidate {
+  user_id: number
+  name: string
+  department_name: string | null
+  position_name: string | null
+}
+
+const participantCandidates = ref<ParticipantCandidate[]>([])
+
+const participantItems = computed(() =>
+  participantCandidates.value.map(kandidat => ({
+    ...kandidat,
+    title: [
+      kandidat.name,
+      [kandidat.department_name, kandidat.position_name].filter(Boolean).join(' / '),
+    ].filter(Boolean).join(' · '),
+  })))
 
 /** Baris rundown yang belum lengkap: tanggal, jam mulai, dan keterangan wajib. */
 const rowIncomplete = (baris: ItineraryForm): boolean =>
@@ -435,6 +477,21 @@ const goBack = (): void => {
 | kosong, daftar kosong, dan tiap medan yang boleh tidak ada -- percabangannya
 | menumpuk sampai tidak terbaca lagi.
 */
+/**
+ * Peserta yang sudah tercatat, dibaca sebagai daftar id akun.
+ *
+ * Bukan dicocokkan dari namanya: nama pada baris peserta adalah salinan
+ * keadaan saat dokumennya dibuat, dan orang yang sudah berganti nama atau
+ * berpindah department akan gagal dikenali.
+ */
+const readParticipants = (data: Record<string, unknown>): number[] => {
+  const daftar = Array.isArray(data.participants) ? data.participants : []
+
+  return daftar
+    .map((p: unknown) => Number((p as { user_id?: unknown })?.user_id))
+    .filter((id: number) => Number.isFinite(id) && id > 0)
+}
+
 const readItineraries = (data: Record<string, unknown>): ItineraryForm[] => {
   const daftar = Array.isArray(data.itineraries) ? data.itineraries : []
 
@@ -449,6 +506,42 @@ const readItineraries = (data: Record<string, unknown>): ItineraryForm[] => {
     timezone: (baris.timezone as string) ?? 'WIB',
     description: (baris.description as string) ?? '',
   }))
+}
+
+/*
+| Revisi yang sedang berjalan, bila dokumen ini dikembalikan.
+|
+| Ditampilkan di atas formnya. Alasan yang hanya bisa dibaca di
+| layar lain sama saja dengan tidak ada: pemohon akan menutup
+| formnya, mencari alasannya, lalu membukanya lagi.
+*/
+const revisiTerbuka = ref<RevisionEntry | null>(null)
+
+/*
+| Daftar kandidat peserta, diminta terpisah dari rincian dokumennya.
+|
+| Rincian dokumen hanya memuat peserta yang SUDAH tercatat; untuk menambah
+| orang, layar ini butuh daftar akun yang bisa dipilih -- dan daftar itu
+| tinggal di endpoint options bersama identitas pemohon.
+|
+| Kegagalannya sengaja tidak menggagalkan form: medan pesertanya hanya akan
+| tampil tanpa pilihan, sementara isian lain tetap bisa disunting. Dokumen
+| yang tertahan karena satu daftar pilihan gagal dimuat adalah harga yang
+| terlalu mahal untuk medan yang boleh kosong.
+*/
+const fetchParticipantCandidates = async (): Promise<void> => {
+  try {
+    const response = await axios.get('/business-trip/perdin/options')
+
+    const payload = response.data?.data
+
+    participantCandidates.value = Array.isArray(payload?.participant_candidates)
+      ? payload.participant_candidates
+      : []
+  }
+  catch {
+    participantCandidates.value = []
+  }
 }
 
 const fetchDetail = async (): Promise<void> => {
@@ -469,6 +562,8 @@ const fetchDetail = async (): Promise<void> => {
 
     tripNumber.value = data.trip_number ?? ''
 
+    revisiTerbuka.value = data.revision_open || null
+
     employee.employee_name = data.employee_name ?? ''
     employee.department_name = data.department_name ?? null
     employee.position_name = data.position_name ?? null
@@ -482,6 +577,7 @@ const fetchDetail = async (): Promise<void> => {
     form.notes = data.notes ?? ''
 
     form.itineraries = readItineraries(data)
+    form.participants = readParticipants(data)
   }
   catch (error: unknown) {
     notFound.value = true
@@ -531,6 +627,7 @@ const save = async (): Promise<void> => {
       return_time: form.return_time,
       purpose: form.purpose.trim(),
       notes: form.notes.trim() || null,
+      participants: form.participants,
 
       itineraries: form.itineraries.map(baris => ({
         date: baris.date,
@@ -543,12 +640,21 @@ const save = async (): Promise<void> => {
 
     closeAlert()
 
-    showSuccessToast({
-      title: t('common.alert.success'),
-      text: t('businessTrip.form.saveSuccess'),
+    /*
+    | Kabarnya dititipkan pada URL, bukan dimunculkan di sini.
+    |
+    | Toast yang lahir tepat sebelum perpindahan halaman tidak sempat
+    | dibaca siapa pun -- ia muncul dan hilang di halaman yang sedang
+    | ditinggalkan. Halaman daftarnya yang memunculkannya, setelah ia
+    | benar-benar terbuka.
+    |
+    | replace, bukan push: formulir yang sudah tersimpan tidak pantas
+    | didatangi lagi lewat tombol kembali.
+    */
+    await router.replace({
+      path: '/business_trip/perdin',
+      query: { success: 'updated' },
     })
-
-    goBack()
   }
   catch (error: unknown) {
     closeAlert()
@@ -578,11 +684,23 @@ onMounted(() => {
   }
 
   fetchDetail()
+  fetchParticipantCandidates()
 })
 </script>
 
 <template>
   <section>
+    <!--
+      Alasan pengembaliannya, paling atas.
+
+      Hanya bagian "sedang berjalan" dari komponen riwayat: di form
+      edit yang dibutuhkan bukan riwayat, melainkan satu hal yang
+      harus diperbaiki sekarang.
+    -->
+    <RevisionHistory
+      v-if="revisiTerbuka"
+      :open-revision="revisiTerbuka"
+    />
     <VAlert
       v-if="!canUpdate"
       type="warning"
@@ -774,6 +892,44 @@ onMounted(() => {
                 ? [t('businessTrip.form.validation.purpose')]
                 : []"
             />
+          </VCol>
+
+          <VCol cols="12">
+            <!--
+              Peserta lain yang ikut dalam perjalanan ini.
+
+              Ditaruh sesudah keperluan, karena urutan membacanya begitu:
+              ke mana, kapan, untuk apa, lalu bersama siapa.
+
+              Daftarnya dibuka DI BAWAH medannya lewat menu-props, bukan
+              menumpuk di atasnya seperti bawaan Vuetify -- angka yang sama
+              dengan seluruh pilihan lain di aplikasi ini. Medan yang
+              membuka daftarnya dengan cara berbeda membuat orang
+              kehilangan kebiasaannya.
+            -->
+            <VAutocomplete
+              v-model="form.participants"
+              :items="participantItems"
+              item-title="title"
+              item-value="user_id"
+              multiple
+              chips
+              closable-chips
+              clearable
+              density="comfortable"
+              :label="t('businessTrip.form.fields.participants')"
+              :hint="t('businessTrip.form.fields.participantsHint')"
+              persistent-hint
+              :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+            >
+              <template #chip="{ props: chipProps, item }">
+                <VChip
+                  v-bind="chipProps"
+                  size="small"
+                  :text="item.raw.name"
+                />
+              </template>
+            </VAutocomplete>
           </VCol>
 
           <VCol cols="12">

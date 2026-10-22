@@ -14,6 +14,7 @@ import {
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { formatNumberWithoutRp } from '@/utils/textFormatter'
 import {
+  documentTypeCategorySource,
   documentTypeUsesAreaMatrix,
   documentTypeUsesTransactionCategory,
   getApprovalFlowDocumentTypeLabel,
@@ -123,8 +124,12 @@ interface SpecialDocumentTypeOption {
   name: string
 }
 
+/*
+| Tipe DEPARTMENT berarti approver_id menunjuk department, dan step itu
+| diisi seluruh akun aktifnya saat approval dibuat.
+*/
 interface ApproverForm {
-  approver_type: 'ROLE' | 'USER'
+  approver_type: 'ROLE' | 'USER' | 'DEPARTMENT'
   approver_id: number | null
   approver_scope: ApproverScope
   branch_ids: number[]
@@ -141,6 +146,17 @@ interface ApprovalStepForm {
   step_order: number
   label: string
   approval_mode: 'ANY' | 'ALL'
+
+  /*
+  | Step boleh disetujui sesama anggotanya: pemohon dikeluarkan dari
+  | daftarnya, stepnya tetap hidup. Bila tidak ada yang tersisa, step
+  | dilewati.
+  */
+  allow_peer_approval: boolean
+
+  /* Role pemohon yang membuat step ini dilewati. Kosong = tidak pernah. */
+  skip_for_role_ids: number[]
+
   approvers: ApproverForm[]
 }
 
@@ -269,6 +285,15 @@ const approverScopeOptions = [
 const approverTypeOptions = [
   { title: 'Role', value: 'ROLE' },
   { title: 'User', value: 'USER' },
+
+  /*
+  | Seluruh akun aktif sebuah department.
+  |
+  | Dipakai ketentuan BOD: "disetujui akun BOD lain". Daftar berbasis role
+  | tidak bisa menyatakannya -- ada akun yang belum punya role, dan aturan
+  | yang bersandar pada role akan melewatkannya diam-diam.
+  */
+  { title: 'Department', value: 'DEPARTMENT' },
 ]
 
 const areaTypeOptions = [
@@ -291,7 +316,7 @@ const getSelectedApproverId = (value: unknown): number | null => {
 const isApproverAlreadySelectedInSameStep = (
   stepIndex: number,
   approverIndex: number,
-  approverType: 'ROLE' | 'USER',
+  approverType: 'ROLE' | 'USER' | 'DEPARTMENT',
   approverId: number,
 ): boolean => {
   const step = form.steps[stepIndex]
@@ -311,11 +336,13 @@ const isApproverAlreadySelectedInSameStep = (
 const getAvailableApproverItems = (
   stepIndex: number,
   approverIndex: number,
-  approverType: 'ROLE' | 'USER',
+  approverType: 'ROLE' | 'USER' | 'DEPARTMENT',
 ): DropdownOption[] => {
   const sourceItems = approverType === 'ROLE'
     ? roleOptions.value
-    : userOptions.value
+    : approverType === 'DEPARTMENT'
+      ? departmentOptions.value
+      : userOptions.value
 
   return sourceItems.filter(item => {
     return !isApproverAlreadySelectedInSameStep(
@@ -406,8 +433,16 @@ const loadTransactionCategories = async (): Promise<void> => {
         /*
          * include_inactive: flow lama bisa saja memakai kategori yang sudah
          * dinonaktifkan; tanpa ini pilihannya hilang diam-diam saat diedit.
+         *
+         * document_type: daftar keterangan transaksi FPU dan Claim berbeda,
+         * dan masternya satu tabel. Tanpa ini layar menawarkan keduanya --
+         * termasuk keterangan milik Claim pada flow FPU, yang tidak akan
+         * pernah cocok dengan dokumen mana pun.
          */
-        params: { include_inactive: 1 },
+        params: {
+          include_inactive: 1,
+          document_type: documentTypeCategorySource(form.document_type) ?? undefined,
+        },
         headers: { Accept: 'application/json' },
       },
     )
@@ -552,6 +587,23 @@ watch(
     if (!documentTypeUsesTransactionCategory(normalizedType)) {
       form.all_transaction_categories = true
       form.transaction_category_ids = []
+    }
+    else {
+      /*
+      | Jenis dokumennya berganti: daftarnya diambil ulang, dan pilihan yang
+      | tidak ada di daftar baru dilepas.
+      |
+      | Dibiarkan, flow-nya tersimpan menunjuk keterangan transaksi milik
+      | modul lain -- cakupan yang tidak akan pernah cocok, tanpa satu pun
+      | galat yang memberi tahu.
+      */
+      loadTransactionCategories().then(() => {
+        const tersedia = transactionCategoryOptions.value.map(satu => Number(satu.id))
+
+        form.transaction_category_ids = form.transaction_category_ids.filter(
+          id => tersedia.includes(Number(id)),
+        )
+      })
     }
 
     if (!documentTypeUsesAreaMatrix(normalizedType))
@@ -737,10 +789,20 @@ const normalizeNumberInput = (value: unknown): number | null => {
   return Number.isFinite(numberValue) ? numberValue : null
 }
 
-const normalizeApproverType = (value: unknown): 'ROLE' | 'USER' => {
-  return String(value || 'ROLE').toUpperCase() === 'USER'
-    ? 'USER'
-    : 'ROLE'
+const normalizeApproverType = (value: unknown): 'ROLE' | 'USER' | 'DEPARTMENT' => {
+  const tipe = String(value || 'ROLE').toUpperCase()
+
+  if (tipe === 'USER')
+    return 'USER'
+
+  /*
+  | Tanpa cabang ini, step bertipe department terbaca sebagai ROLE saat
+  | dimuat -- lalu tersimpan kembali sebagai role dengan id department.
+  */
+  if (tipe === 'DEPARTMENT')
+    return 'DEPARTMENT'
+
+  return 'ROLE'
 }
 
 const normalizeApproverScope = (value: unknown): ApproverScope => {
@@ -814,6 +876,20 @@ const buildStepsFromResponse = (steps: ApprovalStepResponse[] = []): ApprovalSte
         step_order: stepOrder,
         label: String(firstStep?.label || ''),
         approval_mode: normalizeApprovalMode(firstStep?.approval_mode),
+
+        /*
+        | Kedua sifat step ikut dipulihkan.
+        |
+        | Dibaca dari baris pertama step itu: sifatnya milik step, dan setiap
+        | barisnya membawa salinan yang sama.
+        |
+        | Tanpa ini, membuka flow lalu menyimpannya kembali -- walau tidak ada
+        | yang disentuh -- akan mengembalikan keduanya ke mati.
+        */
+        allow_peer_approval: Boolean((firstStep as any)?.allow_peer_approval),
+        skip_for_role_ids: Array.isArray((firstStep as any)?.skip_for_role_ids)
+          ? (firstStep as any).skip_for_role_ids.map(Number).filter((id: number) => id > 0)
+          : [],
         approvers: approvers.map(approver => ({
           approver_type: normalizeApproverType(approver.approver_type),
           approver_id: normalizeNumberInput(approver.approver_id),
@@ -1008,6 +1084,8 @@ const addStep = (): void => {
     step_order: form.steps.length + 1,
     label: '',
     approval_mode: 'ANY',
+    allow_peer_approval: false,
+    skip_for_role_ids: [],
     approvers: [
       {
         approver_type: 'ROLE',
@@ -1291,6 +1369,10 @@ const buildPayload = () => {
       step_order: stepIndex + 1,
       label: step.label?.trim() || null,
       approval_mode: step.approval_mode || 'ANY',
+
+      allow_peer_approval: Boolean(step.allow_peer_approval),
+      skip_for_role_ids: [...new Set((step.skip_for_role_ids || []).map(Number))]
+        .filter(roleId => roleId > 0),
       approvers: step.approvers.map(approver => ({
         approver_type: approver.approver_type,
         approver_id: Number(approver.approver_id),
@@ -1907,6 +1989,67 @@ const formatAmount = (value: number | string | null | undefined): string => {
                     </VBtn>
                   </div>
 
+                  <!--
+                    Dua sifat milik STEP, bukan milik satu approver: keduanya
+                    berbicara tentang satu tingkat, bukan tentang satu baris di
+                    dalamnya. Karena itu letaknya di atas daftar approver.
+                  -->
+                  <VRow class="bod-rule-row">
+                    <VCol
+                      cols="12"
+                      md="6"
+                    >
+                      <VSwitch
+                        v-model="step.allow_peer_approval"
+                        color="warning"
+                        density="comfortable"
+                        :disabled="submitLoading"
+                        hide-details
+                        class="bod-rule-switch"
+                      >
+                        <!--
+                          Keterangannya ditaruh DI DALAM label, bukan sebagai
+                          hint: hint milik VSwitch tidak pernah tergambar, dan
+                          keterangan yang tidak muncul sama saja tidak ada.
+                        -->
+                        <template #label>
+                          <div class="bod-rule-switch__label">
+                            <div>Boleh disetujui rekan setingkat</div>
+
+                            <div class="text-caption text-medium-emphasis">
+                              Pemohon dikeluarkan dari step ini; yang menyetujui
+                              rekannya. Bila tidak ada rekan lain, step dilewati.
+                            </div>
+                          </div>
+                        </template>
+                      </VSwitch>
+                    </VCol>
+
+                    <VCol
+                      cols="12"
+                      md="6"
+                    >
+                      <VAutocomplete
+                        v-model="step.skip_for_role_ids"
+                        label="Lewati step ini bila pemohon ber-role"
+                        :items="roleOptions"
+                        item-title="title"
+                        item-value="id"
+                        multiple
+                        chips
+                        closable-chips
+                        clearable
+                        density="comfortable"
+                        :loading="isLoadingRole"
+                        :disabled="submitLoading"
+                        :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+                        placeholder="Kosongkan = berlaku untuk semua pemohon"
+                        hint="Mis. CEO pada step counter-sign BOD: tidak ada yang di atasnya."
+                        persistent-hint
+                      />
+                    </VCol>
+                  </VRow>
+
                   <div class="approver-list">
                     <div
                       v-for="(approver, approverIndex) in step.approvers"
@@ -1940,11 +2083,23 @@ const formatAmount = (value: number | string | null | undefined): string => {
                             item-value="id"
                             clearable
                             density="comfortable"
-                            :loading="approver.approver_type === 'ROLE' ? isLoadingRole : isLoadingUser"
+                            :loading="approver.approver_type === 'ROLE'
+                              ? isLoadingRole
+                              : approver.approver_type === 'DEPARTMENT'
+                                ? isLoadingDepartment
+                                : isLoadingUser"
                             :disabled="submitLoading"
                             :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
-                            :no-data-text="approver.approver_type === 'ROLE' ? 'Role tidak ditemukan' : 'User tidak ditemukan'"
-                            :placeholder="approver.approver_type === 'ROLE' ? 'Pilih role approver' : 'Pilih user approver'"
+                            :no-data-text="approver.approver_type === 'ROLE'
+                              ? 'Role tidak ditemukan'
+                              : approver.approver_type === 'DEPARTMENT'
+                                ? 'Department tidak ditemukan'
+                                : 'User tidak ditemukan'"
+                            :placeholder="approver.approver_type === 'ROLE'
+                              ? 'Pilih role approver'
+                              : approver.approver_type === 'DEPARTMENT'
+                                ? 'Pilih department approver'
+                                : 'Pilih user approver'"
                           />
                         </VCol>
 
@@ -2354,6 +2509,35 @@ const formatAmount = (value: number | string | null | undefined): string => {
 
 .approval-step-card {
   border-radius: 16px;
+}
+
+/*
+| Label VSwitch tidak pernah menyusut dengan sendirinya: ia melebar
+| sepanjang tulisannya dan menembus kolomnya. Dibuat boleh membungkus,
+| lalu dibatasi lebarnya -- bukan diberi ruang lebih, karena kalimat
+| berikutnya akan selalu lebih panjang daripada ruang mana pun.
+*/
+.bod-rule-row {
+  margin-block-end: 4px;
+  row-gap: 8px;
+}
+
+.bod-rule-switch :deep(.v-label) {
+  display: block;
+  opacity: 1;
+  inline-size: 100%;
+  min-inline-size: 0;
+  white-space: normal;
+}
+
+.bod-rule-switch :deep(.v-selection-control) {
+  align-items: flex-start;
+  min-inline-size: 0;
+}
+
+.bod-rule-switch__label {
+  padding-block-start: 2px;
+  line-height: 1.35;
 }
 
 .approver-list {

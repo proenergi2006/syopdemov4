@@ -3,18 +3,21 @@
 return [
     'po' => [
         'subject' => [
+            'returned_for_revision' => 'PO Dikembalikan untuk Revisi - :nomor_po',
             'final_approved' => 'Purchase Order Disetujui - :nomor_po',
             'step_approved' => 'Update Approval Purchase Order - :nomor_po',
             'rejected' => 'Purchase Order Ditolak - :nomor_po',
             'default' => 'Approval Purchase Order - :nomor_po',
         ],
         'title' => [
+            'returned_for_revision' => 'PO Dikembalikan untuk Revisi',
             'final_approved' => 'Purchase Order Telah Disetujui',
             'step_approved' => 'Update Approval Purchase Order',
             'rejected' => 'Purchase Order Ditolak',
             'default' => 'Approval Purchase Order',
         ],
         'description' => [
+            'returned_for_revision' => 'Purchase Order Anda dikembalikan oleh :actor_name untuk diperbaiki (revisi ke-:revision). Silakan perbaiki sesuai alasan di bawah, lalu ajukan kembali.',
             'final_approved' => 'Purchase Order Anda telah mendapatkan final approval oleh :actor_name.',
             'step_approved' => 'Purchase Order Anda telah disetujui oleh :actor_name dan masih menunggu approval berikutnya.',
             'rejected' => 'Purchase Order Anda telah ditolak oleh :actor_name.',
@@ -26,24 +29,28 @@ return [
         'field_total' => 'Total Nilai',
         'field_status' => 'Status',
         'field_rejection_notes' => 'Catatan Penolakan',
+        'field_return_reason' => 'Alasan Pengembalian',
         'instruction' => 'Silakan klik tombol berikut untuk membuka halaman Purchase Order di SYOP v4.',
         'button' => 'Buka Purchase Order',
     ],
 
     'pr' => [
         'subject' => [
+            'returned_for_revision' => 'PR Dikembalikan untuk Revisi - :nomor_pr',
             'step_approved' => 'Tahap Approval Purchase Requisition Disetujui - :nomor_pr',
             'final_approved' => 'Purchase Requisition Disetujui - :nomor_pr',
             'rejected' => 'Purchase Requisition Ditolak - :nomor_pr',
             'default' => 'Permintaan Approval Purchase Requisition - :nomor_pr',
         ],
         'title' => [
+            'returned_for_revision' => 'PR Dikembalikan untuk Revisi',
             'final_approved' => 'Purchase Requisition Telah Disetujui',
             'step_approved' => 'Update Approval Purchase Requisition',
             'rejected' => 'Purchase Requisition Ditolak',
             'default' => 'Approval Purchase Requisition',
         ],
         'description' => [
+            'returned_for_revision' => 'Purchase Requisition Anda dikembalikan oleh :actor_name untuk diperbaiki (revisi ke-:revision). Silakan perbaiki sesuai alasan di bawah, lalu ajukan kembali.',
             'final_approved' => 'Purchase Requisition Anda telah mendapatkan final approval oleh :actor_name.',
             'step_approved' => 'Purchase Requisition Anda telah disetujui oleh :actor_name dan masih menunggu approval berikutnya.',
             'rejected' => 'Purchase Requisition Anda telah ditolak oleh :actor_name.',
@@ -56,12 +63,14 @@ return [
         'field_step_value' => 'Tahap :step_order',
         'field_status' => 'Status',
         'field_rejection_notes' => 'Catatan Penolakan',
+        'field_return_reason' => 'Alasan Pengembalian',
         'instruction' => 'Silakan klik tombol berikut untuk membuka halaman Purchase Requisition di SYOP v4.',
         'button' => 'Buka Purchase Requisition',
     ],
 
     'claim' => [
         'subject' => [
+            'returned_for_revision' => 'Claim Dikembalikan untuk Revisi - :claim_number',
             'final_approved' => 'Claim Disetujui - :claim_number',
             'rejected' => 'Claim Ditolak - :claim_number',
             'paid' => 'Claim Sudah Dibayarkan - :claim_number',
@@ -72,6 +81,7 @@ return [
             'default' => 'Permintaan Approval Claim - :claim_number',
         ],
         'title' => [
+            'returned_for_revision' => 'Claim Dikembalikan untuk Revisi',
             'final_approved' => 'Claim Telah Disetujui',
             'rejected' => 'Claim Ditolak',
             'paid' => 'Claim Sudah Dibayarkan',
@@ -82,6 +92,7 @@ return [
             'default' => 'Approval Claim',
         ],
         'description' => [
+            'returned_for_revision' => 'Claim Anda dikembalikan oleh :actor_name untuk diperbaiki (revisi ke-:revision). Silakan perbaiki sesuai alasan di bawah, lalu ajukan kembali.',
             'final_approved' => 'Claim Anda telah mendapatkan final approval oleh :actor_name.',
             'rejected' => 'Claim Anda telah ditolak oleh :actor_name.',
             'paid' => 'Claim Anda telah dibayarkan oleh :actor_name.',
@@ -101,11 +112,13 @@ return [
         'field_step_value' => 'Tahap :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Catatan',
+        'field_return_reason' => 'Alasan Pengembalian',
         'instruction' => 'Silakan klik tombol berikut untuk membuka halaman Claim di SYOP v4.',
         'button' => 'Buka Claim',
     ],
     'fpu' => [
         'subject' => [
+            'returned_for_revision' => 'FPU Dikembalikan untuk Revisi - :advance_number',
             'final_approved' => 'FPU Disetujui - :advance_number',
             'rejected' => 'FPU Ditolak - :advance_number',
             'disbursed' => 'FPU Sudah Dibayarkan - :advance_number',
@@ -116,6 +129,7 @@ return [
             'default' => 'Permintaan Approval FPU - :advance_number',
         ],
         'title' => [
+            'returned_for_revision' => 'FPU Dikembalikan untuk Revisi',
             'final_approved' => 'FPU Telah Disetujui',
             'rejected' => 'FPU Ditolak',
             'disbursed' => 'FPU Sudah Dibayarkan',
@@ -126,6 +140,7 @@ return [
             'default' => 'Approval FPU',
         ],
         'description' => [
+            'returned_for_revision' => 'FPU Anda dikembalikan oleh :actor_name untuk diperbaiki (revisi ke-:revision). Silakan perbaiki sesuai alasan di bawah, lalu ajukan kembali.',
             'final_approved' => 'FPU Anda telah mendapatkan final approval oleh :actor_name.',
             'rejected' => 'FPU Anda telah ditolak oleh :actor_name.',
             'disbursed' => 'Dana FPU Anda telah dibayarkan oleh :actor_name.',
@@ -145,6 +160,7 @@ return [
         'field_step_value' => 'Tahap :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Catatan',
+        'field_return_reason' => 'Alasan Pengembalian',
         'field_payment_schedule' => 'Jadwal Pembayaran',
         'payment_early' => 'DIBAYAR LEBIH AWAL',
         'payment_late' => 'MELEWATI JADWAL',
@@ -154,6 +170,7 @@ return [
 
     'realisasi' => [
         'subject' => [
+            'returned_for_revision' => 'Realisasi Dikembalikan untuk Revisi - :realization_number',
             'final_approved' => 'Realisasi FPU Disetujui - :realization_number',
             'rejected' => 'Realisasi FPU Ditolak - :realization_number',
             'settled' => 'Selisih Realisasi FPU Selesai - :realization_number',
@@ -165,6 +182,7 @@ return [
             'default' => 'Permintaan Approval Realisasi FPU - :realization_number',
         ],
         'title' => [
+            'returned_for_revision' => 'Realisasi Dikembalikan untuk Revisi',
             'final_approved' => 'Realisasi FPU Telah Disetujui',
             'rejected' => 'Realisasi FPU Ditolak',
             'settled' => 'Selisih Realisasi FPU Telah Diselesaikan',
@@ -176,6 +194,7 @@ return [
             'default' => 'Approval Realisasi FPU',
         ],
         'description' => [
+            'returned_for_revision' => 'Realisasi Anda dikembalikan oleh :actor_name untuk diperbaiki (revisi ke-:revision). Silakan perbaiki sesuai alasan di bawah, lalu ajukan kembali.',
             'final_approved' => 'Realisasi FPU Anda telah mendapatkan final approval oleh :actor_name.',
             'rejected' => 'Realisasi FPU Anda telah ditolak oleh :actor_name.',
             'settled' => 'Selisih Realisasi FPU Anda telah diselesaikan oleh :actor_name.',
@@ -202,6 +221,7 @@ return [
         'field_step_value' => 'Tahap :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Catatan',
+        'field_return_reason' => 'Alasan Pengembalian',
         'instruction' => 'Silakan klik tombol berikut untuk membuka halaman Realisasi FPU di SYOP v4.',
         'button' => 'Buka Realisasi FPU',
     ],
@@ -216,6 +236,7 @@ return [
     */
     'business_trip' => [
         'subject' => [
+            'returned_for_revision' => 'Perjalanan Dinas Dikembalikan untuk Revisi - :trip_number',
             'default' => 'Persetujuan Perjalanan Dinas :trip_number',
             'final_approved' => 'Perjalanan Dinas :trip_number telah disetujui',
             'rejected' => 'Perjalanan Dinas :trip_number ditolak',
@@ -223,6 +244,7 @@ return [
         ],
 
         'title' => [
+            'returned_for_revision' => 'Perjalanan Dinas Dikembalikan untuk Revisi',
             'default' => 'Permintaan Persetujuan Perdin',
             'final_approved' => 'Perdin Disetujui',
             'rejected' => 'Perdin Ditolak',
@@ -230,6 +252,7 @@ return [
         ],
 
         'description' => [
+            'returned_for_revision' => 'Perjalanan dinas Anda dikembalikan oleh :actor_name untuk diperbaiki (revisi ke-:revision). Silakan perbaiki sesuai alasan di bawah, lalu ajukan kembali.',
             'default' => 'Ada pengajuan perjalanan dinas yang menunggu persetujuan Anda. Mohon diperiksa rencana perjalanannya di bawah ini.',
             'final_approved' => 'Pengajuan perjalanan dinas Anda telah disetujui seluruhnya oleh :actor_name. Anda dapat melanjutkan dengan mengajukan FPU untuk perjalanan ini.',
             'rejected' => 'Pengajuan perjalanan dinas Anda ditolak oleh :actor_name. Silakan periksa catatannya, perbaiki, lalu ajukan kembali.',
@@ -283,6 +306,7 @@ return [
         'field_step_value' => 'Tahap :step_order',
         'field_status' => 'Status',
         'field_notes' => 'Catatan',
+        'field_return_reason' => 'Alasan Pengembalian',
 
         'itinerary_title' => 'Daftar Perjalanan (Itinerary)',
         'itinerary_date' => 'Hari & Tanggal',

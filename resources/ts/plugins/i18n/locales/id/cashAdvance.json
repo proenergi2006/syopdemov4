@@ -7,7 +7,8 @@
         "draft": "Draft",
         "inProgress": "In Progress",
         "received": "Diterima",
-        "rejected": "Rejected"
+        "rejected": "Rejected",
+        "needRevision": "Butuh Revisi"
     },
     "list": {
         "filtersTitle": "Filter FPU",
@@ -97,7 +98,10 @@
             "attachmentCount": "Dokumen ini punya {count} lampiran.",
             "attachmentInclude": "Gabungkan lampiran ke dalam satu PDF",
             "attachmentPdfNotice": "Lampiran berupa gambar akan dimasukkan ke halaman berikutnya, dua per halaman. Lampiran yang sudah berformat PDF tidak bisa digabung — namanya tetap didaftarkan pada halaman terakhir agar bisa dibuka terpisah.",
-            "attachmentConfirm": "Cetak"
+            "attachmentConfirm": "Cetak",
+            "combineTripInclude": "Satukan dengan dokumen Perjalanan Dinas",
+            "combineTripNotice": "Perjalanan Dinas akan dicetak menyusul di belakang dokumen ini, berikut berkas pemesanan GA bila lampiran ikut digabung.",
+            "combineTripUnavailable": "Dokumen ini tidak terikat Perjalanan Dinas, atau perdinnya belum disetujui sepenuhnya."
         },
         "approve": {
             "dialogTitle": "Setujui FPU {number}?",
@@ -235,7 +239,7 @@
     "form": {
         "attachment": {
             "title": "Lampiran",
-            "addButton": "Tambah Lampiran",
+            "addButton": "Unggah Lampiran",
             "empty": "Belum ada lampiran. Format yang diterima: PDF, JPG, JPEG, PNG, maksimal 3MB per file.",
             "deleteButton": "Hapus",
             "existingTitle": "Lampiran Tersimpan"
@@ -289,7 +293,8 @@
             "tableDescription": "Deskripsi",
             "tableNo": "No",
             "total": "Total Pengajuan",
-            "attachmentOptional": "opsional untuk perdin"
+            "attachmentOptional": "opsional untuk perdin",
+            "tableTransactionCategory": "Keterangan Transaksi"
         },
         "loadingTitle": "Memuat data FPU...",
         "noData": {
@@ -333,7 +338,9 @@
             "cancelConfirmTitle": "Batalkan pengisian?",
             "cancelConfirmText": "Data yang sudah diisi akan hilang.",
             "saveFailed": "FPU gagal disimpan.",
-            "linesClearedByCategory": "Rincian pengajuan dikosongkan karena keterangan transaksinya berganti. Cara pengisiannya berbeda, jadi rinciannya diisi ulang dari awal."
+            "linesClearedByCategory": "Rincian pengajuan dikosongkan karena keterangan transaksinya berganti. Cara pengisiannya berbeda, jadi rinciannya diisi ulang dari awal.",
+            "itemTransactionCategoryRequired": "Baris {number}: keterangan transaksinya belum dipilih.",
+            "categoryWithoutItem": "Keterangan transaksi {categories} belum punya satu pun baris. Tambahkan barisnya, atau cabut keterangan transaksi itu di bagian atas formulir."
         },
         "validation": {
             "date": "Tanggal wajib diisi.",
@@ -347,7 +354,8 @@
             "itemDescription": "Deskripsi wajib diisi.",
             "itemAmount": "Nominal wajib diisi.",
             "itemAttachment": "Minimal satu berkas.",
-            "businessTrip": "Dokumen Perjalanan Dinas wajib dipilih."
+            "businessTrip": "Dokumen Perjalanan Dinas wajib dipilih.",
+            "itemTransactionCategory": "Keterangan transaksi wajib dipilih"
         },
         "hints": {
             "businessTrip": "Hanya Perdin milik Anda yang sudah disetujui dan belum dipakai FPU lain yang berjalan.",
@@ -355,7 +363,7 @@
         },
         "businessTripState": {
             "approved": "Disetujui",
-            "pending": "Menunggu acc",
+            "pending": "Menunggu persetujuan",
             "locked": "Belum bisa dipilih: perdin ini belum disetujui dan diajukan kurang dari 7 hari sebelum berangkat.",
             "waitingStep": "Terkunci — menunggu persetujuan tahap {step}: {who}",
             "someone": "penyetuju berikutnya"
@@ -374,7 +382,18 @@
             "toastNoRows": "Belum ada rincian sama sekali. Isi minimal satu baris, atau tandai kategorinya diurus GA.",
             "toastCategory": "Baris {number}: kategori biayanya belum dipilih.",
             "toastQty": "Baris {number}: Qty wajib diisi dan harus lebih dari nol.",
-            "toastUnitPrice": "Baris {number}: Rincian Biaya wajib diisi dan harus lebih dari nol."
+            "toastUnitPrice": "Baris {number}: Rincian Biaya wajib diisi dan harus lebih dari nol.",
+            "arrangedNotesLabel": "Catatan untuk GA (opsional)",
+            "arrangedNotesPlaceholder": "Misal: berangkat pagi, pulang hari yang sama",
+            "arrangedNotesHint": "Permintaan khusus untuk GA pada kategori ini. Ikut terbaca di detail dokumen."
+        },
+        "categorySet": {
+            "hintSingle": "Pengajuan Non Rutin hanya boleh memakai satu keterangan transaksi.",
+            "hintMultiple": "Boleh lebih dari satu. Tiap baris rincian nanti memilih salah satu di antaranya.",
+            "shrunkTitle": "Keterangan transaksi disusutkan",
+            "shrunkText": "Pengajuan Non Rutin hanya boleh memakai satu keterangan transaksi, jadi yang pertama saja yang disimpan.",
+            "linesDroppedTitle": "Baris rincian ikut dihapus",
+            "linesDroppedText": "{count} baris dihapus karena keterangan transaksinya dicabut dari bagian atas formulir."
         }
     },
     "detail": {
@@ -426,6 +445,7 @@
         "paymentOverdue": "Sudah melewati jadwalnya dan dananya belum keluar.",
         "paymentEarly": "Dicairkan lebih awal dari jadwalnya.",
         "paymentOnTime": "Dicairkan tepat pada jadwalnya.",
-        "paymentLate": "Dicairkan setelah jadwalnya."
+        "paymentLate": "Dicairkan setelah jadwalnya.",
+        "itemTransactionCategory": "Keterangan Transaksi"
     }
 }

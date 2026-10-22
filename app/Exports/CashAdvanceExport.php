@@ -157,7 +157,8 @@ class CashAdvanceExport implements FromArray, WithHeadings, WithEvents, WithTitl
             $date = $this->formatDate($cashAdvance->date ?? null);
             $branch = $this->formatBranch($cashAdvance);
             $department = $this->formatDepartment($cashAdvance);
-            $category = $this->formatText($cashAdvance->transactionCategory->name ?? null);
+            /* Seluruhnya, dipisah koma. Aturannya di CashAdvance::transactionCategoryLabel(). */
+            $category = $this->formatText($cashAdvance->transactionCategoryLabel());
             $requestType = $this->formatText($cashAdvance->request_type ?? null);
             $subject = $this->formatText($cashAdvance->subject ?? null);
             $total = $this->formatMoney($cashAdvance->total_amount ?? 0);

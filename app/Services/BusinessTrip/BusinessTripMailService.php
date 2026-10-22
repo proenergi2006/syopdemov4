@@ -227,6 +227,49 @@ class BusinessTripMailService
             ->values();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Dokumen dikembalikan ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | Email, bukan hanya notifikasi dalam aplikasi, dan itu disengaja: begitu
+    | dikembalikan, dokumennya BERHENTI sampai pemohon mengerjakannya. Pemohon
+    | yang sedang tidak membuka aplikasi tidak akan tahu bahwa yang ditunggu
+    | sekarang adalah dirinya, dan dokumennya terdiam berhari-hari tanpa ada
+    | yang merasa sedang menahannya.
+    |
+    | Alasannya ikut dikirim utuh. Email yang hanya berkata "dikembalikan"
+    | memaksa pemohon membuka aplikasi hanya untuk mencari tahu apa yang
+    | salah -- padahal justru itu yang perlu ia bawa saat membukanya.
+    |--------------------------------------------------------------------------
+    */
+    public function sendReturnedForRevision(
+        BusinessTrip $trip,
+        User $actor,
+        ?string $reason = null,
+        ?int $revisionNumber = null,
+    ): void {
+        $requester = $this->resolveRequester($trip);
+
+        if (!$requester) {
+            return;
+        }
+
+        $trip->loadMissing('itineraries');
+
+        $this->queue(
+            $requester,
+            new BusinessTripApprovalMail(
+                trip: $trip,
+                recipient: $requester,
+                mode: 'returned_for_revision',
+                actor: $actor,
+                notes: $reason,
+                revisionNumber: $revisionNumber,
+            ),
+            $trip,
+            'returned_for_revision',
+        );
+    }
     private function resolveRequester(BusinessTrip $trip): ?User
     {
         $requesterId = $trip->submitted_by ?? $trip->created_by ?? null;

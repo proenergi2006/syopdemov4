@@ -1205,7 +1205,278 @@ class MenuController extends Controller
 
         }
 
+        /*
+        | Antrean operasional ditambahkan ke angka yang sama.
+        |
+        | Bukan badge kedua: yang membuka sidebar ingin tahu "ada berapa yang
+        | menunggu saya di sini", bukan menjumlahkan dua angka sendiri. Satu
+        | dokumen pun tidak mungkin terhitung dua kali -- menunggu approval
+        | dan menunggu diterima adalah dua status yang saling meniadakan.
+        */
+        foreach ($this->operationalBadgeQueues() as $moduleKey => $config) {
+            $badges[$moduleKey] = (int) ($badges[$moduleKey] ?? 0)
+                + $this->countOperationalQueues($user, $config);
+        }
+
         return $badges;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Antrean operasional: sesudah disetujui, sebelum selesai
+    |--------------------------------------------------------------------------
+    | Tiap antrean = satu izin, satu keadaan dokumen. Ditulis sebagai daftar,
+    | bukan sebagai rangkaian if: menambah meja baru kelak cukup menambah satu
+    | baris, dan yang menambahkannya tidak perlu mengerti kueri di bawahnya.
+    |
+    | Perdin tidak punya antrean di sini. Sesudah disetujui ia memang tidak
+    | berpindah meja -- yang berpindah dokumen turunannya.
+    |--------------------------------------------------------------------------
+    */
+    private function operationalBadgeQueues(): array
+    {
+        return [
+            'cash_advance' => [
+                'table' => 'cash_advances',
+                'view_permission' => 'cash_advance.view',
+                'created_by_column' => 'created_by',
+                'department_column' => 'department_id',
+                'branch_column' => 'branch',
+                'approval_table' => 'cash_advance_approvals',
+                'approval_foreign_key' => 'cash_advance_id',
+
+                'queues' => [
+                    ['permission' => 'cash_advance.receive', 'status' => 'APPROVED'],
+                    ['permission' => 'cash_advance.disburse', 'status' => 'RECEIVED'],
+                ],
+            ],
+
+            'cash_advance_realization' => [
+                'table' => 'cash_advance_realizations',
+                'view_permission' => 'cash_advance_realization.view',
+                'created_by_column' => 'created_by',
+                'department_column' => 'department_id',
+                'branch_column' => 'branch',
+                'approval_table' => 'cash_advance_realization_approvals',
+                'approval_foreign_key' => 'cash_advance_realization_id',
+
+                'queues' => [
+                    ['permission' => 'cash_advance_realization.receive', 'status' => 'APPROVED'],
+
+                    /*
+                    | Tiga antrean berbeda pada dua status, dibedakan arah
+                    | selisihnya -- lihat alur dua PIC, 9 Oktober 2026.
+                    */
+                    [
+                        'permission' => 'cash_advance_realization.verify',
+                        'status' => 'RECEIVED',
+                        'difference_type' => 'REIMBURSE',
+                    ],
+                    [
+                        'permission' => 'cash_advance_realization.return',
+                        'status' => 'RECEIVED',
+                        'difference_type' => 'RETURN',
+                    ],
+                    [
+                        'permission' => 'cash_advance_realization.reimburse',
+                        'status' => 'VERIFIED',
+                    ],
+                ],
+            ],
+
+            'claim' => [
+                'table' => 'claims',
+                'view_permission' => 'claim.view',
+                'created_by_column' => 'created_by',
+                'department_column' => 'department_id',
+                'branch_column' => 'branch',
+                'approval_table' => 'claim_approvals',
+                'approval_foreign_key' => 'claim_id',
+
+                'queues' => [
+                    ['permission' => 'claim.receive', 'status' => 'APPROVED'],
+                    ['permission' => 'claim.pay', 'status' => 'RECEIVED'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Menghitung seluruh antrean operasional sebuah modul bagi si pembuka.
+     *
+     * Antrean yang izinnya tidak dipegang DILEWATI SEBELUM dihitung, bukan
+     * dihitung lalu dibuang: kueri yang hasilnya pasti tidak dipakai tetap
+     * memakan waktu, dan sidebar dimuat di setiap halaman.
+     */
+    private function countOperationalQueues($user, array $config): int
+    {
+        $tabel = $config['table'];
+
+        if (!$user || !Schema::hasTable($tabel)) {
+            return 0;
+        }
+
+        $jumlah = 0;
+
+        foreach ($config['queues'] as $antrean) {
+            if (!$user->hasPermission($antrean['permission'])) {
+                continue;
+            }
+
+            $jumlah += $this->countOneOperationalQueue($user, $config, $antrean);
+        }
+
+        return $jumlah;
+    }
+
+    private function countOneOperationalQueue($user, array $config, array $antrean): int
+    {
+        $tabel = $config['table'];
+
+        $query = DB::table($tabel)
+            ->when(
+                Schema::hasColumn($tabel, 'deleted_at'),
+                fn ($q) => $q->whereNull("{$tabel}.deleted_at"),
+            )
+            ->whereRaw(
+                "UPPER(TRIM({$tabel}.status)) = ?",
+                [strtoupper(trim((string) $antrean['status']))],
+            );
+
+        /*
+        | Arah selisihnya, bila antreannya membedakannya. Hanya Realisasi yang
+        | punya -- dua meja berbeda duduk pada status yang sama di sana.
+        */
+        if (isset($antrean['difference_type']) && Schema::hasColumn($tabel, 'difference_type')) {
+            $query->whereRaw(
+                "UPPER(TRIM({$tabel}.difference_type)) = ?",
+                [strtoupper(trim((string) $antrean['difference_type']))],
+            );
+        }
+
+        $this->applyBadgeVisibilityScope($query, $user, $config);
+
+        return (int) $query->count();
+    }
+
+    /**
+     * Membatasi hitungan pada dokumen yang memang bisa dilihat si pembuka.
+     *
+     * Aturannya ditiru dari daftar modulnya, dan HARUS tetap sama dengannya:
+     * angka di sidebar yang tidak cocok dengan isi daftarnya menyuruh orang
+     * mencari sesuatu yang tidak ada di sana. Ujinya membandingkan keduanya,
+     * bukan memeriksa kueri ini sendirian.
+     *
+     * Cabang approver ikut disertakan: yang pernah menyetujui sebuah dokumen
+     * tetap bisa melihatnya walau di luar cabang atau departemennya, dan
+     * daftarnya memang menampilkannya.
+     */
+    private function applyBadgeVisibilityScope($query, $user, array $config): void
+    {
+        $scope = strtoupper(trim((string) ($user->getPermissionScope($config['view_permission']) ?? 'NONE')));
+
+        if ($scope === 'ALL') {
+            return;
+        }
+
+        $tabel = $config['table'];
+
+        $penugasan = DB::table('user_access_assignments')
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->get(['branch_id', 'department_id']);
+
+        $cabangIds = collect([(int) ($user->cabang_id ?? 0)])
+            ->merge($penugasan->pluck('branch_id')->map(fn ($id): int => (int) $id))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $departemenIds = collect([(int) ($user->departemen_id ?? 0)])
+            ->merge($penugasan->pluck('department_id')->map(fn ($id): int => (int) $id))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $roleIds = DB::table('user_roles')
+            ->where('user_id', $user->id)
+            ->pluck('role_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $query->where(function ($pembatas) use (
+            $scope,
+            $user,
+            $config,
+            $tabel,
+            $cabangIds,
+            $departemenIds,
+            $roleIds,
+        ): void {
+            $pembatas->where(function ($cakupan) use (
+                $scope,
+                $user,
+                $config,
+                $tabel,
+                $cabangIds,
+                $departemenIds,
+            ): void {
+                if ($scope === 'OWN_DATA') {
+                    $cakupan->where("{$tabel}.{$config['created_by_column']}", $user->id);
+
+                    return;
+                }
+
+                if ($scope === 'OWN_DEPARTMENT') {
+                    $departemenIds->isEmpty()
+                        ? $cakupan->whereRaw('1 = 0')
+                        : $cakupan->whereIn("{$tabel}.{$config['department_column']}", $departemenIds->all());
+
+                    return;
+                }
+
+                if ($scope === 'OWN_CABANG') {
+                    $cakupan->whereIn(
+                        "{$tabel}.{$config['branch_column']}",
+                        $cabangIds->map(fn (int $id): string => (string) $id)->all(),
+                    );
+
+                    return;
+                }
+
+                /* NONE, atau cakupan yang tidak dikenali. */
+                $cakupan->whereRaw('1 = 0');
+            });
+
+            $pembatas->orWhereExists(function ($approval) use ($config, $tabel, $user, $roleIds): void {
+                $approval
+                    ->selectRaw('1')
+                    ->from($config['approval_table'])
+                    ->whereColumn(
+                        "{$config['approval_table']}.{$config['approval_foreign_key']}",
+                        "{$tabel}.id",
+                    )
+                    ->where(function ($siapa) use ($config, $user, $roleIds): void {
+                        $tabelApproval = $config['approval_table'];
+
+                        $siapa->where(function ($perOrang) use ($tabelApproval, $user): void {
+                            $perOrang
+                                ->whereRaw("UPPER(TRIM({$tabelApproval}.approver_type)) = ?", ['USER'])
+                                ->where("{$tabelApproval}.approver_id", $user->id);
+                        });
+
+                        if ($roleIds->isNotEmpty()) {
+                            $siapa->orWhere(function ($perRole) use ($tabelApproval, $roleIds): void {
+                                $perRole
+                                    ->whereRaw("UPPER(TRIM({$tabelApproval}.approver_type)) = ?", ['ROLE'])
+                                    ->whereIn("{$tabelApproval}.approver_id", $roleIds->all());
+                            });
+                        }
+                    });
+            });
+        });
     }
 
     private function countWaitingMyApprovalByConfig($user, array $config): int

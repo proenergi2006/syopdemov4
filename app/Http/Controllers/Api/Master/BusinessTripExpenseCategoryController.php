@@ -69,6 +69,7 @@ class BusinessTripExpenseCategoryController extends Controller
                 'name' => $k->name,
                 'description' => $k->description,
                 'sort_order' => $k->sort_order,
+                'ga_arrangeable' => (bool) $k->ga_arrangeable,
                 'is_active' => (bool) $k->is_active,
 
                 /*
@@ -98,7 +99,7 @@ class BusinessTripExpenseCategoryController extends Controller
         $rows = BusinessTripExpenseCategory::query()
             ->active()
             ->ordered()
-            ->get(['id', 'name', 'sort_order']);
+            ->get(['id', 'name', 'sort_order', 'ga_arrangeable']);
 
         return response()->json([
             'success' => true,
@@ -107,6 +108,14 @@ class BusinessTripExpenseCategoryController extends Controller
                 'name' => $k->name,
                 'title' => $k->name,
                 'sort_order' => $k->sort_order,
+
+                /*
+                | Dipakai formulir FPU dan Realisasi untuk menentukan kategori
+                | mana yang menawarkan penanda "diurus GA". Penjagaan
+                | sebenarnya tetap di BusinessTripExpenseBreakdownService --
+                | yang hanya ada di layar bukan penjagaan.
+                */
+                'ga_arrangeable' => (bool) $k->ga_arrangeable,
             ])->all(),
         ], 200);
     }
@@ -243,6 +252,7 @@ class BusinessTripExpenseCategoryController extends Controller
 
             'description' => ['nullable', 'string', 'max:1000'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'ga_arrangeable' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
         ], [], [
             'name' => __('business_trip_expense_category_messages.fields.name'),
@@ -253,6 +263,13 @@ class BusinessTripExpenseCategoryController extends Controller
             'name' => trim($validated['name']),
             'description' => trim((string) ($validated['description'] ?? '')) ?: null,
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
+
+            /*
+            | Bawaannya FALSE, dan itu disengaja: kategori baru diisi pemohon
+            | kecuali memang disebut sebagai urusan GA. Lihat migrasinya.
+            */
+            'ga_arrangeable' => $request->boolean('ga_arrangeable'),
+
             'is_active' => $request->has('is_active')
                 ? $request->boolean('is_active')
                 : true,

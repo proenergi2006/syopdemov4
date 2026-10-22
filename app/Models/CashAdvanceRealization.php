@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasRevisions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\Crypt;
 */
 class CashAdvanceRealization extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasRevisions, SoftDeletes;
 
     protected $table = 'cash_advance_realizations';
 
@@ -45,6 +46,7 @@ class CashAdvanceRealization extends Model
         'difference_type',
 
         'status',
+        'revision_count',
 
         'created_by',
         'updated_by',
@@ -70,6 +72,10 @@ class CashAdvanceRealization extends Model
         'received_by',
         'received_at',
         'receipt_notes',
+
+        'verified_by',
+        'verified_at',
+        'verification_notes',
         'receipt_reverted_by',
         'receipt_reverted_at',
         'receipt_reversal_notes',
@@ -81,6 +87,7 @@ class CashAdvanceRealization extends Model
     ];
 
     protected $casts = [
+        'revision_count' => 'integer',
         'date' => 'date',
         'cash_advance_id' => 'integer',
         'department_id' => 'integer',
@@ -97,6 +104,7 @@ class CashAdvanceRealization extends Model
         'rejected_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'received_at' => 'datetime',
+        'verified_at' => 'datetime',
         'receipt_reverted_at' => 'datetime',
         'scheduled_payment_date' => 'date',
         'settled_at' => 'datetime',
@@ -113,12 +121,41 @@ class CashAdvanceRealization extends Model
     public const STATUS_APPROVED = 'APPROVED';
     public const STATUS_REJECTED = 'REJECTED';
     public const STATUS_CANCELLED = 'CANCELLED';
+
+    /*
+    | Dikembalikan approver ke pemohon untuk diperbaiki.
+    |
+    | Statusnya HIDUP, dan justru di situ ia berbeda dari REJECTED yang
+    | sudah selesai: dokumennya masih berjalan dan masih akan menjadi
+    | uang, hanya sedang ada di tangan pemohonnya.
+    |
+    | Nomornya sengaja TIDAK dikembalikan ke DRAFT. Dokumen ini sudah
+    | pernah beredar; approver yang pernah membukanya harus masih bisa
+    | menemukannya dengan nomor yang sama, dan nomor yang dipakai ulang
+    | adalah nomor yang menunjuk dua dokumen sekaligus.
+    */
+    public const STATUS_NEED_REVISION = 'NEED REVISION';
     /*
     | Dokumen sudah disetujui penuh dan berkasnya diterima, tetapi belum
     | tuntas. Tahap antara ini yang membedakan "berkasnya sudah di tangan"
     | dari "selisihnya sudah diselesaikan".
     */
     public const STATUS_RECEIVED = 'RECEIVED';
+
+    /*
+    | Sudah diperiksa, menunggu kekurangannya dibayarkan.
+    |
+    | HANYA ADA PADA CABANG KELEBIHAN. Realisasi yang nilainya melebihi
+    | FPU-nya dikerjakan dua orang: yang pertama menerima dan memeriksa,
+    | yang kedua membayarkan. Tahap ini yang memisahkan keduanya -- tanpa
+    | ia, pembayar bisa mendahului pemeriksa dan pemeriksaannya tidak
+    | terekam di mana pun.
+    |
+    | Dua cabang lain tidak pernah melewatinya: yang nilainya pas tertutup
+    | saat diterima, dan yang kurang ditutup orang yang sama begitu uang
+    | sisanya kembali. Keduanya memang tidak berpindah meja.
+    */
+    public const STATUS_VERIFIED = 'VERIFIED';
 
     public const STATUS_SETTLED = 'SETTLED';
 
@@ -255,6 +292,12 @@ class CashAdvanceRealization extends Model
     public function canceller()
     {
         return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    /** Yang memeriksa dan meneruskannya ke pembayaran. */
+    public function verifier()
+    {
+        return $this->belongsTo(User::class, 'verified_by');
     }
 
     public function receiver()

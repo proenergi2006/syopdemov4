@@ -62,6 +62,18 @@ return [
     */
     'duplicate_scope' => 'Sudah ada jadwal lain dengan cakupan yang sama persis. Ubah modul atau keterangan transaksinya, atau sunting jadwal yang sudah ada.',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cakupan yang tidak akan pernah cocok
+    |--------------------------------------------------------------------------
+    | Keterangan transaksi milik modul lain menghasilkan jadwal yang diam:
+    | tersimpan, tampak mengatur sesuatu, tetapi tidak pernah dipakai satu
+    | dokumen pun.
+    |--------------------------------------------------------------------------
+    */
+    'category_requires_module' => 'Pilih modulnya terlebih dahulu. Keterangan transaksi FPU dan Claim berbeda, jadi cakupannya tidak bisa ditentukan sebelum modulnya disebut.',
+    'category_module_mismatch' => 'Keterangan transaksi itu bukan milik modul :module, jadi jadwalnya tidak akan pernah terpakai. Pilih keterangan transaksi yang muncul setelah modulnya dipilih.',
+
     'index' => [
         'forbidden' => 'Anda tidak memiliki akses untuk melihat master jadwal pembayaran.',
     ],

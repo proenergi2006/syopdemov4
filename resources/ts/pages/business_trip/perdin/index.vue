@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from '@axios'
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { usePermissionStore } from '@/stores/permission'
+import type { RevisionEntry } from '@/components/fund_request/revision'
 import { buildPrintLoadingPage } from '@/utils/printLoadingPage'
 
 /*
@@ -80,8 +81,21 @@ interface TripRow {
   status: string
   is_editable: boolean
   can_approve: boolean
+
+  /*
+  | Revisi. revision_count dipakai lencana di daftarnya; riwayat lengkapnya
+  | hanya terkirim bila dokumennya pernah direvisi -- daftar perdin memuat
+  | puluhan baris, dan riwayat yang hampir selalu kosong tidak perlu diminta
+  | pada setiap baris.
+  */
+  revision_count?: number
+  revisions?: RevisionEntry[]
+  revision_open?: RevisionEntry | null
   is_on_time: boolean
   allows_parallel_cash_advance: boolean
+
+  /* Punya FPU atau Claim tertaut yang statusnya sudah boleh dicetak. */
+  has_printable_document?: boolean
 
   /* Tanggal berangkatnya sudah lewat -- draft begini tidak bisa diajukan. */
   is_departure_passed: boolean
@@ -133,6 +147,7 @@ interface Abilities {
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const permissionStore = usePermissionStore()
 
 const rows = ref<TripRow[]>([])
@@ -178,6 +193,7 @@ const statusItems = computed(() => [
   { title: t('businessTrip.status.APPROVED'), value: 'APPROVED' },
   { title: t('businessTrip.status.REJECTED'), value: 'REJECTED' },
   { title: t('businessTrip.status.CANCELLED'), value: 'CANCELLED' },
+  { title: t('businessTrip.status.NEED REVISION'), value: 'NEED REVISION' },
 ])
 
 /*
@@ -275,6 +291,7 @@ const STATUS_COLORS: Record<string, string> = {
   'IN PROGRESS': 'warning',
   'REJECTED': 'error',
   'CANCELLED': 'secondary',
+  'NEED REVISION': 'warning',
 }
 
 const statusColor = (status: string): string => STATUS_COLORS[status] ?? 'info'
@@ -761,6 +778,95 @@ const rejectRow = ref<TripRow | null>(null)
 const rejectNotes = ref('')
 const rejectLoading = ref(false)
 
+/*
+| Kembalikan dokumen ke pemohon untuk direvisi.
+|
+| Pilihan KETIGA di meja approver, di samping menyetujui dan menolak, dan
+| bukan salah satu dari keduanya: dokumennya tidak ditolak -- ia dikembalikan
+| untuk diperbaiki, lalu berjalan lagi dari tahap pertama.
+|
+| Alasannya wajib, dan di situ seluruh gunanya. Dokumen yang kembali tanpa
+| sepatah kata pun akan diajukan ulang apa adanya, lalu berputar sekali lagi
+| melewati seluruh rantai approval -- dan yang terbuang bukan hanya waktu
+| pemohonnya.
+*/
+/*
+| Boleh mengembalikan: approver yang sedang memegangnya.
+|
+| Penjaganya sama dengan tombol Setujui -- can_approve datang dari
+| server, dihitung dari baris approval, dan sudah menolak pemohon atas
+| dokumennya sendiri.
+|
+| Tidak ada pintu Finance di sini: perdin tidak punya meja penerimaan
+| berkas. Biaya perjalanannya diajukan lewat FPU atau Claim, dan di
+| sanalah pintu itu berada.
+*/
+const canReturnRow = (row: TripRow): boolean =>
+  Boolean(row.can_approve)
+
+const returnDialog = ref(false)
+const returnTarget = ref<TripRow | null>(null)
+const returnReason = ref('')
+const returnError = ref('')
+const returnLoading = ref(false)
+
+const openReturn = (row: TripRow): void => {
+  returnTarget.value = row
+  returnReason.value = ''
+  returnError.value = ''
+  returnDialog.value = true
+}
+
+const returnForRevision = async (): Promise<void> => {
+  if (!returnTarget.value?.public_id || returnLoading.value)
+    return
+
+  /* Sama dengan penjaga di server: tiga huruf. */
+  if (returnReason.value.trim().length < 3) {
+    returnError.value = t('common.revision.reasonRequired')
+
+    return
+  }
+
+  returnLoading.value = true
+
+  try {
+    showLoadingAlert(
+      t('common.alert.processing'),
+      t('common.alert.pleaseWait'),
+    )
+
+    const response = await axios.patch(
+      `/business-trip/perdin/${encodeURIComponent(returnTarget.value.public_id)}/return-for-revision`,
+      { reason: returnReason.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    closeAlert()
+
+    returnDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('common.revision.successFallback'),
+    })
+
+    await fetchTrips()
+  }
+  catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(error, t('common.revision.failedFallback')),
+    })
+  }
+  finally {
+    returnLoading.value = false
+  }
+}
+
 const openReject = (row: TripRow): void => {
   rejectRow.value = row
   rejectNotes.value = ''
@@ -882,6 +988,11 @@ const rejectDetail = (): void => {
     openReject(detailRow.value)
 }
 
+const returnDetail = (): void => {
+  if (detailRow.value)
+    openReturn(detailRow.value)
+}
+
 /*
 |--------------------------------------------------------------------------
 | Cetak
@@ -893,11 +1004,36 @@ const rejectDetail = (): void => {
 */
 const printLoadingId = ref<string | null>(null)
 
+/*
+| Dialog pilihan cetak.
+|
+| Hanya muncul bila ada yang bisa dipilih. Perdin tanpa lampiran dan tanpa
+| dokumen tertaut mencetak langsung seperti sebelumnya -- bertanya sesuatu
+| yang jawabannya cuma satu bukan pilihan, ia hambatan.
+*/
+const printDialog = ref(false)
+const printTarget = ref<TripRow | null>(null)
+const printWithAttachments = ref(false)
+const printWithLinkedDocument = ref(false)
+
+/**
+ * Apakah perdin ini punya dokumen keuangan yang sudah boleh dicetak.
+ *
+ * Dihitung server saat menyusun daftarnya -- sekaligus untuk seluruh
+ * halaman, bukan satu pertanyaan per baris.
+ */
+const documentCombinable = (row: TripRow | null): boolean =>
+  Boolean(row?.has_printable_document)
+
 /** Cetakan hanya untuk dokumen yang sudah sah, dan hanya bagi pemegangnya. */
 const canPrintRow = (row: TripRow): boolean =>
   abilities.value.can_print && row.status === 'APPROVED'
 
-const printDocument = async (row: TripRow): Promise<void> => {
+const printDocument = async (
+  row: TripRow,
+  withAttachments = false,
+  withLinkedDocument = false,
+): Promise<void> => {
   if (!row.public_id || printLoadingId.value)
     return
 
@@ -927,7 +1063,19 @@ const printDocument = async (row: TripRow): Promise<void> => {
      */
     const response = await axios.get(
       `/business-trip/perdin/${encodeURIComponent(row.public_id)}/print-url`,
-      { headers: { Accept: 'application/json' } },
+      {
+        /*
+        | Pilihannya ikut ditandatangani server bersama tautannya, jadi ia
+        | dikirim di sini -- bukan ditempelkan ke URL hasilnya, yang akan
+        | merusak tanda tangannya.
+        */
+        params: {
+          with_attachments: withAttachments ? 1 : 0,
+          with_linked_document: withLinkedDocument ? 1 : 0,
+        },
+
+        headers: { Accept: 'application/json' },
+      },
     )
 
     const printUrl = response.data?.url
@@ -960,9 +1108,41 @@ const printDocument = async (row: TripRow): Promise<void> => {
   }
 }
 
+/**
+ * Pintu masuk cetak dari daftar maupun dari detail.
+ *
+ * Bertanya dulu bila ada yang bisa dipilih; kalau tidak, mencetak langsung.
+ */
+const askPrint = async (row: TripRow): Promise<void> => {
+  if (!row.public_id || printLoadingId.value)
+    return
+
+  if (documentCombinable(row)) {
+    printTarget.value = row
+    printWithAttachments.value = false
+    printWithLinkedDocument.value = false
+    printDialog.value = true
+
+    return
+  }
+
+  await printDocument(row)
+}
+
+const confirmPrint = async (): Promise<void> => {
+  const row = printTarget.value
+
+  if (!row)
+    return
+
+  printDialog.value = false
+
+  await printDocument(row, printWithAttachments.value, printWithLinkedDocument.value)
+}
+
 const printDetail = (): void => {
   if (detailRow.value)
-    printDocument(detailRow.value)
+    askPrint(detailRow.value)
 }
 
 const canSubmitRow = (row: TripRow): boolean =>
@@ -985,9 +1165,43 @@ const canDeleteRow = (row: TripRow): boolean =>
 const canCancelRow = (row: TripRow): boolean =>
   abilities.value.can_cancel && row.status === 'IN PROGRESS'
 
-onMounted(() => {
+/*
+| Kabar keberhasilan dari halaman formulir, dititipkan lewat URL.
+|
+| Dimunculkan di sini, bukan di halaman yang mengirimnya: toast yang
+| lahir tepat sebelum perpindahan tidak sempat dibaca siapa pun.
+|
+| Penandanya dihapus dari URL begitu dibaca. Tanpa itu, menyegarkan
+| halaman akan mengabarkan keberhasilan atas sesuatu yang tidak baru saja
+| terjadi -- dan kabar yang salah waktu lebih membingungkan daripada tidak
+| ada kabar sama sekali.
+|
+| Jedanya menunggu daftar selesai digambar; toast yang muncul bersamaan
+| dengan tabel yang sedang dimuat tertimbun olehnya.
+*/
+const umumkanKeberhasilan = async (): Promise<void> => {
+  const penanda = route.query.success
+
+  if (!penanda)
+    return
+
+  await router.replace({ path: '/business_trip/perdin', query: {} })
+
+  setTimeout(() => {
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: penanda === 'updated'
+        ? t('businessTrip.form.updateSuccess')
+        : t('businessTrip.form.saveSuccess'),
+    })
+  }, 300)
+}
+
+onMounted(async () => {
   if (canView.value)
     fetchTrips()
+
+  await umumkanKeberhasilan()
 })
 </script>
 
@@ -1317,12 +1531,16 @@ onMounted(() => {
                       </div>
                     </template>
 
-                    <VList density="compact">
-                      <VListItem @click="openDetail(row)">
+                    <VList>
+                      <VListItem
+                        href="javascript:void(0)"
+                        @click="openDetail(row)"
+                      >
                         <template #prepend>
                           <VIcon
                             icon="tabler-eye"
-                            size="18"
+                            :size="20"
+                            class="me-3"
                           />
                         </template>
 
@@ -1336,13 +1554,15 @@ onMounted(() => {
                       -->
                       <VListItem
                         v-if="canPrintRow(row)"
+                        href="javascript:void(0)"
                         :disabled="printLoadingId === row.public_id"
-                        @click="printDocument(row)"
+                        @click="askPrint(row)"
                       >
                         <template #prepend>
                           <VIcon
                             icon="tabler-printer"
-                            size="18"
+                            :size="20"
+                            class="me-3"
                           />
                         </template>
 
@@ -1350,43 +1570,31 @@ onMounted(() => {
                       </VListItem>
 
                       <VListItem
-                        v-if="canEditRow(row)"
-                        @click="goToEdit(row)"
-                      >
-                        <template #prepend>
-                          <VIcon
-                            icon="tabler-pencil"
-                            size="18"
-                          />
-                        </template>
-
-                        <VListItemTitle>{{ t('businessTrip.menu.edit') }}</VListItemTitle>
-                      </VListItem>
-
-                      <VListItem
                         v-if="canSubmitRow(row)"
+                        href="javascript:void(0)"
                         @click="runAction(row, 'submit')"
                       >
                         <template #prepend>
                           <VIcon
                             icon="tabler-send"
-                            size="18"
+                            :size="20"
+                            class="me-3"
                           />
                         </template>
 
                         <VListItemTitle>{{ t('businessTrip.menu.submit') }}</VListItemTitle>
                       </VListItem>
 
-                      <VDivider v-if="row.can_approve" />
-
                       <VListItem
                         v-if="row.can_approve"
+                        href="javascript:void(0)"
                         @click="runAction(row, 'approve')"
                       >
                         <template #prepend>
                           <VIcon
                             icon="tabler-check"
-                            size="18"
+                            :size="20"
+                            class="me-3"
                             color="success"
                           />
                         </template>
@@ -1396,12 +1604,14 @@ onMounted(() => {
 
                       <VListItem
                         v-if="row.can_approve"
+                        href="javascript:void(0)"
                         @click="openReject(row)"
                       >
                         <template #prepend>
                           <VIcon
                             icon="tabler-x"
-                            size="18"
+                            :size="20"
+                            class="me-3"
                             color="error"
                           />
                         </template>
@@ -1409,16 +1619,52 @@ onMounted(() => {
                         <VListItemTitle>{{ t('businessTrip.menu.reject') }}</VListItemTitle>
                       </VListItem>
 
-                      <VDivider v-if="canCancelRow(row) || canDeleteRow(row)" />
+                      <VListItem
+                        v-if="canReturnRow(row)"
+                        href="javascript:void(0)"
+                        :disabled="returnLoading"
+                        @click="openReturn(row)"
+                      >
+                        <template #prepend>
+                          <VIcon
+                            icon="mdi-undo-variant"
+                            :size="20"
+                            color="warning"
+                            class="me-3"
+                          />
+                        </template>
+
+                        <VListItemTitle class="text-warning">
+                          {{ t('common.revision.menuReturn') }}
+                        </VListItemTitle>
+                      </VListItem>
+
+                      <VListItem
+                        v-if="canEditRow(row)"
+                        href="javascript:void(0)"
+                        @click="goToEdit(row)"
+                      >
+                        <template #prepend>
+                          <VIcon
+                            icon="tabler-pencil"
+                            :size="20"
+                            class="me-3"
+                          />
+                        </template>
+
+                        <VListItemTitle>{{ t('businessTrip.menu.edit') }}</VListItemTitle>
+                      </VListItem>
 
                       <VListItem
                         v-if="canCancelRow(row)"
+                        href="javascript:void(0)"
                         @click="openCancel(row)"
                       >
                         <template #prepend>
                           <VIcon
                             icon="tabler-ban"
-                            size="18"
+                            :size="20"
+                            class="me-3"
                           />
                         </template>
 
@@ -1427,12 +1673,14 @@ onMounted(() => {
 
                       <VListItem
                         v-if="canDeleteRow(row)"
+                        href="javascript:void(0)"
                         @click="runAction(row, 'delete')"
                       >
                         <template #prepend>
                           <VIcon
                             icon="tabler-trash"
-                            size="18"
+                            :size="20"
+                            class="me-3"
                             color="error"
                           />
                         </template>
@@ -1460,13 +1708,30 @@ onMounted(() => {
                 <td>{{ t('businessTrip.days', { count: row.duration_days }) }}</td>
 
                 <td>
-                  <VChip
-                    size="small"
-                    variant="tonal"
-                    :color="statusColor(row.status)"
-                  >
-                    {{ t(`businessTrip.status.${row.status}`) }}
-                  </VChip>
+                  <div class="d-flex flex-column align-start gap-1">
+                    <VChip
+                      size="small"
+                      variant="tonal"
+                      :color="statusColor(row.status)"
+                    >
+                      {{ t(`businessTrip.status.${row.status}`) }}
+                    </VChip>
+
+                    <!--
+                      Lencana revisi, pada dokumen yang pernah dikembalikan.
+                      Tetap tampil walau dokumennya sudah berjalan lagi:
+                      inilah yang memberi tahu approver bahwa isinya sudah
+                      berubah.
+                    -->
+                    <VChip
+                      v-if="(row.revision_count || 0) > 0"
+                      size="x-small"
+                      color="warning"
+                      variant="outlined"
+                    >
+                      {{ t('common.revision.badge', { n: row.revision_count }) }}
+                    </VChip>
+                  </div>
                 </td>
               </tr>
 
@@ -1566,10 +1831,28 @@ onMounted(() => {
             {{ t('businessTrip.menu.print') }}
           </VBtn>
 
+          <!--
+            Setujui di kiri, Tolak di kanan -- urutan yang sama dengan FPU,
+            Realisasi, Claim, dan Purchase Requisition. Tombol yang berpindah
+            tempat antar modul membuat orang menekan yang salah justru ketika
+            ia sudah hafal letaknya.
+          -->
+          <VBtn
+            v-if="detailRow.can_approve"
+            color="success"
+            variant="tonal"
+            prepend-icon="tabler-circle-check"
+            class="text-none"
+            @click="approveDetail"
+          >
+            {{ t('businessTrip.menu.approve') }}
+          </VBtn>
+
           <VBtn
             v-if="detailRow.can_approve"
             color="error"
             variant="tonal"
+            prepend-icon="tabler-circle-x"
             class="text-none"
             @click="rejectDetail"
           >
@@ -1578,11 +1861,14 @@ onMounted(() => {
 
           <VBtn
             v-if="detailRow.can_approve"
-            color="success"
+            color="warning"
+            variant="tonal"
+            prepend-icon="mdi-undo-variant"
             class="text-none"
-            @click="approveDetail"
+            :disabled="returnLoading"
+            @click="returnDetail"
           >
-            {{ t('businessTrip.menu.approve') }}
+            {{ t('common.revision.menuReturn') }}
           </VBtn>
         </template>
       </BusinessTripDetailCard>
@@ -1837,6 +2123,66 @@ onMounted(() => {
     </VDialog>
 
     <!-- TOLAK: wajib beralasan -->
+    <!--
+      DIALOG KEMBALIKAN
+
+      Judulnya bertanya dan menyebut nomornya sekaligus. Yang menekan tombol
+      ini sedang memindahkan dokumen orang lain kembali ke mejanya, dan
+      nomornya adalah hal pertama yang perlu dipastikan sebelum menjawab.
+
+      Warnanya bukan merah. Mengembalikan bukan menolak: dokumennya masih
+      hidup, dan yang diminta adalah perbaikan.
+    -->
+    <VDialog
+      v-model="returnDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('common.revision.dialogTitle', {
+            number: returnTarget?.trip_number || '-',
+          }) }}
+        </VCardTitle>
+
+        <VCardText>
+          <div class="text-body-2 text-medium-emphasis mb-4">
+            {{ t('common.revision.dialogSubtitle') }}
+          </div>
+
+          <VTextarea
+            v-model="returnReason"
+            :label="t('common.revision.reasonLabel')"
+            :placeholder="t('common.revision.reasonPlaceholder')"
+            rows="3"
+            auto-grow
+            :error="!!returnError"
+            :error-messages="returnError ? [returnError] : []"
+          />
+        </VCardText>
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="returnLoading"
+            @click="returnDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="warning"
+            class="text-none"
+            :loading="returnLoading"
+            @click="returnForRevision"
+          >
+            {{ t('common.revision.confirmButton') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <VDialog
       v-model="rejectDialog"
       max-width="520"
@@ -1940,6 +2286,82 @@ onMounted(() => {
             @click="confirmCancel"
           >
             {{ t('businessTrip.action.cancel.confirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+    <!--
+      PILIHAN CETAK
+
+      Hanya muncul bila ada yang bisa dipilih. Perdin tanpa dokumen tertaut
+      mencetak langsung seperti sebelumnya -- bertanya sesuatu yang jawabannya
+      cuma satu bukan pilihan, ia hambatan.
+    -->
+    <VDialog
+      v-model="printDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle class="text-h6 pa-4">
+          {{ t('businessTrip.print.title') }}
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText>
+          <VCheckbox
+            v-model="printWithAttachments"
+            :label="t('businessTrip.print.attachmentInclude')"
+            density="comfortable"
+            hide-details
+          />
+
+          <!--
+            Dimatikan berikut alasannya, bukan disembunyikan: pilihan yang
+            hilang tidak bisa ditanyai, dan yang membacanya akan mengira
+            fiturnya belum ada.
+          -->
+          <VCheckbox
+            v-model="printWithLinkedDocument"
+            :label="t('businessTrip.print.combineDocumentInclude')"
+            :disabled="!documentCombinable(printTarget)"
+            :hint="documentCombinable(printTarget)
+              ? undefined
+              : t('businessTrip.print.combineDocumentUnavailable')"
+            persistent-hint
+            density="comfortable"
+          />
+
+          <VAlert
+            v-if="printWithLinkedDocument"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ t('businessTrip.print.combineDocumentNotice') }}
+          </VAlert>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            @click="printDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="primary"
+            class="text-none"
+            prepend-icon="tabler-printer"
+            @click="confirmPrint"
+          >
+            {{ t('businessTrip.print.confirm') }}
           </VBtn>
         </VCardActions>
       </VCard>

@@ -182,6 +182,8 @@ class ApprovalFlowController extends Controller
                             ?? $step->approverUser?->fullname
                             ?? $step->approverUser?->name
                             ?? null;
+                    } elseif ($approverType === ApprovalFlowStep::APPROVER_TYPE_DEPARTMENT) {
+                        $approverName = self::namaDepartment((int) $step->approver_id);
                     } else {
                         $approverName = null;
                     }
@@ -202,6 +204,13 @@ class ApprovalFlowController extends Controller
                         'is_required' => (bool) $step->is_required,
                         'approver_scope' => $step->approver_scope
                             ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL,
+
+                        /* Dua sifat step; mati pada seluruh flow yang ada sekarang. */
+                        'allow_peer_approval' => (bool) $step->allow_peer_approval,
+                        'skip_for_role_ids' => array_map(
+                            'intval',
+                            (array) ($step->skip_for_role_ids ?? []),
+                        ),
                         'branch_ids' => $step
                             ->branchMappings
                             ->pluck('cabang_id')
@@ -434,11 +443,26 @@ class ApprovalFlowController extends Controller
                 'steps.*.approval_mode' => ['nullable', 'string', 'in:ANY,ALL'],
 
                 'steps.*.approvers' => ['required', 'array', 'min:1'],
+
+                /*
+                | DEPARTMENT: approver_id menunjuk departments.id, dan step itu
+                | diisi seluruh akun aktif department tersebut saat approval
+                | dibuat.
+                */
                 'steps.*.approvers.*.approver_type' => [
                     'required',
                     'string',
-                    'in:ROLE,USER',
+                    'in:ROLE,USER,DEPARTMENT',
                 ],
+
+                /*
+                | Dua sifat step yang lahir dari ketentuan BOD. Keduanya
+                | opsional dan mati secara bawaan: payload lama yang tidak
+                | menyebutnya tersimpan persis seperti sebelumnya.
+                */
+                'steps.*.allow_peer_approval' => ['sometimes', 'boolean'],
+                'steps.*.skip_for_role_ids' => ['sometimes', 'nullable', 'array'],
+                'steps.*.skip_for_role_ids.*' => ['integer', 'exists:roles,id'],
 
                 'steps.*.approvers.*.approver_id' => [
                     'required',
@@ -812,6 +836,8 @@ class ApprovalFlowController extends Controller
                             ?? $step->approverUser?->fullname
                             ?? $step->approverUser?->name
                             ?? null;
+                    } elseif ($approverType === ApprovalFlowStep::APPROVER_TYPE_DEPARTMENT) {
+                        $approverName = self::namaDepartment((int) $step->approver_id);
                     } else {
                         $approverName = null;
                     }
@@ -1027,7 +1053,12 @@ class ApprovalFlowController extends Controller
                 'steps.*.approval_mode' => ['nullable', 'string', 'in:ANY,ALL'],
 
                 'steps.*.approvers' => ['required', 'array', 'min:1'],
-                'steps.*.approvers.*.approver_type' => ['required', 'string', 'in:ROLE,USER'],
+                'steps.*.approvers.*.approver_type' => ['required', 'string', 'in:ROLE,USER,DEPARTMENT'],
+
+                /* Dua sifat step yang lahir dari ketentuan BOD; mati secara bawaan. */
+                'steps.*.allow_peer_approval' => ['sometimes', 'boolean'],
+                'steps.*.skip_for_role_ids' => ['sometimes', 'nullable', 'array'],
+                'steps.*.skip_for_role_ids.*' => ['integer', 'exists:roles,id'],
                 'steps.*.approvers.*.approver_id' => ['required', 'integer'],
 
                 /*
@@ -1353,6 +1384,8 @@ class ApprovalFlowController extends Controller
                                     ?? $step->approverUser?->fullname
                                     ?? $step->approverUser?->name
                                     ?? null;
+                            } elseif ($approverType === ApprovalFlowStep::APPROVER_TYPE_DEPARTMENT) {
+                                $approverName = self::namaDepartment((int) $step->approver_id);
                             } else {
                                 $approverName = null;
                             }
@@ -1440,6 +1473,8 @@ class ApprovalFlowController extends Controller
                             ?? $step->approverUser?->fullname
                             ?? $step->approverUser?->name
                             ?? null;
+                    } elseif ($approverType === ApprovalFlowStep::APPROVER_TYPE_DEPARTMENT) {
+                        $approverName = self::namaDepartment((int) $step->approver_id);
                     } else {
                         $approverName = null;
                     }
@@ -1460,6 +1495,13 @@ class ApprovalFlowController extends Controller
                         'is_required' => (bool) $step->is_required,
                         'approver_scope' => $step->approver_scope
                             ?? ApprovalFlowStep::APPROVER_SCOPE_GLOBAL,
+
+                        /* Dua sifat step; mati pada seluruh flow yang ada sekarang. */
+                        'allow_peer_approval' => (bool) $step->allow_peer_approval,
+                        'skip_for_role_ids' => array_map(
+                            'intval',
+                            (array) ($step->skip_for_role_ids ?? []),
+                        ),
                         'branch_ids' => $step
                             ->branchMappings
                             ->pluck('cabang_id')
@@ -2193,16 +2235,52 @@ class ApprovalFlowController extends Controller
                     },
                 );
 
+                /*
+                | Dua sifat step yang lahir dari ketentuan BOD.
+                |
+                | Keduanya milik STEP, bukan approver: "disetujui rekan
+                | setingkat" berbicara tentang satu tingkat, bukan tentang satu
+                | baris di dalamnya.
+                */
+                $bolehRekan = (bool) ($step['allow_peer_approval'] ?? false);
+
+                $roleDilewati = collect($step['skip_for_role_ids'] ?? [])
+                    ->map(fn ($roleId): int => (int) $roleId)
+                    ->filter(fn (int $roleId): bool => $roleId > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+
                 return [
                     'step_order' => $stepOrder,
                     'label' => $label,
                     'approval_mode' => $approvalMode,
+                    'allow_peer_approval' => $bolehRekan,
+                    'skip_for_role_ids' => $roleDilewati,
                     'approvers' => $normalizedApprovers
                         ->values()
                         ->all(),
                 ];
             },
         );
+    }
+
+    /**
+     * Nama sebuah department, untuk step bertipe DEPARTMENT.
+     *
+     * Dibaca langsung, bukan lewat relasi: tabel step tidak punya relasi ke
+     * department -- approver_id-nya menunjuk tabel yang berbeda-beda
+     * tergantung tipenya.
+     */
+    private static function namaDepartment(int $departmentId): ?string
+    {
+        if ($departmentId <= 0) {
+            return null;
+        }
+
+        $nama = DB::table('departments')->where('id', $departmentId)->value('nama');
+
+        return $nama !== null ? (string) $nama : null;
     }
 
     private function createApprovalFlowSteps(
@@ -2235,6 +2313,16 @@ class ApprovalFlowController extends Controller
 
                     'approver_scope'
                     => $approver['approver_scope'],
+
+                    /*
+                    | Dua sifat milik step, ikut tersalin ke setiap barisnya --
+                    | satu approver memang menjadi satu baris di tabel ini.
+                    */
+                    'allow_peer_approval'
+                    => (bool) ($step['allow_peer_approval'] ?? false),
+
+                    'skip_for_role_ids'
+                    => $step['skip_for_role_ids'] ?? [],
 
                     'is_required'
                     => true,

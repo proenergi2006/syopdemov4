@@ -12,7 +12,7 @@
 
     $translationMode = in_array(
         $currentMode,
-        ['final_approved', 'rejected', 'settled', 'return_request', 'reimburse_request', 'received', 'receipt_request'],
+        ['returned_for_revision', 'final_approved', 'rejected', 'settled', 'return_request', 'reimburse_request', 'received', 'receipt_request'],
         true,
     ) ? $currentMode : 'default';
 
@@ -22,6 +22,7 @@
 
     $description = __('mail.realisasi.description.' . $translationMode, [
         'actor_name' => $actorName,
+        'revision' => $revisionNumber ?? 0,
     ]);
 
     /*
@@ -35,6 +36,7 @@
         'received', 'return_request', 'reimburse_request' => 'RECEIVED',
         'rejected' => 'REJECTED',
         'settled' => 'SETTLED',
+        'returned_for_revision' => 'NEED REVISION',
         default => 'IN PROGRESS',
     };
 
@@ -43,6 +45,7 @@
         'received', 'return_request', 'reimburse_request' => '#0d6b7d',
         'rejected' => '#b3261e',
         'settled' => '#1f4e78',
+        'returned_for_revision' => '#b26a00',
         default => '#8a6d1f',
     };
 
@@ -164,7 +167,9 @@
                                         {{ __('mail.realisasi.field_category') }}
                                     </td>
                                     <td style="padding:0 12px 9px; font-size:12px; font-weight:bold;">
-                                        {{ $realization->transactionCategory->name ?? '-' }}
+                                        {{-- Dibaca dari FPU-nya; himpunannya milik pengajuan. --}}
+                                        {{ $realization->cashAdvance?->transactionCategoryLabel()
+                                            ?? ($realization->transactionCategory->name ?? '-') }}
                                     </td>
                                 </tr>
 
@@ -233,7 +238,9 @@
                                 @if (!empty($notes))
                                     <tr>
                                         <td style="padding:0 12px 11px; font-size:12px; color:#5b6b80;">
-                                            {{ __('mail.realisasi.field_notes') }}
+                                            {{ $currentMode === 'returned_for_revision'
+                                                ? __('mail.realisasi.field_return_reason')
+                                                : __('mail.realisasi.field_notes') }}
                                         </td>
                                         <td style="padding:0 12px 11px; font-size:12px;">
                                             {{ $notes }}

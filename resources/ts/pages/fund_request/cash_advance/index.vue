@@ -19,6 +19,7 @@ import { usePolling } from '@core/composable/usePolling'
 import { useDayNames } from '@core/composable/useDayNames'
 import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
+import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
 
 interface CashAdvanceRow {
 
@@ -40,6 +41,7 @@ interface CashAdvanceRow {
 
   can_submit?: boolean
   can_approve?: boolean
+  revision_count?: number
   approval_label?: string | null
 
   /** FPU ini sudah punya dokumen realisasi. */
@@ -301,9 +303,43 @@ const detail = ref<any | null>(null)
 | Urutan barisnya dibiarkan apa adanya dari server -- itulah urutan yang sama
 | dengan yang tercetak di kertas.
 */
-const detailBreakdown = computed<{ name: string; arranged: boolean; rows: any[] }[]>(() => {
+/**
+ * Membaca satu penanda "diurus GA" dari muatan detailnya.
+ *
+ * Dua bentuk diterima: { name, notes } yang dikirim sekarang, dan nama
+ * saja yang dikirim sebelumnya. Jawaban yang terlanjur tersimpan di cache
+ * peramban masih bisa datang dalam bentuk lamanya, dan String() atas
+ * sebuah objek menghasilkan "[object Object]" -- terpampang sebagai nama
+ * kategori, tanpa satu pun galat yang menunjukkan sebabnya.
+ *
+ * Dipisahkan dari computed-nya karena ia mengerjakan hal yang lain:
+ * menafsirkan bentuk muatan, bukan mengelompokkan baris.
+ */
+const readArrangedMarker = (satu: unknown): { name: string; notes: string } => {
+  if (typeof satu === 'string')
+    return { name: satu.trim(), notes: '' }
+
+  const obj = satu as { name?: unknown; notes?: unknown } | null
+
+  return {
+    name: String(obj?.name ?? '').trim(),
+    notes: String(obj?.notes ?? ''),
+  }
+}
+
+const detailBreakdown = computed<{
+  name: string
+  arranged: boolean
+
+  /*
+  | Catatan pemohon untuk GA. Hanya ada pada kategori yang diurus GA --
+  | di kategori berisi, yang menjelaskan adalah barisnya sendiri.
+  */
+  notes: string
+  rows: any[]
+}[]>(() => {
   const barisRincian: any[] = detail.value?.items || []
-  const kelompok: { name: string; arranged: boolean; rows: any[] }[] = []
+  const kelompok: { name: string; arranged: boolean; notes: string; rows: any[] }[] = []
 
   for (const row of barisRincian) {
     const nama = String(row.expense_category_name || '').trim()
@@ -316,14 +352,27 @@ const detailBreakdown = computed<{ name: string; arranged: boolean; rows: any[] 
     if (adaKelompok)
       adaKelompok.rows.push(row)
     else
-      kelompok.push({ name: nama, arranged: false, rows: [row] })
+      kelompok.push({ name: nama, arranged: false, notes: '', rows: [row] })
   }
 
-  for (const nama of (detail.value?.arranged_categories || [])) {
-    const teks = String(nama || '').trim()
+  for (const satu of (detail.value?.arranged_categories || [])) {
+    const { name, notes } = readArrangedMarker(satu)
 
-    if (teks && !kelompok.some(satu => satu.name === teks))
-      kelompok.push({ name: teks, arranged: true, rows: [] })
+    if (!name)
+      continue
+
+    /*
+    | Kategori yang sudah punya baris tidak diubah menjadi "diurus GA":
+    | server sudah menolak dokumen yang mengatakan dua-duanya, jadi
+    | keadaan ini hanya mungkin pada dokumen lama -- dan di sana barisnya
+    | yang memegang angkanya, jadi barisnya yang menang.
+    */
+    const sudahAda = kelompok.some(satuKelompok => satuKelompok.name === name)
+
+    if (sudahAda)
+      continue
+
+    kelompok.push({ name, arranged: true, notes, rows: [] })
   }
 
   return kelompok
@@ -335,6 +384,35 @@ const detailBreakdown = computed<{ name: string; arranged: boolean; rows: any[] 
 | menggambar tabel kosong tanpa sebab yang kelihatan.
 */
 const detailHasBreakdown = computed<boolean>(() => detailBreakdown.value.length > 0)
+
+/*
+| Himpunan keterangan transaksi dokumennya.
+|
+| Jatuh ke keterangan tunggalnya bila himpunannya tidak dikirim -- itu
+| keadaan FPU yang dibuat sebelum himpunan ini ada, dan juga keadaan
+| jawaban lama yang terlanjur tersimpan di cache peramban.
+*/
+const detailTransactionCategories = computed<string[]>(() => {
+  const himpunan = detail.value?.transaction_categories
+
+  if (Array.isArray(himpunan) && himpunan.length) {
+    return himpunan
+      .map((satu: any) => String(satu?.name ?? '').trim())
+      .filter((nama: string) => nama !== '')
+  }
+
+  const tunggal = String(detail.value?.transaction_category ?? '').trim()
+
+  return tunggal !== '' ? [tunggal] : []
+})
+
+/*
+| Kolom keterangan transaksi per baris hanya berarti bila himpunannya lebih
+| dari satu. Pada dokumen berketerangan tunggal ia mengulang apa yang sudah
+| tertulis di kepala modalnya, sebanyak jumlah barisnya.
+*/
+const detailShowsLineCategory = computed<boolean>(() =>
+  detailTransactionCategories.value.length > 1)
 
 /*
 |--------------------------------------------------------------------------
@@ -397,6 +475,7 @@ const statusItems = computed(() => [
   { title: t('cashAdvance.status.inProgress'), value: 'IN PROGRESS' },
   { title: t('cashAdvance.status.approved'), value: 'APPROVED' },
   { title: t('cashAdvance.status.rejected'), value: 'REJECTED' },
+  { title: t('cashAdvance.status.needRevision'), value: 'NEED REVISION' },
   { title: t('cashAdvance.status.cancelled'), value: 'CANCELLED' },
   { title: t('cashAdvance.status.received'), value: 'RECEIVED' },
   { title: t('cashAdvance.status.disbursed'), value: 'DISBURSED' },
@@ -410,6 +489,7 @@ const formatStatus = (status: string | null | undefined): string => {
     'IN PROGRESS': t('cashAdvance.status.inProgress'),
     'APPROVED': t('cashAdvance.status.approved'),
     'REJECTED': t('cashAdvance.status.rejected'),
+    'NEED REVISION': t('cashAdvance.status.needRevision'),
     'CANCELLED': t('cashAdvance.status.cancelled'),
     'RECEIVED': t('cashAdvance.status.received'),
     'DISBURSED': t('cashAdvance.status.disbursed'),
@@ -426,6 +506,7 @@ const getStatusColor = (status: string | null | undefined): string => {
     'IN PROGRESS': 'warning',
     'APPROVED': 'success',
     'REJECTED': 'error',
+    'NEED REVISION': 'warning',
     'CANCELLED': 'error',
     'RECEIVED': 'primary',
     'DISBURSED': 'info',
@@ -910,7 +991,25 @@ const printAttachmentDialog = ref(false)
 const printTarget = ref<CashAdvanceRow | null>(null)
 const printWithAttachments = ref(false)
 
-const runPrint = async (row: CashAdvanceRow, withAttachments: boolean): Promise<void> => {
+/* Satukan dengan dokumen perjalanan dinasnya. */
+const printWithTrip = ref(false)
+
+/**
+ * Apakah perdin dokumen ini boleh ikut dicetak.
+ *
+ * Perdin yang belum disetujui penuh belum berisi tanda tangan siapa pun,
+ * dan hasil cetaknya bisa disalahpahami sebagai dokumen sah. Server
+ * menolaknya juga -- yang di sini supaya penolakannya datang sebelum
+ * orangnya menunggu, bukan sesudah.
+ */
+const tripCombinable = (row: CashAdvanceRow | null): boolean =>
+  Boolean(row && row.business_trip?.status === 'APPROVED')
+
+const runPrint = async (
+  row: CashAdvanceRow,
+  withAttachments: boolean,
+  withTrip = false,
+): Promise<void> => {
   if (!row.public_id || printLoadingId.value)
     return
 
@@ -945,7 +1044,7 @@ const runPrint = async (row: CashAdvanceRow, withAttachments: boolean): Promise<
       | dikirim di sini -- bukan ditempelkan ke URL hasilnya, yang akan
       | merusak tanda tangannya.
       */
-      { with_attachments: withAttachments },
+      { with_attachments: withAttachments, with_business_trip: withTrip },
       { headers: { Accept: 'application/json' } },
     )
 
@@ -988,9 +1087,15 @@ const printDocument = async (row: CashAdvanceRow): Promise<void> => {
   | jawabannya cuma satu bukan pilihan, ia hambatan -- dan cetakan adalah
   | aksi yang paling sering diulang orang.
   */
-  if ((row.attachment_count ?? 0) > 0) {
+  /*
+  | Ditanyakan bila ADA yang bisa dipilih -- lampiran, perdinnya, atau
+  | keduanya. Semula hanya lampiran yang membuka dialog ini, sehingga
+  | dokumen tanpa lampiran tidak pernah bisa digabungkan dengan perdinnya.
+  */
+  if ((row.attachment_count ?? 0) > 0 || tripCombinable(row)) {
     printTarget.value = row
     printWithAttachments.value = false
+    printWithTrip.value = false
     printAttachmentDialog.value = true
 
     return
@@ -1007,7 +1112,7 @@ const confirmPrint = async (): Promise<void> => {
 
   printAttachmentDialog.value = false
 
-  await runPrint(row, printWithAttachments.value)
+  await runPrint(row, printWithAttachments.value, printWithTrip.value)
 }
 
 /*
@@ -1240,6 +1345,97 @@ const approveCashAdvance = async (): Promise<void> => {
   }
 }
 
+/*
+| Kembalikan dokumen ke pemohon untuk direvisi.
+|
+| Pilihan KETIGA di meja approver, di samping menyetujui dan menolak, dan
+| bukan salah satu dari keduanya: dokumennya tidak ditolak -- ia dikembalikan
+| untuk diperbaiki, lalu berjalan lagi dari tahap pertama.
+|
+| Alasannya wajib, dan di situ seluruh gunanya. Dokumen yang kembali tanpa
+| sepatah kata pun akan diajukan ulang apa adanya, lalu berputar sekali lagi
+| melewati seluruh rantai approval -- dan yang terbuang bukan hanya waktu
+| pemohonnya.
+*/
+/*
+| Boleh mengembalikan: approver yang sedang memegangnya, atau Finance
+| pada dokumen yang berkasnya baru diterima.
+|
+| Penjaga pertama sama dengan tombol Setujui -- can_approve datang
+| dari server, dihitung dari baris approval, dan sudah menolak pemohon
+| atas dokumennya sendiri. Penjaga kedua izin penarikan penerimaan,
+| karena di pintu itu penerimaan berkasnya ikut ditarik.
+|
+| Yang sudah dicairkan, dibayarkan, atau diselesaikan tidak lewat
+| keduanya; servernya menolak, dan di sini tombolnya pun tidak muncul.
+*/
+const canReturnRow = (row: CashAdvanceRow): boolean =>
+  Boolean(row.can_approve)
+  || (isStatus(row, 'RECEIVED') && Boolean(abilities.value.can_unreceive))
+
+const returnDialog = ref(false)
+const returnTarget = ref<CashAdvanceRow | null>(null)
+const returnReason = ref('')
+const returnError = ref('')
+const returnLoading = ref(false)
+
+const openReturn = (row: CashAdvanceRow): void => {
+  returnTarget.value = row
+  returnReason.value = ''
+  returnError.value = ''
+  returnDialog.value = true
+}
+
+const returnForRevision = async (): Promise<void> => {
+  if (!returnTarget.value?.public_id || returnLoading.value)
+    return
+
+  /* Sama dengan penjaga di server: tiga huruf. */
+  if (returnReason.value.trim().length < 3) {
+    returnError.value = t('common.revision.reasonRequired')
+
+    return
+  }
+
+  returnLoading.value = true
+
+  try {
+    showLoadingAlert(
+      t('common.alert.processing'),
+      t('common.alert.pleaseWait'),
+    )
+
+    const response = await axios.patch(
+      `/fund-request/cash-advance/${encodeURIComponent(returnTarget.value.public_id)}/return-for-revision`,
+      { reason: returnReason.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    closeAlert()
+
+    returnDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('common.revision.successFallback'),
+    })
+
+    await fetchCashAdvances()
+  }
+  catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(error, t('common.revision.failedFallback')),
+    })
+  }
+  finally {
+    returnLoading.value = false
+  }
+}
+
 const openReject = (row: CashAdvanceRow): void => {
   rejectTarget.value = row
   rejectNotes.value = ''
@@ -1338,6 +1534,9 @@ const cancelCashAdvance = async (): Promise<void> => {
     })
 
     await fetchCashAdvances()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1520,6 +1719,9 @@ const runBulkAction = async (): Promise<void> => {
     clearSelection()
 
     await fetchCashAdvances()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1690,6 +1892,9 @@ const submitRevise = async (): Promise<void> => {
     })
 
     await fetchCashAdvances()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     /*
@@ -1765,6 +1970,9 @@ const submitUnreceive = async (): Promise<void> => {
     })
 
     await fetchCashAdvances()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     /* Pesannya di dalam dialognya: alasannya masih terketik di sana. */
@@ -1831,6 +2039,9 @@ const openReceive = async (row: CashAdvanceRow): Promise<void> => {
     })
 
     await fetchCashAdvances()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1983,6 +2194,9 @@ const openDisburse = async (row: CashAdvanceRow): Promise<void> => {
     })
 
     await fetchCashAdvances()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -2024,6 +2238,9 @@ const openDelete = async (row: CashAdvanceRow): Promise<void> => {
     })
 
     await fetchCashAdvances()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -2197,6 +2414,19 @@ const detailApprovalSteps = computed<ApprovalStepGroup[]>(() => {
  */
 const detailCanApprove = computed<boolean>(() => Boolean(detail.value?.can_approve))
 
+/*
+| Boleh mengembalikan dari layar detail.
+|
+| Dua pintu, sama seperti di menu barisnya: approver yang sedang memegang
+| dokumennya, dan Finance pada dokumen yang berkasnya baru diterima.
+*/
+const detailCanReturn = computed<boolean>(() =>
+  Boolean(detail.value?.can_approve)
+  || (
+    String(detail.value?.status || '').trim().toUpperCase() === 'RECEIVED'
+    && Boolean(abilities.value.can_unreceive)
+  ))
+
 /** Ikon lampiran mengikuti jenis berkasnya. */
 const getAttachmentIcon = (mimeType: string | null | undefined): string => {
   const normalized = String(mimeType || '').toLowerCase()
@@ -2273,6 +2503,25 @@ const detailPaymentSchedule = computed<{
   const source = detail.value
 
   if (!source?.scheduled_payment_date)
+    return null
+
+  /*
+  | Yang dibayar lebih awal hanya terlihat pemegang izin pencairan.
+  |
+  | Dibayar sebelum jadwal tidak merugikan pemohonnya dan tidak bisa
+  | ditindaklanjutinya; mengabarkannya hanya menambah yang harus dibaca.
+  | Yang membayarkan tetap melihatnya -- ia perlu tahu apa yang
+  | dikerjakannya sendiri.
+  |
+  | Seluruh baloknya disembunyikan, bukan baris keterangannya saja:
+  | balok bertanggal tanpa keterangan terbaca seperti tampilan yang
+  | separuh gagal dimuat.
+  |
+  | Hanya EARLY. Menunggu jadwal, lewat jadwal, tepat waktu, dan
+  | terlambat tetap terlihat semua orang -- justru itu yang perlu
+  | diketahui pemohonnya.
+  */
+  if (source.payment_timing === 'EARLY' && !(abilities.value.can_disburse))
     return null
 
   /* Belum dibayar dan tanggalnya sudah lewat adalah satu-satunya yang mendesak. */
@@ -3091,6 +3340,24 @@ onMounted(async () => {
                   </VListItem>
 
                   <VListItem
+                    v-if="row.can_submit"
+                    href="javascript:void(0)"
+                    @click="openSubmit(row)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="mdi-send-outline"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
+
+                    <VListItemTitle>
+                      {{ t('cashAdvance.list.menu.submit') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <VListItem
                     v-if="row.can_approve"
                     href="javascript:void(0)"
                     :disabled="approveLoading"
@@ -3130,20 +3397,22 @@ onMounted(async () => {
                   </VListItem>
 
                   <VListItem
-                    v-if="row.can_submit"
+                    v-if="canReturnRow(row)"
                     href="javascript:void(0)"
-                    @click="openSubmit(row)"
+                    :disabled="returnLoading"
+                    @click="openReturn(row)"
                   >
                     <template #prepend>
                       <VIcon
-                        icon="mdi-send-outline"
+                        icon="mdi-undo-variant"
                         :size="20"
+                        color="warning"
                         class="me-3"
                       />
                     </template>
 
-                    <VListItemTitle>
-                      {{ t('cashAdvance.list.menu.submit') }}
+                    <VListItemTitle class="text-warning">
+                      {{ t('common.revision.menuReturn') }}
                     </VListItemTitle>
                   </VListItem>
 
@@ -3230,6 +3499,24 @@ onMounted(async () => {
                   </VListItem>
 
                   <VListItem
+                    v-if="(isStatus(row, 'DRAFT') || isStatus(row, 'NEED REVISION')) && canUpdate"
+                    href="javascript:void(0)"
+                    @click="goToEdit(row.public_id)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="mdi-pencil-outline"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
+
+                    <VListItemTitle>
+                      {{ t('cashAdvance.list.menu.edit') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <VListItem
                     v-if="canCancelFor(row)"
                     href="javascript:void(0)"
                     @click="openCancel(row)"
@@ -3245,24 +3532,6 @@ onMounted(async () => {
 
                     <VListItemTitle class="text-error">
                       {{ t('cashAdvance.list.menu.cancel') }}
-                    </VListItemTitle>
-                  </VListItem>
-
-                  <VListItem
-                    v-if="isStatus(row, 'DRAFT') && canUpdate"
-                    href="javascript:void(0)"
-                    @click="goToEdit(row.public_id)"
-                  >
-                    <template #prepend>
-                      <VIcon
-                        icon="mdi-pencil-outline"
-                        :size="20"
-                        class="me-3"
-                      />
-                    </template>
-
-                    <VListItemTitle>
-                      {{ t('cashAdvance.list.menu.edit') }}
                     </VListItemTitle>
                   </VListItem>
 
@@ -3300,13 +3569,33 @@ onMounted(async () => {
             </td>
 
             <td>
-              <VChip
-                size="small"
-                :color="getStatusColor(row.status)"
-                variant="tonal"
-              >
-                {{ formatStatus(row.status) }}
-              </VChip>
+              <div class="d-flex flex-column align-start gap-1">
+                <VChip
+                  size="small"
+                  :color="getStatusColor(row.status)"
+                  variant="tonal"
+                >
+                  {{ formatStatus(row.status) }}
+                </VChip>
+
+                <!--
+                  Lencana revisi, pada dokumen yang pernah dikembalikan.
+
+                  Tetap tampil walau dokumennya sudah berjalan lagi, dan
+                  justru itu gunanya: inilah yang memberi tahu approver
+                  bahwa yang akan ia setujui pernah dikembalikan dan
+                  isinya sudah berubah. Notifikasi bisa terlewat; lencana
+                  di barisnya tidak.
+                -->
+                <VChip
+                  v-if="(row.revision_count || 0) > 0"
+                  size="x-small"
+                  color="warning"
+                  variant="outlined"
+                >
+                  {{ t('common.revision.badge', { n: row.revision_count }) }}
+                </VChip>
+              </div>
             </td>
           </tr>
 
@@ -3400,14 +3689,22 @@ onMounted(async () => {
                   {{ formatStatus(detail?.status) }}
                 </VChip>
 
+                <!--
+                  Seluruh keterangan transaksi dokumennya, bukan penentunya saja.
+
+                  Menampilkan penentunya saja akan menyembunyikan keterangan lain
+                  yang justru dipakai sebagian barisnya -- dan yang menyetujui
+                  membaca dokumen yang isinya tidak seperti kepalanya.
+                -->
                 <VChip
-                  v-if="detail?.transaction_category"
+                  v-for="nama in detailTransactionCategories"
+                  :key="`detail-trxcat-${nama}`"
                   size="small"
                   variant="tonal"
                   color="primary"
                   prepend-icon="tabler-tag"
                 >
-                  {{ detail.transaction_category }}
+                  {{ nama }}
                 </VChip>
 
                 <VChip
@@ -3824,6 +4121,24 @@ onMounted(async () => {
                       </td>
                     </tr>
 
+                    <!--
+                      Catatan pemohon untuk GA. Baris tersendiri, dan hanya bila
+                      ada: kategori yang diurus GA tidak punya baris rincian,
+                      jadi tidak ada kolom keterangan yang bisa ditumpanginya.
+                    -->
+                    <tr v-if="kelompok.arranged && kelompok.notes.trim()">
+                      <td
+                        colspan="6"
+                        class="ca-detail__ga-note"
+                      >
+                        <span class="text-caption text-medium-emphasis">
+                          {{ t('cashAdvance.form.breakdown.arrangedNotesLabel') }}
+                        </span>
+
+                        <div>{{ kelompok.notes }}</div>
+                      </td>
+                    </tr>
+
                     <tr
                       v-for="(item, index) in kelompok.rows"
                       :key="`detail-item-${item.id}`"
@@ -3888,7 +4203,7 @@ onMounted(async () => {
                       {{ t('cashAdvance.detail.total') }}
                     </td>
 
-                    <td class="text-end">
+                    <td class="text-end ca-detail__money">
                       Rp {{ formatNumberWithoutRp(Number(detail.total_amount || 0)) }}
                     </td>
 
@@ -3916,9 +4231,20 @@ onMounted(async () => {
                     <th style="inline-size: 3rem;">
                       {{ t('cashAdvance.detail.itemNo') }}
                     </th>
-                    <th style="inline-size: 8rem;">
+                    <th style="inline-size: 7rem;">
                       {{ t('cashAdvance.detail.itemDate') }}
                     </th>
+                    <!--
+                      Keterangan transaksi barisnya. Hanya bila himpunannya lebih
+                      dari satu -- lihat detailShowsLineCategory.
+                    -->
+                    <th
+                      v-if="detailShowsLineCategory"
+                      style="inline-size: 10rem;"
+                    >
+                      {{ t('cashAdvance.detail.itemTransactionCategory') }}
+                    </th>
+
                     <th>{{ t('cashAdvance.detail.itemDescription') }}</th>
                     <th
                       class="text-end"
@@ -3926,7 +4252,7 @@ onMounted(async () => {
                     >
                       {{ t('cashAdvance.detail.itemAmount') }}
                     </th>
-                    <th style="inline-size: 16rem;">
+                    <th style="inline-size: 12rem;">
                       {{ t('cashAdvance.detail.itemAttachment') }}
                     </th>
                   </tr>
@@ -3941,10 +4267,24 @@ onMounted(async () => {
                       {{ index + 1 }}
                     </td>
                     <td>{{ formatDate(item.date) || '-' }}</td>
+
+                    <td
+                      v-if="detailShowsLineCategory"
+                      class="text-wrap"
+                    >
+                      <!--
+                        Tanda hubung untuk baris lama yang tidak punya keterangan
+                        sendiri. Ia memang ikut headernya, dan menuliskan nama
+                        header di sini akan menyatakan pilihan yang tidak pernah
+                        dibuat siapa pun.
+                      -->
+                      {{ item.transaction_category_name || '-' }}
+                    </td>
+
                     <td class="text-wrap">
                       {{ item.description }}
                     </td>
-                    <td class="text-end font-weight-medium">
+                    <td class="text-end font-weight-medium ca-detail__money">
                       Rp {{ formatNumberWithoutRp(Number(item.amount || 0)) }}
                     </td>
 
@@ -3984,11 +4324,17 @@ onMounted(async () => {
 
                 <tfoot>
                   <tr class="ca-detail__table-total">
-                    <td colspan="3">
+                    <!--
+                      Dihitung, bukan dipatok: kolom keterangan transaksi hanya
+                      muncul bila himpunannya lebih dari satu, dan angka tetap
+                      akan salah pada salah satu keadaannya -- tanpa ada yang
+                      memberi tahu.
+                    -->
+                    <td :colspan="detailShowsLineCategory ? 4 : 3">
                       {{ t('cashAdvance.detail.total') }}
                     </td>
 
-                    <td class="text-end">
+                    <td class="text-end ca-detail__money">
                       Rp {{ formatNumberWithoutRp(Number(detail.total_amount || 0)) }}
                     </td>
 
@@ -4320,6 +4666,20 @@ onMounted(async () => {
                 {{ detailClosingNote.notes }}
               </div>
             </VAlert>
+
+            <!--
+              Revisi: yang sedang berjalan, dan riwayatnya.
+
+              Ditaruh paling bawah dengan sengaja. Yang dibaca lebih dulu
+              adalah dokumennya sendiri; riwayat revisi dibaca sesudahnya,
+              oleh orang yang ingin mengerti kenapa isinya seperti itu.
+            -->
+            <div class="mt-5">
+              <RevisionHistory
+                :revisions="detail?.revisions || []"
+                :open-revision="detail?.revision_open || null"
+              />
+            </div>
           </template>
         </VCardText>
 
@@ -4348,6 +4708,18 @@ onMounted(async () => {
             @click="openReject(detail)"
           >
             {{ t('cashAdvance.detail.rejectButton') }}
+          </VBtn>
+
+          <VBtn
+            v-if="detailCanReturn"
+            color="warning"
+            variant="tonal"
+            prepend-icon="mdi-undo-variant"
+            class="text-none"
+            :disabled="returnLoading"
+            @click="openReturn(detail)"
+          >
+            {{ t('common.revision.menuReturn') }}
           </VBtn>
 
           <VBtn
@@ -4655,6 +5027,66 @@ onMounted(async () => {
       </VCard>
     </VDialog>
 
+    <!--
+      DIALOG KEMBALIKAN
+
+      Judulnya bertanya dan menyebut nomornya sekaligus. Yang menekan tombol
+      ini sedang memindahkan dokumen orang lain kembali ke mejanya, dan
+      nomornya adalah hal pertama yang perlu dipastikan sebelum menjawab.
+
+      Warnanya bukan merah. Mengembalikan bukan menolak: dokumennya masih
+      hidup, dan yang diminta adalah perbaikan.
+    -->
+    <VDialog
+      v-model="returnDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('common.revision.dialogTitle', {
+            number: returnTarget?.advance_number || '-',
+          }) }}
+        </VCardTitle>
+
+        <VCardText>
+          <div class="text-body-2 text-medium-emphasis mb-4">
+            {{ t('common.revision.dialogSubtitle') }}
+          </div>
+
+          <VTextarea
+            v-model="returnReason"
+            :label="t('common.revision.reasonLabel')"
+            :placeholder="t('common.revision.reasonPlaceholder')"
+            rows="3"
+            auto-grow
+            :error="!!returnError"
+            :error-messages="returnError ? [returnError] : []"
+          />
+        </VCardText>
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="returnLoading"
+            @click="returnDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="warning"
+            class="text-none"
+            :loading="returnLoading"
+            @click="returnForRevision"
+          >
+            {{ t('common.revision.confirmButton') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <VDialog
       v-model="rejectDialog"
       max-width="520"
@@ -4951,6 +5383,32 @@ onMounted(async () => {
             hide-details
           />
 
+          <!--
+            Dimatikan berikut alasannya, bukan disembunyikan: pilihan yang
+            hilang tidak bisa ditanyai, dan yang membacanya akan mengira
+            fiturnya belum ada.
+          -->
+          <VCheckbox
+            v-model="printWithTrip"
+            :label="t('cashAdvance.list.print.combineTripInclude')"
+            :disabled="!tripCombinable(printTarget)"
+            :hint="tripCombinable(printTarget)
+              ? undefined
+              : t('cashAdvance.list.print.combineTripUnavailable')"
+            persistent-hint
+            density="comfortable"
+          />
+
+          <VAlert
+            v-if="printWithTrip"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ t('cashAdvance.list.print.combineTripNotice') }}
+          </VAlert>
+
           <VAlert
             v-if="printWithAttachments"
             type="info"
@@ -5200,6 +5658,17 @@ onMounted(async () => {
   overflow-wrap: anywhere;
 }
 
+/*
+| Catatan GA pada modal detail. Bergaris tepi supaya terbaca sebagai
+| perkataan pemohon, bukan sebagai keterangan sistem seperti baris di
+| atasnya.
+*/
+.ca-detail__ga-note {
+  border-inline-start: 2px solid rgba(var(--v-theme-warning), 0.5);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+
 .ca-detail__meta {
   color: rgba(var(--v-theme-on-surface), 0.55);
   font-size: 0.75rem;
@@ -5276,6 +5745,16 @@ onMounted(async () => {
 
 .ca-detail__table :deep(tbody tr:nth-child(even)) {
   background: rgba(var(--v-theme-on-surface), 0.02);
+}
+
+/*
+| Kolom uang tidak pernah terbungkus.
+|
+| "Rp 2.000.000" yang pecah menjadi dua baris terbaca sebagai dua angka
+| sekejap, dan pada kolom uang kesalahan baca sekejap itu yang mahal.
+*/
+.ca-detail__table :deep(.ca-detail__money) {
+  white-space: nowrap;
 }
 
 .ca-detail__table :deep(tfoot .ca-detail__table-total td) {

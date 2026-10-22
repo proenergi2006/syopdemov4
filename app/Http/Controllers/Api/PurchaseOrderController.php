@@ -11,6 +11,9 @@ use App\Models\PurchaseOrderApproval;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
+use App\Models\FundRequestRevision;
+use App\Services\FundRequest\DocumentRevisionService;
+use App\Services\FundRequest\RevisionNotifier;
 use App\Support\DocumentNumberLock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -649,9 +652,20 @@ class PurchaseOrderController extends Controller
                 | 3. Creator PO atau satu department
                 |--------------------------------------------------------------------------
                 */
+                    /*
+                    | Draft dan dokumen revisian sama-sama bisa diajukan
+                    | dan disunting: keduanya ada di tangan pemohon dan
+                    | tidak sedang menunggu keputusan siapa pun.
+                    */
+                    $bisaDisunting = in_array(
+                        $poStatus,
+                        [PurchaseOrder::STATUS_DRAFT, PurchaseOrder::STATUS_NEED_REVISION],
+                        true,
+                    );
+
                     $canSubmitRow = (
                         $canSubmit
-                        && $poStatus === 'DRAFT'
+                        && $bisaDisunting
                         && (
                             $isCreator
                             || $isSameDepartment
@@ -677,7 +691,7 @@ class PurchaseOrderController extends Controller
                 */
                     $canUpdateRow = (
                         $canUpdate
-                        && $poStatus === 'DRAFT'
+                        && $bisaDisunting
                     );
 
                     $canDeleteRow = (
@@ -802,6 +816,14 @@ class PurchaseOrderController extends Controller
 
                         'can_approve'
                         => $canApprove,
+
+                        /*
+                        | Penanda revisi untuk daftar. Inilah satu-satunya
+                        | hal yang memberi tahu approver bahwa yang akan
+                        | ia setujui pernah dikembalikan.
+                        */
+                        'revision_count'
+                        => (int) ($po->revision_count ?? 0),
 
                         'can_update'
                         => $canUpdateRow,
@@ -2241,6 +2263,17 @@ class PurchaseOrderController extends Controller
 
                     'approval_label' => $currentApproval?->label,
 
+                    /*
+                    | Riwayat revisinya, terbaru lebih dulu; revision_open
+                    | hanya terisi selama dokumennya masih di tangan
+                    | pemohon.
+                    */
+                    'revision_count' => (int) ($po->revision_count ?? 0),
+                    'revisions' => app(DocumentRevisionService::class)->riwayat($po),
+                    'revision_open' => ($revisiTerbuka = $po->openRevision())
+                        ? app(DocumentRevisionService::class)->sajikan($revisiTerbuka)
+                        : null,
+
                     'nomor_po' => $po->nomor_po,
                     'tanggal_po' => $po->tanggal_po
                         ? \Carbon\Carbon::parse($po->tanggal_po)->format('Y-m-d')
@@ -2958,6 +2991,15 @@ class PurchaseOrderController extends Controller
 
         $storedPaths = [];
 
+        /*
+        | Revisi yang baru ditandai dikerjakan, bila memang ada.
+        |
+        | Dideklarasikan di LUAR transaksinya dan ditangkap dengan referensi:
+        | yang diisi di dalam closure tidak keluar sendiri, dan kabar yang
+        | bergantung padanya akan diam tanpa ada yang tahu kenapa.
+        */
+        $revisiBerjalan = null;
+
         try {
             $po = DB::transaction(
                 function () use (
@@ -2973,6 +3015,7 @@ class PurchaseOrderController extends Controller
                     $request,
                     $existingAttachmentIds,
                     &$storedPaths,
+                    &$revisiBerjalan,
                 ) {
                     /*
                 |--------------------------------------------------------------------------
@@ -2983,16 +3026,34 @@ class PurchaseOrderController extends Controller
                         ->lockForUpdate()
                         ->findOrFail($id);
 
+                    /*
+                    |----------------------------------------------------------
+                    | Draft, dan dokumen yang sedang butuh revisi
+                    |----------------------------------------------------------
+                    | Keduanya sama-sama berada di tangan pemohon dan tidak
+                    | sedang menunggu keputusan siapa pun -- itulah yang
+                    | membuat keduanya boleh disunting.
+                    |
+                    | Kuota item PR yang dipakai PO ini tetap tercatat selama
+                    | status itu, sama seperti saat ia masih draft, dan jalur
+                    | penyuntingan yang sama pula yang menghitung ulang
+                    | alokasinya. Tidak ada aturan baru yang perlu ditulis di
+                    | sini.
+                    |----------------------------------------------------------
+                    */
+                    $statusSaatIni = strtoupper(trim((string) $po->status));
+                    $sedangDirevisi = $statusSaatIni === PurchaseOrder::STATUS_NEED_REVISION;
+
                     if (
-                        strtoupper(
-                            trim(
-                                (string) $po->status,
-                            ),
-                        ) !== 'DRAFT'
+                        !in_array(
+                            $statusSaatIni,
+                            [PurchaseOrder::STATUS_DRAFT, PurchaseOrder::STATUS_NEED_REVISION],
+                            true,
+                        )
                     ) {
                         throw ValidationException::withMessages([
                             'status' => [
-                                __('purchase_order_messages.update.only_draft_status'),
+                                __('fund_request_messages.return_for_revision.editable_only'),
                             ],
                         ]);
                     }
@@ -3764,9 +3825,36 @@ class PurchaseOrderController extends Controller
                         );
                     }
 
+                    /*
+                    |----------------------------------------------------------
+                    | Revisinya ditandai sudah mulai dikerjakan
+                    |----------------------------------------------------------
+                    | Hanya sekali, pada penyimpanan pertama. Approver yang
+                    | mengembalikannya dikabari sesudah transaksi ini,
+                    | supaya ia tahu dokumennya sedang ditangani.
+                    |----------------------------------------------------------
+                    */
+                    if (
+                        $sedangDirevisi
+                        && app(DocumentRevisionService::class)->tandaiDirevisi($po)
+                    ) {
+                        $revisiBerjalan = $po->openRevision();
+                    }
+
                     return $po->fresh();
                 },
             );
+
+            if ($revisiBerjalan) {
+                try {
+                    app(RevisionNotifier::class)->sedangDirevisi($po, $revisiBerjalan);
+                } catch (\Throwable $notifyError) {
+                    Log::error('[Purchase Order] Notifikasi revisi dikerjakan gagal', [
+                        'po_id' => $po->id,
+                        'message' => $notifyError->getMessage(),
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -4123,13 +4211,28 @@ class PurchaseOrderController extends Controller
         | Validasi status
         |--------------------------------------------------------------------------
         */
+            /*
+        |--------------------------------------------------------------------------
+        | Draft, dan dokumen revisian yang sudah diperbaiki
+        |--------------------------------------------------------------------------
+        | Keduanya masuk lewat pintu yang sama karena yang terjadi setelahnya
+        | memang sama persis: rantai approval dibuat, statusnya menjadi
+        | berjalan, approver tahap pertama dikabari.
+        |--------------------------------------------------------------------------
+        */
+            $statusSaatIni = strtoupper(trim((string) $po->status));
+            $pengajuanUlang = $statusSaatIni === PurchaseOrder::STATUS_NEED_REVISION;
+
             if (
-                strtolower(trim((string) $po->status))
-                !== 'draft'
+                !in_array(
+                    $statusSaatIni,
+                    [PurchaseOrder::STATUS_DRAFT, PurchaseOrder::STATUS_NEED_REVISION],
+                    true,
+                )
             ) {
                 throw ValidationException::withMessages([
                     'status' => [
-                        __('purchase_order_messages.submit.only_draft_status'),
+                        __('fund_request_messages.return_for_revision.submittable_only'),
                     ],
                 ]);
             }
@@ -4196,8 +4299,33 @@ class PurchaseOrderController extends Controller
         | Update status dan snapshot tanda tangan requester
         |--------------------------------------------------------------------------
         */
+            /*
+        |--------------------------------------------------------------------------
+        | Revisinya ditutup
+        |--------------------------------------------------------------------------
+        | Potret sesudahnya, daftar perubahannya, dan siapa yang mengajukan
+        | ulang ditulis sekaligus -- setelah rincian dan lampirannya final,
+        | sebelum statusnya berpindah.
+        |--------------------------------------------------------------------------
+        */
+            $revisiDitutup = $pengajuanUlang
+                ? app(DocumentRevisionService::class)->tutup($po, $user)
+                : null;
+
             $po->status = 'IN PROGRESS';
-            $po->submitted_at = now();
+
+            /*
+        |--------------------------------------------------------------------------
+        | Tanggal pengajuan pertamanya dipertahankan
+        |--------------------------------------------------------------------------
+        | Umur dokumen dihitung sejak ia pertama kali masuk antrean, dan revisi
+        | tidak membuatnya muda kembali. Kapan tepatnya diajukan ulang tercatat
+        | pada riwayat revisinya.
+        |--------------------------------------------------------------------------
+        */
+            if (!$pengajuanUlang || $po->submitted_at === null) {
+                $po->submitted_at = now();
+            }
 
             $po->requester_signature_path
                 = $user->signature_path;
@@ -4230,8 +4358,23 @@ class PurchaseOrderController extends Controller
             try {
                 $po->refresh();
 
-                $this->poNotificationService
-                    ->notifyApprovalRequest($po);
+                /*
+                | Dokumen revisian dikabarkan dengan kalimatnya sendiri:
+                | approver yang menerima permintaan biasa akan membacanya
+                | sebagai dokumen baru, lalu menyetujui perubahan yang justru
+                | menjadi sebab pengembaliannya tanpa melihatnya.
+                */
+                if ($revisiDitutup) {
+                    app(RevisionNotifier::class)->diajukanUlang(
+                        $po,
+                        $revisiDitutup,
+                        fn($approval) => $this->poNotificationService
+                            ->resolveApproverUsers($approval),
+                    );
+                } else {
+                    $this->poNotificationService
+                        ->notifyApprovalRequest($po);
+                }
 
                 $this->poMailService
                     ->sendApprovalRequest($po);
@@ -4312,6 +4455,164 @@ class PurchaseOrderController extends Controller
                 'debug' => app()->environment('local')
                     ? $e->getMessage()
                     : null,
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Kembalikan PO ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | Pilihan KETIGA di meja approver, di samping menyetujui dan menolak.
+    | Dokumennya tidak ditolak -- ia dikembalikan untuk diperbaiki, lalu
+    | berjalan lagi dari tahap pertama.
+    |
+    | SATU PINTU SAJA: approver yang sedang memegang dokumennya, pada status
+    | IN PROGRESS. Penjaganya sama dengan tombol Setujui.
+    |
+    | PO yang sudah APPROVED tidak lewat pintu ini, dan itu disengaja: dari
+    | sana barangnya sudah boleh diterima, dan sebagian mungkin sudah masuk
+    | gudang. Mengubah qty PO yang sudah diterima berarti mengubah angka yang
+    | sudah dicocokkan dengan barang di rak.
+    |
+    | Kuota item PR yang dipakai PO ini TIDAK dilepas saat dikembalikan --
+    | sama seperti PO yang masih draft, alokasinya tetap tercatat. Melepasnya
+    | akan membuat orang lain bisa memesan kuota yang sebenarnya masih
+    | dipegang dokumen ini, dan pemohon menemukan kuotanya hilang justru saat
+    | ia hendak memperbaikinya.
+    |--------------------------------------------------------------------------
+    */
+    public function returnForRevision(
+        string $publicId,
+        Request $request,
+        DocumentRevisionService $revisionService,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], [
+            'reason' => __('fund_request_messages.return_for_revision.reason_label'),
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('purchase_order_messages.approve.unauthenticated'),
+                ], 401);
+            }
+
+            $id = (int) Crypt::decryptString($publicId);
+
+            $po = PurchaseOrder::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (
+                strtoupper(trim((string) $po->status))
+                !== PurchaseOrder::STATUS_IN_PROGRESS
+            ) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('fund_request_messages.return_for_revision.only_in_progress'),
+                ], 422);
+            }
+
+            $approval = $this->poApprovalService->getUserCurrentApproval($po, $user, true);
+
+            if (!$approval) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('fund_request_messages.return_for_revision.not_active_approver'),
+                ], 403);
+            }
+
+            $hasil = $revisionService->kembalikan(
+                document: $po,
+                user: $user,
+                reason: $validated['reason'],
+                permission: null,
+                from: FundRequestRevision::FROM_APPROVAL,
+                stepOrder: (int) $approval->step_order,
+                stepLabel: $approval->label,
+            );
+
+            if (!$hasil['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($hasil['message_key'], $hasil['message_replace']),
+                ], $hasil['status']);
+            }
+
+            DB::commit();
+
+            $revisi = $hasil['revision'];
+
+            $po->refresh();
+
+            try {
+                app(RevisionNotifier::class)->dikembalikan($po, $revisi);
+
+                $this->poMailService->sendReturnedForRevision(
+                    $po,
+                    $user,
+                    $validated['reason'],
+                    (int) $revisi->revision_number,
+                );
+            } catch (\Throwable $notifyError) {
+                Log::error('[Purchase Order] Notifikasi pengembalian gagal', [
+                    'po_id' => $po->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('fund_request_messages.return_for_revision.success'),
+                'data' => [
+                    'id' => (int) $po->id,
+                    'public_id' => $po->encrypted_id,
+                    'nomor_po' => $po->nomor_po,
+                    'status' => $po->status,
+                    'revision_count' => (int) $po->revision_count,
+                    'revision_number' => (int) $revisi->revision_number,
+                ],
+            ], 200);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? __('fund_request_messages.return_for_revision.failed'),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[Purchase Order] Kembalikan untuk revisi error', [
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.return_for_revision.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
     }

@@ -209,7 +209,7 @@ return [
 
         'disbursement_request' => [
             'title' => 'Cash Advance Awaiting Disbursement',
-            'message' => 'Cash advance :advance_number has been approved and is awaiting disbursement of Rp :total_amount.',
+            'message' => 'Cash advance :advance_number worth Rp :total_amount has been received and is awaiting your payment.',
         ],
         'approval_request' => [
             'title' => 'Cash Advance Approval',
@@ -234,10 +234,17 @@ return [
 
 
             /*
-            | Yang menyimpang dari jadwal dikabarkan apa adanya, beserta
-            | keterangan Finance bila ada. Pemohon yang dijanjikan Rabu
-            | lalu menerima uangnya Senin berikutnya berhak tahu tanpa
-            | harus membuka rincian dokumennya sendiri.
+            | LATE payments are reported as they are, with the finance note when
+            | there is one. Someone promised Wednesday who receives the money the
+            | following Monday deserves to know without opening the document.
+            |
+            | EARLY PAYMENTS ARE NO LONGER REPORTED. Being paid before schedule
+            | costs the requester nothing, so the notice only adds something to
+            | read without adding anything to do.
+            |
+            | The '_early' sentences are LEFT IN PLACE on purpose. Stored
+            | notifications keep their key and are re-translated when read;
+            | removing the key would print the key name on someone screen.
             */
             'message_early' => 'Cash advance :advance_number was paid by :disburser_name, ahead of the :scheduled_date schedule.',
             'message_early_reason' => 'Cash advance :advance_number was paid by :disburser_name, ahead of the :scheduled_date schedule. Finance notes: :reason',
@@ -398,6 +405,37 @@ return [
             'type_lainnya' => 'other arrangement',
 
             'vendor_unset' => 'provider not stated',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Revisi dokumen
+    |--------------------------------------------------------------------------
+    | Satu kelompok kalimat untuk empat modul. Nama modulnya datang sebagai
+    | parameter :module -- bukan karena hemat, melainkan karena kalimatnya
+    | memang sama: yang berbeda hanya dokumen apa yang dimaksud.
+    |--------------------------------------------------------------------------
+    */
+    'fund_request_revision' => [
+        'returned' => [
+            'title' => 'Document Returned for Revision',
+            'message' => ':number was returned by :by for revision. Reason: :reason',
+        ],
+
+        'being_revised' => [
+            'title' => 'Revision in Progress',
+            'message' => ':number, which you returned, is being revised by its requester.',
+        ],
+
+        'resubmitted' => [
+            'title' => 'Revised Document Awaiting Approval',
+            'message' => ':number was resubmitted as revision :revision and is awaiting your approval. Its contents have changed since the previous submission.',
+        ],
+
+        'resubmitted_returner' => [
+            'title' => 'Revision Resubmitted',
+            'message' => ':number, which you returned, has been corrected and resubmitted as revision :revision.',
         ],
     ],
 ];

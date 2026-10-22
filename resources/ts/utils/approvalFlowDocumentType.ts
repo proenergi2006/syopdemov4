@@ -31,6 +31,13 @@ export interface ApprovalFlowDocumentType {
 
   /** Dokumen yang flow-nya juga dibedakan per keterangan transaksi (FPU). */
   uses_transaction_category: boolean
+
+  /*
+  | Daftar keterangan transaksi milik siapa yang boleh dipilih:
+  | 'ADVANCE' untuk FPU dan Realisasi, 'CLAIM' untuk Claim, null untuk
+  | jenis dokumen yang memang tidak mengenal keterangan transaksi.
+  */
+  transaction_category_document_type: string | null
 }
 
 const documentTypes = ref<ApprovalFlowDocumentType[]>([])
@@ -77,6 +84,9 @@ export const loadApprovalFlowDocumentTypes = async (
         module_id: Number(item.module_id || 0),
         uses_area_matrix: Boolean(item.uses_area_matrix),
         uses_transaction_category: Boolean(item.uses_transaction_category),
+        transaction_category_document_type: item.transaction_category_document_type
+          ? String(item.transaction_category_document_type)
+          : null,
       }))
 
       isLoaded.value = true
@@ -139,6 +149,16 @@ export const documentTypeUsesAreaMatrix = (value: unknown): boolean => {
  */
 export const documentTypeUsesTransactionCategory = (value: unknown): boolean => {
   return findDocumentType(value)?.uses_transaction_category ?? false
+}
+
+/**
+ * Daftar keterangan transaksi yang boleh dipilih untuk jenis dokumen ini.
+ *
+ * Dibaca dari master, tidak ditulis ulang di layar: aturan yang sama
+ * ditulis dua kali cepat atau lambat berbeda di salah satunya.
+ */
+export const documentTypeCategorySource = (value: unknown): string | null => {
+  return findDocumentType(value)?.transaction_category_document_type ?? null
 }
 
 /**

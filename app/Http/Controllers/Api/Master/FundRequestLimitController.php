@@ -227,6 +227,15 @@ class FundRequestLimitController extends Controller
             'max_outstanding' => ['required', 'integer', 'min:1', 'max:' . self::MAX_OUTSTANDING],
             'max_realization_days' => ['required', 'integer', 'min:1', 'max:' . self::MAX_DAYS],
 
+            /*
+            | Batas yang tidak membatasi apa pun.
+            |
+            | Angka di atas tetap wajib diisi walau penanda ini menyala:
+            | mematikannya kembali harus mengembalikan batas yang masuk akal,
+            | bukan kolom kosong yang harus ditebak isinya.
+            */
+            'is_unlimited' => ['sometimes', 'boolean'],
+
             'is_active' => ['required', 'boolean'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -252,6 +261,7 @@ class FundRequestLimitController extends Controller
                     'department_id' => $validated['department_id'] ?? null,
                     'max_outstanding' => (int) $validated['max_outstanding'],
                     'max_realization_days' => (int) $validated['max_realization_days'],
+                    'is_unlimited' => (bool) ($validated['is_unlimited'] ?? false),
                     'is_active' => (bool) $validated['is_active'],
                     'notes' => $validated['notes'] ?? null,
                     'updated_by' => $user->id,
@@ -301,6 +311,7 @@ class FundRequestLimitController extends Controller
 
             'max_outstanding' => $batas->max_outstanding,
             'max_realization_days' => $batas->max_realization_days,
+            'is_unlimited' => (bool) $batas->is_unlimited,
 
             'is_active' => (bool) $batas->is_active,
             'notes' => $batas->notes,

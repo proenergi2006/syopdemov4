@@ -416,6 +416,49 @@ class CashAdvanceRealizationMailService
     /**
      * Pemohon adalah penekan tombol Submit; created_by dipakai sebagai cadangan.
      */
+    /*
+    |--------------------------------------------------------------------------
+    | Dokumen dikembalikan ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | Email, bukan hanya notifikasi dalam aplikasi, dan itu disengaja: begitu
+    | dikembalikan, dokumennya BERHENTI sampai pemohon mengerjakannya. Pemohon
+    | yang sedang tidak membuka aplikasi tidak akan tahu bahwa yang ditunggu
+    | sekarang adalah dirinya, dan dokumennya terdiam berhari-hari tanpa ada
+    | yang merasa sedang menahannya.
+    |
+    | Alasannya ikut dikirim utuh. Email yang hanya berkata "dikembalikan"
+    | memaksa pemohon membuka aplikasi hanya untuk mencari tahu apa yang
+    | salah -- padahal justru itu yang perlu ia bawa saat membukanya.
+    |--------------------------------------------------------------------------
+    */
+    public function sendReturnedForRevision(
+        CashAdvanceRealization $realization,
+        User $actor,
+        ?string $reason = null,
+        ?int $revisionNumber = null,
+    ): void {
+        $requester = $this->resolveRequester($realization);
+
+        if (!$requester) {
+            return;
+        }
+
+        $realization->loadMissing(['items', 'transactionCategory', 'cashAdvance']);
+
+        $this->queue(
+            $requester,
+            new CashAdvanceRealizationApprovalMail(
+                realization: $realization,
+                recipient: $requester,
+                mode: 'returned_for_revision',
+                actor: $actor,
+                notes: $reason,
+                revisionNumber: $revisionNumber,
+            ),
+            $realization,
+            'returned_for_revision',
+        );
+    }
     private function resolveRequester(CashAdvanceRealization $realization): ?User
     {
         $requesterId = $realization->submitted_by ?? $realization->created_by;

@@ -50,6 +50,17 @@ class BusinessTripApprovalMail extends Mailable implements ShouldQueue
         public ?string $notes = null,
         public ?int $stepOrder = null,
         public ?string $stepLabel = null,
+
+        /*
+        | Nomor revisi, hanya untuk mode returned_for_revision.
+        |
+        | Disebut di dalam kalimatnya supaya pemohon tahu ini
+        | pengembalian yang keberapa; dokumen yang bolak-balik tiga
+        | kali adalah keadaan yang berbeda dari yang pertama kali
+        | dikembalikan, dan email yang tidak menyebutnya membuat
+        | keduanya terbaca sama.
+        */
+        public ?int $revisionNumber = null,
     ) {
         /*
         | Job baru dilepas setelah transaksi commit -- kalau tidak, worker bisa
@@ -89,6 +100,7 @@ class BusinessTripApprovalMail extends Mailable implements ShouldQueue
                 'notes' => $this->notes,
                 'stepOrder' => $this->stepOrder,
                 'stepLabel' => $this->stepLabel,
+                'revisionNumber' => $this->revisionNumber,
                 'approvalUrl' => $this->approvalUrl,
             ],
         );
@@ -105,6 +117,7 @@ class BusinessTripApprovalMail extends Mailable implements ShouldQueue
             'final_approved' => 'mail.business_trip.subject.final_approved',
             'rejected' => 'mail.business_trip.subject.rejected',
             'travel_arrangement' => 'mail.business_trip.subject.travel_arrangement',
+            'returned_for_revision' => 'mail.business_trip.subject.returned_for_revision',
             default => 'mail.business_trip.subject.default',
         };
 

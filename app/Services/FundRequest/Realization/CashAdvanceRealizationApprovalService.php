@@ -60,12 +60,38 @@ class CashAdvanceRealizationApprovalService
         User $user,
         bool $lockForUpdate = false,
     ): ?CashAdvanceRealizationApproval {
+        /*
+        | Pemohon tidak pernah menjadi approver dokumennya sendiri.
+        |
+        | Generator sudah membuang stepnya saat dokumen dibuat; penjaga ini
+        | untuk yang tidak terlihat saat itu -- baris bertipe ROLE disimpan
+        | sebagai role, dan seseorang bisa diberi role itu SESUDAH dokumennya
+        | dibuat.
+        */
+        if ($this->isRequester($realization, $user)) {
+            return null;
+        }
+
         return $this
             ->getCurrentWaitingApprovals($realization, $lockForUpdate)
             ->first(
                 fn(CashAdvanceRealizationApproval $approval): bool =>
                 $this->userCanApprove($approval, $user),
             );
+    }
+
+    /**
+     * Orang ini yang mengajukan dokumennya.
+     *
+     * submitted_by lebih dipercaya daripada created_by: yang menekan
+     * tombol Submit-lah yang mengajukan, sekalipun dokumennya diketik
+     * orang lain.
+     */
+    public function isRequester(CashAdvanceRealization $dokumen, User $user): bool
+    {
+        $pemohon = (int) ($dokumen->submitted_by ?? $dokumen->created_by ?? 0);
+
+        return $pemohon > 0 && $pemohon === (int) $user->id;
     }
 
     public function userCanApprove(

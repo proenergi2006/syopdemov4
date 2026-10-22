@@ -155,4 +155,25 @@ return [
         'trip_not_valid' => 'Claim ini tidak bisa dibayarkan: Perjalanan Dinas :number sudah dibatalkan atau ditolak.',
         'item_date_outside_trip' => 'Baris :row: tanggalnya di luar periode Perjalanan Dinas :number (:from s/d :to). Biaya perjalanan tidak bisa bertanggal di luar perjalanannya.',
     ],
+    /*
+    | Himpunan keterangan transaksi sebuah Claim.
+    |
+    | Headernya menyatakan himpunan yang boleh dipakai baris rinciannya;
+    | barisnya memilih dari himpunan itu, bukan dari seluruh master.
+    |
+    | single_for_non_routine dan request_type_mismatch tidak pernah terpakai
+    | di Claim -- ia tidak punya sifat pengajuan. Tetap disediakan karena
+    | layanannya dipakai bersama FPU, dan kunci yang hilang akan tampil
+    | sebagai nama kuncinya sendiri di layar orang.
+    */
+    'transaction_category_set' => [
+        'required' => 'Keterangan transaksi wajib dipilih minimal satu.',
+        'single_for_non_routine' => 'Hanya boleh satu keterangan transaksi.',
+        'unknown' => 'Ada keterangan transaksi yang tidak dikenali. Muat ulang halamannya, lalu pilih kembali.',
+        'request_type_mismatch' => 'Keterangan transaksi :categories tidak berlaku untuk pengajuan :request_type.',
+        'item_required' => 'Baris :row: keterangan transaksinya belum dipilih.',
+        'item_not_in_set' => 'Baris :row: keterangan transaksinya tidak termasuk yang dipilih di bagian atas Claim.',
+        'category_without_item' => 'Keterangan transaksi :categories belum punya satu pun baris rincian. Tambahkan barisnya, atau cabut keterangan transaksi itu dari bagian atas Claim.',
+    ],
+
 ];

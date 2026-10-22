@@ -21,11 +21,13 @@ class BusinessTripExpenseCategory extends Model
         'name',
         'description',
         'sort_order',
+        'ga_arrangeable',
         'is_active',
     ];
 
     protected $casts = [
         'sort_order' => 'integer',
+        'ga_arrangeable' => 'boolean',
         'is_active' => 'boolean',
     ];
 
@@ -44,5 +46,16 @@ class BusinessTripExpenseCategory extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Kategori yang boleh ditandai diurus GA.
+     *
+     * Yang di luarnya wajib diisi pemohon sendiri -- lihat keterangan
+     * pada migrasi yang menambahkan kolomnya.
+     */
+    public function scopeGaArrangeable($query)
+    {
+        return $query->where('ga_arrangeable', true);
     }
 }

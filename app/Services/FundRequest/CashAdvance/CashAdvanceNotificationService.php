@@ -566,14 +566,21 @@ class CashAdvanceNotificationService
      * ditambah "karena ..." -- hanya bisa dirangkai dengan tata bahasa satu
      * bahasa, dan pecah begitu bahasa keduanya menyusun kalimatnya berbeda.
      *
-     * ON_TIME dan keadaan tanpa jadwal sama-sama memakai kalimat dasar:
-     * yang tepat waktu tidak perlu penjelasan, dan yang tidak terjadwal
+     * ON_TIME, LEBIH AWAL, dan keadaan tanpa jadwal sama-sama memakai
+     * kalimat dasar.
+     *
+     * Yang tepat waktu tidak perlu penjelasan, dan yang tidak terjadwal
      * tidak punya apa pun untuk dibandingkan.
+     *
+     * YANG LEBIH AWAL PUN TIDAK. Dibayar sebelum jadwal bukan penyimpangan
+     * yang merugikan pemohonnya -- uangnya justru datang lebih cepat.
+     * Mengabarkannya hanya menambah satu hal untuk dibaca tanpa menambah
+     * satu pun hal untuk dilakukan. Yang terlambat berbeda: di sana
+     * pemohon memang perlu tahu kenapa uangnya belum datang tepat waktu.
      */
     private function disbursedMessageKey(?string $timing, bool $adaAlasan): string
     {
         $dasar = match ($timing) {
-            'EARLY' => 'disbursed.message_early',
             'LATE' => 'disbursed.message_late',
             default => 'disbursed.message',
         };

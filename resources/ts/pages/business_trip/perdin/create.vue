@@ -8,7 +8,6 @@ import {
   showConfirmAlert,
   showErrorToast,
   showLoadingAlert,
-  showSuccessToast,
   showWarningToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
@@ -81,7 +80,48 @@ const form = reactive({
    * dibuka.
    */
   itineraries: [] as ItineraryForm[],
+
+  /*
+   * Peserta lain yang ikut, sebagai daftar id akun.
+   *
+   * Boleh kosong: perjalanan yang dijalani sendiri adalah keadaan yang
+   * paling biasa, dan memaksa memilih seseorang hanya akan melahirkan
+   * nama yang dipilih asal ada.
+   */
+  participants: [] as number[],
 })
+
+/*
+|--------------------------------------------------------------------------
+| Peserta lain yang ikut
+|--------------------------------------------------------------------------
+| Pilihannya datang dari endpoint options bersama identitas pemohon, dan
+| sudah TIDAK memuat akun pemohonnya sendiri -- dokumennya menyebut dirinya
+| di bagian identitas, dan menawarkan namanya hanya akan melahirkan dokumen
+| yang menyebutnya dua kali.
+|
+| Judul pilihannya memuat department dan jabatan, bukan nama saja: dua orang
+| bernama mirip hanya bisa dibedakan dari keduanya. Pada chip yang sudah
+| terpilih cukup namanya, supaya medannya tidak menjadi dinding teks.
+|--------------------------------------------------------------------------
+*/
+interface ParticipantCandidate {
+  user_id: number
+  name: string
+  department_name: string | null
+  position_name: string | null
+}
+
+const participantCandidates = ref<ParticipantCandidate[]>([])
+
+const participantItems = computed(() =>
+  participantCandidates.value.map(kandidat => ({
+    ...kandidat,
+    title: [
+      kandidat.name,
+      [kandidat.department_name, kandidat.position_name].filter(Boolean).join(' / '),
+    ].filter(Boolean).join(' · '),
+  })))
 
 /** Baris rundown yang belum lengkap: tanggal, jam mulai, dan keterangan wajib. */
 const rowIncomplete = (baris: ItineraryForm): boolean =>
@@ -448,6 +488,10 @@ const fetchOptions = async (): Promise<void> => {
 
     if (Array.isArray(payload?.timezones) && payload.timezones.length)
       timezones.value = payload.timezones
+
+    participantCandidates.value = Array.isArray(payload?.participant_candidates)
+      ? payload.participant_candidates
+      : []
   }
   catch (error: unknown) {
     showErrorToast({
@@ -499,6 +543,7 @@ const save = async (): Promise<void> => {
       return_time: form.return_time,
       purpose: form.purpose.trim(),
       notes: form.notes.trim() || null,
+      participants: form.participants,
 
       itineraries: form.itineraries.map(baris => ({
         date: baris.date,
@@ -511,12 +556,21 @@ const save = async (): Promise<void> => {
 
     closeAlert()
 
-    showSuccessToast({
-      title: t('common.alert.success'),
-      text: t('businessTrip.form.saveSuccess'),
+    /*
+    | Kabarnya dititipkan pada URL, bukan dimunculkan di sini.
+    |
+    | Toast yang lahir tepat sebelum perpindahan halaman tidak sempat
+    | dibaca siapa pun -- ia muncul dan hilang di halaman yang sedang
+    | ditinggalkan. Halaman daftarnya yang memunculkannya, setelah ia
+    | benar-benar terbuka.
+    |
+    | replace, bukan push: formulir yang sudah tersimpan tidak pantas
+    | didatangi lagi lewat tombol kembali.
+    */
+    await router.replace({
+      path: '/business_trip/perdin',
+      query: { success: 'created' },
     })
-
-    goBack()
   }
   catch (error: unknown) {
     closeAlert()
@@ -724,6 +778,44 @@ onMounted(() => {
                 ? [t('businessTrip.form.validation.purpose')]
                 : []"
             />
+          </VCol>
+
+          <VCol cols="12">
+            <!--
+              Peserta lain yang ikut dalam perjalanan ini.
+
+              Ditaruh sesudah keperluan, karena urutan membacanya begitu:
+              ke mana, kapan, untuk apa, lalu bersama siapa.
+
+              Daftarnya dibuka DI BAWAH medannya lewat menu-props, bukan
+              menumpuk di atasnya seperti bawaan Vuetify -- angka yang sama
+              dengan seluruh pilihan lain di aplikasi ini. Medan yang
+              membuka daftarnya dengan cara berbeda membuat orang
+              kehilangan kebiasaannya.
+            -->
+            <VAutocomplete
+              v-model="form.participants"
+              :items="participantItems"
+              item-title="title"
+              item-value="user_id"
+              multiple
+              chips
+              closable-chips
+              clearable
+              density="comfortable"
+              :label="t('businessTrip.form.fields.participants')"
+              :hint="t('businessTrip.form.fields.participantsHint')"
+              persistent-hint
+              :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+            >
+              <template #chip="{ props: chipProps, item }">
+                <VChip
+                  v-bind="chipProps"
+                  size="small"
+                  :text="item.raw.name"
+                />
+              </template>
+            </VAutocomplete>
           </VCol>
 
           <VCol cols="12">

@@ -19,6 +19,8 @@ class ApprovalFlowStep extends Model
         'approval_mode',
         'is_required',
         'approver_scope',
+        'allow_peer_approval',
+        'skip_for_role_ids',
     ];
 
     protected $casts = [
@@ -26,6 +28,8 @@ class ApprovalFlowStep extends Model
         'step_order' => 'integer',
         'approver_id' => 'integer',
         'is_required' => 'boolean',
+        'allow_peer_approval' => 'boolean',
+        'skip_for_role_ids' => 'array',
     ];
 
     /*
@@ -49,6 +53,26 @@ class ApprovalFlowStep extends Model
     public const APPROVER_TYPE_USER = 'USER';
 
     public const APPROVER_TYPE_ROLE = 'ROLE';
+
+    /*
+    | approver_id menunjuk departments.id.
+    |
+    | Step diisi SELURUH akun aktif department itu saat approval dibuat --
+    | dicairkan menjadi baris USER, sama seperti scope cabang. Dengan begitu
+    | tidak ada satu pun pembaca di hilir (persetujuan, notifikasi, cetakan)
+    | yang perlu mengenal tipe baru ini.
+    |
+    | Lahir dari ketentuan BOD: "disetujui akun BOD lain". Daftar berbasis
+    | role tidak bisa menyatakannya -- ada akun BOD yang belum punya role, dan
+    | aturan yang bersandar pada role akan melewatkannya diam-diam.
+    */
+    public const APPROVER_TYPE_DEPARTMENT = 'DEPARTMENT';
+
+    public const APPROVER_TYPES = [
+        self::APPROVER_TYPE_USER,
+        self::APPROVER_TYPE_ROLE,
+        self::APPROVER_TYPE_DEPARTMENT,
+    ];
 
     /*
     |--------------------------------------------------------------------------

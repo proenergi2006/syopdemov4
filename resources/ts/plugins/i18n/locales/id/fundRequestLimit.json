@@ -13,6 +13,7 @@
     "empty": "Belum ada batas pengajuan.",
     "active": "Aktif",
     "inactive": "Nonaktif",
+    "unlimitedChip": "Tanpa batas",
     "fallbackChip": "Umum",
     "editButton": "Ubah",
     "deleteButton": "Hapus",
@@ -42,6 +43,8 @@
     "maxDaysHint": "Hari kalender — Sabtu dan Minggu ikut dihitung.",
     "notes": "Catatan",
     "notesPlaceholder": "Opsional. Misalnya alasan batas ini dibedakan.",
+    "isUnlimited": "Tanpa batas",
+    "isUnlimitedHint": "Batas ini tidak membatasi apa pun: jumlah FPU berjalan dan umur realisasi diabaikan. Dipakai mis. untuk BOD. Kedua angka di atas tetap disimpan dan berlaku lagi begitu penanda ini dimatikan.",
     "isActive": "Aktif",
     "saveSuccess": "Batas pengajuan tersimpan.",
     "saveFailed": "Batas pengajuan gagal disimpan."

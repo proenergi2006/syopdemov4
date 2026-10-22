@@ -24,6 +24,7 @@ class CashAdvanceRealizationItem extends Model
         'cash_advance_item_id',
         'date',
         'description',
+        'transaction_category_id',
         'expense_category_id',
         'qty',
         'unit_price',
@@ -49,6 +50,20 @@ class CashAdvanceRealizationItem extends Model
      * Kosong untuk baris yang keterangan transaksinya bukan perdin --
      * di sana rinciannya memang tidak dikelompokkan.
      */
+    /**
+     * Keterangan transaksi baris ini.
+     *
+     * null berarti IKUT FPU SUMBERNYA, bukan belum diisi. Jangan tertukar
+     * dengan expenseCategory(), yang mengelompokkan biaya perjalanan dinas.
+     */
+    public function transactionCategory()
+    {
+        return $this->belongsTo(
+            \App\Models\FundRequestTransactionCategory::class,
+            'transaction_category_id',
+        );
+    }
+
     public function expenseCategory()
     {
         return $this->belongsTo(

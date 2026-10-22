@@ -39,6 +39,14 @@ class RoleController extends Controller
     $data = $request->validate([
       'kode' => ['required', 'string', 'max:30', 'unique:roles,kode'],
       'nama' => ['required', 'string', 'max:120'],
+
+      /*
+      | Tingkat jabatan: 1 staf sampai 5 direksi. Boleh dikosongkan --
+      | role tanpa tingkat tidak ikut aturan "bawahan tidak menyetujui
+      | atasan", dan itulah yang berlaku sebelum kolom ini ada.
+      */
+      'level' => ['nullable', 'integer', 'between:1,5'],
+
       'is_active' => ['nullable', 'boolean'],
     ]);
 
@@ -57,6 +65,14 @@ class RoleController extends Controller
     $data = $request->validate([
       'kode' => ['required', 'string', 'max:30', Rule::unique('roles', 'kode')->ignore($role->id)],
       'nama' => ['required', 'string', 'max:120'],
+
+      /*
+      | Tingkat jabatan: 1 staf sampai 5 direksi. Boleh dikosongkan --
+      | role tanpa tingkat tidak ikut aturan "bawahan tidak menyetujui
+      | atasan", dan itulah yang berlaku sebelum kolom ini ada.
+      */
+      'level' => ['nullable', 'integer', 'between:1,5'],
+
       'is_active' => ['nullable', 'boolean'],
     ]);
 

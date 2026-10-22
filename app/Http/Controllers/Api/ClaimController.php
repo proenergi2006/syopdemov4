@@ -8,8 +8,12 @@ use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Api\BusinessTripController;
 use App\Http\Controllers\Controller;
+use App\Services\FundRequest\CombinedPrintComposer;
 use App\Services\FundRequest\PrintAttachmentCollector;
 use App\Services\FundRequest\ReceiptReversalService;
+use App\Services\FundRequest\DocumentRevisionService;
+use App\Services\FundRequest\RevisionNotifier;
+use App\Models\FundRequestRevision;
 use App\Models\BusinessTrip;
 use App\Models\Claim;
 use App\Services\FundRequest\AmountRevisionService;
@@ -22,6 +26,7 @@ use App\Services\FundRequest\Claim\ClaimMailService;
 use App\Services\FundRequest\Claim\ClaimNotificationService;
 use App\Services\FundRequest\Claim\ClaimNumberService;
 use App\Services\FundRequest\RupiahWords;
+use App\Services\FundRequest\TransactionCategorySetService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -121,11 +126,11 @@ class ClaimController extends Controller
             $query = Claim::query()
                 ->withCount('attachments')
                 ->with([
-                    'businessTrip:id,trip_number,depart_date,return_date',
+                    'businessTrip:id,trip_number,depart_date,return_date,status',
                     'branchData',
                     'departmentData',
                     'transactionCategory',
-                    'items',
+                    'items.transactionCategory:id,name',
                     'approvals' => function ($approvalQuery) {
                         $approvalQuery
                             ->orderBy('step_order')
@@ -202,15 +207,26 @@ class ClaimController extends Controller
                         && (int) $claim->department_id === (int) $user->departemen_id
                     );
 
+                    /*
+                    | Draft dan dokumen revisian sama-sama bisa diajukan,
+                    | oleh orang yang sama: pembuatnya atau rekan satu
+                    | departmentnya. Mempersempitnya khusus untuk revisi akan
+                    | menahan dokumen saat pemohonnya tidak di tempat.
+                    */
                     $rowCanSubmit = (
                         $canSubmit
-                        && $status === Claim::STATUS_DRAFT
+                        && in_array(
+                            $status,
+                            [Claim::STATUS_DRAFT, Claim::STATUS_NEED_REVISION],
+                            true,
+                        )
                         && ($isCreator || $isSameDepartment)
                     );
 
                     $currentApproval = $claim->approvals->first(
                         fn(ClaimApproval $approval): bool =>
                         strtoupper((string) $approval->status) === ClaimApproval::STATUS_WAITING
+                            && !$approvalService->isRequester($claim, $user)
                             && $approvalService->userCanApprove($approval, $user),
                     );
 
@@ -232,6 +248,9 @@ class ClaimController extends Controller
                         */
                         'business_trip_id' => $claim->business_trip_id,
                         'business_trip_number' => $claim->businessTrip?->trip_number,
+
+                        /* Penentu boleh tidaknya cetakan digabung dengan perdinnya. */
+                        'business_trip_status' => $claim->businessTrip?->status,
                         'transaction_category' => $claim->transactionCategory?->name,
 
                         'branch' => $claim->branchData?->nama_cabang ?? '-',
@@ -271,6 +290,14 @@ class ClaimController extends Controller
                         'approval_label' => $currentApproval?->label,
                         'approval_mode' => $currentApproval?->approval_mode,
 
+                        /*
+                        | Penanda revisi untuk daftar. Inilah satu-satunya
+                        | hal yang memberi tahu approver bahwa yang akan ia
+                        | setujui pernah dikembalikan -- notifikasi bisa
+                        | terlewat, lencana di barisnya tidak.
+                        */
+                        'revision_count' => (int) ($claim->revision_count ?? 0),
+
                         'item_count' => $claim->items->count(),
 
                         'created_at' => $claim->created_at,
@@ -282,7 +309,6 @@ class ClaimController extends Controller
                         'received_at' => $claim->received_at,
                         'scheduled_payment_date' => $claim->scheduled_payment_date,
                         'can_pay_today' => $this->canPayToday(
-                            $claim->scheduled_payment_date,
                             'CLAIM',
                             $claim->transaction_category_id,
                         ),
@@ -372,6 +398,15 @@ class ClaimController extends Controller
                     'exists:fund_request_transaction_categories,id',
                 ],
 
+                /*
+                | Himpunan keterangan transaksi yang boleh dipakai baris
+                | rinciannya. Aturan isinya ada di TransactionCategorySetService
+                | -- layanan yang sama dengan FPU, bukan aturan yang ditulis
+                | ulang.
+                */
+                'transaction_category_ids' => ['nullable', 'array'],
+                'transaction_category_ids.*' => ['integer'],
+
                 'branch' => ['required'],
                 'department_id' => ['required', 'integer'],
                 'notes' => ['nullable', 'string', 'max:2000'],
@@ -393,7 +428,32 @@ class ClaimController extends Controller
                 $request->input('department_id'),
             );
 
+            /*
+            | Himpunan keterangan transaksi headernya.
+            |
+            | Claim tidak punya sifat pengajuan, jadi tidak ada aturan "Non
+            | Rutin hanya boleh satu" -- himpunannya boleh berisi berapa pun.
+            | Pengirim yang belum mengenalnya jatuh ke penentu tunggalnya,
+            | sehingga Claim tetap bisa dibuat seperti sebelumnya.
+            */
+            $himpunanKategori = $this->layananHimpunanKategori()->normalize(
+                $request->filled('transaction_category_ids')
+                    ? (array) $request->input('transaction_category_ids')
+                    : [(int) $request->input('transaction_category_id')],
+                null,
+            );
+
             $items = $this->decodeItems($request->input('items'));
+
+            /*
+            | Tiap baris hanya boleh memakai keterangan transaksi dari himpunan
+            | headernya, dan tiap anggota himpunan wajib punya minimal satu
+            | baris. Keduanya dijaga layanan yang sama dengan FPU.
+            */
+            $items = $this->layananHimpunanKategori()->applyToItems(
+                $items,
+                $himpunanKategori,
+            );
 
             /*
             | Perdinnya ditentukan sebelum apa pun disimpan. Kiriman yang
@@ -437,10 +497,13 @@ class ClaimController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'transaction_category_id' => $item['transaction_category_id'] ?? null,
                 ]);
 
                 $itemIdsByIndex[(int) $index] = (int) $row->id;
             }
+
+            $this->simpanHimpunanKategori($claim, $himpunanKategori);
 
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, []);
 
@@ -524,7 +587,7 @@ class ClaimController extends Controller
                 'branchData',
                 'departmentData',
                 'transactionCategory',
-                'items',
+                'items.transactionCategory:id,name',
                 'attachments',
                 'creator:id,name',
                 'submitter:id,name',
@@ -541,7 +604,8 @@ class ClaimController extends Controller
             $currentApproval = $claim->approvals->first(
                 fn(ClaimApproval $approval): bool =>
                 strtoupper((string) $approval->status) === ClaimApproval::STATUS_WAITING
-                    && $approvalService->userCanApprove($approval, $user),
+                    && !$approvalService->isRequester($claim, $user)
+                            && $approvalService->userCanApprove($approval, $user),
             );
 
             return response()->json([
@@ -592,7 +656,11 @@ class ClaimController extends Controller
                 ], 404);
             }
 
-            $claim->load(['items', 'attachments', 'businessTrip']);
+            $claim->load([
+                'items.transactionCategory:id,name',
+                'attachments',
+                'businessTrip',
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -604,6 +672,14 @@ class ClaimController extends Controller
                     'date' => optional($claim->date)->toDateString(),
                     'subject' => $claim->subject,
                     'transaction_category_id' => $claim->transaction_category_id,
+
+                    /*
+                    | Himpunan keterangan transaksinya. Tanpa ini, menyunting Claim
+                    | lalu menyimpannya kembali akan menyusutkan himpunannya menjadi
+                    | satu -- dan baris yang memakai keterangan lain mendadak berada
+                    | di luar himpunan headernya sendiri.
+                    */
+                    'transaction_category_ids' => $this->layananHimpunanKategori()->idsFor($claim),
 
                     /*
                     | Perjalanan dinas yang ditagihkan Claim ini, bila ada.
@@ -628,6 +704,19 @@ class ClaimController extends Controller
                     'amount_revision_notes' => $claim->amount_revision_notes,
                     'notes' => $claim->notes,
                     'status' => $claim->status,
+
+                    /*
+                    | Alasan pengembalian, bila dokumennya sedang butuh revisi.
+                    |
+                    | Dibaca pemohon di atas formnya, tepat saat ia hendak
+                    | memperbaikinya. Null untuk dokumen lain -- termasuk yang
+                    | pernah direvisi lalu sudah diajukan ulang: yang sudah
+                    | selesai tidak perlu lagi diminta mengerjakannya.
+                    */
+                    'revision_count' => (int) ($claim->revision_count ?? 0),
+                    'revision_open' => ($terbukaEdit = $claim->openRevision())
+                        ? app(DocumentRevisionService::class)->sajikan($terbukaEdit)
+                        : null,
                     'items' => $this->transformItems($claim),
                     'attachments' => $this->transformAttachments($claim),
                 ],
@@ -679,12 +768,28 @@ class ClaimController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
-            if (strtoupper((string) $claim->status) !== Claim::STATUS_DRAFT) {
+            /*
+            | Draft, dan dokumen yang sedang butuh revisi.
+            |
+            | Keduanya sama-sama berada di tangan pemohon dan tidak sedang
+            | menunggu keputusan siapa pun -- itulah yang membuat keduanya
+            | boleh disunting. Statusnya sendiri yang menjaga sisanya.
+            */
+            $statusSaatIni = strtoupper((string) $claim->status);
+            $sedangDirevisi = $statusSaatIni === Claim::STATUS_NEED_REVISION;
+
+            if (
+                !in_array(
+                    $statusSaatIni,
+                    [Claim::STATUS_DRAFT, Claim::STATUS_NEED_REVISION],
+                    true,
+                )
+            ) {
                 DB::rollBack();
 
                 return response()->json([
                     'success' => false,
-                    'message' => __('claim_messages.update.only_draft'),
+                    'message' => __('fund_request_messages.return_for_revision.editable_only'),
                 ], 422);
             }
 
@@ -701,6 +806,15 @@ class ClaimController extends Controller
                     'integer',
                     'exists:fund_request_transaction_categories,id',
                 ],
+
+                /*
+                | Himpunan keterangan transaksi yang boleh dipakai baris
+                | rinciannya. Aturan isinya ada di TransactionCategorySetService
+                | -- layanan yang sama dengan FPU, bukan aturan yang ditulis
+                | ulang.
+                */
+                'transaction_category_ids' => ['nullable', 'array'],
+                'transaction_category_ids.*' => ['integer'],
 
                 'branch' => ['required'],
                 'department_id' => ['required', 'integer'],
@@ -724,7 +838,32 @@ class ClaimController extends Controller
                 $request->input('department_id'),
             );
 
+            /*
+            | Himpunan keterangan transaksi headernya.
+            |
+            | Claim tidak punya sifat pengajuan, jadi tidak ada aturan "Non
+            | Rutin hanya boleh satu" -- himpunannya boleh berisi berapa pun.
+            | Pengirim yang belum mengenalnya jatuh ke penentu tunggalnya,
+            | sehingga Claim tetap bisa dibuat seperti sebelumnya.
+            */
+            $himpunanKategori = $this->layananHimpunanKategori()->normalize(
+                $request->filled('transaction_category_ids')
+                    ? (array) $request->input('transaction_category_ids')
+                    : [(int) $request->input('transaction_category_id')],
+                null,
+            );
+
             $items = $this->decodeItems($request->input('items'));
+
+            /*
+            | Tiap baris hanya boleh memakai keterangan transaksi dari himpunan
+            | headernya, dan tiap anggota himpunan wajib punya minimal satu
+            | baris. Keduanya dijaga layanan yang sama dengan FPU.
+            */
+            $items = $this->layananHimpunanKategori()->applyToItems(
+                $items,
+                $himpunanKategori,
+            );
 
             /*
             | Claim ini sendiri dikecualikan dari penyaring "sudah terpakai".
@@ -768,6 +907,8 @@ class ClaimController extends Controller
 
             $deletedIds = $this->requestedDeletedAttachmentIds($request);
 
+            $this->simpanHimpunanKategori($claim, $himpunanKategori);
+
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, $deletedIds);
 
             $this->deleteRequestedAttachments($request, $claim);
@@ -778,7 +919,31 @@ class ClaimController extends Controller
                 $itemIdsByIndex,
             );
 
+            /*
+            | Revisinya ditandai sudah mulai dikerjakan -- sekali saja, pada
+            | penyimpanan pertama. Approver yang mengembalikannya dikabari di
+            | situ, supaya ia tahu dokumennya sedang ditangani.
+            */
+            $revisiBerjalan = null;
+
+            if ($sedangDirevisi) {
+                if (app(DocumentRevisionService::class)->tandaiDirevisi($claim)) {
+                    $revisiBerjalan = $claim->openRevision();
+                }
+            }
+
             DB::commit();
+
+            if ($revisiBerjalan) {
+                try {
+                    app(RevisionNotifier::class)->sedangDirevisi($claim, $revisiBerjalan);
+                } catch (\Throwable $notifyError) {
+                    Log::error('[Claim] Notifikasi revisi dikerjakan gagal', [
+                        'claim_id' => $claim->id,
+                        'message' => $notifyError->getMessage(),
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -915,12 +1080,28 @@ class ClaimController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
-            if (strtoupper((string) $claim->status) !== Claim::STATUS_DRAFT) {
+            /*
+            | Draft, dan dokumen revisian yang sudah diperbaiki.
+            |
+            | Keduanya masuk lewat pintu yang sama karena yang terjadi
+            | setelahnya memang sama persis: rantai approval dibuat,
+            | statusnya menjadi berjalan, approver tahap pertama dikabari.
+            */
+            $statusSaatIni = strtoupper((string) $claim->status);
+            $pengajuanUlang = $statusSaatIni === Claim::STATUS_NEED_REVISION;
+
+            if (
+                !in_array(
+                    $statusSaatIni,
+                    [Claim::STATUS_DRAFT, Claim::STATUS_NEED_REVISION],
+                    true,
+                )
+            ) {
                 DB::rollBack();
 
                 return response()->json([
                     'success' => false,
-                    'message' => __('claim_messages.submit.only_draft'),
+                    'message' => __('fund_request_messages.return_for_revision.submittable_only'),
                 ], 422);
             }
 
@@ -956,9 +1137,26 @@ class ClaimController extends Controller
 
             $submittedAt = now();
 
+            /*
+            | Revisinya ditutup: potret sesudahnya, daftar perubahannya, dan
+            | siapa yang mengajukan ulang, sekaligus. Dipanggil setelah
+            | rinciannya final dan sebelum statusnya berpindah.
+            */
+            $revisiDitutup = $pengajuanUlang
+                ? app(DocumentRevisionService::class)->tutup($claim, $user)
+                : null;
+
             $claim->status = Claim::STATUS_IN_PROGRESS;
             $claim->submitted_by = $user->id;
-            $claim->submitted_at = $submittedAt;
+
+            /*
+            | Tanggal pengajuan pertamanya dipertahankan: umur dokumen
+            | dihitung sejak ia masuk antrean, dan revisi tidak membuatnya
+            | muda kembali. Kapan diajukan ulang tercatat di riwayat revisinya.
+            */
+            if (!$pengajuanUlang || $claim->submitted_at === null) {
+                $claim->submitted_at = $submittedAt;
+            }
 
             $claim->requester_signed_by = $user->id;
             $claim->requester_signature_path = $requesterSignaturePath;
@@ -971,7 +1169,21 @@ class ClaimController extends Controller
             $claim->refresh();
 
             try {
-                $notificationService->notifyApprovalRequest($claim);
+                /*
+                | Dokumen revisian dikabarkan dengan kalimatnya sendiri:
+                | approver yang menerima permintaan biasa akan membacanya
+                | sebagai dokumen baru, lalu menyetujui perubahan yang justru
+                | menjadi sebab pengembaliannya tanpa melihatnya.
+                */
+                if ($revisiDitutup) {
+                    app(RevisionNotifier::class)->diajukanUlang(
+                        $claim,
+                        $revisiDitutup,
+                        fn($approval) => $notificationService->resolveApproverUsers($approval),
+                    );
+                } else {
+                    $notificationService->notifyApprovalRequest($claim);
+                }
             } catch (\Throwable $notificationError) {
                 Log::error('[Claim] Notifikasi approver gagal dibuat', [
                     'claim_id' => $claim->id,
@@ -1737,7 +1949,6 @@ class ClaimController extends Controller
 
                     /* Pembayaran hanya boleh jatuh pada hari pembayaran. */
                     if (!$this->canPayToday(
-                        $terkunci->scheduled_payment_date,
                         'CLAIM',
                         $terkunci->transaction_category_id,
                     )) {
@@ -1890,7 +2101,6 @@ class ClaimController extends Controller
             | boleh, tetapi tetap harus jatuh pada hari kerja kasirnya.
             */
             if (!$this->canPayToday(
-                $claim->scheduled_payment_date,
                 'CLAIM',
                 $claim->transaction_category_id,
             )) {
@@ -1963,6 +2173,173 @@ class ClaimController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => __('claim_messages.pay.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Kembalikan Claim ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | DUA PINTU, DAN STATUSNYA YANG MEMILIH.
+    |
+    |  - IN PROGRESS : approver yang sedang memegang dokumennya. Penjaganya
+    |                  sama dengan tombol Setujui -- getUserCurrentApproval
+    |                  sekaligus menolak pemohon atas dokumennya sendiri.
+    |
+    |  - RECEIVED    : Finance yang berkasnya baru diterima. Penerimaannya
+    |                  ikut ditarik dan tanggal pembayarannya dibatalkan,
+    |                  jadi penjaganya izin claim.unreceive.
+    |
+    | Yang sudah dibayarkan tidak lewat pintu mana pun: uang penggantinya
+    | sudah di tangan pemohon, dan tidak ada yang bisa direvisi lagi.
+    |--------------------------------------------------------------------------
+    */
+    public function returnForRevision(
+        string $publicId,
+        Request $request,
+        ClaimApprovalService $approvalService,
+        ClaimMailService $mailService,
+        DocumentRevisionService $revisionService,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], [
+            'reason' => __('fund_request_messages.return_for_revision.reason_label'),
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('claim_messages.user_not_authenticated'),
+                ], 401);
+            }
+
+            $id = Crypt::decryptString($publicId);
+
+            $claim = Claim::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            $status = strtoupper((string) $claim->status);
+
+            if ($status === Claim::STATUS_IN_PROGRESS) {
+                $approval = $approvalService->getUserCurrentApproval($claim, $user, true);
+
+                if (!$approval) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => __('fund_request_messages.return_for_revision.not_active_approver'),
+                    ], 403);
+                }
+
+                $hasil = $revisionService->kembalikan(
+                    document: $claim,
+                    user: $user,
+                    reason: $validated['reason'],
+                    permission: null,
+                    from: FundRequestRevision::FROM_APPROVAL,
+                    stepOrder: (int) $approval->step_order,
+                    stepLabel: $approval->label,
+                );
+            } elseif ($status === Claim::STATUS_RECEIVED) {
+                $hasil = $revisionService->kembalikan(
+                    document: $claim,
+                    user: $user,
+                    reason: $validated['reason'],
+                    permission: 'claim.unreceive',
+                    from: FundRequestRevision::FROM_RECEIPT,
+                    approvedStatus: Claim::STATUS_APPROVED,
+                );
+            } else {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('fund_request_messages.return_for_revision.only_in_progress'),
+                ], 422);
+            }
+
+            if (!$hasil['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($hasil['message_key'], $hasil['message_replace']),
+                ], $hasil['status']);
+            }
+
+            DB::commit();
+
+            $revisi = $hasil['revision'];
+
+            $claim->refresh();
+
+            try {
+                app(RevisionNotifier::class)->dikembalikan($claim, $revisi);
+
+                $mailService->sendReturnedForRevision(
+                    $claim,
+                    $user,
+                    $validated['reason'],
+                    (int) $revisi->revision_number,
+                );
+            } catch (\Throwable $notifyError) {
+                Log::error('[Claim] Notifikasi pengembalian gagal', [
+                    'claim_id' => $claim->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $hasil['scheduled_date']
+                    ? __('fund_request_messages.return_for_revision.success_with_schedule', [
+                        'date' => $hasil['scheduled_date'],
+                    ])
+                    : __('fund_request_messages.return_for_revision.success'),
+                'data' => [
+                    'id' => $claim->id,
+                    'public_id' => $claim->encrypted_id,
+                    'claim_number' => $claim->claim_number,
+                    'status' => $claim->status,
+                    'revision_count' => (int) $claim->revision_count,
+                    'revision_number' => (int) $revisi->revision_number,
+                ],
+            ], 200);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? __('fund_request_messages.return_for_revision.failed'),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[Claim] Kembalikan untuk revisi error', [
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.return_for_revision.failed'),
                 'debug' => app()->environment('local') ? $e->getMessage() : null,
             ], 500);
         }
@@ -2128,10 +2505,13 @@ class ClaimController extends Controller
 
             $query = Claim::query()
                 ->with([
-                    'items',
+                    'items.transactionCategory:id,name',
                     'branchData',
                     'departmentData',
                     'transactionCategory',
+
+                    /* Himpunannya, supaya labelnya tidak menagih satu kueri per baris. */
+                    'transactionCategories',
                     'creator',
 
                 ]);
@@ -2202,14 +2582,28 @@ class ClaimController extends Controller
             | diberikan -- dan yang diubah di sini menentukan berkas siapa
             | saja yang ikut tercetak.
             */
-            $denganLampiran = $request->boolean('with_attachments');
+            /*
+            | Seluruh pilihan cetak ikut ke dalam tanda tangan URL-nya.
+            |
+            | Semula hanya lampirannya yang ikut, sehingga pilihan gabung
+            | perdin sampai ke sini lalu hilang -- layarnya mengirim, server
+            | menerimanya, dan URL yang dibentuk tidak membawanya. Cetakannya
+            | keluar tanpa perdin tanpa ada yang bersuara.
+            */
+            $pilihan = ['publicId' => $publicId];
+
+            if ($request->boolean('with_attachments')) {
+                $pilihan['with_attachments'] = 1;
+            }
+
+            if ($request->boolean('with_business_trip')) {
+                $pilihan['with_business_trip'] = 1;
+            }
 
             $relativeUrl = URL::temporarySignedRoute(
                 'fund-request.claim.print-signed',
                 now()->addMinutes(10),
-                $denganLampiran
-                    ? ['publicId' => $publicId, 'with_attachments' => 1]
-                    : ['publicId' => $publicId],
+                $pilihan,
                 false,
             );
 
@@ -2254,7 +2648,7 @@ class ClaimController extends Controller
                 'branchData:id,nama_cabang,inisial_cabang',
                 'departmentData:id,kode,nama',
                 'transactionCategory:id,code,name',
-                'items',
+                'items.transactionCategory:id,name',
                 'creator:id,name',
                 'submitter:id,name',
                 'receiver:id,name',
@@ -2312,6 +2706,66 @@ class ClaimController extends Controller
                     ->paginate($terpilah['images']);
 
                 $attachmentOthers = $terpilah['others'];
+            }
+
+            /*
+            | Cetakan gabungan dengan perjalanan dinasnya.
+            |
+            | Disisipkan di sini, setelah seluruh data tampilannya tersusun:
+            | yang perlu ditambahkan hanya data perdinnya, dan susunan
+            | halamannya pun sudah benar -- dokumen ini di atas, perdin
+            | menyusul.
+            |
+            | Syaratnya ditegakkan di sini, bukan di layar. URL cetak
+            | bertanda tangan membawa parameternya secara terbuka, dan
+            | parameter yang hanya dijaga layar bukan dijaga sama sekali.
+            */
+            if ($request->boolean('with_business_trip')) {
+                $penyusun = app(CombinedPrintComposer::class);
+
+                $penahan = $penyusun->tripBlocker($claim);
+
+                if ($penahan) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $penahan,
+                    ], 422);
+                }
+
+                $trip = $penyusun->tripFor($claim);
+
+                $lampiranTrip = $request->boolean('with_attachments')
+                    ? $penyusun->tripAttachments($trip)
+                    : ['pages' => [], 'others' => []];
+
+                $pdf = Pdf::loadView('pdf.combined', array_merge(
+                    app(BusinessTripController::class)->tripViewData($trip),
+                    [
+                        'judul' => $claim->claim_number . ' + ' . $trip->trip_number,
+                        'gayaDokumen' => 'claim-styles',
+                        'badanDokumen' => 'claim-body',
+                        'claim' => $claim,
+                        'totalAmount' => $totalAmount,
+                        'terbilang' => RupiahWords::of($totalAmount),
+                        'requester' => $this->buildRequesterSigner($claim),
+                        'approvers' => $this->buildApproverSigners($claim),
+
+                        'attachmentPages' => $attachmentPages,
+                        'attachmentOthers' => $attachmentOthers,
+
+                        /* Lampiran perdinnya, dipisah dari lampiran dokumen ini. */
+                        'tripAttachmentPages' => $lampiranTrip['pages'],
+                        'tripAttachmentOthers' => $lampiranTrip['others'],
+                    ],
+                ))->setPaper('a4', 'portrait');
+
+                return $this->pdfResponse(
+                    $pdf->output(),
+                    'CLAIM-' . $this->safeFileName(
+                        (string) $claim->claim_number . '-' . $trip->trip_number,
+                        (string) $claim->id,
+                    ),
+                );
             }
 
             $pdf = Pdf::loadView('pdf.claim', [
@@ -2815,6 +3269,41 @@ class ClaimController extends Controller
     | membawa lampiran sekaligus.
     |--------------------------------------------------------------------------
     */
+    /**
+     * Layanan himpunan keterangan transaksi, berkelompok kalimat Claim.
+     *
+     * Kelompok kalimatnya dioper, bukan dibiarkan memakai bawaannya: kalimat
+     * penolakan yang menyebut FPU akan menyuruh yang ditolak mencari isiannya
+     * di layar yang tidak sedang ia buka.
+     */
+    /**
+     * Menyimpan himpunan keterangan transaksinya, berikut penentunya.
+     *
+     * Penentunya dipastikan selalu anggota himpunannya: penentu yang berada di
+     * luar himpunan akan memilih jadwal pembayaran yang tidak ada kaitannya
+     * dengan isi dokumennya.
+     *
+     * @param  int[]  $categoryIds  hasil normalize(), sudah terurut masternya
+     */
+    private function simpanHimpunanKategori(Claim $claim, array $categoryIds): void
+    {
+        $layanan = $this->layananHimpunanKategori();
+
+        $layanan->sync($claim, $categoryIds);
+
+        $penentu = $layanan->primary($categoryIds);
+
+        if ($penentu !== null && (int) $claim->transaction_category_id !== $penentu) {
+            $claim->forceFill(['transaction_category_id' => $penentu])->save();
+        }
+    }
+
+    private function layananHimpunanKategori(): TransactionCategorySetService
+    {
+        return app(TransactionCategorySetService::class)
+            ->usingMessages('claim_messages.transaction_category_set');
+    }
+
     private function decodeItems(mixed $rawItems): array
     {
         $items = json_decode((string) $rawItems, true);
@@ -2875,6 +3364,13 @@ class ClaimController extends Controller
                 'date' => $date !== '' ? $date : null,
                 'description' => $description,
                 'amount' => round($amount, 2),
+
+                /*
+                | Keterangan transaksi barisnya, dibawa apa adanya. Yang
+                | memeriksa keanggotaannya pada himpunan header adalah
+                | TransactionCategorySetService.
+                */
+                'transaction_category_id' => $item['transaction_category_id'] ?? null,
             ];
         }
 
@@ -2918,6 +3414,7 @@ class ClaimController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'transaction_category_id' => $item['transaction_category_id'] ?? null,
                 ]);
             } else {
                 $row = ClaimItem::create([
@@ -2925,6 +3422,7 @@ class ClaimController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'transaction_category_id' => $item['transaction_category_id'] ?? null,
                 ]);
             }
 
@@ -3365,6 +3863,22 @@ class ClaimController extends Controller
             'business_trip_number' => $claim->businessTrip?->trip_number,
             'transaction_category' => $claim->transactionCategory?->name,
 
+            /*
+            | Himpunannya berikut nama -- modal detail menampilkan nama, bukan
+            | id. Dikirim walau berisi satu: yang membacanya tidak perlu tahu
+            | kapan himpunan itu lebih panjang.
+            */
+            'transaction_categories' => $claim->transactionCategories()
+                ->orderBy('sort_order')
+                ->orderBy('fund_request_transaction_categories.id')
+                ->get(['fund_request_transaction_categories.id', 'name'])
+                ->map(fn ($satu): array => [
+                    'id' => (int) $satu->id,
+                    'name' => (string) $satu->name,
+                ])
+                ->values()
+                ->all(),
+
             'branch' => $claim->branchData?->nama_cabang ?? '-',
             'branch_id' => $claim->branch,
 
@@ -3392,6 +3906,18 @@ class ClaimController extends Controller
                 : null,
             'approval_label' => $currentApproval?->label,
 
+            /*
+            | Riwayat revisinya, terbaru lebih dulu; revision_open hanya
+            | terisi selama dokumennya masih di tangan pemohon. Dipisahkan
+            | supaya layarnya tidak perlu menebak mana di antara riwayatnya
+            | yang masih berlaku.
+            */
+            'revision_count' => (int) ($claim->revision_count ?? 0),
+            'revisions' => app(DocumentRevisionService::class)->riwayat($claim),
+            'revision_open' => ($terbuka = $claim->openRevision())
+                ? app(DocumentRevisionService::class)->sajikan($terbuka)
+                : null,
+
             'created_at' => $claim->created_at,
             'created_by' => $claim->created_by,
             'created_by_name' => $claim->creator?->name,
@@ -3414,7 +3940,6 @@ class ClaimController extends Controller
             'received_at' => $claim->received_at,
             'scheduled_payment_date' => $claim->scheduled_payment_date,
             'can_pay_today' => $this->canPayToday(
-                $claim->scheduled_payment_date,
                 'CLAIM',
                 $claim->transaction_category_id,
             ),
@@ -3482,6 +4007,15 @@ class ClaimController extends Controller
                 'date' => optional($item->date)->toDateString(),
                 'description' => $item->description,
                 'amount' => (float) $item->amount,
+
+                /*
+                | Keterangan transaksi barisnya. null berarti baris lama yang
+                | ikut headernya, bukan belum diisi.
+                */
+                'transaction_category_id' => $item->transaction_category_id,
+                'transaction_category_name' => $item->relationLoaded('transactionCategory')
+                    ? optional($item->transactionCategory)->name
+                    : null,
 
                 /*
                 | Nominal yang diajukan pemohon, terisi hanya bila Finance
