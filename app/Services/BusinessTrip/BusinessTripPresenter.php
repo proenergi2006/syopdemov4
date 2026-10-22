@@ -6,6 +6,7 @@ use App\Models\BusinessTrip;
 use App\Models\BusinessTripApproval;
 use App\Models\BusinessTripArrangement;
 use App\Models\BusinessTripItinerary;
+use App\Models\BusinessTripParticipant;
 use Illuminate\Support\Facades\Crypt;
 
 /**
@@ -49,6 +50,29 @@ class BusinessTripPresenter
             'rejection_notes' => $trip->rejection_notes,
             'cancellation_notes' => $trip->cancellation_notes,
 
+            /*
+            | Revisi.
+            |
+            | revision_count dibawa pada setiap baris karena inilah satu-
+            | satunya hal yang memberi tahu approver bahwa yang akan ia
+            | setujui pernah dikembalikan -- notifikasi bisa terlewat,
+            | lencana di barisnya tidak.
+            |
+            | Riwayat lengkapnya hanya disusun bila dokumennya PERNAH
+            | direvisi: daftar perdin memuat puluhan baris sekaligus, dan
+            | menanyakan riwayat yang hampir selalu kosong pada setiap baris
+            | hanya menambah puluhan kueri tanpa menambah satu pun keterangan.
+            */
+            'revision_count' => (int) ($trip->revision_count ?? 0),
+            'revisions' => (int) ($trip->revision_count ?? 0) > 0
+                ? app(\App\Services\FundRequest\DocumentRevisionService::class)->riwayat($trip)
+                : [],
+            'revision_open' => ($terbuka = (int) ($trip->revision_count ?? 0) > 0
+                ? $trip->openRevision()
+                : null)
+                ? app(\App\Services\FundRequest\DocumentRevisionService::class)->sajikan($terbuka)
+                : null,
+
             'employee_name' => $trip->employee_name,
             'department_id' => $trip->department_id,
             'department_name' => $trip->department_name,
@@ -65,6 +89,29 @@ class BusinessTripPresenter
 
             'purpose' => $trip->purpose,
             'notes' => $trip->notes,
+
+            /*
+            | Peserta lain yang ikut.
+            |
+            | Dibaca dari salinan identitas pada barisnya, bukan dari akunnya
+            | sekarang: dokumen yang sudah disetujui harus tetap berbunyi
+            | seperti saat ia ditandatangani, walau orangnya sudah berpindah
+            | department atau berganti jabatan.
+            |
+            | user_id ikut dikirim supaya form edit bisa memilih ulang
+            | orang-orang yang sama tanpa menebak dari namanya.
+            */
+            'participants' => $trip->relationLoaded('participants')
+                ? $trip->participants
+                    ->map(fn (BusinessTripParticipant $p): array => [
+                        'user_id' => $p->user_id,
+                        'name' => $p->employee_name,
+                        'department_name' => $p->department_name,
+                        'position_name' => $p->position_name,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
 
             'itineraries' => $trip->itineraries
                 ->map(fn (BusinessTripItinerary $b): array => [

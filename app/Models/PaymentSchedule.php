@@ -47,6 +47,43 @@ class PaymentSchedule extends Model
      */
     public const DOCUMENT_TYPES = ['FPU', 'REALISASI', 'CLAIM'];
 
+    /*
+    |----------------------------------------------------------------------
+    | Modul mana memakai daftar keterangan transaksi milik siapa
+    |----------------------------------------------------------------------
+    | Master keterangan transaksi menampung dua daftar pada satu tabel,
+    | dipisah kolom document_type-nya: 'ADVANCE' untuk FPU, 'CLAIM' untuk
+    | Claim.
+    |
+    | Realisasi TIDAK punya daftar sendiri -- keterangan transaksinya
+    | disalin dari FPU yang direalisasikan, jadi yang boleh ditunjuk di
+    | sini pun daftar FPU. Memberinya daftar sendiri berarti menjanjikan
+    | cakupan yang tidak akan pernah cocok dengan dokumen mana pun.
+    |----------------------------------------------------------------------
+    */
+    /*
+    | Petanya tinggal di FundRequestTransactionCategory -- pemilik daftarnya
+    | -- karena master approval flow menanyakan hal yang sama persis.
+    | Tetap dipajang di sini supaya yang sudah membacanya tidak perlu tahu
+    | ia pindah.
+    */
+    public const KATEGORI_MODUL = FundRequestTransactionCategory::DOCUMENT_TYPE_BY_MODULE;
+
+    /**
+     * Daftar keterangan transaksi milik siapa yang boleh dipakai modul ini.
+     *
+     * null untuk jadwal tanpa modul: cakupannya seluruh modul, dan tidak
+     * ada satu daftar pun yang bisa mewakili semuanya.
+     */
+    public static function kategoriModul(?string $documentType): ?string
+    {
+        if ($documentType === null) {
+            return null;
+        }
+
+        return FundRequestTransactionCategory::documentTypeForModule($documentType);
+    }
+
     /**
      * @return array<string, string>
      */

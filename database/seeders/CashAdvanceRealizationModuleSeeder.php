@@ -93,6 +93,20 @@ class CashAdvanceRealizationModuleSeeder extends Seeder
             ['unreceive', 'Undo Receive Realisasi FPU', 'Membatalkan penerimaan berkas Realisasi FPU sehingga dokumennya kembali ke status disetujui. Tanggal pembayaran yang sudah dijanjikan ikut dibatalkan.', false],
 
             /*
+            | Pemeriksaan sebelum kekurangannya dibayarkan.
+            |
+            | Realisasi yang nilainya melebihi FPU-nya dikerjakan dua orang:
+            | yang pertama memeriksa berkasnya, yang kedua membayarkan.
+            | Izinnya dipisah supaya kedua meja itu bisa diberikan kepada
+            | orang yang berbeda -- walau pada awalnya diberikan kepada
+            | pemegang receive yang sudah ada.
+            |
+            | Tanpa scope, sama seperti receive: PIC-nya melayani seluruh
+            | cabang.
+            */
+            ['verify', 'Verify Realisasi FPU', 'Memeriksa Realisasi FPU yang kekurangannya perlu dibayarkan, lalu meneruskannya ke pemegang izin pembayaran.', false],
+
+            /*
             | Penyelesaian selisih dipecah dua, mengikuti arah uangnya:
             |
             | - return    : pemohon mengembalikan sisa dana ke Finance.
@@ -134,6 +148,55 @@ class CashAdvanceRealizationModuleSeeder extends Seeder
                 ->update(['created_at' => $now]);
         }
 
+        /*
+        | Izin .verify diberikan kepada pemegang .receive yang sudah ada.
+        |
+        | SEKALI SAJA, lewat insertOrIgnore. Peran yang sudah pernah menerima
+        | -- atau sudah sengaja dicabut -- tidak ikut diubah lagi; penyalinan
+        | yang berulang akan mengembalikan pencabutan itu diam-diam setiap
+        | seeder dijalankan.
+        |
+        | Tujuannya hanya supaya alurnya langsung berjalan tanpa ada yang
+        | perlu diatur dulu. Pemisahan kedua meja itu tetap bisa dilakukan
+        | kapan saja lewat matriks izin.
+        */
+        $idVerify = DB::table('permissions')
+            ->where('code', self::MODULE_CODE . '.verify')
+            ->value('id');
+
+        $idReceive = DB::table('permissions')
+            ->where('code', self::MODULE_CODE . '.receive')
+            ->value('id');
+
+        if ($idVerify && $idReceive) {
+            /*
+            | Hanya pemegang yang AKTIF.
+            |
+            | Pencabutan izin di sini tersimpan sebagai is_active = false,
+            | bukan sebagai baris yang hilang. Tanpa saringan ini, peran yang
+            | izin menerimanya sudah dicabut pun ikut tersalin -- dan karena
+            | kolom is_active memakai nilai bawaannya, salinannya justru
+            | terpasang HIDUP. Peran yang tidak boleh menerima berkas akhirnya
+            | boleh meneruskan pembayaran.
+            */
+            $peran = DB::table('role_permissions')
+                ->where('permission_id', $idReceive)
+                ->where('is_active', true)
+                ->pluck('role_id');
+
+            foreach ($peran as $roleId) {
+                DB::table('role_permissions')->insertOrIgnore([
+                    'role_id' => $roleId,
+                    'permission_id' => $idVerify,
+
+                    /* Disebut terang-terangan, bukan diserahkan ke nilai bawaan. */
+                    'is_active' => true,
+
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+        }
         /*
         | Permission lama 'settle' dinonaktifkan, bukan dihapus.
         |

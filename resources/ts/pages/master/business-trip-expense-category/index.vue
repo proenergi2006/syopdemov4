@@ -29,6 +29,7 @@ interface CategoryRow {
   name: string
   description: string | null
   sort_order: number
+  ga_arrangeable: boolean
   is_active: boolean
 
   /*
@@ -135,6 +136,7 @@ const form = reactive({
   name: '',
   description: '',
   sort_order: 0,
+  ga_arrangeable: false,
   is_active: true,
 })
 
@@ -156,6 +158,13 @@ const openCreate = (): void => {
     ? Math.max(...rows.value.map(row => row.sort_order)) + 10
     : 10
 
+  /*
+  | Kategori baru diisi pemohon, kecuali memang disebut sebagai urusan GA.
+  | Bawaan sebaliknya akan menawarkan penanda GA pada kategori yang belum
+  | tentu diurus siapa pun.
+  */
+  form.ga_arrangeable = false
+
   form.is_active = true
 
   formError.value = ''
@@ -168,6 +177,7 @@ const openEdit = (row: CategoryRow): void => {
   form.name = row.name
   form.description = row.description || ''
   form.sort_order = row.sort_order
+  form.ga_arrangeable = row.ga_arrangeable
   form.is_active = row.is_active
 
   formError.value = ''
@@ -189,6 +199,7 @@ const submitForm = async (): Promise<void> => {
       name: form.name.trim(),
       description: form.description.trim() || null,
       sort_order: Number(form.sort_order) || 0,
+      ga_arrangeable: form.ga_arrangeable,
       is_active: form.is_active,
     }
 
@@ -357,6 +368,16 @@ onMounted(() => fetchRows())
             </th>
             <th>{{ t('businessTripExpenseCategory.columns.name') }}</th>
             <th>{{ t('businessTripExpenseCategory.columns.description') }}</th>
+
+            <!--
+              Yang membuka master ini sering datang justru untuk menjawab
+              "GA mengurus apa saja". Jawabannya diberi kolom sendiri,
+              bukan diselipkan ke keterangan.
+            -->
+            <th style="inline-size: 150px;">
+              {{ t('businessTripExpenseCategory.columns.gaArrangeable') }}
+            </th>
+
             <th style="inline-size: 120px;">
               {{ t('businessTripExpenseCategory.columns.status') }}
             </th>
@@ -372,7 +393,7 @@ onMounted(() => fetchRows())
         <tbody>
           <tr v-if="loading">
             <td
-              colspan="5"
+              colspan="6"
               class="text-center py-6"
             >
               <VProgressCircular
@@ -384,7 +405,7 @@ onMounted(() => fetchRows())
 
           <tr v-else-if="!rows.length">
             <td
-              colspan="5"
+              colspan="6"
               class="text-center text-medium-emphasis py-6"
             >
               {{ t('businessTripExpenseCategory.empty') }}
@@ -406,6 +427,19 @@ onMounted(() => fetchRows())
 
             <td class="text-body-2 text-medium-emphasis">
               {{ row.description || '-' }}
+            </td>
+
+            <td>
+              <VChip
+                size="small"
+                variant="tonal"
+                :color="row.ga_arrangeable ? 'warning' : 'secondary'"
+                :prepend-icon="row.ga_arrangeable ? 'tabler-user-check' : 'tabler-user-edit'"
+              >
+                {{ row.ga_arrangeable
+                  ? t('businessTripExpenseCategory.gaArrangeableYes')
+                  : t('businessTripExpenseCategory.gaArrangeableNo') }}
+              </VChip>
             </td>
 
             <td>
@@ -551,6 +585,24 @@ onMounted(() => fetchRows())
                 min="0"
                 density="comfortable"
               />
+            </VCol>
+
+            <!--
+              Penanda ini menentukan apakah pemohon ditawari pilihan
+              "diurus GA" pada kategori ini saat mengisi rincian perdin.
+              Yang dimatikan wajib diisi pemohon sendiri.
+            -->
+            <VCol cols="12">
+              <VSwitch
+                v-model="form.ga_arrangeable"
+                color="warning"
+                :label="t('businessTripExpenseCategory.form.gaArrangeable')"
+                hide-details
+              />
+
+              <div class="text-caption text-medium-emphasis mt-1">
+                {{ t('businessTripExpenseCategory.form.gaArrangeableHint') }}
+              </div>
             </VCol>
 
             <VCol cols="12">

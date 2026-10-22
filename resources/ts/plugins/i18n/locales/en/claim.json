@@ -18,6 +18,7 @@
         "itemDescription": "Description",
         "itemNo": "No",
         "itemsTitle": "Expense Lines",
+        "itemTransactionCategory": "Transaction Category",
         "loadFailed": "Failed to load the claim detail.",
         "notes": "Notes",
         "rejectButton": "Reject",
@@ -45,6 +46,11 @@
             "cancel": "Cancel",
             "save": "Save",
             "update": "Save Changes"
+        },
+        "categorySet": {
+            "hint": "More than one is allowed. Each detail line then picks one of them.",
+            "linesDroppedTitle": "Detail lines removed",
+            "linesDroppedText": "{count} line(s) were removed because their transaction category was taken off the top of the form."
         },
         "createSubtitle": "Reimbursement for money you have already spent.",
         "createTitle": "New Claim",
@@ -81,6 +87,7 @@
             "tableDate": "Date",
             "tableDescription": "Description",
             "tableNo": "No",
+            "tableTransactionCategory": "Transaction Category",
             "total": "Claim Total"
         },
         "loadingTitle": "Loading claim data...",
@@ -105,6 +112,7 @@
         "toast": {
             "cancelConfirmText": "Anything you have filled in will be lost.",
             "cancelConfirmTitle": "Discard this form?",
+            "categoryWithoutItem": "Transaction category {categories} has no lines yet. Add a line for it, or remove that transaction category at the top of the form.",
             "completeItemRow": "Please complete the request line on row {number}.",
             "completeRequiredData": "Please complete the required fields first.",
             "invalidFileSize": "\"{name}\" is larger than 3MB.",
@@ -112,6 +120,7 @@
             "invalidFileType": "\"{name}\" is not a PDF/JPG/JPEG/PNG file.",
             "itemAttachmentRequired": "Row {number} requires at least one attachment.",
             "itemDateRequired": "Date on row {number} is required.",
+            "itemTransactionCategoryRequired": "Row {number}: its transaction category has not been selected.",
             "loadAccessFailed": "Failed to load branch and department access data.",
             "loadFailed": "Failed to load claim data.",
             "minOneItem": "At least one request line is required.",
@@ -120,8 +129,7 @@
             "saveFailed": "Failed to save the claim.",
             "savingData": "Saving data...",
             "updateConfirmText": "The changes to this claim will be saved.",
-            "updateConfirmTitle": "Save the changes?",
-            "linesClearedByCategory": "The expense lines were cleared because the transaction category changed. The two are filled in differently, so the lines start over."
+            "updateConfirmTitle": "Save the changes?"
         },
         "validation": {
             "branch": "Branch is required.",
@@ -131,6 +139,7 @@
             "itemAttachment": "At least one file.",
             "itemDate": "Date is required.",
             "itemDescription": "Description is required.",
+            "itemTransactionCategory": "A transaction category is required",
             "subject": "Subject is required.",
             "transactionCategory": "Transaction category is required.",
             "businessTrip": "A Business Trip document is required.",
@@ -226,7 +235,10 @@
             "attachmentCount": "This document has {count} attachment(s).",
             "attachmentInclude": "Merge attachments into a single PDF",
             "attachmentPdfNotice": "Image attachments are added on the following pages, two per page. Attachments that are already PDFs cannot be merged — their names are still listed on the last page so they can be opened separately.",
-            "attachmentConfirm": "Print"
+            "attachmentConfirm": "Print",
+            "combineTripInclude": "Combine with the business trip document",
+            "combineTripNotice": "The business trip will be printed after this document, along with the GA booking files if attachments are combined.",
+            "combineTripUnavailable": "This document is not linked to a business trip, or the trip is not fully approved yet."
         },
         "reject": {
             "confirmButton": "Reject",
@@ -359,6 +371,7 @@
         "inProgress": "In Progress",
         "paid": "Reimbursed",
         "rejected": "Rejected",
-        "received": "Received"
+        "received": "Received",
+        "needRevision": "Needs Revision"
     }
 }

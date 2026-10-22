@@ -307,8 +307,14 @@ class PurchaseOrderNotificationService
 
     /**
      * Resolve satu row approval menjadi collection user.
+     *
+     * Terbuka karena kabar revisi memerlukannya: pemberi kabar revisi
+     * berlaku untuk enam modul sekaligus dan sengaja tidak tahu sedang
+     * mengurus modul yang mana, jadi penerjemahan baris approval menjadi
+     * daftar pengguna diminta dari modulnya -- dan pengetahuan itu tetap
+     * tinggal di sini.
      */
-    private function resolveApproverUsers(
+    public function resolveApproverUsers(
         PurchaseOrderApproval $approval,
     ): Collection {
         $approverType = strtoupper(

@@ -21,8 +21,8 @@
         "total": "{count} dokumen",
         "onlyMyApproval": "Hanya yang menunggu persetujuan saya",
         "waitingMyApprovalBadge": "Menunggu Anda",
-        "fpuUnlockedBadge": "FPU boleh dibuat",
-        "fpuLockedBadge": "FPU menunggu acc",
+        "fpuUnlockedBadge": "Boleh ajukan FPU",
+        "fpuLockedBadge": "FPU menunggu perdin disetujui",
         "departurePassedBadge": "Tanggal sudah lewat",
         "departurePassedHint": "Tanggal berangkatnya sudah lewat, jadi perdin ini tidak bisa diajukan lagi. Ubah dulu tanggal perjalanannya, atau hapus dan buat yang baru."
     },
@@ -52,7 +52,8 @@
         "submittedBy": "Mengajukan dokumen ini",
         "byRole": "lewat jabatan",
         "anyHolder": "Pemegang jabatan",
-        "notSubmittedYet": "Dokumen ini belum diajukan, jadi belum ada riwayat persetujuan."
+        "notSubmittedYet": "Dokumen ini belum diajukan, jadi belum ada riwayat persetujuan.",
+        "participants": "Peserta Lain ({count})"
     },
     "form": {
         "createTitle": "Buat Perjalanan Dinas",
@@ -83,7 +84,9 @@
             "rowTimeStart": "Jam Mulai",
             "rowTimeEnd": "Jam Selesai",
             "rowTimezone": "Zona",
-            "rowDescription": "Keterangan"
+            "rowDescription": "Keterangan",
+            "participants": "Peserta lain",
+            "participantsHint": "Orang lain yang ikut dalam perjalanan ini. Biarkan kosong bila Anda berangkat sendiri."
         },
         "validation": {
             "destination": "Tujuan wajib diisi.",
@@ -128,7 +131,8 @@
             "inheritNote": "Baris baru mewarisi tanggal dan zona baris di atasnya, dan jam mulainya menyambung dari jam selesai sebelumnya. Semuanya tetap bisa diubah.",
             "datePlaceholder": "Pilih tanggal"
         },
-        "addRowShort": "Tambah Baris"
+        "addRowShort": "Tambah Baris",
+        "updateSuccess": "Perjalanan Dinas berhasil diperbarui."
     },
     "days": "{count} hari",
     "status": {
@@ -136,7 +140,8 @@
         "IN PROGRESS": "Menunggu Persetujuan",
         "APPROVED": "Disetujui",
         "REJECTED": "Ditolak",
-        "CANCELLED": "Dibatalkan"
+        "CANCELLED": "Dibatalkan",
+        "NEED REVISION": "Butuh Revisi"
     },
     "menu": {
         "detail": "Lihat Rincian",
@@ -192,7 +197,13 @@
         "loading": "Menyiapkan cetakan Perdin",
         "failed": "Cetakan Perjalanan Dinas gagal dibuat.",
         "popupBlocked": "Jendela cetak diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.",
-        "windowClosed": "Jendela cetak ditutup sebelum dokumennya siap."
+        "windowClosed": "Jendela cetak ditutup sebelum dokumennya siap.",
+        "title": "Cetak Perjalanan Dinas",
+        "attachmentInclude": "Satukan berkas pemesanan GA",
+        "combineDocumentInclude": "Satukan dengan FPU / Claim yang tertaut",
+        "combineDocumentNotice": "Dokumen keuangannya dicetak lebih dulu, perjalanan dinas ini menyusul di belakangnya.",
+        "combineDocumentUnavailable": "Belum ada FPU atau Claim tertaut yang statusnya boleh dicetak.",
+        "confirm": "Cetak"
     },
     "approvalStatus": {
         "PENDING": "Belum giliran",

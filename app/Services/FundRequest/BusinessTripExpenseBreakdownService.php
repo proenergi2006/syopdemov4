@@ -32,6 +32,13 @@ use Illuminate\Validation\ValidationException;
 | punya baris tidak boleh ditandai. Keduanya pernyataan yang saling
 | meniadakan; membiarkan keduanya berlaku berarti cetakannya mengatakan dua
 | hal sekaligus tentang kategori yang sama.
+|
+| DAN TIDAK SEMUA KATEGORI BOLEH DITANDAI.
+|
+| GA hanya mengurus sebagian -- hari ini tiket dan penginapan. Kategori mana
+| saja ditentukan masternya (ga_arrangeable), bukan ditulis di sini: daftar
+| "GA mengurus apa" adalah kesepakatan kerja, dan ia berubah tanpa menunggu
+| rilis.
 |--------------------------------------------------------------------------
 */
 class BusinessTripExpenseBreakdownService
@@ -96,14 +103,40 @@ class BusinessTripExpenseBreakdownService
             $hasil[] = $baris;
         }
 
-        /*
-        | Kategori tidak boleh sekaligus ditandai diurus GA dan punya baris.
-        | Keduanya pernyataan yang saling meniadakan.
-        */
         foreach ($arrangedCategoryIds as $id) {
-            if (isset($terpakai[(int) $id])) {
+            $id = (int) $id;
+
+            $satu = $kategori->get($id);
+
+            /*
+            | Hanya kategori yang disebut masternya.
+            |
+            | GA tidak mengurus semua kategori -- tiket dan penginapan iya,
+            | uang saku tidak. Penanda yang dipasang di luar itu menyatakan
+            | ada yang akan mengurusnya padahal tidak ada siapa pun, dan
+            | angkanya hilang dari dokumen tanpa ada yang menagihnya.
+            |
+            | Diperiksa di sini, bukan hanya di layar: layar bisa tidak ikut
+            | diperbarui, dan permintaannya bisa datang tanpa lewat layar
+            | sama sekali.
+            |
+            | Kategori yang tidak ditemukan pun ditolak di sini: id yang tidak
+            | menunjuk apa pun bukan penanda yang sah, dan membiarkannya lewat
+            | akan menyimpan baris penanda yang tidak bisa ditampilkan.
+            */
+            if (!$satu || !$satu->ga_arrangeable) {
+                $this->tolak($messagePrefix . '.arranged_not_allowed', [
+                    'category' => $satu?->name ?? '-',
+                ]);
+            }
+
+            /*
+            | Tidak boleh sekaligus ditandai diurus GA dan punya baris.
+            | Keduanya pernyataan yang saling meniadakan.
+            */
+            if (isset($terpakai[$id])) {
                 $this->tolak($messagePrefix . '.arranged_has_items', [
-                    'category' => $kategori->get((int) $id)?->name ?? '-',
+                    'category' => $satu->name,
                 ]);
             }
         }
@@ -118,10 +151,21 @@ class BusinessTripExpenseBreakdownService
      * benar-benar hilang, dan membandingkan satu per satu hanya menambah
      * jalan untuk keliru pada himpunan sekecil ini.
      *
+     * Catatan pemohon ikut disimpan bila ada. Ia dikirim sebagai peta
+     * id-kategori => catatan, dan HANYA yang kategorinya benar-benar
+     * ditandai yang tersimpan: catatan untuk kategori yang penandanya
+     * dimatikan bukan keterangan apa pun lagi, dan menyimpannya akan
+     * menghidupkannya kembali diam-diam begitu penandanya menyala lagi.
+     *
      * @param  int[]  $categoryIds
+     * @param  array<int|string, mixed>  $notes  id kategori => catatan pemohon
      */
-    public function syncArranged(string $documentType, int $documentId, array $categoryIds): void
-    {
+    public function syncArranged(
+        string $documentType,
+        int $documentId,
+        array $categoryIds,
+        array $notes = [],
+    ): void {
         FundRequestArrangedCategory::query()
             ->for($documentType, $documentId)
             ->delete();
@@ -131,10 +175,20 @@ class BusinessTripExpenseBreakdownService
                 continue;
             }
 
+            $catatan = trim((string) ($notes[$id] ?? $notes[(string) $id] ?? ''));
+
             FundRequestArrangedCategory::create([
                 'document_type' => $documentType,
                 'document_id' => $documentId,
                 'expense_category_id' => $id,
+
+                /*
+                | Kosong disimpan sebagai null, bukan sebagai string kosong:
+                | keduanya berarti "tidak ada permintaan khusus", dan dua
+                | bentuk untuk satu arti memaksa setiap pembacanya memeriksa
+                | dua-duanya -- salah satunya pasti terlupa.
+                */
+                'notes' => $catatan !== '' ? $catatan : null,
             ]);
         }
     }
@@ -154,6 +208,32 @@ class BusinessTripExpenseBreakdownService
     }
 
     /**
+     * Catatan pemohon pada kategori yang diurus GA.
+     *
+     * Terpisah dari arrangedFor() yang hanya mengembalikan idnya: yang
+     * memanggilnya hampir selalu cukup dengan id, dan mengubah bentuk
+     * kembaliannya akan menyentuh seluruh pemanggil demi sesuatu yang
+     * hanya dibutuhkan formulir suntingnya.
+     *
+     * Yang catatannya kosong tidak ikut -- ketiadaan kunci dan kunci
+     * bernilai kosong berarti sama, dan satu bentuk lebih baik dari dua.
+     *
+     * @return array<int, string>  id kategori => catatan
+     */
+    public function arrangedNotesFor(string $documentType, int $documentId): array
+    {
+        return FundRequestArrangedCategory::query()
+            ->for($documentType, $documentId)
+            ->whereNotNull('notes')
+            ->get(['expense_category_id', 'notes'])
+            ->mapWithKeys(fn ($baris): array => [
+                (int) $baris->expense_category_id => (string) $baris->notes,
+            ])
+            ->filter(fn (string $catatan): bool => trim($catatan) !== '')
+            ->all();
+    }
+
+    /**
      * Rincian berkategori untuk hasil cetak.
      *
      * Formulir kertasnya dibaca per kategori, bukan sebagai satu daftar
@@ -167,7 +247,7 @@ class BusinessTripExpenseBreakdownService
      *
      * @param  iterable<object>  $items  baris dokumennya
      * @param  string  $kolomNominal  amount pada FPU, realization_amount pada Realisasi
-     * @return array<int, array{name: string, arranged: bool, rows: array<int, object>, total: float}>
+     * @return array<int, array{name: string, arranged: bool, notes: string|null, rows: array<int, object>, total: float}>
      */
     public function groupedForPrint(
         string $documentType,
@@ -176,6 +256,7 @@ class BusinessTripExpenseBreakdownService
         string $kolomNominal,
     ): array {
         $arranged = $this->arrangedFor($documentType, $documentId);
+        $catatan = $this->arrangedNotesFor($documentType, $documentId);
 
         $barisPerKategori = [];
 
@@ -201,9 +282,19 @@ class BusinessTripExpenseBreakdownService
         foreach ($kategori as $satu) {
             $baris = $barisPerKategori[(int) $satu->id] ?? [];
 
+            $diurusGa = in_array((int) $satu->id, $arranged, true);
+
             $hasil[] = [
                 'name' => (string) $satu->name,
-                'arranged' => in_array((int) $satu->id, $arranged, true),
+                'arranged' => $diurusGa,
+
+                /*
+                | Hanya pada kategori yang diurus GA. Catatan pada kategori
+                | berisi akan menyesatkan: di sana yang menjelaskan barisnya
+                | sendiri, dan catatan sisa dari penanda yang sudah dimatikan
+                | akan terbaca sebagai keterangan barisnya.
+                */
+                'notes' => $diurusGa ? ($catatan[(int) $satu->id] ?? null) : null,
                 'rows' => $baris,
                 'total' => array_reduce(
                     $baris,

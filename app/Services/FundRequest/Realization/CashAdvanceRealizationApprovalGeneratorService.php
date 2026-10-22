@@ -8,6 +8,7 @@ use App\Models\CashAdvanceRealization;
 use App\Models\CashAdvanceRealizationApproval;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\FundRequest\ApprovalStepRuleService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -93,7 +94,78 @@ class CashAdvanceRealizationApprovalGeneratorService
             ]);
         }
 
-        $firstStepOrder = (int) $flowSteps->min('step_order');
+        /*
+        | Rencana rantainya, sebelum satu baris pun ditulis.
+        |
+        | Step bisa gugur karena dua sebab baru: role pemohon masuk daftar
+        | pengecualian step itu, atau step boleh disetujui rekan setingkat
+        | dan tidak ada rekan lain yang tersisa. Keduanya harus diketahui
+        | SEKARANG: status "menunggu" melekat pada step pertama yang
+        | tersisa, dan step pertama yang gugur di tengah jalan akan
+        | meninggalkan dokumen tanpa satu pun baris yang menunggu.
+        |
+        | Tanpa sifat baru itu, rencananya kosong dan tidak ada yang
+        | berubah.
+        */
+        $aturanStep = app(ApprovalStepRuleService::class);
+
+        $pemohonId = (int) ($realization->submitted_by ?? $realization->created_by ?? 0);
+
+        $rencanaStep = $aturanStep->planSteps(
+            $flowSteps,
+            $pemohonId,
+            $aturanStep->roleIdsOf($pemohonId),
+
+            /*
+            | Step bercakupan cabang dicairkan lebih dulu supaya keputusan
+            | "pemohon ada di dalamnya atau tidak" diambil atas orang yang
+            | benar-benar akan menjadi approver dokumen ini -- bukan atas
+            | role pada kertasnya, yang pemegangnya bisa berada di cabang
+            | lain dan memang tidak pernah ikut.
+            */
+            function (ApprovalFlowStep $step) use ($realization) {
+                $scope = strtoupper(trim(
+                    (string) ($step->approver_scope ?: ApprovalFlowStep::APPROVER_SCOPE_GLOBAL),
+                ));
+
+                $tipe = strtoupper(trim((string) $step->approver_type));
+
+                if ($scope === ApprovalFlowStep::APPROVER_SCOPE_SAME_BRANCH) {
+                    return $this->resolveSameBranchApprovers($step, $realization, $tipe);
+                }
+
+                if ($scope === ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES) {
+                    return $this->resolveSelectedBranchApprovers($step, $realization, $tipe);
+                }
+
+                return null;
+            },
+        );
+
+        /*
+        | Tingkat yang bertahan tetapi tidak punya seorang pun di dalamnya.
+        |
+        | Ditahan di sini, bukan dibiarkan tersimpan: dokumen yang masuk ke
+        | tingkat tanpa approver akan berstatus menunggu selamanya, tanpa
+        | pesan, dan baru ketahuan ketika seseorang bertanya kenapa
+        | dokumennya tidak maju-maju.
+        */
+        $aturanStep->assertApproverAda($rencanaStep, 'Realisasi');
+
+        $stepHidup = $flowSteps->reject(
+            fn (ApprovalFlowStep $satu): bool => isset($rencanaStep['skipped'][(int) $satu->id]),
+        );
+
+        if ($stepHidup->isEmpty()) {
+            throw ValidationException::withMessages([
+                'approval_flow' => [
+                    'Tidak ada approver yang tersisa pada approval flow Realisasi ini untuk Anda.'
+                    . ' Hubungi admin untuk memeriksa matriks approval-nya.',
+                ],
+            ]);
+        }
+
+        $firstStepOrder = (int) $stepHidup->min('step_order');
 
         // Logical step yang wajib menghasilkan minimal satu approver.
         $requiredSteps = [];
@@ -109,6 +181,21 @@ class CashAdvanceRealizationApprovalGeneratorService
 
         foreach ($flowSteps as $flowStep) {
             $stepOrder = (int) $flowStep->step_order;
+
+            /*
+            | Dilewati SEBELUM didaftarkan sebagai step yang wajib berisi.
+            | Kalau didaftarkan lebih dulu, step yang sengaja dilewati akan
+            | menolak dokumennya sendiri karena tidak punya approver.
+            */
+            if (isset($rencanaStep['skipped'][(int) $flowStep->id])) {
+                Log::info('[Realisasi Approval Generator] Step dilewati', [
+                    'step_order' => $stepOrder,
+                    'label' => $flowStep->label,
+                    'sebab' => $rencanaStep['skipped'][(int) $flowStep->id],
+                ]);
+
+                continue;
+            }
 
             $requiredSteps[$stepOrder] = $requiredSteps[$stepOrder]
                 ?? ($flowStep->label ?: sprintf('Step %d', $stepOrder));
@@ -188,6 +275,45 @@ class CashAdvanceRealizationApprovalGeneratorService
                         $realization,
                         $approverType,
                     ),
+                    stepOrder: $stepOrder,
+                    approvalMode: $approvalMode,
+                    status: $status,
+                    resolvedSnapshotKeys: $resolvedSnapshotKeys,
+                    createdApproversPerStep: $createdApproversPerStep,
+                );
+
+                continue;
+            }
+
+            /*
+            | Approver yang sudah dicairkan rencana di atas: step bertipe
+            | DEPARTMENT, atau step yang pemohonnya baru saja dikeluarkan.
+            |
+            | Hanya untuk scope GLOBAL. Kedua sifat itu bekerja pada daftar
+            | orang, sementara scope cabang menyaring daftar yang sama dengan
+            | aturan lain -- menggabungkan keduanya tanpa memikirkannya akan
+            | menghasilkan daftar yang tidak pernah diminta siapa pun.
+            */
+            $rencanaBaris = $rencanaStep['users'][(int) $flowStep->id] ?? null;
+
+            if ($rencanaBaris !== null) {
+                if ($approverScope !== ApprovalFlowStep::APPROVER_SCOPE_GLOBAL) {
+                    throw ValidationException::withMessages([
+                        'approval_flow' => [
+                            sprintf(
+                                'Step "%s" memakai department atau aturan rekan setingkat,'
+                                . ' sehingga scope-nya harus Global.',
+                                $flowStep->label ?? '-',
+                            ),
+                        ],
+                    ]);
+                }
+
+                $this->createResolvedUserSnapshots(
+                    realization: $realization,
+                    approvalFlow: $approvalFlow,
+                    flowStep: $flowStep,
+                    resolvedUsers: $rencanaBaris,
                     stepOrder: $stepOrder,
                     approvalMode: $approvalMode,
                     status: $status,

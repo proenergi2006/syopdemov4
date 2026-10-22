@@ -24,6 +24,7 @@ class FundRequestLimit extends Model
         'department_id',
         'max_outstanding',
         'max_realization_days',
+        'is_unlimited',
         'is_active',
         'notes',
         'created_by',
@@ -34,6 +35,7 @@ class FundRequestLimit extends Model
         'department_id' => 'integer',
         'max_outstanding' => 'integer',
         'max_realization_days' => 'integer',
+        'is_unlimited' => 'boolean',
         'is_active' => 'boolean',
     ];
 

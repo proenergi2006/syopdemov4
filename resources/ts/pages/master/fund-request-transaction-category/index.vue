@@ -40,6 +40,8 @@ interface CategoryRow {
 
   sort_order: number
   requires_business_trip: boolean
+  allows_routine: boolean
+  allows_non_routine: boolean
   is_active: boolean
 
   usage_approval_flows: number
@@ -166,6 +168,11 @@ const form = reactive({
   /* FPU dengan keterangan transaksi ini wajib menunjuk dokumen Perdin. */
   requires_business_trip: false,
 
+  /* Bawaannya dua-duanya menyala: kategori baru berlaku di mana saja
+  | sampai pemiliknya menyempitkannya dengan sengaja. */
+  allows_routine: true,
+  allows_non_routine: true,
+
   sort_order: 0,
   is_active: true,
 })
@@ -202,6 +209,8 @@ const resetForm = (): void => {
    */
   form.sort_order = (summary.total + 1) * 10
   form.requires_business_trip = false
+  form.allows_routine = true
+  form.allows_non_routine = true
   form.is_active = true
 }
 
@@ -223,6 +232,8 @@ const openEdit = (row: CategoryRow): void => {
   form.required_documents = row.required_documents || ''
   form.sort_order = Number(row.sort_order || 0)
   form.requires_business_trip = Boolean(row.requires_business_trip)
+  form.allows_routine = Boolean(row.allows_routine)
+  form.allows_non_routine = Boolean(row.allows_non_routine)
   form.is_active = Boolean(row.is_active)
 
   dialog.value = true
@@ -345,6 +356,9 @@ const submitForm = async (): Promise<void> => {
 
       /* Berlaku untuk FPU maupun Claim: keduanya kini bisa menunjuk Perdin. */
       requires_business_trip: form.requires_business_trip,
+
+      allows_routine: form.allows_routine,
+      allows_non_routine: form.allows_non_routine,
 
       sort_order: Number(form.sort_order || 0),
       is_active: form.is_active,
@@ -773,6 +787,19 @@ onMounted(async () => {
               >
                 Dokumen Pendukung Wajib
               </th>
+              <!--
+                Sifat pengajuan yang boleh memakainya. Diberi kolom sendiri:
+                yang membuka master ini perlu melihat sekali lihat kategori
+                mana yang akan muncul di formulir Rutin dan mana yang tidak.
+              -->
+              <th
+                scope="col"
+                class="text-center"
+                style="inline-size: 9rem;"
+              >
+                Sifat Pengajuan
+              </th>
+
               <th
                 scope="col"
                 class="text-center"
@@ -840,6 +867,28 @@ onMounted(async () => {
 
               <td class="ftc-desc-col text-medium-emphasis">
                 {{ row.required_documents || '-' }}
+              </td>
+
+              <td class="text-center">
+                <div class="d-flex flex-column ga-1 align-center">
+                  <VChip
+                    v-if="row.allows_routine"
+                    size="x-small"
+                    variant="tonal"
+                    color="info"
+                  >
+                    Rutin
+                  </VChip>
+
+                  <VChip
+                    v-if="row.allows_non_routine"
+                    size="x-small"
+                    variant="tonal"
+                    color="warning"
+                  >
+                    Non Rutin
+                  </VChip>
+                </div>
               </td>
 
               <td class="text-center text-medium-emphasis">
@@ -914,7 +963,7 @@ onMounted(async () => {
 
             <tr v-if="!loading && !rows.length">
               <td
-                colspan="9"
+                colspan="10"
                 class="text-center py-8"
               >
                 <div class="text-body-1 font-weight-medium">
@@ -928,7 +977,7 @@ onMounted(async () => {
 
             <tr v-if="loading">
               <td
-                colspan="9"
+                colspan="10"
                 class="text-center py-8"
               >
                 <VProgressCircular indeterminate />
@@ -1130,6 +1179,60 @@ onMounted(async () => {
               mukanya -- pegawainya menalangi dulu, lalu menagihnya lewat
               Claim -- dan perjalanan semacam itu perlu tetap tertaut.
             -->
+            <!--
+              Sifat pengajuan yang boleh memakai keterangan transaksi ini.
+
+              Dua saklar, bukan satu pilihan tiga nilai: "keduanya" bukan
+              jenis ketiga -- ia memang dua-duanya. Pilihan tiga nilai akan
+              memaksa setiap yang membacanya menafsirkan nilai ketiga.
+            -->
+            <VCol cols="12">
+              <div class="text-subtitle-2 mb-1">
+                Sifat Pengajuan
+              </div>
+
+              <div class="d-flex flex-wrap ga-6">
+                <VSwitch
+                  v-model="form.allows_routine"
+                  color="info"
+                  label="Rutin"
+                  hide-details
+                  :disabled="isSaving"
+                />
+
+                <VSwitch
+                  v-model="form.allows_non_routine"
+                  color="warning"
+                  label="Non Rutin"
+                  hide-details
+                  :disabled="isSaving"
+                />
+              </div>
+
+              <div class="text-caption text-medium-emphasis mt-1">
+                Formulir FPU hanya menawarkan keterangan transaksi yang cocok
+                dengan sifat pengajuan yang dipilih pemohon. Pada
+                <strong>Non Rutin</strong>, satu FPU hanya boleh memilih satu
+                keterangan transaksi.
+              </div>
+
+              <!--
+                Minimal satu harus menyala. Diperingatkan di sini, dan tetap
+                ditolak server: kategori yang bukan Rutin dan bukan Non Rutin
+                tidak akan pernah muncul di formulir mana pun.
+              -->
+              <VAlert
+                v-if="!form.allows_routine && !form.allows_non_routine"
+                type="warning"
+                variant="tonal"
+                density="compact"
+                class="mt-2"
+              >
+                Pilih minimal satu sifat pengajuan. Tanpa itu keterangan
+                transaksi ini tidak akan muncul di formulir mana pun.
+              </VAlert>
+            </VCol>
+
             <VCol cols="12">
               <VSwitch
                 v-model="form.requires_business_trip"

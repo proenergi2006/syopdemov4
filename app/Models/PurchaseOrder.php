@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasRevisions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Crypt;
 
 class PurchaseOrder extends Model
 {
-    use SoftDeletes;
+    use HasRevisions, SoftDeletes;
 
     protected $fillable = [
         'nomor_po',
@@ -18,6 +19,7 @@ class PurchaseOrder extends Model
         'id_department',
         'total_nilai',
         'status',
+        'revision_count',
         'notes',
         'created_by',
         'approved_by',
@@ -35,6 +37,7 @@ class PurchaseOrder extends Model
     ];
 
     protected $casts = [
+        'revision_count' => 'integer',
         'cancelled_at' => 'datetime',
     ];
 
@@ -148,4 +151,61 @@ class PurchaseOrder extends Model
     public const STATUS_APPROVED = 'APPROVED';
     public const STATUS_REJECTED = 'REJECTED';
     public const STATUS_CANCELLED = 'CANCELLED';
+
+    /*
+    | Dikembalikan approver ke pemohon untuk diperbaiki.
+    |
+    | Statusnya HIDUP, berbeda dari REJECTED yang sudah selesai: dokumennya
+    | masih berjalan, dan kuota item PR yang dipakainya masih tercatat --
+    | sama seperti saat ia masih draft.
+    |
+    | Nomornya sengaja TIDAK dikembalikan ke DRAFT: approver yang pernah
+    | membukanya harus masih bisa menemukannya dengan nomor yang sama, dan
+    | nomor PO sudah beredar ke pemasok.
+    */
+    public const STATUS_NEED_REVISION = 'NEED REVISION';
+
+    /**
+     * Yang ikut dipotret saat dokumennya dikembalikan.
+     *
+     * @return array<int, string>
+     */
+    public function revisionSnapshotRelations(): array
+    {
+        return ['items', 'attachments'];
+    }
+
+    /**
+     * Pengenal baris anak pada potret revisi.
+     *
+     * Sama seperti PR: rincian PO ditulis ulang seluruhnya setiap kali
+     * dokumennya disimpan ("Insert Ulang Item PO"), jadi id-nya berganti dan
+     * barisnya dipasangkan menurut urutannya.
+     *
+     * purchase_request_item_id sengaja TIDAK dipakai sebagai pengenal: satu
+     * baris PR boleh dipenuhi lebih dari satu baris PO, dan pengenal yang
+     * kembar membuat pasangannya ditebak sembarang.
+     */
+    public function revisionSnapshotRowKey(string $relasi): ?string
+    {
+        return match ($relasi) {
+            'items' => null,
+            'attachments' => 'filename',
+            default => $this->getKeyName(),
+        };
+    }
+
+    /**
+     * Kolom turunan yang tidak ikut dipotret.
+     *
+     * Ketiganya berubah karena BARANGNYA DITERIMA, bukan karena pemohon
+     * mengetik apa pun: status_receive, jumlah yang sudah diterima, dan
+     * sisanya. Semuanya ditulis modul penerimaan barang.
+     *
+     * @return array<int, string>
+     */
+    public function revisionSnapshotSkip(): array
+    {
+        return ['status_receive', 'qty_received', 'qty_outstanding_receive'];
+    }
 }

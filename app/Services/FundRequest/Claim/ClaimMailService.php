@@ -389,6 +389,49 @@ class ClaimMailService
     /**
      * Pemohon adalah penekan tombol Submit; created_by dipakai sebagai cadangan.
      */
+    /*
+    |--------------------------------------------------------------------------
+    | Dokumen dikembalikan ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | Email, bukan hanya notifikasi dalam aplikasi, dan itu disengaja: begitu
+    | dikembalikan, dokumennya BERHENTI sampai pemohon mengerjakannya. Pemohon
+    | yang sedang tidak membuka aplikasi tidak akan tahu bahwa yang ditunggu
+    | sekarang adalah dirinya, dan dokumennya terdiam berhari-hari tanpa ada
+    | yang merasa sedang menahannya.
+    |
+    | Alasannya ikut dikirim utuh. Email yang hanya berkata "dikembalikan"
+    | memaksa pemohon membuka aplikasi hanya untuk mencari tahu apa yang
+    | salah -- padahal justru itu yang perlu ia bawa saat membukanya.
+    |--------------------------------------------------------------------------
+    */
+    public function sendReturnedForRevision(
+        Claim $claim,
+        User $actor,
+        ?string $reason = null,
+        ?int $revisionNumber = null,
+    ): void {
+        $requester = $this->resolveRequester($claim);
+
+        if (!$requester) {
+            return;
+        }
+
+        $claim->loadMissing(['items', 'transactionCategory']);
+
+        $this->queue(
+            $requester,
+            new ClaimApprovalMail(
+                claim: $claim,
+                recipient: $requester,
+                mode: 'returned_for_revision',
+                actor: $actor,
+                notes: $reason,
+                revisionNumber: $revisionNumber,
+            ),
+            $claim,
+            'returned_for_revision',
+        );
+    }
     private function resolveRequester(Claim $claim): ?User
     {
         $requesterId = $claim->submitted_by ?? $claim->created_by;

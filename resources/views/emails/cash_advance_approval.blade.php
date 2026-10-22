@@ -12,7 +12,7 @@
 
     $translationMode = in_array(
         $currentMode,
-        ['final_approved', 'rejected', 'disbursed', 'disbursement_request', 'received', 'receipt_request'],
+        ['returned_for_revision', 'final_approved', 'rejected', 'disbursed', 'disbursement_request', 'received', 'receipt_request'],
         true,
     ) ? $currentMode : 'default';
 
@@ -22,6 +22,7 @@
 
     $description = __('mail.fpu.description.' . $translationMode, [
         'actor_name' => $actorName,
+        'revision' => $revisionNumber ?? 0,
     ]);
 
     /*
@@ -33,6 +34,7 @@
         'received', 'disbursement_request' => 'RECEIVED',
         'rejected' => 'REJECTED',
         'disbursed' => 'DISBURSED',
+        'returned_for_revision' => 'NEED REVISION',
         default => 'IN PROGRESS',
     };
 
@@ -41,6 +43,7 @@
         'received', 'disbursement_request' => '#0d6b7d',
         'rejected' => '#b3261e',
         'disbursed' => '#1f4e78',
+        'returned_for_revision' => '#b26a00',
         default => '#8a6d1f',
     };
 
@@ -61,8 +64,15 @@
         $ketepatan = app(\App\Services\FundRequest\PaymentScheduleService::class)
             ->timing($fpu->scheduled_payment_date, $fpu->disbursed_at);
 
+        /*
+        | Hanya keterlambatan yang ditandai.
+        |
+        | Dibayar lebih awal bukan penyimpangan yang merugikan pemohonnya --
+        | uangnya justru datang lebih cepat -- jadi tidak ada yang perlu
+        | diumumkan. Tanggal jadwalnya tetap ditampilkan sebagai keterangan,
+        | hanya tanpa penanda yang menyatakan ia dilanggar.
+        */
         $penanda = match ($ketepatan) {
-            'EARLY' => [__('mail.fpu.payment_early'), '#1b7f4f'],
             'LATE' => [__('mail.fpu.payment_late'), '#8a6d1f'],
             default => [null, null],
         };
@@ -166,7 +176,8 @@
                                         {{ __('mail.fpu.field_category') }}
                                     </td>
                                     <td style="padding:0 12px 9px; font-size:12px; font-weight:bold;">
-                                        {{ $fpu->transactionCategory->name ?? '-' }}
+                                        {{-- Seluruhnya, dipisah koma. Aturannya di CashAdvance::transactionCategoryLabel(). --}}
+                                        {{ $fpu->transactionCategoryLabel() }}
                                     </td>
                                 </tr>
 
@@ -235,7 +246,9 @@
                                 @if (!empty($notes))
                                     <tr>
                                         <td style="padding:0 12px 11px; font-size:12px; color:#5b6b80;">
-                                            {{ __('mail.fpu.field_notes') }}
+                                            {{ $currentMode === 'returned_for_revision'
+                                                ? __('mail.fpu.field_return_reason')
+                                                : __('mail.fpu.field_notes') }}
                                         </td>
                                         <td style="padding:0 12px 11px; font-size:12px;">
                                             {{ $notes }}

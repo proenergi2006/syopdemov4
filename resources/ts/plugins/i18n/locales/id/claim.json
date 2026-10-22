@@ -18,6 +18,7 @@
         "itemDescription": "Deskripsi",
         "itemNo": "No",
         "itemsTitle": "Rincian Pengeluaran",
+        "itemTransactionCategory": "Keterangan Transaksi",
         "loadFailed": "Detail Claim gagal dimuat.",
         "notes": "Catatan",
         "rejectButton": "Tolak",
@@ -45,6 +46,11 @@
             "cancel": "Batal",
             "save": "Simpan",
             "update": "Simpan Perubahan"
+        },
+        "categorySet": {
+            "hint": "Boleh lebih dari satu. Tiap baris rincian nanti memilih salah satu di antaranya.",
+            "linesDroppedTitle": "Baris rincian ikut dihapus",
+            "linesDroppedText": "{count} baris dihapus karena keterangan transaksinya dicabut dari bagian atas formulir."
         },
         "createSubtitle": "Penggantian uang yang sudah lebih dulu Anda keluarkan.",
         "createTitle": "Buat Claim",
@@ -81,6 +87,7 @@
             "tableDate": "Tanggal",
             "tableDescription": "Deskripsi",
             "tableNo": "No",
+            "tableTransactionCategory": "Keterangan Transaksi",
             "total": "Total Claim"
         },
         "loadingTitle": "Memuat data Claim...",
@@ -105,6 +112,7 @@
         "toast": {
             "cancelConfirmText": "Data yang sudah diisi akan hilang.",
             "cancelConfirmTitle": "Batalkan pengisian?",
+            "categoryWithoutItem": "Keterangan transaksi {categories} belum punya satu pun baris. Tambahkan barisnya, atau cabut keterangan transaksi itu di bagian atas formulir.",
             "completeItemRow": "Lengkapi rincian pada baris {number}.",
             "completeRequiredData": "Lengkapi data yang wajib diisi terlebih dahulu.",
             "invalidFileSize": "\"{name}\" lebih dari 3MB.",
@@ -112,6 +120,7 @@
             "invalidFileType": "\"{name}\" bukan file PDF/JPG/JPEG/PNG.",
             "itemAttachmentRequired": "Lampiran pada baris {number} wajib diisi minimal satu berkas.",
             "itemDateRequired": "Tanggal pada baris {number} wajib diisi.",
+            "itemTransactionCategoryRequired": "Baris {number}: keterangan transaksinya belum dipilih.",
             "loadAccessFailed": "Gagal memuat data akses cabang dan department.",
             "loadFailed": "Gagal memuat data Claim.",
             "minOneItem": "Minimal satu baris rincian harus diisi.",
@@ -120,8 +129,7 @@
             "saveFailed": "Claim gagal disimpan.",
             "savingData": "Menyimpan data...",
             "updateConfirmText": "Perubahan pada Claim ini akan disimpan.",
-            "updateConfirmTitle": "Simpan perubahan?",
-            "linesClearedByCategory": "Rincian pengeluaran dikosongkan karena keterangan transaksinya berganti. Cara pengisiannya berbeda, jadi rinciannya diisi ulang dari awal."
+            "updateConfirmTitle": "Simpan perubahan?"
         },
         "validation": {
             "branch": "Cabang wajib dipilih.",
@@ -131,6 +139,7 @@
             "itemAttachment": "Minimal satu berkas.",
             "itemDate": "Tanggal wajib diisi.",
             "itemDescription": "Deskripsi wajib diisi.",
+            "itemTransactionCategory": "Keterangan transaksi wajib dipilih",
             "subject": "Perihal wajib diisi.",
             "transactionCategory": "Keterangan transaksi wajib dipilih.",
             "businessTrip": "Dokumen Perjalanan Dinas wajib dipilih.",
@@ -142,7 +151,7 @@
         },
         "businessTripState": {
             "approved": "Disetujui",
-            "pending": "Menunggu acc",
+            "pending": "Menunggu persetujuan",
             "locked": "Belum bisa dipilih: perdin ini belum disetujui, atau sudah dipakai dokumen lain.",
             "waitingStep": "Terkunci — menunggu persetujuan tahap {step}: {who}",
             "someone": "penyetuju berikutnya"
@@ -226,7 +235,10 @@
             "attachmentCount": "Dokumen ini punya {count} lampiran.",
             "attachmentInclude": "Gabungkan lampiran ke dalam satu PDF",
             "attachmentPdfNotice": "Lampiran berupa gambar akan dimasukkan ke halaman berikutnya, dua per halaman. Lampiran yang sudah berformat PDF tidak bisa digabung — namanya tetap didaftarkan pada halaman terakhir agar bisa dibuka terpisah.",
-            "attachmentConfirm": "Cetak"
+            "attachmentConfirm": "Cetak",
+            "combineTripInclude": "Satukan dengan dokumen Perjalanan Dinas",
+            "combineTripNotice": "Perjalanan Dinas akan dicetak menyusul di belakang dokumen ini, berikut berkas pemesanan GA bila lampiran ikut digabung.",
+            "combineTripUnavailable": "Dokumen ini tidak terikat Perjalanan Dinas, atau perdinnya belum disetujui sepenuhnya."
         },
         "reject": {
             "confirmButton": "Tolak",
@@ -359,6 +371,7 @@
         "inProgress": "In Progress",
         "paid": "Sudah Diganti",
         "rejected": "Rejected",
-        "received": "Diterima"
+        "received": "Diterima",
+        "needRevision": "Butuh Revisi"
     }
 }

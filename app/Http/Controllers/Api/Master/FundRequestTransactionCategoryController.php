@@ -382,6 +382,19 @@ class FundRequestTransactionCategoryController extends Controller
         }
 
         /*
+        | Penyaringan menurut sifat pengajuan -- OPT-IN.
+        |
+        | Berlaku hanya bila request_type disebut. Daftar ini dipakai bersama
+        | formulir Claim dan master approval flow, dan keduanya tidak
+        | mengenal sifat pengajuan; saringan yang berlaku tanpa diminta akan
+        | memotong daftar mereka tanpa seorang pun memintanya.
+        |
+        | Sifat yang tidak dikenali dibiarkan lewat tanpa menyaring -- lihat
+        | keterangan pada scopeForRequestType().
+        */
+        $query->forRequestType($request->input('request_type'));
+
+        /*
         | Penyaringan menurut approval flow.
         |
         | Matriks "departemen mana boleh mengajukan keterangan transaksi apa"
@@ -541,6 +554,13 @@ class FundRequestTransactionCategoryController extends Controller
             */
             'requires_business_trip' => ['nullable', 'boolean'],
 
+            /*
+            | Sifat pengajuan yang boleh memakai keterangan transaksi ini.
+            | Boleh dua-duanya; tidak boleh tidak satu pun.
+            */
+            'allows_routine' => ['nullable', 'boolean'],
+            'allows_non_routine' => ['nullable', 'boolean'],
+
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:999999'],
             'is_active' => ['nullable', 'boolean'],
         ], [
@@ -562,6 +582,34 @@ class FundRequestTransactionCategoryController extends Controller
         | yang tidak berlaku pada modulnya.
         */
         $isClaim = $documentType === FundRequestTransactionCategory::DOCUMENT_TYPE_CLAIM;
+
+        /*
+        | Minimal satu sifat pengajuan harus menyala.
+        |
+        | Keterangan transaksi yang bukan Rutin dan bukan Non Rutin tidak akan
+        | pernah muncul di formulir mana pun -- ia baris mati yang tampak
+        | hidup di master, dan pemiliknya akan mencari tahu kenapa
+        | pilihannya hilang di tempat yang salah.
+        |
+        | Bawaannya KEDUANYA menyala, bukan keduanya mati: pengirim lama yang
+        | belum mengenal kedua isian ini tidak boleh mendadak membuat baris
+        | yang tidak bisa dipakai.
+        */
+        $rutin = $request->has('allows_routine')
+            ? $request->boolean('allows_routine')
+            : true;
+
+        $nonRutin = $request->has('allows_non_routine')
+            ? $request->boolean('allows_non_routine')
+            : true;
+
+        if (!$rutin && !$nonRutin) {
+            throw ValidationException::withMessages([
+                'allows_routine' => [
+                    'Keterangan transaksi harus berlaku untuk Rutin, Non Rutin, atau keduanya.',
+                ],
+            ]);
+        }
 
         return [
             // Kode disimpan huruf besar supaya konsisten dengan data awal.
@@ -591,6 +639,9 @@ class FundRequestTransactionCategoryController extends Controller
             | akan tahu kenapa formulirnya berhenti meminta nomor perdin.
             */
             'requires_business_trip' => $request->boolean('requires_business_trip'),
+
+            'allows_routine' => $rutin,
+            'allows_non_routine' => $nonRutin,
 
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => $request->has('is_active')
@@ -673,6 +724,9 @@ class FundRequestTransactionCategoryController extends Controller
             'required_documents' => $category->required_documents,
 
             'requires_business_trip' => (bool) $category->requires_business_trip,
+
+            'allows_routine' => (bool) $category->allows_routine,
+            'allows_non_routine' => (bool) $category->allows_non_routine,
 
             'sort_order' => (int) $category->sort_order,
             'is_active' => (bool) $category->is_active,

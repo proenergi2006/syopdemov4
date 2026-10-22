@@ -56,13 +56,23 @@ class PurchaseOrderApprovalMail extends Mailable implements ShouldQueue
     public bool $isFinalApproved;
     public ?string $notes;
 
+    /*
+    | Nomor revisi, hanya untuk mode returned_for_revision.
+    |
+    | Disebut di dalam kalimatnya supaya pemohon tahu ini
+    | pengembalian yang keberapa; dokumen yang bolak-balik tiga kali
+    | adalah keadaan yang berbeda dari yang pertama kali dikembalikan.
+    */
+    public ?int $revisionNumber;
+
     public function __construct(
         PurchaseOrder $po,
         User $recipient,
         string $mode = 'approval_request',
         ?User $actor = null,
         bool $isFinalApproved = false,
-        ?string $notes = null
+        ?string $notes = null,
+        ?int $revisionNumber = null
     ) {
         $this->po = $po;
         $this->recipient = $recipient;
@@ -70,6 +80,7 @@ class PurchaseOrderApprovalMail extends Mailable implements ShouldQueue
         $this->mode = $mode;
         $this->isFinalApproved = $isFinalApproved;
         $this->notes = $notes;
+        $this->revisionNumber = $revisionNumber;
 
         /*
         | Job baru dilepas setelah transaksi commit -- kalau tidak, worker bisa
@@ -96,6 +107,7 @@ class PurchaseOrderApprovalMail extends Mailable implements ShouldQueue
             'final_approved' => 'mail.po.subject.final_approved',
             'step_approved' => 'mail.po.subject.step_approved',
             'rejected' => 'mail.po.subject.rejected',
+            'returned_for_revision' => 'mail.po.subject.returned_for_revision',
             default => 'mail.po.subject.default',
         };
 

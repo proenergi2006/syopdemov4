@@ -21,8 +21,8 @@
         "total": "{count} documents",
         "onlyMyApproval": "Only those awaiting my approval",
         "waitingMyApprovalBadge": "Awaiting you",
-        "fpuUnlockedBadge": "Cash advance allowed",
-        "fpuLockedBadge": "Cash advance waiting",
+        "fpuUnlockedBadge": "Cash advance can be submitted",
+        "fpuLockedBadge": "Cash advance waits for trip approval",
         "departurePassedBadge": "Departure date passed",
         "departurePassedHint": "The departure date has passed, so this trip can no longer be submitted. Change the travel dates, or delete it and create a new one."
     },
@@ -52,7 +52,8 @@
         "submittedBy": "Submitted this document",
         "byRole": "via role",
         "anyHolder": "Role holder",
-        "notSubmittedYet": "This document has not been submitted, so there is no approval history yet."
+        "notSubmittedYet": "This document has not been submitted, so there is no approval history yet.",
+        "participants": "Other Participants ({count})"
     },
     "form": {
         "createTitle": "New Business Trip",
@@ -83,7 +84,9 @@
             "rowTimeStart": "Start Time",
             "rowTimeEnd": "End Time",
             "rowTimezone": "Zone",
-            "rowDescription": "Description"
+            "rowDescription": "Description",
+            "participants": "Other participants",
+            "participantsHint": "Anyone else travelling with you. Leave empty if you travel alone."
         },
         "validation": {
             "destination": "Destination is required.",
@@ -128,7 +131,8 @@
             "inheritNote": "A new row inherits the date and zone of the row above, and its start time continues from the previous end time. All of it stays editable.",
             "datePlaceholder": "Pick a date"
         },
-        "addRowShort": "Add Row"
+        "addRowShort": "Add Row",
+        "updateSuccess": "Business trip updated successfully."
     },
     "days": "{count} days",
     "status": {
@@ -136,7 +140,8 @@
         "IN PROGRESS": "Awaiting Approval",
         "APPROVED": "Approved",
         "REJECTED": "Rejected",
-        "CANCELLED": "Cancelled"
+        "CANCELLED": "Cancelled",
+        "NEED REVISION": "Needs Revision"
     },
     "menu": {
         "detail": "View Detail",
@@ -192,7 +197,13 @@
         "loading": "Preparing the business trip printout",
         "failed": "Failed to generate the business trip printout.",
         "popupBlocked": "The print window was blocked by your browser. Allow pop-ups for this site and try again.",
-        "windowClosed": "The print window was closed before the document was ready."
+        "windowClosed": "The print window was closed before the document was ready.",
+        "title": "Print Business Trip",
+        "attachmentInclude": "Combine the GA booking files",
+        "combineDocumentInclude": "Combine with the linked cash advance / claim",
+        "combineDocumentNotice": "The financial document is printed first, with this business trip following behind it.",
+        "combineDocumentUnavailable": "No linked cash advance or claim has reached a printable status yet.",
+        "confirm": "Print"
     },
     "approvalStatus": {
         "PENDING": "Not yet due",

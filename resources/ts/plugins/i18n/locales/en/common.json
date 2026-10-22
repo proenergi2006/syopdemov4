@@ -71,5 +71,35 @@
         "6": "Saturday",
         "7": "Sunday"
     },
-    "and": "and"
+    "and": "and",
+    "revision": {
+        "badge": "Revision {n}",
+        "returnedStatus": "Needs Revision",
+        "menuReturn": "Return for revision",
+        "dialogTitle": "Return {number} to its requester?",
+        "dialogSubtitle": "The document goes back to its requester and the approval chain starts again from the first step once it is resubmitted.",
+        "reasonLabel": "Reason for returning",
+        "reasonPlaceholder": "State what must be corrected, as specifically as you can.",
+        "reasonRequired": "A reason is required. Without it the requester has no way of knowing what to fix.",
+        "confirmButton": "Return for revision",
+        "successFallback": "The document was returned to its requester.",
+        "failedFallback": "The document could not be returned.",
+        "historyTitle": "Revision History",
+        "historyEmpty": "This document has never been returned for revision.",
+        "returnedBy": "Returned by",
+        "returnedAtStep": "at step {step}",
+        "fromReceipt": "from the receipt desk",
+        "reason": "Reason",
+        "revisedAt": "Started",
+        "resubmittedBy": "Resubmitted by",
+        "changesTitle": "What changed",
+        "changesNone": "No field changed; only the attachments or nothing at all.",
+        "changeRow": "{label}: {old} → {new}",
+        "empty": "(empty)",
+        "rowsAdded": "{n} line(s) added",
+        "rowsRemoved": "{n} line(s) removed",
+        "rowsChanged": "{n} line(s) changed",
+        "previousApprovals": "Approvals in that round",
+        "waitingForRevision": "Waiting for the requester to revise it."
+    }
 }

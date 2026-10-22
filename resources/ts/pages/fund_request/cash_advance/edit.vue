@@ -12,6 +12,8 @@ import {
   showWarningToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
+import type { RevisionEntry } from '@/components/fund_request/revision'
 import { formatSanitizedNumberInput } from '@/utils/textFormatter'
 import { usePermissionStore } from '@/stores/permission'
 import { useDialogDatePicker } from '@core/composable/useDialogDatePicker'
@@ -41,6 +43,18 @@ interface CashAdvanceItemForm {
   expense_category_id: number | null
   qty: number | null
   unit_price: number | null
+
+  /*
+  | Keterangan transaksi barisnya, dibatasi himpunan di headernya.
+  |
+  | Bukan expense_category_id di atas: yang ini Telpon atau Perjalanan
+  | Dinas, yang itu Tiket atau Penginapan. Dua kolom berkata "kategori"
+  | pada satu baris memang mudah tertukar -- karena itu disebut beda.
+  |
+  | null saat himpunannya tepat satu: server mengisinya sendiri, dan
+  | isian berpilihan tunggal tidak pantas diminta dari pengguna.
+  */
+  transaction_category_id: number | null
 }
 
 interface ExistingAttachment {
@@ -124,6 +138,13 @@ const createEmptyItem = (): CashAdvanceItemForm => ({
   expense_category_id: null,
   qty: null,
   unit_price: null,
+
+  /*
+  | Diisikan otomatis saat himpunannya tepat satu -- lihat watcher di
+  | bawah. Dibiarkan null di sini supaya barisnya tidak memegang nilai
+  | yang belum tentu masih sah saat himpunannya berganti.
+  */
+  transaction_category_id: null,
 })
 
 const form = reactive({
@@ -134,7 +155,20 @@ const form = reactive({
   /*
    * Keterangan transaksi ikut menentukan approval flow, jadi wajib diisi.
    */
+  /*
+  | Keterangan transaksi PENENTU: yang pertama di antara himpunannya.
+  |
+  | Masih yang memilih alur approval dan jadwal pembayaran di server, dan
+  | masih yang dibaca needsBusinessTrip serta pemuat daftar perdin di sini.
+  | Diisi otomatis dari himpunannya -- bukan dipilih sendiri.
+  */
   transaction_category_id: null as number | null,
+
+  /*
+  | Himpunan keterangan transaksi yang boleh dipakai baris rinciannya.
+  | Pada Non Rutin isinya tepat satu -- aturan dokumennya memang begitu.
+  */
+  transaction_category_ids: [] as number[],
 
   /* Dokumen Perdin yang mendasari FPU ini; hanya terisi bila diwajibkan. */
   business_trip_id: null as number | null,
@@ -149,6 +183,29 @@ const form = reactive({
 
 /* Kategori yang ditandai diurus GA -- tidak ditagihkan, tanpa baris. */
 const arrangedCategories = ref<number[]>([])
+
+/*
+| Catatan pemohon untuk GA, per kategori. Opsional.
+|
+| "Diurus GA" belum menjawab APA yang diminta -- berangkat pagi atau
+| malam, kereta atau pesawat. Tanpa tempat menuliskannya, keterangan itu
+| berpindah lewat pesan terpisah yang tidak menempel pada dokumennya, dan
+| yang menyetujui tidak pernah melihatnya.
+|
+| Terpisah dari daftar penandanya, bukan dilebur: yang menentukan tetap
+| daftar idnya, dan catatan hanyalah keterangan yang menempel padanya.
+*/
+const arrangedNotes = ref<Record<number, string>>({})
+
+const arrangedNote = (categoryId: number): string =>
+  arrangedNotes.value[Number(categoryId)] ?? ''
+
+const setArrangedNote = (categoryId: number, value: unknown): void => {
+  arrangedNotes.value = {
+    ...arrangedNotes.value,
+    [Number(categoryId)]: String(value ?? ''),
+  }
+}
 
 /**
  * Baris rincian itu benar-benar berisi sesuatu.
@@ -269,7 +326,122 @@ const selectedBusinessTripPending = computed<boolean>(() => {
   return !!dipilih && dipilih.status !== 'APPROVED'
 })
 
-/** Keterangan transaksi yang sedang dipilih menuntut dokumen Perdin. */
+/*
+|--------------------------------------------------------------------------
+| Himpunan keterangan transaksi
+|--------------------------------------------------------------------------
+| Headernya menyatakan himpunan; tiap baris rincian memilih salah satunya.
+| Pada Non Rutin himpunannya tepat satu, jadi pemilihnya pun berubah
+| menjadi tunggal -- bukan multi-pilih yang kebetulan hanya boleh satu,
+| yang akan membiarkan orang mencentang dua lalu ditolak saat menyimpan.
+|--------------------------------------------------------------------------
+*/
+const allowMultipleCategories = computed<boolean>(() =>
+  String(form.request_type || '').trim() !== 'Non Rutin')
+
+/**
+* Mengurutkan himpunannya menurut urutan masternya.
+*
+* Daftar dari server sudah terurut sort_order, jadi urutan itu yang
+* dipakai -- bukan urutan centang pengguna. Penentunya diambil dari yang
+* pertama, dan penentu yang berpindah mengikuti urutan centang adalah
+* penentu yang tidak bisa dijelaskan kepada siapa pun.
+*/
+const sortByMaster = (ids: number[]): number[] => {
+  const urutan = transactionCategoryList.value.map(satu => Number(satu.id))
+
+  return [...new Set(ids.map(Number))]
+    .filter(id => id > 0)
+    .sort((a, b) => {
+      const ia = urutan.indexOf(a)
+      const ib = urutan.indexOf(b)
+
+      /* Yang tidak ada di daftar ditaruh di belakang, bukan di depan. */
+      return (ia < 0 ? Number.MAX_SAFE_INTEGER : ia) - (ib < 0 ? Number.MAX_SAFE_INTEGER : ib)
+    })
+}
+
+const setCategorySet = (ids: number[]): void => {
+  form.transaction_category_ids = sortByMaster(ids)
+
+  /* Penentunya selalu anggota himpunannya -- lihat keterangan di atas. */
+  form.transaction_category_id = form.transaction_category_ids[0] ?? null
+}
+
+/*
+| Satu pemilih untuk dua bentuk.
+|
+| Bentuk nilainya berbeda -- daftar saat multi, satu angka saat tunggal --
+| sedangkan sumber kebenarannya tetap satu: himpunannya. Dua komponen
+| terpisah akan melahirkan dua jalan untuk memasang nilai yang sama, dan
+| salah satunya cepat atau lambat lupa memasang penentunya.
+*/
+const selectedCategories = computed<number[] | number | null>({
+  get: () => allowMultipleCategories.value
+    ? form.transaction_category_ids
+    : (form.transaction_category_ids[0] ?? null),
+
+  set: (nilai: number[] | number | null) => {
+    if (Array.isArray(nilai)) {
+      setCategorySet(nilai)
+
+      return
+    }
+
+    setCategorySet(nilai === null || nilai === undefined ? [] : [Number(nilai)])
+  },
+})
+
+/** Baris rincian perlu menyebut keterangan transaksinya sendiri. */
+const lineNeedsCategory = computed<boolean>(() =>
+  form.transaction_category_ids.length > 1)
+
+/**
+ * Kolom keterangan transaksi digambar pada rinciannya.
+ *
+ * Berbeda dari lineNeedsCategory, yang menjawab "perlukah pengguna
+ * memilih". Pada keterangan tunggal tidak ada yang perlu dipilih --
+ * tetapi tetap perlu TERLIHAT, supaya rincian yang sedang diisi
+ * menyebutkan untuk apa ia dibuat tanpa menggulung ke atas.
+ */
+/**
+ * Keterangan transaksi satu-satunya, bila himpunannya memang tunggal.
+ *
+ * null saat himpunannya panjang: di sana memilih adalah pekerjaan
+ * pengguna, dan tebakan yang salah tidak akan diperiksa siapa pun lagi.
+ */
+const keteranganTunggal = computed<number | null>(() =>
+  form.transaction_category_ids.length === 1
+    ? form.transaction_category_ids[0]
+    : null)
+
+const lineShowsCategory = computed<boolean>(() =>
+  form.transaction_category_ids.length > 0)
+
+/*
+| Pilihan yang ditawarkan di baris: HANYA anggota himpunan headernya.
+|
+| Diturunkan dari himpunannya, bukan dari daftar master -- menawarkan
+| seluruh master di baris akan membuat pilihannya ditolak server, sesudah
+| diklik. Urutannya mengikuti himpunannya, yang sudah terurut masternya.
+*/
+const selectedCategoryOptions = computed<{ id: number; title: string }[]>(() =>
+  form.transaction_category_ids
+    .map(id => transactionCategoryList.value.find(satu => Number(satu.id) === Number(id)))
+    .filter((satu): satu is { id: number; title: string } => Boolean(satu))
+    .map(satu => ({ id: Number(satu.id), title: String(satu.title) })))
+
+/*
+| Keterangan transaksi yang menuntut dokumen Perdin.
+|
+| Membaca penentunya, bukan menyisir himpunannya -- dan itu cukup: FPU
+| perdin bersifat Non Rutin, dan Non Rutin hanya punya satu keterangan
+| transaksi, sehingga penentunya memang satu-satunya yang ada.
+|
+| Kalau kelak keterangan transaksi perdin ditandai Rutin juga di master
+| lalu dicampur, pembacaan ini perlu berubah menjadi "ada yang menuntut
+| perdin" -- dan bentuk rinciannya ikut perlu dirancang ulang.
+*/
 const needsBusinessTrip = computed<boolean>(() => {
   const dipilih = transactionCategoryList.value.find(
     (item: any) => Number(item.id) === Number(form.transaction_category_id),
@@ -449,6 +621,14 @@ const loadTransactionCategories = async (preserveSelected = false): Promise<void
           document_type: 'ADVANCE',
           branch_id: form.branch,
           department_id: form.department_id,
+
+          /*
+          | Sifat pengajuannya. Masternya sudah menyatakan tiap keterangan
+          | transaksi berlaku untuk Rutin, Non Rutin, atau keduanya --
+          | menawarkan yang tidak berlaku hanya melahirkan penolakan
+          | sesudah tombol simpan ditekan.
+          */
+          request_type: form.request_type || undefined,
         },
       },
     )
@@ -466,6 +646,26 @@ const loadTransactionCategories = async (preserveSelected = false): Promise<void
     hasApprovalFlow.value = response?.data?.meta?.has_matching_flow ?? null
 
     syncSelectedTransactionCategory(preserveSelected)
+
+    /*
+    | Himpunannya ikut diselaraskan.
+    |
+    | Tanpa ini, mengganti cabang atau sifat pengajuan meninggalkan
+    | anggota yang sudah tidak ada di daftar -- tidak terlihat di
+    | pemilihnya, tetap terkirim saat menyimpan, lalu ditolak server
+    | dengan sebab yang tidak kelihatan di layar.
+    |
+    | Pada halaman sunting pilihannya dipertahankan: yang dipertahankan
+    | sudah ditambahkan ke daftar oleh penyelaras di atas.
+    */
+    if (!preserveSelected) {
+      const tersedia = transactionCategoryList.value.map(satu => Number(satu.id))
+
+      const tersisa = form.transaction_category_ids.filter(id => tersedia.includes(Number(id)))
+
+      if (tersisa.length !== form.transaction_category_ids.length)
+        setCategorySet(tersisa)
+    }
   }
   catch (error: unknown) {
     console.error('[Cash Advance] TRANSACTION CATEGORY ERROR:', error)
@@ -479,6 +679,47 @@ const loadTransactionCategories = async (preserveSelected = false): Promise<void
 
 const required = (value: unknown): boolean =>
   value !== '' && value !== null && value !== undefined
+
+/**
+ * Nama berkas yang dipendekkan, dengan akhirannya dipertahankan.
+ *
+ * Dipotong di DEPAN, bukan di belakang. Akhirannya yang paling
+ * menentukan -- ".pdf" membedakan berkas yang bisa dibuka dari yang
+ * tidak -- sedangkan awalan nama berkas unggahan sering berupa
+ * keterangan panjang yang sama di banyak berkas. Memotong ekornya justru
+ * membuang bagian yang membedakan.
+ *
+ * Nama lengkapnya tetap terbaca lewat title pada elemennya: yang
+ * dipendekkan harus tetap bisa dipastikan, bukan hilang.
+ */
+const BATAS_NAMA_BERKAS = 25
+
+const shortFileName = (name: string): string => {
+  const nama = String(name ?? '').trim()
+
+  if (nama.length <= BATAS_NAMA_BERKAS)
+    return nama
+
+  const titik = nama.lastIndexOf('.')
+
+  /* Tanpa akhiran, atau akhirannya sendiri sudah kepanjangan. */
+  if (titik <= 0 || nama.length - titik > 8)
+    return `${nama.slice(0, BATAS_NAMA_BERKAS - 1)}…`
+
+  const akhiran = nama.slice(titik)
+  const pangkal = nama.slice(0, titik)
+
+  const sisa = BATAS_NAMA_BERKAS - akhiran.length - 1
+
+  /*
+  | Akhirannya memakan hampir seluruh jatah: namanya dipotong apa adanya,
+  | daripada menyisakan satu dua huruf yang tidak mengatakan apa pun.
+  */
+  if (sisa < 4)
+    return `${nama.slice(0, BATAS_NAMA_BERKAS - 1)}…`
+
+  return `${pangkal.slice(0, sisa)}…${akhiran}`
+}
 
 const formatMoney = (value: number | null | undefined): string => {
   if (!value)
@@ -598,6 +839,8 @@ const loadCashAdvance = async (): Promise<void> => {
 
     advanceNumber.value = data.advance_number || '-'
 
+    revisiTerbuka.value = data.revision_open || null
+
     form.date = data.date || ''
     form.branch = data.branch !== null && data.branch !== undefined
       ? Number(data.branch)
@@ -607,6 +850,23 @@ const loadCashAdvance = async (): Promise<void> => {
     form.transaction_category_id = data.transaction_category_id
       ? Number(data.transaction_category_id)
       : null
+
+    /*
+    | Himpunan keterangan transaksinya ikut dipulihkan.
+    |
+    | Tanpa ini himpunannya kosong saat dokumennya dibuka, lalu tersimpan
+    | kembali berisi penentunya saja -- dan baris rincian yang memakai
+    | keterangan lain mendadak berada di luar himpunan headernya sendiri.
+    |
+    | Jatuh ke penentunya untuk FPU yang dibuat sebelum himpunan ini ada.
+    | Servernya sudah melakukan hal yang sama lewat idsFor(); diulang di
+    | sini supaya layar tidak bergantung pada muatan yang bisa saja datang
+    | dari jawaban lama yang tersimpan di cache peramban.
+    */
+    form.transaction_category_ids = Array.isArray(data.transaction_category_ids)
+      && data.transaction_category_ids.length
+      ? data.transaction_category_ids.map((id: unknown) => Number(id))
+      : (form.transaction_category_id ? [form.transaction_category_id] : [])
 
     savedTransactionCategoryName.value = String(data.transaction_category || '')
 
@@ -627,6 +887,19 @@ const loadCashAdvance = async (): Promise<void> => {
     arrangedCategories.value = Array.isArray(data.arranged_categories)
       ? data.arranged_categories.map((id: unknown) => Number(id))
       : []
+
+    /*
+    | Catatannya ikut dipulihkan. Tanpa ini, menyunting lalu menyimpan
+    | kembali akan menghapus catatan pemohon tanpa ia pernah menyentuh
+    | isiannya -- penandanya tetap, keterangannya lenyap.
+    |
+    | Kuncinya dinormalkan ke angka: JSON mengirimkannya sebagai teks,
+    | sedangkan yang membacanya di template memakai id bertipe angka.
+    */
+    arrangedNotes.value = Object.fromEntries(
+      Object.entries(data.arranged_notes || {})
+        .map(([id, catatan]) => [Number(id), String(catatan ?? '')]),
+    )
 
     form.request_type = data.request_type || null
 
@@ -662,6 +935,19 @@ const loadCashAdvance = async (): Promise<void> => {
         qty: item.qty !== null && item.qty !== undefined ? Number(item.qty) : null,
         unit_price: item.unit_price !== null && item.unit_price !== undefined
           ? Number(item.unit_price)
+          : null,
+
+        /*
+        | Keterangan transaksi barisnya ikut dipulihkan.
+        |
+        | Tanpa ini, menyunting FPU lalu menyimpannya kembali akan
+        | mengosongkan pilihan tiap barisnya -- dan pada himpunan berisi lebih
+        | dari satu, server menolaknya dengan menyebut nomor baris yang
+        | pengisinya tidak pernah sentuh.
+        */
+        transaction_category_id: item.transaction_category_id !== null
+          && item.transaction_category_id !== undefined
+          ? Number(item.transaction_category_id)
           : null,
         attachments: [] as File[],
         existing: Array.isArray(item.attachments)
@@ -834,6 +1120,13 @@ interface ExpenseCategoryOption {
   id: number
   name: string
   sort_order: number
+
+  /*
+  | Kategori ini boleh ditandai diurus GA. Datang dari master, bukan
+  | ditetapkan di sini: daftar "GA mengurus apa" adalah kesepakatan
+  | kerja, dan ia berubah tanpa menunggu rilis.
+  */
+  ga_arrangeable: boolean
 }
 
 const expenseCategoryList = ref<ExpenseCategoryOption[]>([])
@@ -876,6 +1169,7 @@ watch(needsBusinessTrip, () => {
   */
   if (!needsBusinessTrip.value) {
     arrangedCategories.value = []
+    arrangedNotes.value = {}
 
     for (const item of form.items) {
       item.expense_category_id = null
@@ -966,11 +1260,25 @@ const tempItemsTotal = computed<number>(() =>
 const toggleArranged = (categoryId: number): void => {
   const id = Number(categoryId)
 
+  /* Mematikannya selalu boleh -- lihat jalan keluar di bawah. */
   if (arrangedCategories.value.includes(id)) {
     arrangedCategories.value = arrangedCategories.value.filter(satu => satu !== id)
 
     return
   }
+
+  /*
+  | Menyalakannya hanya pada kategori yang disebut masternya.
+  |
+  | Tombolnya memang sudah disembunyikan, jadi ini bukan jalan yang
+  | biasa dilewati. Tetap diperiksa karena daftar kategorinya bisa
+  | termuat ulang sesudah modalnya terbuka, dan saat itu penandanya
+  | bisa berubah di bawah tangan yang sedang mengisi.
+  */
+  const kategori = expenseCategoryList.value.find(satu => Number(satu.id) === id)
+
+  if (!kategori?.ga_arrangeable)
+    return
 
   arrangedCategories.value = [...arrangedCategories.value, id]
 
@@ -1033,8 +1341,37 @@ const openItemFullscreen = (): void => {
       item => Number(item.expense_category_id) > 0,
     )
   }
+  else if (lineNeedsCategory.value) {
+    /*
+    | Satu baris untuk tiap keterangan transaksi yang belum punya.
+    |
+    | Memilih tiga keterangan transaksi berarti berniat menagih ketiganya;
+    | membiarkan modalnya terbuka dengan satu baris kosong tanpa keterangan
+    | memaksa pengguna menambah baris lalu memilih kategorinya satu per
+    | satu -- pekerjaan yang jawabannya sudah diketahui sejak headernya
+    | diisi.
+    |
+    | Yang sudah punya baris tidak ditambahi: membuka kembali modal yang
+    | sudah terisi tidak boleh melahirkan baris kosong baru tiap kali.
+    */
+    for (const id of form.transaction_category_ids) {
+      const sudahAda = tempItems.value.some(
+        item => Number(item.transaction_category_id) === Number(id),
+      )
+
+      if (!sudahAda) {
+        tempItems.value.push({
+          ...createEmptyItem(),
+          transaction_category_id: Number(id),
+        })
+      }
+    }
+  }
   else if (!tempItems.value.length) {
-    tempItems.value = [createEmptyItem()]
+    tempItems.value = [{
+      ...createEmptyItem(),
+      transaction_category_id: keteranganTunggal.value,
+    }]
   }
 
   itemDialogSaved.value = false
@@ -1140,6 +1477,7 @@ const clearLinesOnCategoryChange = (): void => {
 
   form.items = []
   arrangedCategories.value = []
+  arrangedNotes.value = {}
   itemDialogSaved.value = false
 
   if (!adaIsi)
@@ -1174,6 +1512,183 @@ watch(() => form.transaction_category_id, (baru, lama) => {
 
   clearLinesOnCategoryChange()
 })
+
+/*
+| Dua pengawas berdiri di sini, bukan di atas bersama pembantu himpunannya.
+|
+| Keduanya memakai hal yang didefinisikan lebih bawah -- tempItems dan
+| loadTransactionCategories. Pada composition API urutan itu nyata:
+| pengawas yang terpasang saat halaman dibaca akan memanggil sesuatu yang
+| belum ada.
+*/
+/*
+| Sifat pengajuannya berganti: daftarnya diminta ulang, dan himpunannya
+| disusutkan bila perlu.
+|
+| Non Rutin hanya boleh satu. Yang tersisa adalah yang PERTAMA menurut
+| urutan masternya, bukan yang terakhir dicentang -- supaya hasilnya sama
+| bagi dua orang yang mencentang hal yang sama dengan urutan berbeda.
+*/
+watch(() => form.request_type, () => {
+  loadTransactionCategories()
+
+  if (allowMultipleCategories.value || form.transaction_category_ids.length <= 1)
+    return
+
+  const disimpan = form.transaction_category_ids[0]
+
+  setCategorySet([disimpan])
+
+  showInfoToast({
+    title: t('cashAdvance.form.categorySet.shrunkTitle'),
+    text: t('cashAdvance.form.categorySet.shrunkText'),
+  })
+})
+
+/**
+ * Nama keterangan transaksi sebuah baris.
+ *
+ * Dicari di himpunan headernya, bukan di daftar master: yang di luar
+ * himpunan memang tidak sah di baris ini, dan menuliskan namanya hanya
+ * akan membuat isian yang salah terlihat benar.
+ */
+const lineCategoryName = (categoryId: number | null): string => {
+  const ketemu = selectedCategoryOptions.value.find(
+    satu => Number(satu.id) === Number(categoryId),
+  )
+
+  return ketemu ? ketemu.title : ''
+}
+
+/**
+ * Keterangan transaksi yang dipilih tetapi belum punya satu baris pun.
+ *
+ * Barisnya memang disediakan saat modalnya dibuka, tetapi yang disediakan
+ * bisa dihapus. Tanpa pemeriksaan ini headernya menyatakan menagih tiga hal
+ * sementara isinya hanya memuat dua -- dan yang membaca cetakannya tidak
+ * punya cara tahu mana yang hilang, apakah memang tidak ditagih atau lupa
+ * diisi.
+ *
+ * Kosong bila himpunannya tunggal: di sana tidak ada yang perlu dibagi.
+ */
+const categoriesWithoutItem = (daftar: CashAdvanceItemForm[]): string[] => {
+  if (!lineNeedsCategory.value)
+    return []
+
+  return form.transaction_category_ids
+    .filter(id => !daftar.some(
+      item => Number(item.transaction_category_id) === Number(id),
+    ))
+    .map(id => lineCategoryName(id))
+    .filter(nama => nama !== '')
+}
+
+/**
+ * Apa yang salah dengan keterangan transaksi pada rinciannya, bila ada.
+ *
+ * Dipakai saat formulirnya disimpan -- bukan hanya saat modalnya ditutup.
+ * Headernya bisa diganti SESUDAH rinciannya disimpan, dan modalnya belum
+ * tentu dibuka lagi; penjaga yang hanya berdiri di satu pintu tidak
+ * menjaga apa pun bagi orang yang tidak lewat situ.
+ *
+ * Mengembalikan kalimatnya, bukan sekadar benar-salah: yang menanyakannya
+ * tidak perlu tahu keluhan mana yang keluar.
+ */
+const breakdownCategoryIssue = (): string | null => {
+  /*
+  | Dokumen perdin yang seluruh kategorinya diurus GA sah tanpa satu baris
+  | pun: pemohon memang tidak mengeluarkan apa-apa karena GA yang memesan
+  | semuanya. Itu keadaan yang sudah dijelaskan, bukan formulir yang belum
+  | selesai -- dan aturan yang sama sudah berlaku di modalnya.
+  */
+  if (!form.items.length && !(needsBusinessTrip.value && arrangedCategories.value.length))
+    return t('cashAdvance.form.toast.minOneItem')
+
+  if (lineNeedsCategory.value) {
+    const tanpaKategori = form.items.findIndex(
+      item => !Number(item.transaction_category_id),
+    )
+
+    if (tanpaKategori !== -1) {
+      return t('cashAdvance.form.toast.itemTransactionCategoryRequired', {
+        number: tanpaKategori + 1,
+      })
+    }
+  }
+
+  const tanpaBaris = categoriesWithoutItem(form.items)
+
+  return tanpaBaris.length
+    ? t('cashAdvance.form.toast.categoryWithoutItem', {
+      categories: tanpaBaris.join(', '),
+    })
+    : null
+}
+
+/*
+| Baris disesuaikan setiap himpunannya berganti.
+|
+| Dua arah, dan keduanya perlu:
+|
+| - Himpunannya menyusut menjadi satu: seluruh baris diisikan yang satu
+|   itu. Kolomnya hilang dari layar, jadi tidak ada lagi tempat bagi
+|   pengguna untuk memperbaiki baris yang nilainya sudah tidak sah.
+|
+| - Anggota dicabut dari himpunannya: baris yang memakainya dikosongkan,
+|   supaya ia terlihat sebagai isian yang menunggu -- bukan terkirim lalu
+|   ditolak dengan sebab yang tidak kelihatan di layar.
+*/
+watch(() => form.transaction_category_ids, himpunan => {
+  const tunggal = himpunan.length === 1 ? himpunan[0] : null
+
+  /*
+  | Mengembalikan baris yang masih sah. Yang keterangannya dicabut dari
+  | header TIDAK ikut -- dan itu inti perbaikannya.
+  |
+  | Sebelumnya, himpunan yang menyusut menjadi satu membuat seluruh baris
+  | dilabeli ulang menjadi yang satu itu. Baris yang menagih biaya listrik
+  | berubah menjadi menagih telepon tanpa satu pun galat: angkanya benar,
+  | keterangannya bohong, dan tersimpan begitu.
+  |
+  | Yang BELUM memilih tetap diisikan bila himpunannya tunggal -- di sana
+  | tidak ada pilihan yang ditimpa.
+  */
+  const sesuaikan = (daftar: CashAdvanceItemForm[]): CashAdvanceItemForm[] =>
+    daftar.filter(baris => {
+      const dipakai = Number(baris.transaction_category_id)
+
+      if (!dipakai) {
+        baris.transaction_category_id = tunggal
+
+        return true
+      }
+
+      return himpunan.includes(dipakai)
+    })
+
+  /* Keduanya: yang sedang disunting di modal, dan yang akan terkirim. */
+  tempItems.value = sesuaikan(tempItems.value)
+
+  const sebelum = form.items.length
+
+  form.items = sesuaikan(form.items)
+
+  /*
+  | Dikabarkan, bukan dibuang diam-diam.
+  |
+  | Baris yang sudah diketik orang -- berikut lampirannya -- tidak pantas
+  | lenyap tanpa sepatah kata, walau lenyapnya memang benar. Aturan yang
+  | sama sudah berlaku saat keterangan transaksinya berganti.
+  */
+  const hilang = sebelum - form.items.length
+
+  if (hilang > 0) {
+    showInfoToast({
+      title: t('cashAdvance.form.categorySet.linesDroppedTitle'),
+      text: t('cashAdvance.form.categorySet.linesDroppedText', { count: hilang }),
+    })
+  }
+}, { deep: true })
 
 const saveItemsFromDialog = (): void => {
   /*
@@ -1211,6 +1726,58 @@ const saveItemsFromDialog = (): void => {
    * Tanggal wajib pada setiap baris. Dipisah dari pemeriksaan deskripsi
    * dan nominal supaya pesannya menunjuk langsung ke kolom yang kosong.
    */
+  /*
+  | Keterangan transaksi barisnya, bila headernya memilih lebih dari satu.
+  |
+  | Ditahan di sini, bukan hanya di server: modalnya ditutup lalu halamannya
+  | tampak siap dikirim, dan penolakan yang baru datang di tombol simpan
+  | memaksa orangnya membuka modalnya lagi untuk mencari baris mana.
+  */
+  if (lineNeedsCategory.value) {
+    const withoutCategory = tempItems.value.findIndex(
+      item => !Number(item.transaction_category_id),
+    )
+
+    if (withoutCategory !== -1) {
+      isSubmitted.value = true
+
+      showWarningToast({
+        title: t('common.alert.warning'),
+        text: t('cashAdvance.form.toast.itemTransactionCategoryRequired', {
+          number: withoutCategory + 1,
+        }),
+      })
+
+      return
+    }
+  }
+
+  /*
+  | Tiap keterangan transaksi yang dipilih harus punya minimal satu baris.
+  |
+  | Barisnya memang disediakan saat modalnya dibuka, tetapi yang disediakan
+  | bisa dihapus. Tanpa penjaga ini headernya menyatakan menagih tiga hal
+  | sementara isinya hanya memuat dua -- dan yang membaca cetakannya tidak
+  | punya cara tahu mana yang hilang.
+  |
+  | Jalan keluarnya disebutkan dua-duanya: tambah barisnya, atau cabut
+  | keterangan transaksinya dari header.
+  */
+  const tanpaBaris = categoriesWithoutItem(tempItems.value)
+
+  if (tanpaBaris.length) {
+    isSubmitted.value = true
+
+    showWarningToast({
+      title: t('common.alert.warning'),
+      text: t('cashAdvance.form.toast.categoryWithoutItem', {
+        categories: tanpaBaris.join(', '),
+      }),
+    })
+
+    return
+  }
+
   const withoutDate = tempItems.value.findIndex(item => !String(item.date ?? '').trim())
 
   if (withoutDate !== -1) {
@@ -1285,7 +1852,10 @@ const saveItemsFromDialog = (): void => {
 }
 
 const addItemRow = (): void => {
-  tempItems.value.push(createEmptyItem())
+  tempItems.value.push({
+    ...createEmptyItem(),
+    transaction_category_id: keteranganTunggal.value,
+  })
 }
 
 const removeItemRow = (index: number): void => {
@@ -1468,6 +2038,25 @@ const formatFileSize = (bytes: number | null): string => {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`
 }
 
+/**
+ * Membuka berkas yang BARU DIPILIH, yang belum pernah diunggah.
+ *
+ * Ia masih objek File di memori peramban dan tidak punya alamat apa pun,
+ * jadi alamat sementaranya dibuatkan lebih dulu.
+ *
+ * Alamatnya dibebaskan BELAKANGAN, bukan seketika: membebaskannya tepat
+ * sesudah window.open membatalkan alamat yang baru saja dipakai, dan tab
+ * yang terbuka mendapati halaman kosong. Semenit cukup lama untuk dibuka,
+ * cukup singkat untuk tidak menumpuk.
+ */
+const openPickedFile = (file: File): void => {
+  const alamat = URL.createObjectURL(file)
+
+  window.open(alamat, '_blank', 'noopener')
+
+  window.setTimeout(() => URL.revokeObjectURL(alamat), 60000)
+}
+
 const getFileType = (mimeType: string | null): string =>
   mimeType === 'application/pdf' ? 'PDF' : 'IMAGE'
 
@@ -1492,15 +2081,19 @@ const validateForm = (): boolean => {
   }
 
   /*
-  | Dokumen perdin yang seluruh kategorinya diurus GA sah tanpa satu
-  | baris pun: pemohon memang tidak mengeluarkan apa-apa karena GA yang
-  | memesan semuanya. Itu keadaan yang sudah dijelaskan, bukan formulir
-  | yang belum selesai -- dan aturan yang sama sudah berlaku di modalnya.
+  | Keterangan transaksi tiap baris, diperiksa lagi di sini.
+  |
+  | Penjaganya sudah ada di pintu modal, tetapi headernya bisa diganti
+  | SESUDAH rinciannya disimpan -- dan modalnya belum tentu dibuka lagi.
+  | Penjaga yang hanya berdiri di satu pintu tidak menjaga apa pun bagi
+  | orang yang tidak lewat situ.
   */
-  if (!form.items.length && !(needsBusinessTrip.value && arrangedCategories.value.length)) {
+  const keluhanKategori = breakdownCategoryIssue()
+
+  if (keluhanKategori) {
     showWarningToast({
       title: t('common.alert.warning'),
-      text: t('cashAdvance.form.toast.minOneItem'),
+      text: keluhanKategori,
     })
 
     return false
@@ -1597,6 +2190,14 @@ const buildFormData = (): FormData => {
   formData.append('transaction_category_id', String(form.transaction_category_id || ''))
 
   /*
+  | Himpunannya, berikut penentunya di atas. Keduanya dikirim: penentunya
+  | masih yang memilih alur approval, dan server tetap mewajibkannya.
+  */
+  form.transaction_category_ids.forEach(id => {
+    formData.append('transaction_category_ids[]', String(id))
+  })
+
+  /*
    * Dikirim hanya bila memang diperlukan. Server tetap mengabaikannya
    * untuk keterangan transaksi yang tidak menuntutnya.
    */
@@ -1612,6 +2213,22 @@ const buildFormData = (): FormData => {
   if (needsBusinessTrip.value) {
     arrangedCategories.value.forEach(id => {
       formData.append('arranged_categories[]', String(id))
+
+      /*
+      | Catatannya hanya terkirim untuk kategori yang sedang ditandai.
+      |
+      | Yang penandanya dimatikan tetap tersimpan di layar -- supaya salah
+      | klik tidak menghapus apa yang sudah diketik -- tetapi tidak ikut
+      | berangkat: catatan tanpa penanda bukan keterangan apa pun lagi.
+      |
+      | Yang kosong pun dilewati, bukan dikirim sebagai string kosong:
+      | server menyimpan kosong sebagai null, dan dua bentuk untuk satu
+      | arti memaksa setiap pembacanya memeriksa dua-duanya.
+      */
+      const catatan = arrangedNote(Number(id)).trim()
+
+      if (catatan)
+        formData.append(`arranged_notes[${id}]`, catatan)
     })
   }
 
@@ -1631,6 +2248,15 @@ const buildFormData = (): FormData => {
         expense_category_id: item.expense_category_id,
         qty: item.qty,
         unit_price: item.unit_price,
+
+        /*
+        | Keterangan transaksi barisnya. Berlaku pada baris perdin maupun
+        | bukan -- keterangan transaksi bukan bagian dari bentuk rinciannya.
+        |
+        | Server mengisinya sendiri bila himpunannya tepat satu, jadi null
+        | di sini bukan kehilangan data.
+        */
+        transaction_category_id: item.transaction_category_id,
       })),
     ),
   )
@@ -1757,6 +2383,15 @@ onMounted(async () => {
    */
   await loadTransactionCategories(true)
 })
+
+/*
+| Revisi yang sedang berjalan, bila dokumen ini dikembalikan.
+|
+| Ditampilkan di atas formnya. Alasan yang hanya bisa dibaca di
+| layar lain sama saja dengan tidak ada: pemohon akan menutup
+| formnya, mencari alasannya, lalu membukanya lagi.
+*/
+const revisiTerbuka = ref<RevisionEntry | null>(null)
 </script>
 
 <template>
@@ -1793,6 +2428,17 @@ onMounted(async () => {
   </VCard>
 
   <section v-else>
+    <!--
+      Alasan pengembaliannya, paling atas.
+
+      Hanya bagian "sedang berjalan" dari komponen riwayat: di form
+      edit yang dibutuhkan bukan riwayat, melainkan satu hal yang
+      harus diperbaiki sekarang.
+    -->
+    <RevisionHistory
+      v-if="revisiTerbuka"
+      :open-revision="revisiTerbuka"
+    />
     <VRow>
       <VCol cols="12">
         <VCard>
@@ -1907,7 +2553,7 @@ onMounted(async () => {
                   matriks yang membedakan Perdin dari Telpon/Listrik/Pantry.
                 -->
                 <VAutocomplete
-                  v-model="form.transaction_category_id"
+                  v-model="selectedCategories"
                   :label="t('cashAdvance.form.fields.transactionCategory')"
                   :items="transactionCategoryList"
                   item-title="title"
@@ -1915,12 +2561,21 @@ onMounted(async () => {
                   density="comfortable"
                   :loading="isLoadingTransactionCategory"
                   clearable
+
+                  :multiple="allowMultipleCategories"
+                  :chips="allowMultipleCategories"
+                  :closable-chips="allowMultipleCategories"
+
                   :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
-                  :error="isSubmitted && !form.transaction_category_id"
-                  :error-messages="isSubmitted && !form.transaction_category_id ? [t('cashAdvance.form.validation.transactionCategory')] : []"
-                  :disabled="!form.branch || !form.department_id"
+                  :error="isSubmitted && !form.transaction_category_ids.length"
+                  :error-messages="isSubmitted && !form.transaction_category_ids.length ? [t('cashAdvance.form.validation.transactionCategory')] : []"
+                  :disabled="!form.branch || !form.department_id || !form.request_type"
                   :no-data-text="t('cashAdvance.form.noData.transactionCategory')"
                   :placeholder="t('cashAdvance.form.placeholders.transactionCategory')"
+                  :hint="allowMultipleCategories
+                    ? t('cashAdvance.form.categorySet.hintMultiple')
+                    : t('cashAdvance.form.categorySet.hintSingle')"
+                  persistent-hint
                 />
 
                 <!--
@@ -2157,6 +2812,22 @@ onMounted(async () => {
                       {{ t('cashAdvance.form.breakdown.arrangedNotice') }}
                     </div>
 
+                    <!--
+                      Catatannya ikut terbaca di ringkasan halamannya. Tanpa ini
+                      yang mengisi harus membuka modalnya lagi hanya untuk
+                      memastikan apa yang sudah ia tulis.
+                    -->
+                    <div
+                      v-if="kelompok.arranged && arrangedNote(kelompok.category.id).trim()"
+                      class="ca-cat-note-read"
+                    >
+                      <span class="text-caption text-medium-emphasis">
+                        {{ t('cashAdvance.form.breakdown.arrangedNotesLabel') }}
+                      </span>
+
+                      <div>{{ arrangedNote(kelompok.category.id) }}</div>
+                    </div>
+
                     <template v-else>
                       <div
                         v-for="(item, index) in kelompok.rows"
@@ -2228,6 +2899,23 @@ onMounted(async () => {
                           {{ item.description || '-' }}
                         </div>
 
+                        <!--
+                          Keterangan transaksi barisnya. Muncul hanya bila
+                          headernya memilih lebih dari satu -- bila cuma satu, ia
+                          mengulang apa yang sudah tertulis di bagian atas
+                          formulir, sebanyak jumlah barisnya.
+                        -->
+                        <VChip
+                          v-if="lineShowsCategory && lineCategoryName(item.transaction_category_id)"
+                          size="x-small"
+                          variant="tonal"
+                          color="primary"
+                          prepend-icon="tabler-tag"
+                          class="mt-1"
+                        >
+                          {{ lineCategoryName(item.transaction_category_id) }}
+                        </VChip>
+
                         <div class="text-caption text-medium-emphasis mt-1">
                           {{ t('cashAdvance.form.items.tableDate') }}:
                           <strong :class="{ 'text-error': dateOutsideTrip(item.date) }">
@@ -2243,6 +2931,10 @@ onMounted(async () => {
                             variant="tonal"
                             color="primary"
                             prepend-icon="tabler-paperclip"
+                            link
+                            :href="attachment.url || undefined"
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
                             {{ attachment.original_filename || attachment.filename }}
                           </VChip>
@@ -2254,8 +2946,11 @@ onMounted(async () => {
                             variant="tonal"
                             color="success"
                             prepend-icon="tabler-paperclip"
+                            :title="file.name"
+                            link
+                            @click="openPickedFile(file)"
                           >
-                            {{ file.name }}
+                            {{ shortFileName(file.name) }}
                           </VChip>
                         </div>
                       </div>
@@ -2486,11 +3181,26 @@ onMounted(async () => {
                       {{ t('cashAdvance.form.items.tableDate') }}
                       <span class="text-error">*</span>
                     </th>
+                    <!--
+                      Keterangan transaksi barisnya. Muncul hanya bila headernya
+                      memilih lebih dari satu -- kolom berpilihan tunggal hanya
+                      menambah lebar tanpa menambah keterangan.
+                    -->
+                    <th
+                      v-if="lineShowsCategory"
+                      class="ca-col-trxcat"
+                    >
+                      {{ t('cashAdvance.form.items.tableTransactionCategory') }}
+                      <span class="text-error">*</span>
+                    </th>
+
                     <th class="ca-col-desc">
                       {{ t('cashAdvance.form.items.tableDescription') }}
+                      <span class="text-error">*</span>
                     </th>
                     <th class="ca-col-amount">
                       {{ t('cashAdvance.form.items.tableAmount') }}
+                      <span class="text-error">*</span>
                     </th>
                     <th class="ca-col-attachment">
                       {{ t('cashAdvance.form.items.tableAttachment') }}
@@ -2535,6 +3245,24 @@ onMounted(async () => {
                         :config="lineDateConfig"
                         :error="(isSubmitted && !item.date) || dateOutsideTrip(item.date)"
                         :error-messages="itemDateErrors(item)"
+                      />
+                    </td>
+
+                    <td v-if="lineShowsCategory">
+                      <VSelect
+                        v-model="item.transaction_category_id"
+                        :items="selectedCategoryOptions"
+                        item-title="title"
+                        item-value="id"
+                        density="compact"
+                        variant="outlined"
+                        hide-details="auto"
+                        :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300, minWidth: 320 }"
+                        :title="lineCategoryName(item.transaction_category_id)"
+                        :error="isSubmitted && !item.transaction_category_id"
+                        :error-messages="isSubmitted && !item.transaction_category_id
+                          ? [t('cashAdvance.form.validation.itemTransactionCategory')]
+                          : []"
                       />
                     </td>
 
@@ -2585,6 +3313,7 @@ onMounted(async () => {
                           class="text-none align-self-start"
                           :color="isSubmitted && lineMissingAttachment(index) ? 'error' : 'primary'"
                           prepend-icon="tabler-paperclip"
+                          :title="t('cashAdvance.form.attachment.addButton')"
                           @click="triggerLineFileInput(index)"
                         >
                           {{ t('cashAdvance.form.attachment.addButton') }}
@@ -2659,8 +3388,21 @@ onMounted(async () => {
                           />
 
                           <div class="ca-line-file__body">
-                            <div class="ca-line-file__name">
-                              {{ file.name }}
+                            <!--
+                              Namanya yang bisa ditekan, bukan seluruh barisnya:
+                              barisnya memuat tombol hapus, dan baris yang
+                              seluruhnya bisa ditekan membuat orang membuka berkas
+                              padahal hendak menghapusnya.
+                            -->
+                            <div
+                              class="ca-line-file__name ca-line-file__name--open"
+                              role="button"
+                              tabindex="0"
+                              :title="file.name"
+                              @click="openPickedFile(file)"
+                              @keydown.enter="openPickedFile(file)"
+                            >
+                              {{ shortFileName(file.name) }}
                             </div>
 
                             <div class="text-caption text-medium-emphasis">
@@ -2741,7 +3483,19 @@ onMounted(async () => {
                   meniadakan, dan server menolak dokumen yang mengatakan
                   dua-duanya.
                 -->
+
+                <!--
+                  Hanya pada kategori yang disebut masternya. GA tidak mengurus
+                  semuanya; yang di luarnya diisi pemohon sendiri, dan penanda
+                  yang ditawarkan di sana menyatakan ada yang akan mengurusnya
+                  padahal tidak ada siapa pun.
+
+                  Yang SUDAH ditandai tetap menampilkannya walau masternya kini
+                  melarang -- tanpa itu, dokumen yang ditandai sebelum
+                  peraturannya berubah tidak bisa diperbaiki siapa pun.
+                -->
                 <VSwitch
+                  v-if="kelompok.category.ga_arrangeable || kelompok.arranged"
                   :model-value="kelompok.arranged"
                   color="warning"
                   density="compact"
@@ -2767,6 +3521,30 @@ onMounted(async () => {
                 {{ t('cashAdvance.form.breakdown.arrangedNotice') }}
               </div>
 
+              <!--
+                Catatan untuk GA. Opsional: penandanya sudah sah berdiri
+                sendiri, dan mewajibkannya hanya melahirkan isian berisi
+                tanda hubung.
+              -->
+              <div
+                v-if="kelompok.arranged"
+                class="ca-cat-note"
+              >
+                <VTextarea
+                  :model-value="arrangedNote(kelompok.category.id)"
+                  :label="t('cashAdvance.form.breakdown.arrangedNotesLabel')"
+                  :placeholder="t('cashAdvance.form.breakdown.arrangedNotesPlaceholder')"
+                  :hint="t('cashAdvance.form.breakdown.arrangedNotesHint')"
+                  persistent-hint
+                  rows="2"
+                  auto-grow
+                  counter="1000"
+                  maxlength="1000"
+                  density="compact"
+                  @update:model-value="nilai => setArrangedNote(kelompok.category.id, nilai)"
+                />
+              </div>
+
               <template v-else>
                 <div class="ca-table-wrapper">
                   <VTable class="ca-item-table">
@@ -2777,12 +3555,15 @@ onMounted(async () => {
                         </th>
                         <th class="ca-col-desc">
                           {{ t('cashAdvance.form.breakdown.tableItem') }}
+                          <span class="text-error">*</span>
                         </th>
                         <th class="ca-col-qty">
                           {{ t('cashAdvance.form.breakdown.tableQty') }}
+                          <span class="text-error">*</span>
                         </th>
                         <th class="ca-col-unit">
                           {{ t('cashAdvance.form.breakdown.tableUnitPrice') }}
+                          <span class="text-error">*</span>
                         </th>
                         <th class="ca-col-amount">
                           {{ t('cashAdvance.form.items.total') }}
@@ -2878,6 +3659,7 @@ onMounted(async () => {
                               color="primary"
                               class="text-none align-self-start"
                               prepend-icon="tabler-paperclip"
+                              :title="t('cashAdvance.form.attachment.addButton')"
                               @click="triggerLineFileInput(baris.index)"
                             >
                               {{ t('cashAdvance.form.attachment.addButton') }}
@@ -2891,9 +3673,10 @@ onMounted(async () => {
                                 variant="tonal"
                                 color="primary"
                                 closable
+                                :title="file.name"
                                 @click:close="removeLineFile(baris.index, fileIndex)"
                               >
-                                {{ file.name }}
+                                {{ shortFileName(file.name) }}
                               </VChip>
                             </div>
                           </div>
@@ -3028,6 +3811,22 @@ onMounted(async () => {
   padding-inline: 1rem;
 }
 
+/* Isian catatan GA di dalam modal. */
+.ca-cat-note {
+  padding-block: 0 0.75rem;
+  padding-inline: 0.875rem;
+}
+
+/* Dan bacaannya pada ringkasan di halamannya. */
+.ca-cat-note-read {
+  border-inline-start: 2px solid rgba(var(--v-theme-warning), 0.5);
+  margin-block-end: 0.5rem;
+  margin-inline: 0.875rem;
+  padding-inline-start: 0.625rem;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+
 .ca-cat-arranged {
   color: rgba(var(--v-theme-on-surface), 0.7);
   font-size: 0.85rem;
@@ -3037,11 +3836,13 @@ onMounted(async () => {
 }
 
 .ca-col-qty {
-  inline-size: 110px;
+  inline-size: 88px;
+  min-inline-size: 88px;
 }
 
 .ca-col-unit {
-  inline-size: 170px;
+  inline-size: 140px;
+  min-inline-size: 140px;
 }
 
 /* Ringkasan rincian pada halaman utama. */
@@ -3057,17 +3858,76 @@ onMounted(async () => {
   padding-inline: 0.875rem;
 }
 
+/*
+| TIDAK ber-overflow sendiri.
+|
+| VTable sudah membawa penggulirnya pada .v-table__wrapper. Menambah satu
+| lagi di sini memunculkan dua batang penggulir bertumpuk -- dan yang atas
+| menggulir yang bawah, bukan isinya.
+|
+| min-inline-size: 0 tetap perlu: tanpa itu, pembungkus yang menjadi anak
+| flex atau grid tidak boleh menyusut di bawah lebar isinya, dan penggulir
+| di dalamnya tidak pernah mendapat ruang untuk bekerja.
+*/
 .ca-table-wrapper {
-  overflow-x: auto;
+  min-inline-size: 0;
 }
 
-.ca-item-table {
-  min-inline-size: 1060px;
+/*
+| Jumlah seluruh lebar minimum kolomnya: 48 + 192 + 176 + 224 + 176 + 240
+| + 72. Angka yang lebih kecil dari jumlahnya tidak menahan apa pun, dan
+| yang membacanya kelak mengira ia sudah dihitung.
+|
+| Melebihi lebar layar berarti tabelnya digulir ke samping, dan itu
+| memang dipilih: rapi dan terbaca lebih berharga daripada muat tanpa
+| menggulir.
+*/
+/*
+| Lebar minimumnya pada TABELNYA, bukan pada akar VTable.
+|
+| Dipasang di akarnya, akar itu yang melebar dan pembungkus di luarnya ikut
+| menggulir -- sementara tabel di dalamnya masih bisa melebar lagi karena
+| jumlah lebar minimum kolomnya tidak terikat angka ini. Dua wadah
+| menggulir sekaligus, dan dua batang penggulir muncul bertumpuk.
+|
+| Di tabelnya, akarnya tetap selebar induknya dan hanya .v-table__wrapper
+| milik Vuetify yang menggulir. Satu batang, dan kepalanya ikut bergeser
+| bersama isinya -- ia memang satu tabel.
+*/
+/*
+| Teks pilihan keterangan transaksi dipotong, tidak dibungkus.
+|
+| Nama di master bisa panjang. Dibiarkan membungkus, satu sel tumbuh
+| beberapa baris dan isinya melampaui tinggi selnya sendiri -- menimpa
+| kolom sebelahnya.
+|
+| min-inline-size: 0 pada wadahnya bukan hiasan: anak flex tidak boleh
+| menyusut di bawah lebar isinya tanpa itu, dan ellipsis-nya tidak pernah
+| dapat giliran.
+*/
+.ca-item-table :deep(.v-select .v-field__input) {
+  flex-wrap: nowrap;
+  min-inline-size: 0;
+}
+
+.ca-item-table :deep(.v-select .v-select__selection) {
+  overflow: hidden;
+  min-inline-size: 0;
+}
+
+.ca-item-table :deep(.v-select .v-select__selection-text) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ca-item-table :deep(table) {
+  min-inline-size: 1128px;
 }
 
 .ca-col-attachment {
-  inline-size: 18rem;
-  min-inline-size: 18rem;
+  inline-size: 15rem;
+  min-inline-size: 15rem;
 }
 
 /* Kartu berkas yang menempel pada satu baris rincian. */
@@ -3086,6 +3946,13 @@ onMounted(async () => {
   min-inline-size: 0;
 }
 
+/* Nama yang bisa ditekan -- dan terlihat begitu. */
+.ca-line-file__name--open {
+  color: rgb(var(--v-theme-primary));
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .ca-line-file__name {
   overflow: hidden;
   font-size: 0.8rem;
@@ -3094,8 +3961,33 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+/*
+| Kolom deskripsi: lentur, tetapi berbatas bawah.
+|
+| Ia satu-satunya kolom yang boleh melar mengisi sisa ruang. Tanpa batas
+| bawah ia pula yang pertama diambil ketika ruangnya kurang, dan
+| keterangan yang panjang terpotong tanpa ada yang bisa dilakukan
+| pembacanya.
+*/
+/*
+| Keterangan transaksi per baris.
+|
+| min-inline-size, bukan inline-size: tabel auto-layout memperlakukan
+| inline-size sebagai saran dan tetap memeras kolomnya saat ruangnya
+| kurang -- dan pemilih yang terperas tidak terbaca isinya.
+*/
+.ca-col-trxcat {
+  inline-size: 11rem;
+  min-inline-size: 11rem;
+}
+
+.ca-col-desc {
+  min-inline-size: 14rem;
+}
+
 .ca-col-no {
-  inline-size: 4rem;
+  inline-size: 3rem;
+  min-inline-size: 3rem;
 }
 
 /*
@@ -3105,16 +3997,18 @@ onMounted(async () => {
 | lebarnya dikunci lewat min-inline-size, bukan sekadar inline-size.
 */
 .ca-col-date {
-  inline-size: 14rem;
-  min-inline-size: 14rem;
+  inline-size: 12rem;
+  min-inline-size: 12rem;
 }
 
 .ca-col-amount {
-  inline-size: 14rem;
+  inline-size: 11rem;
+  min-inline-size: 11rem;
 }
 
 .ca-col-action {
-  inline-size: 6rem;
+  inline-size: 4.5rem;
+  min-inline-size: 4.5rem;
 }
 
 .ca-total-box {

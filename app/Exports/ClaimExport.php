@@ -96,7 +96,8 @@ class ClaimExport implements FromArray, WithHeadings, WithEvents, WithTitle, Wit
             $date = $this->formatDate($claim->date ?? null);
             $branch = $this->formatBranch($claim);
             $department = $this->formatDepartment($claim);
-            $category = $this->formatText($claim->transactionCategory->name ?? null);
+            /* Seluruhnya, dipisah koma. Aturannya di Claim::transactionCategoryLabel(). */
+            $category = $this->formatText($claim->transactionCategoryLabel());
             $subject = $this->formatText($claim->subject ?? null);
             $total = $this->formatMoney($claim->total_amount ?? 0);
             $status = $this->formatText($claim->status ?? null);

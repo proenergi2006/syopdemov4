@@ -6,6 +6,9 @@ type RoleRow = {
   id: number
   kode: string
   nama: string
+
+  /* 1 staf, 2 supervisor, 3 head, 4 manager, 5 direksi. null = belum diatur. */
+  level: number | null
   is_active: boolean
 }
 
@@ -13,6 +16,9 @@ type RoleForm = {
   id?: number
   kode: string
   nama: string
+
+  /* 1 staf, 2 supervisor, 3 head, 4 manager, 5 direksi. null = belum diatur. */
+  level: number | null
   is_active: boolean
 }
 
@@ -33,9 +39,24 @@ const isEdit = ref(false)
 const formLoading = ref(false)
 const formErrors = ref<Record<string, string>>({})
 
+/*
+| Tingkat jabatan, dipakai aturan approval.
+|
+| Namanya ikut ditulis supaya yang mengisi tidak perlu mengingat arti
+| angkanya -- yang disimpan tetap angkanya.
+*/
+const levelOptions = [
+  { title: '1 — Staf / pelaksana', value: 1 },
+  { title: '2 — Supervisor / SPV', value: 2 },
+  { title: '3 — Head / Asisten Manager', value: 3 },
+  { title: '4 — Manager / GM', value: 4 },
+  { title: '5 — Direksi', value: 5 },
+]
+
 const form = ref<RoleForm>({
   kode: '',
   nama: '',
+  level: null as number | null,
   is_active: true,
 })
 
@@ -135,14 +156,20 @@ const paginationData = computed(() => {
 const openCreate = () => {
   isEdit.value = false
   formErrors.value = {}
-  form.value = { kode: '', nama: '', is_active: true }
+  form.value = { kode: '', nama: '', level: null, is_active: true }
   isDialogOpen.value = true
 }
 
 const openEdit = (row: RoleRow) => {
   isEdit.value = true
   formErrors.value = {}
-  form.value = { id: row.id, kode: row.kode, nama: row.nama, is_active: row.is_active }
+  form.value = {
+    id: row.id,
+    kode: row.kode,
+    nama: row.nama,
+    level: row.level ?? null,
+    is_active: row.is_active,
+  }
   isDialogOpen.value = true
 }
 
@@ -155,6 +182,12 @@ const save = async () => {
   const payload = {
     kode: form.value.kode,
     nama: form.value.nama,
+
+    /* Kosong dikirim sebagai null, bukan 0: 0 bukan tingkat jabatan. */
+    level: form.value.level === null || form.value.level === undefined || String(form.value.level) === ''
+      ? null
+      : Number(form.value.level),
+
     is_active: form.value.is_active,
   }
 
@@ -241,6 +274,13 @@ const save = async () => {
           <tr>
             <th scope="col">KODE</th>
             <th scope="col">NAMA</th>
+            <th
+              scope="col"
+              class="text-center"
+              style="width: 8rem;"
+            >
+              TINGKAT
+            </th>
             <th scope="col">STATUS</th>
             <th scope="col" class="text-center" style="width: 5rem;">ACTIONS</th>
           </tr>
@@ -250,6 +290,18 @@ const save = async () => {
           <tr v-for="r in rows" :key="r.id">
             <td class="text-medium-emphasis">{{ r.kode }}</td>
             <td class="text-medium-emphasis">{{ r.nama }}</td>
+
+            <!--
+              Tanda hubung untuk yang belum diatur: angka 0 akan terbaca
+              sebagai tingkat terendah, padahal artinya "tidak ikut aturan".
+            -->
+            <td class="text-center">
+              <span v-if="r.level">{{ r.level }}</span>
+              <span
+                v-else
+                class="text-disabled"
+              >—</span>
+            </td>
             <td>
               <VChip :color="r.is_active ? 'success' : 'secondary'" size="small" class="text-capitalize">
                 {{ r.is_active ? 'active' : 'inactive' }}
@@ -326,6 +378,18 @@ const save = async () => {
         <VCardText class="d-flex flex-column gap-3">
           <VTextField v-model="form.kode" label="Kode" :error-messages="formErrors.kode" />
           <VTextField v-model="form.nama" label="Nama" :error-messages="formErrors.nama" />
+
+          <VSelect
+            v-model="form.level"
+            label="Tingkat Jabatan"
+            :items="levelOptions"
+            item-title="title"
+            item-value="value"
+            clearable
+            :error-messages="formErrors.level"
+            hint="Dipakai aturan approval: step yang approvernya setingkat atau lebih rendah dan berada di department yang sama tidak ikut digambar. Dikosongkan berarti role ini tidak ikut aturan itu."
+            persistent-hint
+          />
           <VSwitch v-model="form.is_active" label="Active" inset />
         </VCardText>
 

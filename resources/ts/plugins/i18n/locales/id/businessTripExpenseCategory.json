@@ -13,7 +13,8 @@
         "name": "Nama Kategori",
         "description": "Keterangan",
         "status": "Status",
-        "actions": "Aksi"
+        "actions": "Aksi",
+        "gaArrangeable": "Diurus GA"
     },
     "form": {
         "createTitle": "Tambah Kategori Biaya",
@@ -26,7 +27,9 @@
         "active": "Aktif",
         "activeHint": "Yang nonaktif hilang dari pilihan, tetapi dokumen lama yang memakainya tetap terbaca.",
         "save": "Simpan",
-        "cancel": "Batal"
+        "cancel": "Batal",
+        "gaArrangeable": "Boleh diurus GA",
+        "gaArrangeableHint": "Bila dinyalakan, pemohon bisa menandai kategori ini sebagai diurus GA pada rincian perdin -- tanpa perlu mengisi barisnya. Yang dimatikan wajib diisi pemohon sendiri."
     },
     "toggle": {
         "activate": "Aktifkan",
@@ -38,5 +41,7 @@
         "text": "Kategori {name} akan dihapus. Tindakan ini tidak bisa dibatalkan.",
         "confirm": "Ya, Hapus",
         "inUseTooltip": "Sudah dipakai rincian dokumen — nonaktifkan saja."
-    }
+    },
+    "gaArrangeableYes": "Diurus GA",
+    "gaArrangeableNo": "Diisi pemohon"
 }

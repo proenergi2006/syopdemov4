@@ -163,10 +163,27 @@ return [
     | dari layar -- nominal yang bisa datang dari dua tempat cepat atau
     | lambat akan datang berbeda.
     */
+    /*
+    | Himpunan keterangan transaksi sebuah FPU.
+    |
+    | Headernya menyatakan himpunan yang boleh dipakai baris rinciannya;
+    | barisnya memilih dari himpunan itu, bukan dari seluruh master.
+    */
+    'transaction_category_set' => [
+        'required' => 'At least one transaction category must be selected.',
+        'single_for_non_routine' => 'A Non Rutin request may use only one transaction category. Split it into several FPUs, or change the request type to Rutin.',
+        'unknown' => 'One of the transaction categories is not recognised. Reload the page and select again.',
+        'request_type_mismatch' => 'Transaction category :categories does not apply to :request_type requests. This is configured in the Transaction Category master.',
+        'item_required' => 'Row :row: the transaction category has not been selected.',
+        'item_not_in_set' => 'Row :row: its transaction category is not among those selected at the top of the FPU.',
+        'category_without_item' => 'Transaction category :categories has no detail lines at all. Add a line for it, or remove that transaction category at the top of the FPU.',
+    ],
+
     'breakdown' => [
         'category_required' => 'Row :row: the expense category is not selected. Business trip lines are grouped by category.',
         'qty_required' => 'Row :row: Qty is required and must be greater than zero.',
         'unit_price_required' => 'Row :row: Unit cost is required and must be greater than zero.',
         'arranged_has_items' => 'Category :category is marked as arranged by GA, so it cannot have any lines. Remove the lines, or turn the marker off.',
+        'arranged_not_allowed' => 'Category :category is not handled by GA, so the marker cannot be set. Its lines are filled in by the requester. This is configured in the Business Trip Expense Category master.',
     ],
 ];

@@ -13,6 +13,7 @@
     "empty": "No submission limits yet.",
     "active": "Active",
     "inactive": "Inactive",
+    "unlimitedChip": "No limit",
     "fallbackChip": "General",
     "editButton": "Edit",
     "deleteButton": "Delete",
@@ -42,6 +43,8 @@
     "maxDaysHint": "Calendar days — weekends are counted too.",
     "notes": "Notes",
     "notesPlaceholder": "Optional. For example, why this limit differs.",
+    "isUnlimited": "No limit",
+    "isUnlimitedHint": "This limit does not limit anything: the number of running FPUs and the age of their realisations are ignored. Used e.g. for the BOD. Both numbers above are kept and apply again as soon as this is switched off.",
     "isActive": "Active",
     "saveSuccess": "The submission limit was saved.",
     "saveFailed": "Failed to save the submission limit."

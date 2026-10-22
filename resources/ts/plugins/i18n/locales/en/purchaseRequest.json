@@ -188,7 +188,8 @@
             "statusPoAll": "All",
             "statusPoOpen": "Open",
             "statusPoPartial": "Partial",
-            "statusPoCompleted": "Completed"
+            "statusPoCompleted": "Completed",
+            "statusNeedRevision": "Needs Revision"
         },
         "menu": {
             "waitingMyApprovalBadge": "Awaiting Your Approval",

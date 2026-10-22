@@ -7,7 +7,8 @@
         "draft": "Draft",
         "inProgress": "In Progress",
         "received": "Received",
-        "rejected": "Rejected"
+        "rejected": "Rejected",
+        "needRevision": "Needs Revision"
     },
     "list": {
         "filtersTitle": "Cash Advance Filters",
@@ -97,7 +98,10 @@
             "attachmentCount": "This document has {count} attachment(s).",
             "attachmentInclude": "Merge attachments into a single PDF",
             "attachmentPdfNotice": "Image attachments are added on the following pages, two per page. Attachments that are already PDFs cannot be merged — their names are still listed on the last page so they can be opened separately.",
-            "attachmentConfirm": "Print"
+            "attachmentConfirm": "Print",
+            "combineTripInclude": "Combine with the business trip document",
+            "combineTripNotice": "The business trip will be printed after this document, along with the GA booking files if attachments are combined.",
+            "combineTripUnavailable": "This document is not linked to a business trip, or the trip is not fully approved yet."
         },
         "approve": {
             "dialogTitle": "Approve cash advance {number}?",
@@ -235,7 +239,7 @@
     "form": {
         "attachment": {
             "title": "Attachments",
-            "addButton": "Add Attachment",
+            "addButton": "Upload Attachment",
             "empty": "No attachments yet. Accepted formats: PDF, JPG, JPEG, PNG, up to 3MB each.",
             "deleteButton": "Remove",
             "existingTitle": "Saved Attachments"
@@ -289,7 +293,8 @@
             "tableDescription": "Description",
             "tableNo": "No",
             "total": "Total Requested",
-            "attachmentOptional": "optional for business trips"
+            "attachmentOptional": "optional for business trips",
+            "tableTransactionCategory": "Transaction Category"
         },
         "loadingTitle": "Loading cash advance data...",
         "noData": {
@@ -333,7 +338,9 @@
             "cancelConfirmTitle": "Discard this form?",
             "cancelConfirmText": "Anything you have filled in will be lost.",
             "saveFailed": "Failed to save the cash advance.",
-            "linesClearedByCategory": "The request lines were cleared because the transaction category changed. The two are filled in differently, so the lines start over."
+            "linesClearedByCategory": "The request lines were cleared because the transaction category changed. The two are filled in differently, so the lines start over.",
+            "itemTransactionCategoryRequired": "Row {number}: its transaction category has not been selected.",
+            "categoryWithoutItem": "Transaction category {categories} has no lines yet. Add a line for it, or remove that transaction category at the top of the form."
         },
         "validation": {
             "date": "Date is required.",
@@ -347,7 +354,8 @@
             "itemDescription": "Description is required.",
             "itemAmount": "Amount is required.",
             "itemAttachment": "At least one file.",
-            "businessTrip": "A business trip document is required."
+            "businessTrip": "A business trip document is required.",
+            "itemTransactionCategory": "A transaction category is required"
         },
         "hints": {
             "businessTrip": "Only your approved business trips that are not already used by an active cash advance.",
@@ -374,7 +382,18 @@
             "toastNoRows": "There are no lines at all. Fill in at least one, or mark the category as arranged by GA.",
             "toastCategory": "Row {number}: the expense category is not selected.",
             "toastQty": "Row {number}: Qty is required and must be greater than zero.",
-            "toastUnitPrice": "Row {number}: Unit cost is required and must be greater than zero."
+            "toastUnitPrice": "Row {number}: Unit cost is required and must be greater than zero.",
+            "arrangedNotesLabel": "Note for GA (optional)",
+            "arrangedNotesPlaceholder": "e.g. morning departure, return the same day",
+            "arrangedNotesHint": "A specific request to GA for this category. It also shows in the document detail."
+        },
+        "categorySet": {
+            "hintSingle": "A Non Rutin request may use only one transaction category.",
+            "hintMultiple": "More than one is allowed. Each detail line then picks one of them.",
+            "shrunkTitle": "Transaction categories reduced",
+            "shrunkText": "A Non Rutin request may use only one transaction category, so only the first one was kept.",
+            "linesDroppedTitle": "Detail lines removed",
+            "linesDroppedText": "{count} line(s) were removed because their transaction category was taken off the top of the form."
         }
     },
     "detail": {
@@ -426,6 +445,7 @@
         "paymentOverdue": "Past its schedule and the funds have not been released.",
         "paymentEarly": "Disbursed ahead of schedule.",
         "paymentOnTime": "Disbursed exactly on schedule.",
-        "paymentLate": "Disbursed after its schedule."
+        "paymentLate": "Disbursed after its schedule.",
+        "itemTransactionCategory": "Transaction Category"
     }
 }

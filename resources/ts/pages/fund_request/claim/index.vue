@@ -19,6 +19,7 @@ import { usePolling } from '@core/composable/usePolling'
 import { useDayNames } from '@core/composable/useDayNames'
 import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
+import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
 
 /*
 |--------------------------------------------------------------------------
@@ -53,6 +54,7 @@ interface ClaimRow {
 
   can_submit?: boolean
   can_approve?: boolean
+  revision_count?: number
   approval_label?: string | null
 
   /*
@@ -272,6 +274,35 @@ const detailError = ref('')
 const detail = ref<any | null>(null)
 
 /*
+| Himpunan keterangan transaksi dokumennya.
+|
+| Jatuh ke keterangan tunggalnya bila himpunannya tidak dikirim -- itu
+| keadaan Claim yang dibuat sebelum himpunan ini ada, dan juga keadaan
+| jawaban lama yang terlanjur tersimpan di cache peramban.
+*/
+const detailTransactionCategories = computed<string[]>(() => {
+  const himpunan = detail.value?.transaction_categories
+
+  if (Array.isArray(himpunan) && himpunan.length) {
+    return himpunan
+      .map((satu: { name?: unknown }) => String(satu?.name ?? '').trim())
+      .filter((nama: string) => nama !== '')
+  }
+
+  const tunggal = String(detail.value?.transaction_category ?? '').trim()
+
+  return tunggal !== '' ? [tunggal] : []
+})
+
+/*
+| Kolom keterangan transaksi per baris hanya berarti bila himpunannya lebih
+| dari satu. Pada dokumen berketerangan tunggal ia mengulang apa yang sudah
+| tertulis di kepala modalnya, sebanyak jumlah barisnya.
+*/
+const detailShowsLineCategory = computed<boolean>(() =>
+  detailTransactionCategories.value.length > 1)
+
+/*
 |--------------------------------------------------------------------------
 | Status
 |--------------------------------------------------------------------------
@@ -319,6 +350,7 @@ const statusItems = computed(() => [
   { title: t('claim.status.inProgress'), value: 'IN PROGRESS' },
   { title: t('claim.status.approved'), value: 'APPROVED' },
   { title: t('claim.status.rejected'), value: 'REJECTED' },
+  { title: t('claim.status.needRevision'), value: 'NEED REVISION' },
   { title: t('claim.status.cancelled'), value: 'CANCELLED' },
   { title: t('claim.status.received'), value: 'RECEIVED' },
   { title: t('claim.status.paid'), value: 'PAID' },
@@ -332,6 +364,7 @@ const formatStatus = (status: string | null | undefined): string => {
     'IN PROGRESS': t('claim.status.inProgress'),
     'APPROVED': t('claim.status.approved'),
     'REJECTED': t('claim.status.rejected'),
+    'NEED REVISION': t('claim.status.needRevision'),
     'CANCELLED': t('claim.status.cancelled'),
     'RECEIVED': t('claim.status.received'),
     'PAID': t('claim.status.paid'),
@@ -348,6 +381,7 @@ const getStatusColor = (status: string | null | undefined): string => {
     'IN PROGRESS': 'warning',
     'APPROVED': 'success',
     'REJECTED': 'error',
+    'NEED REVISION': 'warning',
     'CANCELLED': 'error',
     'RECEIVED': 'primary',
     'PAID': 'info',
@@ -380,9 +414,19 @@ const canPayTodayRow = (row: ClaimRow): boolean => row.can_pay_today !== false
 const isStatus = (row: ClaimRow, status: string): boolean =>
   String(row.status || '').trim().toUpperCase() === status
 
-/** Draft saja yang boleh diubah maupun dihapus, sama seperti FPU. */
+/*
+| Yang boleh diubah: draft, dan dokumen yang sedang butuh revisi.
+|
+| Keduanya berada di tangan pemohon dan tidak sedang menunggu keputusan
+| siapa pun. Sama seperti FPU.
+|
+| Yang boleh dihapus tetap HANYA draft. Dokumen yang butuh revisi sudah
+| pernah beredar -- approver pernah membukanya, notifikasinya sudah
+| terkirim -- dan jejak itu tidak ikut hilang saat barisnya dihapus. Yang
+| diminta approver pun revisi, bukan pelenyapan.
+*/
 const canEditRow = (row: ClaimRow): boolean =>
-  canUpdate.value && isStatus(row, 'DRAFT')
+  canUpdate.value && (isStatus(row, 'DRAFT') || isStatus(row, 'NEED REVISION'))
 
 const canDeleteRow = (row: ClaimRow): boolean =>
   canDelete.value && isStatus(row, 'DRAFT')
@@ -603,6 +647,25 @@ const detailPaymentSchedule = computed<{
   if (!source?.scheduled_payment_date)
     return null
 
+  /*
+  | Yang dibayar lebih awal hanya terlihat pemegang izin pembayaran.
+  |
+  | Dibayar sebelum jadwal tidak merugikan pemohonnya dan tidak bisa
+  | ditindaklanjutinya; mengabarkannya hanya menambah yang harus dibaca.
+  | Yang membayarkan tetap melihatnya -- ia perlu tahu apa yang
+  | dikerjakannya sendiri.
+  |
+  | Seluruh baloknya disembunyikan, bukan baris keterangannya saja:
+  | balok bertanggal tanpa keterangan terbaca seperti tampilan yang
+  | separuh gagal dimuat.
+  |
+  | Hanya EARLY. Menunggu jadwal, lewat jadwal, tepat waktu, dan
+  | terlambat tetap terlihat semua orang -- justru itu yang perlu
+  | diketahui pemohonnya.
+  */
+  if (source.payment_timing === 'EARLY' && !(abilities.value.can_pay))
+    return null
+
   /* Belum dibayar dan tanggalnya sudah lewat adalah satu-satunya yang mendesak. */
   const tampilan: Record<string, { color: 'info' | 'success' | 'warning' | 'error'; icon: string; label: string }> = {
     ON_TRACK: { color: 'info', icon: 'tabler-calendar-event', label: t('claim.detail.paymentOnTrack') },
@@ -621,6 +684,17 @@ const detailPaymentSchedule = computed<{
 })
 
 const detailCanApprove = computed<boolean>(() => Boolean(detail.value?.can_approve))
+
+/*
+| Boleh mengembalikan dari layar detail: approver yang sedang memegangnya,
+| atau Finance pada dokumen yang berkasnya baru diterima.
+*/
+const detailCanReturn = computed<boolean>(() =>
+  Boolean(detail.value?.can_approve)
+  || (
+    String(detail.value?.status || '').trim().toUpperCase() === 'RECEIVED'
+    && canUnreceive.value
+  ))
 
 /** Ikon lampiran mengikuti jenis berkasnya. */
 const getAttachmentIcon = (mimeType: string | null | undefined): string => {
@@ -1068,6 +1142,97 @@ const saveSignatureAndContinue = async (): Promise<void> => {
 | Tolak
 |--------------------------------------------------------------------------
 */
+/*
+| Kembalikan dokumen ke pemohon untuk direvisi.
+|
+| Pilihan KETIGA di meja approver, di samping menyetujui dan menolak, dan
+| bukan salah satu dari keduanya: dokumennya tidak ditolak -- ia dikembalikan
+| untuk diperbaiki, lalu berjalan lagi dari tahap pertama.
+|
+| Alasannya wajib, dan di situ seluruh gunanya. Dokumen yang kembali tanpa
+| sepatah kata pun akan diajukan ulang apa adanya, lalu berputar sekali lagi
+| melewati seluruh rantai approval -- dan yang terbuang bukan hanya waktu
+| pemohonnya.
+*/
+/*
+| Boleh mengembalikan: approver yang sedang memegangnya, atau Finance
+| pada dokumen yang berkasnya baru diterima.
+|
+| Penjaga pertama sama dengan tombol Setujui -- can_approve datang
+| dari server, dihitung dari baris approval, dan sudah menolak pemohon
+| atas dokumennya sendiri. Penjaga kedua izin penarikan penerimaan,
+| karena di pintu itu penerimaan berkasnya ikut ditarik.
+|
+| Yang sudah dicairkan, dibayarkan, atau diselesaikan tidak lewat
+| keduanya; servernya menolak, dan di sini tombolnya pun tidak muncul.
+*/
+const canReturnRow = (row: ClaimRow): boolean =>
+  Boolean(row.can_approve)
+  || (isStatus(row, 'RECEIVED') && Boolean(canUnreceive.value))
+
+const returnDialog = ref(false)
+const returnTarget = ref<ClaimRow | null>(null)
+const returnReason = ref('')
+const returnError = ref('')
+const returnLoading = ref(false)
+
+const openReturn = (row: ClaimRow): void => {
+  returnTarget.value = row
+  returnReason.value = ''
+  returnError.value = ''
+  returnDialog.value = true
+}
+
+const returnForRevision = async (): Promise<void> => {
+  if (!returnTarget.value?.public_id || returnLoading.value)
+    return
+
+  /* Sama dengan penjaga di server: tiga huruf. */
+  if (returnReason.value.trim().length < 3) {
+    returnError.value = t('common.revision.reasonRequired')
+
+    return
+  }
+
+  returnLoading.value = true
+
+  try {
+    showLoadingAlert(
+      t('common.alert.processing'),
+      t('common.alert.pleaseWait'),
+    )
+
+    const response = await axios.patch(
+      `/fund-request/claim/${encodeURIComponent(returnTarget.value.public_id)}/return-for-revision`,
+      { reason: returnReason.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    closeAlert()
+
+    returnDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message || t('common.revision.successFallback'),
+    })
+
+    await fetchClaims()
+  }
+  catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(error, t('common.revision.failedFallback')),
+    })
+  }
+  finally {
+    returnLoading.value = false
+  }
+}
+
 const openReject = (row: ClaimRow): void => {
   rejectTarget.value = row
   rejectNotes.value = ''
@@ -1322,6 +1487,9 @@ const runBulkAction = async (): Promise<void> => {
     clearSelection()
 
     await fetchClaims()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1481,6 +1649,9 @@ const submitRevise = async (): Promise<void> => {
     })
 
     await fetchClaims()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     /* Pesannya di dalam modalnya: formulirnya masih terbuka dan masih berisi. */
@@ -1552,6 +1723,9 @@ const submitUnreceive = async (): Promise<void> => {
     })
 
     await fetchClaims()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     /* Pesannya di dalam dialognya: alasannya masih terketik di sana. */
@@ -1616,6 +1790,9 @@ const openReceive = async (row: ClaimRow): Promise<void> => {
     })
 
     await fetchClaims()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1756,6 +1933,9 @@ const openPay = async (row: ClaimRow): Promise<void> => {
     })
 
     await fetchClaims()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1816,6 +1996,9 @@ const cancelClaim = async (): Promise<void> => {
     })
 
     await fetchClaims()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -1933,7 +2116,25 @@ const printAttachmentDialog = ref(false)
 const printTarget = ref<ClaimRow | null>(null)
 const printWithAttachments = ref(false)
 
-const runPrint = async (row: ClaimRow, withAttachments: boolean): Promise<void> => {
+/* Satukan dengan dokumen perjalanan dinasnya. */
+const printWithTrip = ref(false)
+
+/**
+ * Apakah perdin dokumen ini boleh ikut dicetak.
+ *
+ * Perdin yang belum disetujui penuh belum berisi tanda tangan siapa pun,
+ * dan hasil cetaknya bisa disalahpahami sebagai dokumen sah. Server
+ * menolaknya juga -- yang di sini supaya penolakannya datang sebelum
+ * orangnya menunggu, bukan sesudah.
+ */
+const tripCombinable = (row: ClaimRow | null): boolean =>
+  Boolean(row && row.business_trip_status === 'APPROVED')
+
+const runPrint = async (
+  row: ClaimRow,
+  withAttachments: boolean,
+  withTrip = false,
+): Promise<void> => {
   if (!row.public_id || printLoadingId.value)
     return
 
@@ -1968,7 +2169,7 @@ const runPrint = async (row: ClaimRow, withAttachments: boolean): Promise<void> 
       | dikirim di sini -- bukan ditempelkan ke URL hasilnya, yang akan
       | merusak tanda tangannya.
       */
-      { with_attachments: withAttachments },
+      { with_attachments: withAttachments, with_business_trip: withTrip },
       { headers: { Accept: 'application/json' } },
     )
 
@@ -2009,9 +2210,15 @@ const printDocument = async (row: ClaimRow): Promise<void> => {
   | jawabannya cuma satu bukan pilihan, ia hambatan -- dan cetakan adalah
   | aksi yang paling sering diulang orang.
   */
-  if ((row.attachment_count ?? 0) > 0) {
+  /*
+  | Ditanyakan bila ADA yang bisa dipilih -- lampiran, perdinnya, atau
+  | keduanya. Semula hanya lampiran yang membuka dialog ini, sehingga
+  | dokumen tanpa lampiran tidak pernah bisa digabungkan dengan perdinnya.
+  */
+  if ((row.attachment_count ?? 0) > 0 || tripCombinable(row)) {
     printTarget.value = row
     printWithAttachments.value = false
+    printWithTrip.value = false
     printAttachmentDialog.value = true
 
     return
@@ -2028,7 +2235,7 @@ const confirmPrint = async (): Promise<void> => {
 
   printAttachmentDialog.value = false
 
-  await runPrint(row, printWithAttachments.value)
+  await runPrint(row, printWithAttachments.value, printWithTrip.value)
 }
 
 const openDelete = async (row: ClaimRow): Promise<void> => {
@@ -2058,6 +2265,9 @@ const openDelete = async (row: ClaimRow): Promise<void> => {
     })
 
     await fetchClaims()
+
+    /* Angka di sidebar ikut turun -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
   }
   catch (error: unknown) {
     closeAlert()
@@ -2692,24 +2902,6 @@ onMounted(async () => {
                   </VListItem>
 
                   <VListItem
-                    v-if="canEditRow(row)"
-                    href="javascript:void(0)"
-                    @click="goToEdit(row)"
-                  >
-                    <template #prepend>
-                      <VIcon
-                        icon="tabler-pencil"
-                        :size="20"
-                        class="me-3"
-                      />
-                    </template>
-
-                    <VListItemTitle>
-                      {{ t('claim.list.menu.edit') }}
-                    </VListItemTitle>
-                  </VListItem>
-
-                  <VListItem
                     v-if="canSubmitRow(row)"
                     href="javascript:void(0)"
                     @click="openSubmit(row)"
@@ -2764,6 +2956,26 @@ onMounted(async () => {
 
                     <VListItemTitle class="text-error">
                       {{ t('claim.list.menu.reject') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <VListItem
+                    v-if="canReturnRow(row)"
+                    href="javascript:void(0)"
+                    :disabled="returnLoading"
+                    @click="openReturn(row)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="mdi-undo-variant"
+                        :size="20"
+                        color="warning"
+                        class="me-3"
+                      />
+                    </template>
+
+                    <VListItemTitle class="text-warning">
+                      {{ t('common.revision.menuReturn') }}
                     </VListItemTitle>
                   </VListItem>
 
@@ -2834,6 +3046,24 @@ onMounted(async () => {
                   </VListItem>
 
                   <VListItem
+                    v-if="canEditRow(row)"
+                    href="javascript:void(0)"
+                    @click="goToEdit(row)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-pencil"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
+
+                    <VListItemTitle>
+                      {{ t('claim.list.menu.edit') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <VListItem
                     v-if="canCancelRow(row)"
                     href="javascript:void(0)"
                     :disabled="cancelLoading"
@@ -2888,13 +3118,29 @@ onMounted(async () => {
             </td>
 
             <td>
-              <VChip
-                size="small"
-                :color="getStatusColor(row.status)"
-                variant="tonal"
-              >
-                {{ formatStatus(row.status) }}
-              </VChip>
+              <div class="d-flex flex-column align-start gap-1">
+                <VChip
+                  size="small"
+                  :color="getStatusColor(row.status)"
+                  variant="tonal"
+                >
+                  {{ formatStatus(row.status) }}
+                </VChip>
+
+                <!--
+                  Lencana revisi, pada dokumen yang pernah dikembalikan.
+                  Tetap tampil walau dokumennya sudah berjalan lagi: inilah
+                  yang memberi tahu approver bahwa isinya sudah berubah.
+                -->
+                <VChip
+                  v-if="(row.revision_count || 0) > 0"
+                  size="x-small"
+                  color="warning"
+                  variant="outlined"
+                >
+                  {{ t('common.revision.badge', { n: row.revision_count }) }}
+                </VChip>
+              </div>
             </td>
           </tr>
 
@@ -2985,14 +3231,22 @@ onMounted(async () => {
                   {{ formatStatus(detail?.status) }}
                 </VChip>
 
+                <!--
+                  Seluruh keterangan transaksi dokumennya, bukan penentunya saja.
+
+                  Menampilkan penentunya saja akan menyembunyikan keterangan lain
+                  yang justru dipakai sebagian barisnya -- dan yang menyetujui
+                  membaca dokumen yang isinya tidak seperti kepalanya.
+                -->
                 <VChip
-                  v-if="detail?.transaction_category"
+                  v-for="nama in detailTransactionCategories"
+                  :key="`detail-trxcat-${nama}`"
                   size="small"
                   variant="tonal"
                   color="primary"
                   prepend-icon="tabler-tag"
                 >
-                  {{ detail.transaction_category }}
+                  {{ nama }}
                 </VChip>
               </div>
             </div>
@@ -3216,6 +3470,18 @@ onMounted(async () => {
                     <th style="inline-size: 8rem;">
                       {{ t('claim.detail.itemDate') }}
                     </th>
+
+                    <!--
+                      Keterangan transaksi barisnya. Hanya bila himpunannya lebih
+                      dari satu -- lihat detailShowsLineCategory.
+                    -->
+                    <th
+                      v-if="detailShowsLineCategory"
+                      style="inline-size: 10rem;"
+                    >
+                      {{ t('claim.detail.itemTransactionCategory') }}
+                    </th>
+
                     <th>{{ t('claim.detail.itemDescription') }}</th>
                     <th
                       class="text-end"
@@ -3238,6 +3504,20 @@ onMounted(async () => {
                       {{ index + 1 }}
                     </td>
                     <td>{{ formatDate(item.date) || '-' }}</td>
+
+                    <td
+                      v-if="detailShowsLineCategory"
+                      class="text-wrap"
+                    >
+                      <!--
+                        Tanda hubung untuk baris lama yang tidak punya keterangan
+                        sendiri. Ia memang ikut headernya, dan menuliskan nama
+                        header di sini akan menyatakan pilihan yang tidak pernah
+                        dibuat siapa pun.
+                      -->
+                      {{ item.transaction_category_name || '-' }}
+                    </td>
+
                     <td class="text-wrap">
                       {{ item.description }}
                     </td>
@@ -3281,7 +3561,13 @@ onMounted(async () => {
 
                 <tfoot>
                   <tr class="cl-detail__table-total">
-                    <td colspan="3">
+                    <!--
+                      Dihitung, bukan dipatok: kolom keterangan transaksi hanya
+                      muncul bila himpunannya lebih dari satu, dan angka tetap
+                      akan salah pada salah satu keadaannya -- tanpa ada yang
+                      memberi tahu.
+                    -->
+                    <td :colspan="detailShowsLineCategory ? 4 : 3">
                       {{ t('claim.detail.total') }}
                     </td>
 
@@ -3457,6 +3743,17 @@ onMounted(async () => {
                 {{ detailPaymentSchedule.label }}
               </div>
             </VAlert>
+
+            <!--
+              Revisi: yang sedang berjalan, dan riwayatnya. Ditaruh paling
+              bawah -- yang dibaca lebih dulu adalah dokumennya sendiri.
+            -->
+            <div class="mt-5">
+              <RevisionHistory
+                :revisions="detail?.revisions || []"
+                :open-revision="detail?.revision_open || null"
+              />
+            </div>
           </template>
         </VCardText>
 
@@ -3487,6 +3784,18 @@ onMounted(async () => {
             @click="openReject(detail)"
           >
             {{ t('claim.detail.rejectButton') }}
+          </VBtn>
+
+          <VBtn
+            v-if="detailCanReturn"
+            color="warning"
+            variant="tonal"
+            prepend-icon="mdi-undo-variant"
+            class="text-none"
+            :disabled="returnLoading"
+            @click="openReturn(detail)"
+          >
+            {{ t('common.revision.menuReturn') }}
           </VBtn>
 
           <VBtn
@@ -3734,6 +4043,66 @@ onMounted(async () => {
                 ? t('claim.list.revise.confirmRevised')
                 : t('claim.list.revise.confirmUnchanged')
             }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!--
+      DIALOG KEMBALIKAN
+
+      Judulnya bertanya dan menyebut nomornya sekaligus. Yang menekan tombol
+      ini sedang memindahkan dokumen orang lain kembali ke mejanya, dan
+      nomornya adalah hal pertama yang perlu dipastikan sebelum menjawab.
+
+      Warnanya bukan merah. Mengembalikan bukan menolak: dokumennya masih
+      hidup, dan yang diminta adalah perbaikan.
+    -->
+    <VDialog
+      v-model="returnDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('common.revision.dialogTitle', {
+            number: returnTarget?.claim_number || '-',
+          }) }}
+        </VCardTitle>
+
+        <VCardText>
+          <div class="text-body-2 text-medium-emphasis mb-4">
+            {{ t('common.revision.dialogSubtitle') }}
+          </div>
+
+          <VTextarea
+            v-model="returnReason"
+            :label="t('common.revision.reasonLabel')"
+            :placeholder="t('common.revision.reasonPlaceholder')"
+            rows="3"
+            auto-grow
+            :error="!!returnError"
+            :error-messages="returnError ? [returnError] : []"
+          />
+        </VCardText>
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="returnLoading"
+            @click="returnDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="warning"
+            class="text-none"
+            :loading="returnLoading"
+            @click="returnForRevision"
+          >
+            {{ t('common.revision.confirmButton') }}
           </VBtn>
         </VCardActions>
       </VCard>
@@ -4033,6 +4402,32 @@ onMounted(async () => {
             density="comfortable"
             hide-details
           />
+
+          <!--
+            Dimatikan berikut alasannya, bukan disembunyikan: pilihan yang
+            hilang tidak bisa ditanyai, dan yang membacanya akan mengira
+            fiturnya belum ada.
+          -->
+          <VCheckbox
+            v-model="printWithTrip"
+            :label="t('claim.list.print.combineTripInclude')"
+            :disabled="!tripCombinable(printTarget)"
+            :hint="tripCombinable(printTarget)
+              ? undefined
+              : t('claim.list.print.combineTripUnavailable')"
+            persistent-hint
+            density="comfortable"
+          />
+
+          <VAlert
+            v-if="printWithTrip"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ t('claim.list.print.combineTripNotice') }}
+          </VAlert>
 
           <VAlert
             v-if="printWithAttachments"

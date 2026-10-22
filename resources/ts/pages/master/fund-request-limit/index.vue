@@ -37,6 +37,9 @@ interface LimitRow {
   max_outstanding: number
   max_realization_days: number
 
+  /* Batas ini tidak membatasi apa pun; kedua angka di atas diabaikan. */
+  is_unlimited: boolean
+
   is_active: boolean
   notes: string | null
 
@@ -123,6 +126,7 @@ const form = reactive({
   department_id: null as number | null,
   max_outstanding: 3,
   max_realization_days: 14,
+  is_unlimited: false,
   is_active: true,
   notes: '',
 })
@@ -133,6 +137,7 @@ const resetForm = (): void => {
   form.department_id = null
   form.max_outstanding = 3
   form.max_realization_days = 14
+  form.is_unlimited = false
   form.is_active = true
   form.notes = ''
   formError.value = ''
@@ -153,6 +158,7 @@ const openEdit = (row: LimitRow): void => {
   form.department_id = row.department_id
   form.max_outstanding = row.max_outstanding
   form.max_realization_days = row.max_realization_days
+  form.is_unlimited = row.is_unlimited
   form.is_active = row.is_active
   form.notes = row.notes ?? ''
 
@@ -193,6 +199,7 @@ const save = async (): Promise<void> => {
       department_id: form.department_id,
       max_outstanding: Number(form.max_outstanding),
       max_realization_days: Number(form.max_realization_days),
+      is_unlimited: form.is_unlimited,
       is_active: form.is_active,
       notes: form.notes.trim() || null,
     }
@@ -488,15 +495,32 @@ onMounted(() => {
                     >
                       {{ t('fundRequestLimit.list.fallbackChip') }}
                     </VChip>
+
+                    <VChip
+                      v-if="row.is_unlimited"
+                      size="x-small"
+                      color="warning"
+                      variant="tonal"
+                    >
+                      {{ t('fundRequestLimit.list.unlimitedChip') }}
+                    </VChip>
                   </div>
                 </td>
 
+                <!--
+                  Angka yang tidak berlaku ditulis sebagai tanda hubung.
+                  Menuliskannya apa adanya membuat pembacanya mengira batas itu
+                  masih berlaku, lalu heran kenapa tidak pernah menahan siapa
+                  pun.
+                -->
                 <td class="text-center font-weight-medium">
-                  {{ row.max_outstanding }}
+                  <span v-if="row.is_unlimited">—</span>
+                  <template v-else>{{ row.max_outstanding }}</template>
                 </td>
 
                 <td class="text-center font-weight-medium">
-                  {{ row.max_realization_days }}
+                  <span v-if="row.is_unlimited">—</span>
+                  <template v-else>{{ row.max_realization_days }}</template>
                 </td>
 
                 <td class="text-center">
@@ -656,6 +680,20 @@ onMounted(() => {
                 density="comfortable"
                 :placeholder="t('fundRequestLimit.form.notesPlaceholder')"
                 persistent-placeholder
+              />
+            </VCol>
+
+            <!--
+              Penandanya ditaruh tepat di bawah kedua angkanya, bukan di
+              bagian lain: ia yang menentukan apakah kedua angka itu berlaku.
+            -->
+            <VCol cols="12">
+              <VSwitch
+                v-model="form.is_unlimited"
+                :label="t('fundRequestLimit.form.isUnlimited')"
+                color="warning"
+                :hint="t('fundRequestLimit.form.isUnlimitedHint')"
+                persistent-hint
               />
             </VCol>
 

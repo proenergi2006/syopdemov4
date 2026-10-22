@@ -94,6 +94,20 @@ return [
     | Penerimaan mendahului penyelesaian selisih: berkasnya diterima dulu,
     | baru uangnya berpindah.
     */
+    /*
+    | Meneruskan ke pembayaran kekurangan.
+    |
+    | Hanya ada pada cabang kelebihan: dua cabang lain tidak berpindah meja,
+    | jadi tidak ada yang perlu diteruskan ke siapa pun.
+    */
+    'verify' => [
+        'forbidden' => 'Anda tidak punya akses untuk meneruskan Realisasi FPU ke pembayaran.',
+        'only_received' => 'Hanya Realisasi FPU yang berkasnya sudah diterima yang bisa diteruskan ke pembayaran.',
+        'only_reimburse' => 'Hanya Realisasi FPU yang kekurangannya perlu dibayarkan yang perlu diteruskan. Yang nilainya pas sudah selesai saat diterima, dan yang lebih ditutup saat uang sisanya kembali.',
+        'success' => 'Realisasi FPU diteruskan ke pembayaran kekurangan.',
+        'failed' => 'Realisasi FPU gagal diteruskan ke pembayaran.',
+    ],
+
     'receive' => [
         'forbidden' => 'Anda tidak memiliki akses untuk menerima Realisasi FPU.',
         'only_approved' => 'Hanya Realisasi FPU berstatus approved yang dapat ditandai diterima.',
@@ -194,5 +208,6 @@ return [
         'qty_required' => 'Baris :row: Qty wajib diisi dan harus lebih dari nol.',
         'unit_price_required' => 'Baris :row: Rincian Biaya wajib diisi dan harus lebih dari nol.',
         'arranged_has_items' => 'Kategori :category ditandai diurus GA, jadi tidak boleh punya baris rincian. Hapus barisnya, atau matikan penandanya.',
+        'arranged_not_allowed' => 'Kategori :category tidak diurus GA, jadi penandanya tidak bisa dipasang. Rinciannya diisi pemohon sendiri. Pengaturannya ada di master Kategori Biaya Perjalanan Dinas.',
     ],
 ];

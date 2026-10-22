@@ -161,7 +161,15 @@ class CashAdvanceRealizationExport implements FromArray, WithHeadings, WithEvent
             $advanceNumber = $this->formatText($cashAdvance->advance_number ?? null);
             $branch = $this->formatBranch($realization);
             $department = $this->formatDepartment($realization);
-            $category = $this->formatText($realization->transactionCategory->name ?? null);
+            /*
+            | Dibaca dari FPU-nya: himpunannya milik pengajuan, dan Realisasi
+            | tidak boleh menggantinya. Jatuh ke keterangan tunggalnya sendiri
+            | bila FPU-nya tidak ikut termuat.
+            */
+            $category = $this->formatText(
+                $realization->cashAdvance?->transactionCategoryLabel()
+                    ?? ($realization->transactionCategory->name ?? null),
+            );
             $subject = $this->formatText($cashAdvance->subject ?? null);
 
             $totalAdvance = $this->formatMoney($realization->total_advance_amount ?? 0);

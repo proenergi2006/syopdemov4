@@ -23,7 +23,7 @@
     | Nama yang tampil ke user: Purchase Requisition
     |--------------------------------------------------------------------------
     */
-    $translationMode = in_array($currentMode, ['final_approved', 'step_approved', 'rejected'], true)
+    $translationMode = in_array($currentMode, ['returned_for_revision', 'final_approved', 'step_approved', 'rejected'], true)
         ? $currentMode
         : 'default';
 
@@ -33,6 +33,7 @@
 
     $description = __('mail.pr.description.' . $translationMode, [
         'actor_name' => $actorName,
+        'revision' => $revisionNumber ?? 0,
     ]);
 
     $displayStatus = match ($currentMode) {
@@ -40,6 +41,7 @@
         'final_approved' => 'APPROVED',
         'step_approved' => 'IN PROGRESS',
         'rejected' => 'REJECTED',
+        'returned_for_revision' => 'NEED REVISION',
         default => $pr->status,
     };
 
@@ -304,7 +306,7 @@
                                             font-size: 13px;
                                             color: #6b7280;
                                         ">
-                                            {{ __('mail.pr.field_rejection_notes') }}
+                                            {{ $currentMode === 'returned_for_revision' ? __('mail.pr.field_return_reason') : __('mail.pr.field_rejection_notes') }}
                                         </td>
 
                                         <td style="

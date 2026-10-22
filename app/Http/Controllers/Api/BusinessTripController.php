@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Exports\BusinessTripExport;
 use App\Http\Controllers\Controller;
+use App\Services\FundRequest\CombinedPrintComposer;
 use App\Models\BusinessTrip;
 use App\Models\BusinessTripItinerary;
+use App\Models\BusinessTripParticipant;
+use App\Models\User;
 use App\Models\CashAdvance;
 use App\Models\Claim;
 use App\Models\BusinessTripApproval;
@@ -18,6 +21,9 @@ use App\Services\BusinessTrip\BusinessTripMailService;
 use App\Services\BusinessTrip\BusinessTripNotificationService;
 use App\Services\BusinessTrip\BusinessTripNumberService;
 use App\Services\BusinessTrip\BusinessTripPresenter;
+use App\Services\FundRequest\DocumentRevisionService;
+use App\Services\FundRequest\RevisionNotifier;
+use App\Models\FundRequestRevision;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Contracts\Encryption\DecryptException;
@@ -29,6 +35,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 /*
@@ -126,7 +133,7 @@ class BusinessTripController extends Controller
             | ke sana. Beberapa langkah per dokumen -- ringan, dan menghindarkan
             | satu permintaan tambahan setiap kali rincian dibuka.
             */
-            $query = BusinessTrip::query()->with(['itineraries', 'approvals']);
+            $query = BusinessTrip::query()->with(['itineraries', 'participants', 'approvals']);
 
             $this->applyVisibilityScope($query, $user, $context);
 
@@ -155,14 +162,27 @@ class BusinessTripController extends Controller
                 collect($paginator->items())->pluck('id')->all(),
             );
 
+            /*
+            | Perdin mana saja yang punya dokumen keuangan tertaut dan sudah
+            | boleh dicetak -- penentu hidup matinya pilihan cetak gabungan.
+            |
+            | Dijawab sekaligus untuk seluruh halaman, bukan per baris.
+            */
+            $punyaDokumen = app(CombinedPrintComposer::class)->printableByTrip(
+                collect($paginator->items())->pluck('id')->all(),
+            );
+
             return response()->json([
                 'success' => true,
                 'message' => __('business_trip_messages.list_loaded'),
 
                 'data' => collect($paginator->items())
-                    ->map(fn (BusinessTrip $trip): array => $this->transform(
-                        $trip,
-                        in_array($trip->id, $menungguSaya, true),
+                    ->map(fn (BusinessTrip $trip): array => array_merge(
+                        $this->transform($trip, in_array($trip->id, $menungguSaya, true)),
+                        [
+                            /* Penentu hidup matinya pilihan cetak gabungan. */
+                            'has_printable_document' => $punyaDokumen[(int) $trip->id] ?? false,
+                        ],
                     ))
                     ->all(),
 
@@ -230,8 +250,92 @@ class BusinessTripController extends Controller
                 ],
 
                 'timezones' => BusinessTripItinerary::TIMEZONES,
+
+                /*
+                | Kandidat peserta: akun aktif selain pemohonnya sendiri.
+                |
+                | Dititipkan di endpoint options yang sudah ada, bukan di
+                | endpoint daftar akun tersendiri. Formnya memang sudah
+                | memanggil yang satu ini, dan daftar yang dipakai memilih
+                | peserta perdin berbeda kebutuhannya dari daftar akun untuk
+                | layar master: di sini department dan jabatannya ikut,
+                | karena itulah yang membedakan dua orang bernama mirip.
+                |
+                | Pemohonnya dikeluarkan dari pilihan. Ia bukan "peserta
+                | lain"; dokumennya sudah menyebut dirinya di bagian
+                | identitas, dan menawarkan namanya hanya akan melahirkan
+                | dokumen yang menyebutnya dua kali.
+                */
+                'participant_candidates' => $this->participantCandidates((int) $user->id),
             ],
         ], 200);
+    }
+
+    /**
+     * Akun aktif yang bisa dipilih sebagai peserta, selain satu akun.
+     *
+     * Jabatannya diambil dengan aturan yang sama seperti
+     * resolvePositionName() -- user_roles lebih dulu, users.id_role sebagai
+     * cadangan -- tetapi untuk SELURUH kandidat dalam satu kueri. Memanggil
+     * penolong itu per orang berarti satu kueri per baris; untuk daftar yang
+     * dimuat setiap kali form dibuka, itu puluhan kueri yang tidak perlu.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function participantCandidates(int $kecualiUserId): array
+    {
+        $baris = DB::table('users as u')
+            ->leftJoin('departments as d', 'd.id', '=', 'u.departemen_id')
+            ->where('u.id', '!=', $kecualiUserId)
+            ->when(
+                Schema::hasColumn('users', 'is_active'),
+                fn ($query) => $query->where('u.is_active', true),
+            )
+            ->orderBy('u.name')
+            ->get([
+                'u.id',
+                'u.name',
+                'u.departemen_id',
+                'u.id_role',
+                'd.nama as department_name',
+            ]);
+
+        if ($baris->isEmpty()) {
+            return [];
+        }
+
+        $ids = $baris->pluck('id')->all();
+
+        /*
+        | Satu akun bisa memegang lebih dari satu role; yang pertama dipakai,
+        | sama seperti getActiveRoleId() milik User dan
+        | resolvePositionName() di atas.
+        */
+        $rolePertama = DB::table('user_roles')
+            ->whereIn('user_id', $ids)
+            ->orderBy('id')
+            ->get(['user_id', 'role_id'])
+            ->groupBy('user_id')
+            ->map(fn ($g) => (int) $g->first()->role_id);
+
+        $namaRole = DB::table('roles')
+            ->whereIn('id', $rolePertama->values()->merge($baris->pluck('id_role')->filter())->unique()->all())
+            ->pluck('nama', 'id');
+
+        return $baris
+            ->map(function ($b) use ($rolePertama, $namaRole): array {
+                $roleId = $rolePertama[$b->id] ?? $b->id_role ?? null;
+
+                return [
+                    'user_id' => (int) $b->id,
+                    'name' => (string) $b->name,
+                    'department_id' => $b->departemen_id ? (int) $b->departemen_id : null,
+                    'department_name' => $b->department_name,
+                    'position_name' => $roleId ? ($namaRole[$roleId] ?? null) : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /*
@@ -556,11 +660,12 @@ class BusinessTripController extends Controller
                 ]);
 
                 $this->syncItineraries($trip, $validated['itineraries'] ?? []);
+                $this->syncParticipants($trip, $validated['participants'] ?? []);
 
                 return $trip;
             });
 
-            $trip->load(['itineraries', 'approvals']);
+            $trip->load(['itineraries', 'participants', 'approvals']);
 
             return response()->json([
                 'success' => true,
@@ -608,7 +713,7 @@ class BusinessTripController extends Controller
             ], 404);
         }
 
-        $trip->load(['itineraries', 'approvals']);
+        $trip->load(['itineraries', 'participants', 'approvals']);
 
         return response()->json([
             'success' => true,
@@ -673,9 +778,30 @@ class BusinessTripController extends Controller
                 ]);
 
                 $this->syncItineraries($trip, $validated['itineraries'] ?? []);
+                $this->syncParticipants($trip, $validated['participants'] ?? []);
             });
 
-            $trip->refresh()->load(['itineraries', 'approvals']);
+            /*
+            | Revisinya ditandai sudah mulai dikerjakan -- sekali saja, pada
+            | penyimpanan pertama. Approver yang mengembalikannya dikabari di
+            | situ, supaya ia tahu dokumennya sedang ditangani dan tidak
+            | terdiam di tangan pemohon.
+            */
+            if (
+                strtoupper((string) $trip->status) === BusinessTrip::STATUS_NEED_REVISION
+                && app(DocumentRevisionService::class)->tandaiDirevisi($trip)
+            ) {
+                try {
+                    app(RevisionNotifier::class)->sedangDirevisi($trip, $trip->openRevision());
+                } catch (\Throwable $notifyError) {
+                    Log::error('[Perdin] Notifikasi revisi dikerjakan gagal', [
+                        'business_trip_id' => $trip->id,
+                        'message' => $notifyError->getMessage(),
+                    ]);
+                }
+            }
+
+            $trip->refresh()->load(['itineraries', 'participants', 'approvals']);
 
             return response()->json([
                 'success' => true,
@@ -802,9 +928,23 @@ class BusinessTripController extends Controller
                 ], 404);
             }
 
+            /*
+            | Draft, yang pernah ditolak, dan yang sedang butuh revisi.
+            |
+            | Ketiganya masuk lewat pintu yang sama karena yang terjadi
+            | setelahnya memang sama: rantai approval dibuat ulang, statusnya
+            | menjadi berjalan, approver tahap pertama dikabari.
+            */
+            $pengajuanUlang = strtoupper((string) $trip->status)
+                === BusinessTrip::STATUS_NEED_REVISION;
+
             if (!in_array(
                 strtoupper((string) $trip->status),
-                [BusinessTrip::STATUS_DRAFT, BusinessTrip::STATUS_REJECTED],
+                [
+                    BusinessTrip::STATUS_DRAFT,
+                    BusinessTrip::STATUS_REJECTED,
+                    BusinessTrip::STATUS_NEED_REVISION,
+                ],
                 true,
             )) {
                 DB::rollBack();
@@ -880,6 +1020,15 @@ class BusinessTripController extends Controller
 
             $submittedAt = now();
 
+            /*
+            | Revisinya ditutup: potret sesudahnya, daftar perubahannya, dan
+            | siapa yang mengajukan ulang, sekaligus. Dipanggil setelah
+            | itinerary-nya final dan sebelum statusnya berpindah.
+            */
+            $revisiDitutup = $pengajuanUlang
+                ? app(DocumentRevisionService::class)->tutup($trip, $user)
+                : null;
+
             $trip->status = BusinessTrip::STATUS_IN_PROGRESS;
             $trip->submitted_by = $user->id;
             $trip->submitted_at = $submittedAt;
@@ -905,7 +1054,21 @@ class BusinessTripController extends Controller
             | supaya kegagalannya tidak membatalkan pengajuannya.
             */
             try {
-                $notificationService->notifyApprovalRequest($trip);
+                /*
+                | Dokumen revisian dikabarkan dengan kalimatnya sendiri:
+                | approver yang menerima permintaan biasa akan membacanya
+                | sebagai dokumen baru, lalu menyetujui perubahan yang justru
+                | menjadi sebab pengembaliannya tanpa melihatnya.
+                */
+                if ($revisiDitutup) {
+                    app(RevisionNotifier::class)->diajukanUlang(
+                        $trip,
+                        $revisiDitutup,
+                        fn($approval) => $notificationService->resolveApproverUsers($approval),
+                    );
+                } else {
+                    $notificationService->notifyApprovalRequest($trip);
+                }
             } catch (\Throwable $e) {
                 Log::error('[Perdin] Notifikasi approver gagal dibuat', [
                     'business_trip_id' => $trip->id,
@@ -922,7 +1085,7 @@ class BusinessTripController extends Controller
                 ]);
             }
 
-            $trip->load(['itineraries', 'approvals']);
+            $trip->load(['itineraries', 'participants', 'approvals']);
 
             return response()->json([
                 'success' => true,
@@ -1062,7 +1225,7 @@ class BusinessTripController extends Controller
                 ]);
             }
 
-            $trip->load(['itineraries', 'approvals']);
+            $trip->load(['itineraries', 'participants', 'approvals']);
 
             return response()->json([
                 'success' => true,
@@ -1192,7 +1355,7 @@ class BusinessTripController extends Controller
                 ]);
             }
 
-            $trip->load(['itineraries', 'approvals']);
+            $trip->load(['itineraries', 'participants', 'approvals']);
 
             return response()->json([
                 'success' => true,
@@ -1324,6 +1487,165 @@ class BusinessTripController extends Controller
             }
         }
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Kembalikan Perdin ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | SATU PINTU SAJA: approver yang sedang memegang dokumennya.
+    |
+    | Perdin tidak punya tahap penerimaan berkas dan tidak pernah menjadi
+    | uang pada dirinya sendiri, jadi tidak ada meja Finance yang bisa
+    | mengembalikannya -- biaya perjalanannya diajukan lewat FPU atau Claim,
+    | dan di sanalah pintu Finance berada.
+    |
+    | Penjaganya sama dengan tombol Setujui: getUserCurrentApproval sekaligus
+    | menolak pemohon atas dokumennya sendiri.
+    |
+    | Perdin yang sudah dirujuk FPU TIDAK dikunci. Dokumen yang menumpangnya
+    | memang akan ikut terpengaruh, dan itu memang maksudnya: yang keliru
+    | pada perjalanannya harus diperbaiki di perjalanannya, bukan ditambal
+    | di dokumen yang menumpang.
+    |--------------------------------------------------------------------------
+    */
+    public function returnForRevision(
+        string $publicId,
+        Request $request,
+        BusinessTripApprovalService $approvalService,
+        BusinessTripMailService $mailService,
+        DocumentRevisionService $revisionService,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], [
+            'reason' => __('fund_request_messages.return_for_revision.reason_label'),
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('business_trip_messages.forbidden_approve'),
+                ], 401);
+            }
+
+            $trip = $this->lockVisible($publicId, $user);
+
+            if (!$trip) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('business_trip_messages.not_found'),
+                ], 404);
+            }
+
+            if (strtoupper((string) $trip->status) !== BusinessTrip::STATUS_IN_PROGRESS) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('fund_request_messages.return_for_revision.only_in_progress'),
+                ], 422);
+            }
+
+            $approval = $approvalService->getUserCurrentApproval($trip, $user, true);
+
+            if (!$approval) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('fund_request_messages.return_for_revision.not_active_approver'),
+                ], 403);
+            }
+
+            $hasil = $revisionService->kembalikan(
+                document: $trip,
+                user: $user,
+                reason: $validated['reason'],
+                permission: null,
+                from: FundRequestRevision::FROM_APPROVAL,
+                stepOrder: (int) $approval->step_order,
+                stepLabel: $approval->label,
+            );
+
+            if (!$hasil['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($hasil['message_key'], $hasil['message_replace']),
+                ], $hasil['status']);
+            }
+
+            DB::commit();
+
+            $revisi = $hasil['revision'];
+
+            $trip->refresh();
+
+            try {
+                app(RevisionNotifier::class)->dikembalikan($trip, $revisi);
+
+                $mailService->sendReturnedForRevision(
+                    $trip,
+                    $user,
+                    $validated['reason'],
+                    (int) $revisi->revision_number,
+                );
+            } catch (\Throwable $notifyError) {
+                Log::error('[Perdin] Notifikasi pengembalian gagal', [
+                    'business_trip_id' => $trip->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('fund_request_messages.return_for_revision.success'),
+                'data' => [
+                    'public_id' => $trip->encrypted_id,
+                    'trip_number' => $trip->trip_number,
+                    'status' => $trip->status,
+                    'revision_count' => (int) $trip->revision_count,
+                    'revision_number' => (int) $revisi->revision_number,
+                ],
+            ], 200);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? __('fund_request_messages.return_for_revision.failed'),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[Perdin] Kembalikan untuk revisi error', [
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.return_for_revision.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
     public function cancel(
         string $publicId,
         Request $request,
@@ -1445,7 +1767,7 @@ class BusinessTripController extends Controller
 
             $this->kabarkanTurunanGugur($gugur, $trip, 'cancelled');
 
-            $trip->refresh()->load(['itineraries', 'approvals']);
+            $trip->refresh()->load(['itineraries', 'participants', 'approvals']);
 
             return response()->json([
                 'success' => true,
@@ -1508,10 +1830,25 @@ class BusinessTripController extends Controller
                 ], 422);
             }
 
+            /*
+            | Pilihannya ikut ke dalam tanda tangan URL-nya, bukan ditempelkan
+            | sesudahnya: parameter di luar tanda tangan bisa diubah siapa pun
+            | yang memegang tautannya.
+            */
+            $pilihan = ['publicId' => $publicId];
+
+            if ($request->boolean('with_attachments')) {
+                $pilihan['with_attachments'] = 1;
+            }
+
+            if ($request->boolean('with_linked_document')) {
+                $pilihan['with_linked_document'] = 1;
+            }
+
             $relativeUrl = URL::temporarySignedRoute(
                 'business-trip.perdin.print-signed',
                 now()->addMinutes(10),
-                ['publicId' => $publicId],
+                $pilihan,
                 false,
             );
 
@@ -1549,7 +1886,7 @@ class BusinessTripController extends Controller
         try {
             $id = (int) Crypt::decryptString($publicId);
 
-            $trip = BusinessTrip::with(['itineraries', 'approvals', 'branchData'])
+            $trip = BusinessTrip::with(['itineraries', 'participants', 'approvals', 'branchData'])
                 ->findOrFail($id);
 
             if (strtoupper((string) $trip->status) !== BusinessTrip::STATUS_APPROVED) {
@@ -1559,11 +1896,40 @@ class BusinessTripController extends Controller
                 ], 422);
             }
 
-            $pdf = Pdf::loadView('pdf.business-trip', [
-                'trip' => $trip,
-                'requester' => $this->buildRequesterSigner($trip),
-                'approvers' => $this->buildApproverSigners($trip),
-            ])->setPaper('a4', 'portrait');
+            $penyusun = app(CombinedPrintComposer::class);
+
+            /*
+            | Dokumen keuangannya, bila diminta digabung.
+            |
+            | Susunannya tetap dokumen keuangan di atas lalu perdin di bawahnya,
+            | walau yang menekan tombol cetak halaman perdin -- satu berkas
+            | gabungan harus tersusun sama dari pintu mana pun.
+            */
+            if ($request->boolean('with_linked_document')) {
+                $penahan = $penyusun->documentBlocker($trip);
+
+                if ($penahan) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $penahan,
+                    ], 422);
+                }
+
+                return $this->cetakGabungan($trip, $penyusun->documentFor($trip), $request);
+            }
+
+            /* Berkas pemesanan GA, bila diminta digabung. */
+            $lampiran = $request->boolean('with_attachments')
+                ? $penyusun->tripAttachments($trip)
+                : ['pages' => [], 'others' => []];
+
+            $pdf = Pdf::loadView('pdf.business-trip', array_merge(
+                $this->tripViewData($trip),
+                [
+                    'attachmentPages' => $lampiran['pages'],
+                    'attachmentOthers' => $lampiran['others'],
+                ],
+            ))->setPaper('a4', 'portrait');
 
             $nama = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) $trip->trip_number), '-');
 
@@ -1596,6 +1962,62 @@ class BusinessTripController extends Controller
                 'message' => __('business_trip_messages.print_failed'),
             ], 500);
         }
+    }
+
+    /**
+     * Data tampilan cetakan perdin.
+     *
+     * Publik karena dipakai juga oleh cetakan gabungan yang dirender dari
+     * modul lain. Dibagikan, bukan disalin: dua salinan yang ditulis
+     * terpisah selalu berakhir berbeda, dan yang berbeda di sini isi
+     * dokumen resmi.
+     *
+     * @return array<string, mixed>
+     */
+    public function tripViewData(BusinessTrip $trip): array
+    {
+        $trip->loadMissing(['itineraries', 'participants', 'approvals', 'branchData']);
+
+        return [
+            'trip' => $trip,
+            'requester' => $this->buildRequesterSigner($trip),
+            'approvers' => $this->buildApproverSigners($trip),
+        ];
+    }
+
+    /**
+     * Cetakan gabungan, diminta dari halaman perdin.
+     *
+     * TIDAK MEMBANGUN PDF-NYA SENDIRI. Ia menyerahkannya ke controller
+     * dokumen keuangannya, yang sudah tahu cara menyusunnya -- jalur yang
+     * sama persis dengan yang dipakai ketika orang mencetak dari halaman
+     * FPU, Claim, atau Realisasi.
+     *
+     * Dua jalur yang membangun berkas yang sama cepat atau lambat
+     * menghasilkan berkas yang berbeda, dan bedanya tidak akan terlihat
+     * sampai ada yang membandingkan dua cetakan berdampingan.
+     */
+    private function cetakGabungan(BusinessTrip $trip, object $dokumen, Request $request)
+    {
+        $controller = match ($dokumen::class) {
+            CashAdvance::class => CashAdvanceController::class,
+            Claim::class => ClaimController::class,
+            CashAdvanceRealization::class => CashAdvanceRealizationController::class,
+        };
+
+        /*
+        | Permintaan baru, bukan yang ini. Yang ini membawa tanda tangan URL
+        | milik rute perdin; meneruskannya apa adanya akan membuat pemeriksaan
+        | di seberang membaca tanda tangan untuk rute yang salah.
+        */
+        $permintaan = Request::create('/', 'GET', [
+            'with_business_trip' => 1,
+            'with_attachments' => $request->boolean('with_attachments') ? 1 : 0,
+        ]);
+
+        $permintaan->setUserResolver($request->getUserResolver());
+
+        return app($controller)->print($permintaan, $dokumen->encrypted_id);
     }
 
     /**
@@ -1725,6 +2147,18 @@ class BusinessTripController extends Controller
             'itineraries.*.time_end' => ['nullable', 'date_format:H:i'],
             'itineraries.*.timezone' => ['required', Rule::in(BusinessTripItinerary::TIMEZONES)],
             'itineraries.*.description' => ['required', 'string'],
+
+            /*
+            | Peserta lain yang ikut. Boleh kosong: perjalanan yang dijalani
+            | sendiri adalah keadaan yang paling biasa, dan perdin yang sudah
+            | ada semuanya begitu.
+            |
+            | Batas 50 bukan aturan kantor, hanya penjaga terhadap kiriman
+            | yang rusak atau disusun sendiri -- jumlah akun aktifnya pun
+            | masih di bawah itu.
+            */
+            'participants' => ['nullable', 'array', 'max:50'],
+            'participants.*' => ['integer', 'exists:users,id'],
         ];
     }
 
@@ -1735,6 +2169,67 @@ class BusinessTripController extends Controller
      * tidak punya identitas yang berarti bagi pengguna -- ia hanya urutan --
      * sehingga mencocokkan id justru memperumit tanpa menambah apa pun.
      */
+    /**
+     * Menulis ulang daftar peserta, seluruhnya.
+     *
+     * Ditulis ulang, bukan ditambal: daftar peserta datang dari layar sebagai
+     * satu himpunan utuh, dan menyelaraskan baris demi baris hanya menambah
+     * jalan untuk salah tanpa menambah satu pun keterangan.
+     *
+     * IDENTITASNYA DISALIN DI SINI, bukan dibaca saat ditampilkan. Aturannya
+     * sama dengan identitas pemohon: dokumen yang sudah disetujui tidak boleh
+     * berubah sendiri mengikuti mutasi jabatan orangnya.
+     *
+     * @param  array<int, mixed>  $userIds
+     */
+    private function syncParticipants(BusinessTrip $trip, array $userIds): void
+    {
+        $trip->participants()->delete();
+
+        /*
+        | Pemohonnya dibuang dari daftar, bukan ditolak dengan pesan
+        | kesalahan.
+        |
+        | Ia memang ikut -- dokumennya atas namanya -- dan bagian identitas
+        | sudah menyebutnya. Menolak kiriman yang menyertakan namanya berarti
+        | menghukum pemohon atas hal yang tidak salah; cukup tidak dicatat
+        | dua kali.
+        */
+        $pemohonId = (int) ($trip->user_id ?: ($trip->submitted_by ?? $trip->created_by));
+
+        $bersih = collect($userIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0 && $id !== $pemohonId)
+            ->unique()
+            ->values();
+
+        if ($bersih->isEmpty()) {
+            return;
+        }
+
+        $urut = 1;
+
+        foreach ($bersih as $userId) {
+            $akun = User::find($userId);
+
+            if (!$akun) {
+                continue;
+            }
+
+            $identitas = $this->resolveEmployeeIdentity($akun);
+
+            BusinessTripParticipant::create([
+                'business_trip_id' => $trip->id,
+                'user_id' => $userId,
+                'employee_name' => $identitas['employee_name'],
+                'department_id' => $identitas['department_id'],
+                'department_name' => $identitas['department_name'],
+                'position_name' => $identitas['position_name'],
+                'sort_no' => $urut++,
+            ]);
+        }
+    }
+
     private function syncItineraries(BusinessTrip $trip, array $baris): void
     {
         $trip->itineraries()->forceDelete();

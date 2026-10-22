@@ -5,7 +5,7 @@
 
     $currentMode = $mode ?? 'approval_request';
 
-    $translationMode = in_array($currentMode, ['final_approved', 'step_approved', 'rejected'], true)
+    $translationMode = in_array($currentMode, ['returned_for_revision', 'final_approved', 'step_approved', 'rejected'], true)
         ? $currentMode
         : 'default';
 
@@ -13,6 +13,7 @@
 
     $description = __('mail.po.description.' . $translationMode, [
         'actor_name' => optional($actor)->name,
+        'revision' => $revisionNumber ?? 0,
     ]);
 
     $displayStatus = match ($currentMode) {
@@ -20,6 +21,7 @@
         'final_approved' => 'APPROVED',
         'step_approved' => 'IN PROGRESS',
         'rejected' => 'REJECTED',
+        'returned_for_revision' => 'NEED REVISION',
         default => $po->status,
     };
 
@@ -105,7 +107,7 @@
                                 </tr>
                                 @if (!empty($notes))
                                     <tr>
-                                        <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">{{ __('mail.po.field_rejection_notes') }}</td>
+                                        <td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">{{ $currentMode === 'returned_for_revision' ? __('mail.po.field_return_reason') : __('mail.po.field_rejection_notes') }}</td>
                                         <td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;color:#991b1b;line-height:1.5;">
                                             {!! nl2br(e($notes)) !!}
                                         </td>

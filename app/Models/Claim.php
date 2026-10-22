@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasRevisions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Crypt;
 */
 class Claim extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasRevisions, SoftDeletes;
 
     protected $table = 'claims';
 
@@ -44,6 +45,7 @@ class Claim extends Model
         'amount_revision_notes',
         'notes',
         'status',
+        'revision_count',
 
         'created_by',
         'updated_by',
@@ -79,6 +81,7 @@ class Claim extends Model
     ];
 
     protected $casts = [
+        'revision_count' => 'integer',
         'date' => 'date',
         'department_id' => 'integer',
         'transaction_category_id' => 'integer',
@@ -108,6 +111,20 @@ class Claim extends Model
     public const STATUS_APPROVED = 'APPROVED';
     public const STATUS_REJECTED = 'REJECTED';
     public const STATUS_CANCELLED = 'CANCELLED';
+
+    /*
+    | Dikembalikan approver ke pemohon untuk diperbaiki.
+    |
+    | Statusnya HIDUP, dan justru di situ ia berbeda dari REJECTED yang
+    | sudah selesai: dokumennya masih berjalan dan masih akan menjadi
+    | uang, hanya sedang ada di tangan pemohonnya.
+    |
+    | Nomornya sengaja TIDAK dikembalikan ke DRAFT. Dokumen ini sudah
+    | pernah beredar; approver yang pernah membukanya harus masih bisa
+    | menemukannya dengan nomor yang sama, dan nomor yang dipakai ulang
+    | adalah nomor yang menunjuk dua dokumen sekaligus.
+    */
+    public const STATUS_NEED_REVISION = 'NEED REVISION';
     /*
     | Dokumen sudah disetujui penuh dan berkasnya diterima, tetapi belum
     | tuntas. Tahap antara ini yang membedakan "berkasnya sudah di tangan"
@@ -178,12 +195,68 @@ class Claim extends Model
         return $this->belongsTo(Department::class, 'department_id', 'id');
     }
 
+    /**
+     * Keterangan transaksi PENENTU.
+     *
+     * Satu, dan masih yang memilih jadwal pembayaran -- satu-satunya hal
+     * yang memang hanya bisa satu per dokumen. Sejak keterangan transaksi
+     * bisa lebih dari satu, ia berisi yang pertama menurut urutan masternya.
+     *
+     * Berbeda dari FPU, alur approval Claim TIDAK bergantung keterangan
+     * transaksi, jadi tidak ada pertanyaan "kategori mana yang menentukan
+     * alurnya" di sini.
+     */
     public function transactionCategory()
     {
         return $this->belongsTo(
             FundRequestTransactionCategory::class,
             'transaction_category_id',
         );
+    }
+
+    /**
+     * Himpunan keterangan transaksi yang boleh dipakai baris rinciannya.
+     */
+    public function transactionCategories()
+    {
+        return $this->belongsToMany(
+            FundRequestTransactionCategory::class,
+            'claim_transaction_categories',
+            'claim_id',
+            'transaction_category_id',
+        )->withTimestamps();
+    }
+
+    /**
+     * Seluruh keterangan transaksinya, siap ditulis apa adanya.
+     *
+     * Dipakai cetakan. Aturan jatuhnya ke keterangan tunggal -- untuk
+     * dokumen yang dibuat sebelum himpunan ini ada -- ditulis sekali di
+     * sini, sama seperti pada FPU.
+     */
+    public function transactionCategoryLabel(): string
+    {
+        /*
+        | Relasi yang sudah dimuat dipakai apa adanya.
+        |
+        | Tanpa ini, ekspor Excel -- yang memanggil label ini sekali per
+        | dokumen -- melahirkan satu kueri per baris daftarnya.
+        */
+        $himpunan = ($this->relationLoaded('transactionCategories')
+            ? $this->transactionCategories
+                ->sortBy([['sort_order', 'asc'], ['id', 'asc']])
+                ->pluck('name')
+            : $this->transactionCategories()
+                ->orderBy('sort_order')
+                ->orderBy('fund_request_transaction_categories.id')
+                ->pluck('name'))
+            ->filter(fn ($nama): bool => trim((string) $nama) !== '');
+
+        if ($himpunan->isNotEmpty()) {
+            return $himpunan->implode(', ');
+        }
+
+        return trim((string) ($this->transactionCategory?->name ?? '')) ?: '-';
     }
 
     public function creator()

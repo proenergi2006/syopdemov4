@@ -7,13 +7,19 @@ use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
+use App\Services\FundRequest\CombinedPrintComposer;
+use App\Http\Controllers\Api\BusinessTripController;
 use App\Services\FundRequest\PrintAttachmentCollector;
 use App\Services\FundRequest\ReceiptReversalService;
+use App\Services\FundRequest\DocumentRevisionService;
+use App\Services\FundRequest\RevisionNotifier;
+use App\Models\FundRequestRevision;
 use App\Models\BusinessTrip;
 use App\Models\BusinessTripApproval;
 use App\Models\CashAdvance;
 use App\Models\FundRequestArrangedCategory;
 use App\Services\FundRequest\BusinessTripExpenseBreakdownService;
+use App\Services\FundRequest\TransactionCategorySetService;
 use App\Services\FundRequest\AmountRevisionService;
 use App\Models\CashAdvanceApproval;
 use App\Models\CashAdvanceAttachment;
@@ -253,15 +259,29 @@ class CashAdvanceController extends Controller
                         && (int) $cashAdvance->department_id === (int) $user->departemen_id
                     );
 
+                    /*
+                    | Draft dan dokumen revisian sama-sama bisa diajukan.
+                    |
+                    | Siapa yang boleh mengajukannya pun sama: pembuatnya,
+                    | atau rekan satu departmentnya. Mempersempitnya khusus
+                    | untuk revisi akan membuat dokumen terhenti saat
+                    | pemohonnya sedang tidak di tempat -- padahal yang
+                    | diminta approver justru diperbaiki segera.
+                    */
                     $rowCanSubmit = (
                         $canSubmit
-                        && $status === CashAdvance::STATUS_DRAFT
+                        && in_array(
+                            $status,
+                            [CashAdvance::STATUS_DRAFT, CashAdvance::STATUS_NEED_REVISION],
+                            true,
+                        )
                         && ($isCreator || $isSameDepartment)
                     );
 
                     $currentApproval = $cashAdvance->approvals->first(
                         fn(CashAdvanceApproval $approval): bool =>
                         strtoupper((string) $approval->status) === CashAdvanceApproval::STATUS_WAITING
+                            && !$approvalService->isRequester($cashAdvance, $user)
                             && $approvalService->userCanApprove($approval, $user),
                     );
 
@@ -322,6 +342,17 @@ class CashAdvanceController extends Controller
                         'can_submit' => $rowCanSubmit,
                         'can_approve' => $currentApproval !== null,
 
+                        /*
+                        | Penanda revisi untuk daftar.
+                        |
+                        | Dibawa pada setiap baris -- termasuk baris yang
+                        | sudah berjalan lagi -- karena inilah satu-satunya
+                        | hal yang memberi tahu approver bahwa yang akan ia
+                        | setujui pernah dikembalikan. Notifikasi bisa
+                        | terlewat; lencana di barisnya tidak.
+                        */
+                        'revision_count' => (int) ($cashAdvance->revision_count ?? 0),
+
                         'approval_id' => $currentApproval?->id,
                         'approval_step_order' => $currentApproval
                             ? (int) $currentApproval->step_order
@@ -340,7 +371,6 @@ class CashAdvanceController extends Controller
                         'received_at' => $cashAdvance->received_at,
                         'scheduled_payment_date' => $cashAdvance->scheduled_payment_date,
                         'can_pay_today' => $this->canPayToday(
-                            $cashAdvance->scheduled_payment_date,
                             'FPU',
                             $cashAdvance->transaction_category_id,
                         ),
@@ -454,6 +484,16 @@ class CashAdvanceController extends Controller
                 ],
 
                 /*
+                | Himpunan keterangan transaksi yang boleh dipakai baris
+                | rinciannya. Aturan isinya -- minimal satu, tepat satu pada Non
+                | Rutin, dan harus cocok sifat pengajuannya -- ada di
+                | TransactionCategorySetService, bukan di sini: ia dipakai dua
+                | jalur dan satu pembaca ketiga.
+                */
+                'transaction_category_ids' => ['nullable', 'array'],
+                'transaction_category_ids.*' => ['integer'],
+
+                /*
                 | Dokumen Perdin yang mendasari FPU ini. Wajib atau tidaknya
                 | ditentukan keterangan transaksinya -- lihat
                 | resolveBusinessTripId() di bawah.
@@ -466,6 +506,15 @@ class CashAdvanceController extends Controller
                 'department_id' => ['required', 'integer'],
                 'notes' => ['nullable', 'string', 'max:2000'],
                 'items' => ['required', 'string'],
+
+                /*
+                | Catatan pemohon untuk GA, per kategori. Opsional, tetapi tetap
+                | berbatas: isian tanpa batas yang akhirnya ditolak basis data
+                | akan gagal sebagai galat 500, bukan sebagai pesan yang bisa
+                | dibaca orang yang mengisinya.
+                */
+                'arranged_notes' => ['nullable', 'array'],
+                'arranged_notes.*' => ['nullable', 'string', 'max:1000'],
 
                 /*
                 | Lampiran kini dikirim per baris rincian: line_attachments[i][].
@@ -494,6 +543,21 @@ class CashAdvanceController extends Controller
             $rincianPerdin = $this->isBusinessTripCategory($request);
 
             /*
+            | Himpunan keterangan transaksi headernya.
+            |
+            | Dibaca SEBELUM rinciannya, karena ia yang membatasi pilihan di
+            | tiap barisnya. Pengirim yang belum mengenal himpunan ini -- layar
+            | lama, atau permintaan tanpa layar -- jatuh ke penentu tunggalnya,
+            | sehingga FPU tetap bisa dibuat seperti sebelumnya.
+            */
+            $himpunanKategori = app(TransactionCategorySetService::class)->normalize(
+                $request->filled('transaction_category_ids')
+                    ? (array) $request->input('transaction_category_ids')
+                    : [(int) $request->input('transaction_category_id')],
+                $request->input('request_type'),
+            );
+
+            /*
             | Kategori yang ditandai diurus GA. Dikirim sebagai daftar id;
             | kategori di dalamnya tidak boleh punya baris rincian.
             |
@@ -504,10 +568,35 @@ class CashAdvanceController extends Controller
                 ? (array) $request->input('arranged_categories', [])
                 : [];
 
+            /*
+            | Catatan pemohon untuk GA, per kategori. Opsional.
+            |
+            | Diangkut terpisah dari daftar idnya, dan itu disengaja: daftar
+            | id tetap satu-satunya yang menentukan kategori mana yang
+            | ditandai. Catatan untuk kategori yang tidak ditandai diabaikan
+            | di penyimpanannya, bukan ditolak -- yang mengirimnya tidak
+            | sedang melakukan kesalahan, hanya mengirim keterangan yang
+            | sudah kehilangan sandarannya.
+            */
+            $arrangedNotes = $rincianPerdin
+                ? (array) $request->input('arranged_notes', [])
+                : [];
+
             $items = $this->decodeItems(
                 $request->input('items'),
                 $rincianPerdin,
                 $rincianPerdin && $arrangedCategories !== [],
+            );
+
+            /*
+            | Tiap baris hanya boleh memakai keterangan transaksi dari himpunan
+            | headernya. Bila himpunannya tepat satu, baris yang tidak menyebut
+            | apa pun diisikan yang satu itu -- isian berpilihan tunggal tidak
+            | pantas diminta dari pengguna, tetapi datanya tetap harus lengkap.
+            */
+            $items = app(TransactionCategorySetService::class)->applyToItems(
+                $items,
+                $himpunanKategori,
             );
 
             if ($rincianPerdin) {
@@ -558,6 +647,7 @@ class CashAdvanceController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'transaction_category_id' => $item['transaction_category_id'] ?? null,
                     'expense_category_id' => $item['expense_category_id'] ?? null,
                     'qty' => $item['qty'] ?? null,
                     'unit_price' => $item['unit_price'] ?? null,
@@ -568,11 +658,28 @@ class CashAdvanceController extends Controller
 
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, []);
 
+            /*
+            | Himpunan keterangan transaksinya, ditulis ulang seluruhnya.
+            |
+            | Kolom penentunya sudah terisi dari kiriman layar. Dipastikan lagi
+            | di sini supaya ia selalu salah satu anggota himpunannya: penentu
+            | yang berada di luar himpunan akan memilih alur approval yang tidak
+            | ada kaitannya dengan isi dokumennya.
+            */
+            app(TransactionCategorySetService::class)->sync($cashAdvance, $himpunanKategori);
+
+            $penentu = app(TransactionCategorySetService::class)->primary($himpunanKategori);
+
+            if ($penentu !== null && (int) $cashAdvance->transaction_category_id !== $penentu) {
+                $cashAdvance->forceFill(['transaction_category_id' => $penentu])->save();
+            }
+
             /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
             app(BusinessTripExpenseBreakdownService::class)->syncArranged(
                 FundRequestArrangedCategory::DOC_CASH_ADVANCE,
                 (int) $cashAdvance->id,
                 $arrangedCategories,
+                $arrangedNotes,
             );
 
             $storedPaths = $this->storeLineAttachments(
@@ -656,11 +763,17 @@ class CashAdvanceController extends Controller
                 'transactionCategory',
 
                 /*
-                | Perdin beserta rundown dan rantai persetujuannya: detail FPU
-                | membuka modal rincian perdin yang sama persis dengan yang di
-                | halaman perdin, dan modal itu menampilkan keduanya.
+                | Perdin beserta rundown, pesertanya, dan rantai
+                | persetujuannya: detail FPU membuka modal rincian perdin yang
+                | sama persis dengan yang di halaman perdin, dan modal itu
+                | menampilkan semuanya.
+                |
+                | Pesertanya ikut karena jumlah orang yang berangkat itulah
+                | yang menjelaskan besarnya uang muka yang diminta -- dan
+                | layar FPU adalah tempat angka itu dibaca.
                 */
                 'businessTrip.itineraries',
+                'businessTrip.participants',
                 'businessTrip.approvals' => function ($tripApprovalQuery) {
                     $tripApprovalQuery->orderBy('step_order')->orderBy('id');
                 },
@@ -675,6 +788,7 @@ class CashAdvanceController extends Controller
                 'businessTrip.arrangements.creator:id,name',
                 'businessTrip.arrangements.canceller:id,name',
                 'items.expenseCategory',
+                'items.transactionCategory:id,name',
                 'attachments',
                 'creator:id,name',
                 'submitter:id,name',
@@ -691,7 +805,8 @@ class CashAdvanceController extends Controller
             $currentApproval = $cashAdvance->approvals->first(
                 fn(CashAdvanceApproval $approval): bool =>
                 strtoupper((string) $approval->status) === CashAdvanceApproval::STATUS_WAITING
-                    && $approvalService->userCanApprove($approval, $user),
+                    && !$approvalService->isRequester($cashAdvance, $user)
+                            && $approvalService->userCanApprove($approval, $user),
             );
 
             /*
@@ -758,7 +873,12 @@ class CashAdvanceController extends Controller
                 ], 404);
             }
 
-            $cashAdvance->load(['items.expenseCategory', 'attachments', 'transactionCategory:id,name']);
+            $cashAdvance->load([
+                'items.expenseCategory',
+                'items.transactionCategory:id,name',
+                'attachments',
+                'transactionCategory:id,name',
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -771,6 +891,18 @@ class CashAdvanceController extends Controller
                     'subject' => $cashAdvance->subject,
                     'transaction_category_id' => $cashAdvance->transaction_category_id,
                     'transaction_category' => $cashAdvance->transactionCategory?->name,
+
+                    /*
+                    | Himpunan keterangan transaksinya. Tanpa ini, menyunting FPU
+                    | lalu menyimpannya kembali akan menyusutkan himpunannya
+                    | menjadi satu -- dan baris rincian yang memakai keterangan
+                    | lain mendadak di luar himpunan headernya sendiri.
+                    |
+                    | FPU lama jatuh ke penentu tunggalnya -- lihat idsFor().
+                    */
+                    'transaction_category_ids' => app(TransactionCategorySetService::class)
+                        ->idsFor($cashAdvance),
+
                     'business_trip_id' => $cashAdvance->business_trip_id,
                     'request_type' => $cashAdvance->request_type,
                     'branch' => $cashAdvance->branch,
@@ -788,6 +920,19 @@ class CashAdvanceController extends Controller
                     'amount_revision_notes' => $cashAdvance->amount_revision_notes,
                     'notes' => $cashAdvance->notes,
                     'status' => $cashAdvance->status,
+
+                    /*
+                    | Alasan pengembalian, bila dokumennya sedang butuh revisi.
+                    |
+                    | Dibaca pemohon di atas formnya, tepat saat ia hendak
+                    | memperbaikinya. Null untuk dokumen lain -- termasuk yang
+                    | pernah direvisi lalu sudah diajukan ulang: yang sudah
+                    | selesai tidak perlu lagi diminta mengerjakannya.
+                    */
+                    'revision_count' => (int) ($cashAdvance->revision_count ?? 0),
+                    'revision_open' => ($terbukaEdit = $cashAdvance->openRevision())
+                        ? app(DocumentRevisionService::class)->sajikan($terbukaEdit)
+                        : null,
                     'items' => $this->transformItems($cashAdvance),
                     'attachments' => $this->transformAttachments($cashAdvance),
 
@@ -799,6 +944,17 @@ class CashAdvanceController extends Controller
                     */
                     'arranged_categories' => app(BusinessTripExpenseBreakdownService::class)
                         ->arrangedFor(
+                            FundRequestArrangedCategory::DOC_CASH_ADVANCE,
+                            (int) $cashAdvance->id,
+                        ),
+
+                    /*
+                    | Catatan pemohon pada penanda itu. Tanpa ini, menyunting
+                    | FPU lalu menyimpannya kembali akan menghapus catatannya
+                    | tanpa pemohon pernah menyentuh isiannya.
+                    */
+                    'arranged_notes' => app(BusinessTripExpenseBreakdownService::class)
+                        ->arrangedNotesFor(
                             FundRequestArrangedCategory::DOC_CASH_ADVANCE,
                             (int) $cashAdvance->id,
                         ),
@@ -851,12 +1007,30 @@ class CashAdvanceController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
-            if (strtoupper((string) $cashAdvance->status) !== CashAdvance::STATUS_DRAFT) {
+            /*
+            | Draft, dan dokumen yang sedang butuh revisi.
+            |
+            | Keduanya sama-sama berada di tangan pemohon dan tidak sedang
+            | menunggu keputusan siapa pun -- itulah yang membuat keduanya
+            | boleh disunting. Statusnya sendiri yang menjaga sisanya:
+            | dokumen yang sedang berjalan, sudah disetujui, sudah diterima,
+            | atau sudah selesai tidak termasuk keduanya.
+            */
+            $statusSaatIni = strtoupper((string) $cashAdvance->status);
+            $sedangDirevisi = $statusSaatIni === CashAdvance::STATUS_NEED_REVISION;
+
+            if (
+                !in_array(
+                    $statusSaatIni,
+                    [CashAdvance::STATUS_DRAFT, CashAdvance::STATUS_NEED_REVISION],
+                    true,
+                )
+            ) {
                 DB::rollBack();
 
                 return response()->json([
                     'success' => false,
-                    'message' => __('cash_advance_messages.update.only_draft'),
+                    'message' => __('fund_request_messages.return_for_revision.editable_only'),
                 ], 422);
             }
 
@@ -875,6 +1049,16 @@ class CashAdvanceController extends Controller
                 ],
 
                 /*
+                | Himpunan keterangan transaksi yang boleh dipakai baris
+                | rinciannya. Aturan isinya -- minimal satu, tepat satu pada Non
+                | Rutin, dan harus cocok sifat pengajuannya -- ada di
+                | TransactionCategorySetService, bukan di sini: ia dipakai dua
+                | jalur dan satu pembaca ketiga.
+                */
+                'transaction_category_ids' => ['nullable', 'array'],
+                'transaction_category_ids.*' => ['integer'],
+
+                /*
                 | Dokumen Perdin yang mendasari FPU ini. Wajib atau tidaknya
                 | ditentukan keterangan transaksinya -- lihat
                 | resolveBusinessTripId() di bawah.
@@ -887,6 +1071,15 @@ class CashAdvanceController extends Controller
                 'department_id' => ['required', 'integer'],
                 'notes' => ['nullable', 'string', 'max:2000'],
                 'items' => ['required', 'string'],
+
+                /*
+                | Catatan pemohon untuk GA, per kategori. Opsional, tetapi tetap
+                | berbatas: isian tanpa batas yang akhirnya ditolak basis data
+                | akan gagal sebagai galat 500, bukan sebagai pesan yang bisa
+                | dibaca orang yang mengisinya.
+                */
+                'arranged_notes' => ['nullable', 'array'],
+                'arranged_notes.*' => ['nullable', 'string', 'max:1000'],
                 'deleted_attachment_ids' => ['nullable', 'string'],
 
                 /*
@@ -916,6 +1109,21 @@ class CashAdvanceController extends Controller
             $rincianPerdin = $this->isBusinessTripCategory($request);
 
             /*
+            | Himpunan keterangan transaksi headernya.
+            |
+            | Dibaca SEBELUM rinciannya, karena ia yang membatasi pilihan di
+            | tiap barisnya. Pengirim yang belum mengenal himpunan ini -- layar
+            | lama, atau permintaan tanpa layar -- jatuh ke penentu tunggalnya,
+            | sehingga FPU tetap bisa dibuat seperti sebelumnya.
+            */
+            $himpunanKategori = app(TransactionCategorySetService::class)->normalize(
+                $request->filled('transaction_category_ids')
+                    ? (array) $request->input('transaction_category_ids')
+                    : [(int) $request->input('transaction_category_id')],
+                $request->input('request_type'),
+            );
+
+            /*
             | Kategori yang ditandai diurus GA. Dikirim sebagai daftar id;
             | kategori di dalamnya tidak boleh punya baris rincian.
             |
@@ -926,10 +1134,35 @@ class CashAdvanceController extends Controller
                 ? (array) $request->input('arranged_categories', [])
                 : [];
 
+            /*
+            | Catatan pemohon untuk GA, per kategori. Opsional.
+            |
+            | Diangkut terpisah dari daftar idnya, dan itu disengaja: daftar
+            | id tetap satu-satunya yang menentukan kategori mana yang
+            | ditandai. Catatan untuk kategori yang tidak ditandai diabaikan
+            | di penyimpanannya, bukan ditolak -- yang mengirimnya tidak
+            | sedang melakukan kesalahan, hanya mengirim keterangan yang
+            | sudah kehilangan sandarannya.
+            */
+            $arrangedNotes = $rincianPerdin
+                ? (array) $request->input('arranged_notes', [])
+                : [];
+
             $items = $this->decodeItems(
                 $request->input('items'),
                 $rincianPerdin,
                 $rincianPerdin && $arrangedCategories !== [],
+            );
+
+            /*
+            | Tiap baris hanya boleh memakai keterangan transaksi dari himpunan
+            | headernya. Bila himpunannya tepat satu, baris yang tidak menyebut
+            | apa pun diisikan yang satu itu -- isian berpilihan tunggal tidak
+            | pantas diminta dari pengguna, tetapi datanya tetap harus lengkap.
+            */
+            $items = app(TransactionCategorySetService::class)->applyToItems(
+                $items,
+                $himpunanKategori,
             );
 
             if ($rincianPerdin) {
@@ -981,11 +1214,28 @@ class CashAdvanceController extends Controller
 
             $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, $deletedIds);
 
+            /*
+            | Himpunan keterangan transaksinya, ditulis ulang seluruhnya.
+            |
+            | Kolom penentunya sudah terisi dari kiriman layar. Dipastikan lagi
+            | di sini supaya ia selalu salah satu anggota himpunannya: penentu
+            | yang berada di luar himpunan akan memilih alur approval yang tidak
+            | ada kaitannya dengan isi dokumennya.
+            */
+            app(TransactionCategorySetService::class)->sync($cashAdvance, $himpunanKategori);
+
+            $penentu = app(TransactionCategorySetService::class)->primary($himpunanKategori);
+
+            if ($penentu !== null && (int) $cashAdvance->transaction_category_id !== $penentu) {
+                $cashAdvance->forceFill(['transaction_category_id' => $penentu])->save();
+            }
+
             /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
             app(BusinessTripExpenseBreakdownService::class)->syncArranged(
                 FundRequestArrangedCategory::DOC_CASH_ADVANCE,
                 (int) $cashAdvance->id,
                 $arrangedCategories,
+                $arrangedNotes,
             );
 
             $this->deleteRequestedAttachments($request, $cashAdvance);
@@ -996,7 +1246,36 @@ class CashAdvanceController extends Controller
                 $itemIdsByIndex,
             );
 
+            /*
+            | Revisinya ditandai sudah mulai dikerjakan.
+            |
+            | Hanya sekali, pada penyimpanan pertama -- lihat
+            | DocumentRevisionService::tandaiDirevisi. Approver yang
+            | mengembalikannya dikabari di situ, supaya ia tahu dokumennya
+            | sedang ditangani dan tidak terdiam di tangan pemohon.
+            */
+            $revisiBerjalan = null;
+
+            if ($sedangDirevisi) {
+                $revisionService = app(DocumentRevisionService::class);
+
+                if ($revisionService->tandaiDirevisi($cashAdvance)) {
+                    $revisiBerjalan = $cashAdvance->openRevision();
+                }
+            }
+
             DB::commit();
+
+            if ($revisiBerjalan) {
+                try {
+                    app(RevisionNotifier::class)->sedangDirevisi($cashAdvance, $revisiBerjalan);
+                } catch (\Throwable $notifyError) {
+                    Log::error('[FPU] Notifikasi revisi dikerjakan gagal', [
+                        'cash_advance_id' => $cashAdvance->id,
+                        'message' => $notifyError->getMessage(),
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -1177,12 +1456,30 @@ class CashAdvanceController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
-            if (strtoupper((string) $cashAdvance->status) !== CashAdvance::STATUS_DRAFT) {
+            /*
+            | Draft, dan dokumen revisian yang sudah diperbaiki.
+            |
+            | Keduanya masuk lewat pintu yang sama, dan itu disengaja: yang
+            | terjadi setelahnya memang sama persis -- rantai approval dibuat,
+            | statusnya menjadi berjalan, approver tahap pertama dikabari.
+            | Pintu kedua yang terpisah berarti dua salinan aturan pengajuan,
+            | dan yang berbeda di antara keduanya adalah uang orang.
+            */
+            $statusSaatIni = strtoupper((string) $cashAdvance->status);
+            $pengajuanUlang = $statusSaatIni === CashAdvance::STATUS_NEED_REVISION;
+
+            if (
+                !in_array(
+                    $statusSaatIni,
+                    [CashAdvance::STATUS_DRAFT, CashAdvance::STATUS_NEED_REVISION],
+                    true,
+                )
+            ) {
                 DB::rollBack();
 
                 return response()->json([
                     'success' => false,
-                    'message' => __('cash_advance_messages.submit.only_draft'),
+                    'message' => __('fund_request_messages.return_for_revision.submittable_only'),
                 ], 422);
             }
 
@@ -1212,7 +1509,21 @@ class CashAdvanceController extends Controller
                 $cashAdvance->department_id ? (int) $cashAdvance->department_id : null,
             );
 
-            if ($batas['blocked']) {
+            /*
+            | Dokumen revisian TIDAK dinilai ulang terhadap batas ini.
+            |
+            | Batasnya menjaga pintu masuk antrean: dokumen baru tidak boleh
+            | masuk sebelum yang lama dipertanggungjawabkan. Dokumen revisian
+            | sudah berada di dalam antrean sejak pengajuan pertamanya; yang
+            | sedang terjadi adalah perbaikan atas permintaan approver, bukan
+            | pengajuan baru.
+            |
+            | Kalau ikut dinilai, pemohon yang pencairannya bertambah selama
+            | dokumennya direvisi akan terjebak: mengajukan ulang ditolak
+            | batas, dan membatalkan tidak boleh karena yang diminta approver
+            | adalah revisi. Dokumennya berhenti tanpa pintu keluar.
+            */
+            if (!$pengajuanUlang && $batas['blocked']) {
                 DB::rollBack();
 
                 return response()->json([
@@ -1245,10 +1556,35 @@ class CashAdvanceController extends Controller
 
             $submittedAt = now();
 
+            /*
+            | Revisinya ditutup: potret sesudahnya, daftar perubahannya, dan
+            | siapa yang mengajukan ulang ditulis sekaligus. Dipanggil setelah
+            | rincian dan lampirannya final, dan sebelum statusnya berpindah,
+            | supaya yang terpotret adalah dokumen yang benar-benar diajukan.
+            */
+            $revisiDitutup = $pengajuanUlang
+                ? app(DocumentRevisionService::class)->tutup($cashAdvance, $user)
+                : null;
+
             $cashAdvance->status = CashAdvance::STATUS_IN_PROGRESS;
             $cashAdvance->submitted_by = $user->id;
-            $cashAdvance->submitted_at = $submittedAt;
 
+            /*
+            | Tanggal pengajuan pertamanya dipertahankan.
+            |
+            | Umur dokumen dihitung sejak ia pertama kali masuk antrean, dan
+            | revisi tidak membuatnya muda kembali. Kapan tepatnya diajukan
+            | ulang tetap tercatat, di resubmitted_at pada riwayat revisinya.
+            */
+            if (!$pengajuanUlang || $cashAdvance->submitted_at === null) {
+                $cashAdvance->submitted_at = $submittedAt;
+            }
+
+            /*
+            | Tanda tangan pemohon diperbarui, termasuk pada pengajuan ulang:
+            | isinya sudah berubah, dan tanda tangan lama menyatakan
+            | persetujuan atas angka yang sudah tidak ada lagi.
+            */
             $cashAdvance->requester_signed_by = $user->id;
             $cashAdvance->requester_signature_path = $requesterSignaturePath;
             $cashAdvance->requester_signed_at = $submittedAt;
@@ -1260,7 +1596,25 @@ class CashAdvanceController extends Controller
             $cashAdvance->refresh();
 
             try {
-                $notificationService->notifyApprovalRequest($cashAdvance);
+                /*
+                | Dokumen revisian dikabarkan dengan kalimatnya sendiri.
+                |
+                | Permintaan persetujuan biasa tidak menyebut apa pun soal
+                | revisi, dan approver yang menerimanya akan membacanya
+                | sebagai dokumen baru -- lalu menyetujui perubahan yang
+                | justru menjadi sebab pengembaliannya tanpa melihatnya.
+                | Yang mengembalikan juga dikabari di sini, supaya tahu
+                | permintaannya sudah dipenuhi.
+                */
+                if ($revisiDitutup) {
+                    app(RevisionNotifier::class)->diajukanUlang(
+                        $cashAdvance,
+                        $revisiDitutup,
+                        fn($approval) => $notificationService->resolveApproverUsers($approval),
+                    );
+                } else {
+                    $notificationService->notifyApprovalRequest($cashAdvance);
+                }
             } catch (\Throwable $notificationError) {
                 Log::error('[FPU] Notifikasi approver gagal dibuat', [
                     'cash_advance_id' => $cashAdvance->id,
@@ -1596,6 +1950,182 @@ class CashAdvanceController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | Kembalikan FPU ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | DUA PINTU, DAN STATUSNYA YANG MEMILIH.
+    |
+    |  - IN PROGRESS : approver yang sedang memegang dokumennya. Penjaganya
+    |                  sama dengan tombol Setujui -- getUserCurrentApproval
+    |                  sekaligus menolak pemohon atas dokumennya sendiri.
+    |
+    |  - RECEIVED    : Finance yang berkasnya baru diterima. Di sini
+    |                  penerimaannya ikut ditarik dan tanggal pembayaran yang
+    |                  sudah dijanjikan dibatalkan, jadi penjaganya izin
+    |                  cash_advance.unreceive -- izin yang memang sudah
+    |                  mengatur pekerjaan itu.
+    |
+    | Yang sudah dicairkan tidak lewat pintu mana pun: uangnya sudah keluar,
+    | dan yang tersisa adalah dokumen Realisasi, bukan revisi.
+    |
+    | Satu endpoint untuk keduanya, karena bagi yang memakainya ini satu
+    | tindakan yang sama: mengembalikan dokumen kepada pemohonnya.
+    |--------------------------------------------------------------------------
+    */
+    public function returnForRevision(
+        string $publicId,
+        Request $request,
+        CashAdvanceApprovalService $approvalService,
+        CashAdvanceMailService $mailService,
+        DocumentRevisionService $revisionService,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], [
+            'reason' => __('fund_request_messages.return_for_revision.reason_label'),
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_messages.user_not_authenticated'),
+                ], 401);
+            }
+
+            $id = Crypt::decryptString($publicId);
+
+            $cashAdvance = CashAdvance::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            $status = strtoupper((string) $cashAdvance->status);
+
+            if ($status === CashAdvance::STATUS_IN_PROGRESS) {
+                $approval = $approvalService->getUserCurrentApproval($cashAdvance, $user, true);
+
+                if (!$approval) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => __('fund_request_messages.return_for_revision.not_active_approver'),
+                    ], 403);
+                }
+
+                $hasil = $revisionService->kembalikan(
+                    document: $cashAdvance,
+                    user: $user,
+                    reason: $validated['reason'],
+                    permission: null,
+                    from: FundRequestRevision::FROM_APPROVAL,
+                    stepOrder: (int) $approval->step_order,
+                    stepLabel: $approval->label,
+                );
+            } elseif ($status === CashAdvance::STATUS_RECEIVED) {
+                $hasil = $revisionService->kembalikan(
+                    document: $cashAdvance,
+                    user: $user,
+                    reason: $validated['reason'],
+                    permission: 'cash_advance.unreceive',
+                    from: FundRequestRevision::FROM_RECEIPT,
+                    approvedStatus: CashAdvance::STATUS_APPROVED,
+                );
+            } else {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('fund_request_messages.return_for_revision.only_in_progress'),
+                ], 422);
+            }
+
+            if (!$hasil['ok']) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __($hasil['message_key'], $hasil['message_replace']),
+                ], $hasil['status']);
+            }
+
+            DB::commit();
+
+            $revisi = $hasil['revision'];
+
+            $cashAdvance->refresh();
+
+            /*
+            | Pemohon dikabari di luar transaksi: dokumennya sudah berpindah
+            | tangan, dan kabar yang gagal tidak boleh membatalkannya.
+            */
+            try {
+                app(RevisionNotifier::class)->dikembalikan($cashAdvance, $revisi);
+
+                $mailService->sendReturnedForRevision(
+                    $cashAdvance,
+                    $user,
+                    $validated['reason'],
+                    (int) $revisi->revision_number,
+                );
+            } catch (\Throwable $notifyError) {
+                Log::error('[FPU] Notifikasi pengembalian gagal', [
+                    'cash_advance_id' => $cashAdvance->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $hasil['scheduled_date']
+                    ? __('fund_request_messages.return_for_revision.success_with_schedule', [
+                        'date' => $hasil['scheduled_date'],
+                    ])
+                    : __('fund_request_messages.return_for_revision.success'),
+                'data' => [
+                    'id' => $cashAdvance->id,
+                    'public_id' => $cashAdvance->encrypted_id,
+                    'advance_number' => $cashAdvance->advance_number,
+                    'status' => $cashAdvance->status,
+                    'revision_count' => (int) $cashAdvance->revision_count,
+                    'revision_number' => (int) $revisi->revision_number,
+                ],
+            ], 200);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+                    ?? __('fund_request_messages.return_for_revision.failed'),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[FPU] Kembalikan untuk revisi error', [
+                'public_id' => $publicId,
+                'user_id' => $request->user()?->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('fund_request_messages.return_for_revision.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Batalkan FPU yang sudah approved
     |--------------------------------------------------------------------------
     | Hanya status APPROVED yang boleh dibatalkan:
@@ -1792,9 +2322,13 @@ class CashAdvanceController extends Controller
                 ->with([
                     /* Kategori ikut dimuat: kolom Kategori Biaya membacanya. */
                     'items.expenseCategory',
+                    'items.transactionCategory:id,name',
                     'branchData',
                     'departmentData',
                     'transactionCategory',
+
+                    /* Himpunannya, supaya labelnya tidak menagih satu kueri per baris. */
+                    'transactionCategories',
                     'creator',
 
                     /*
@@ -1982,7 +2516,6 @@ class CashAdvanceController extends Controller
                     if (
                         $toStatus === CashAdvance::STATUS_DISBURSED
                         && !$this->canPayToday(
-                            $terkunci->scheduled_payment_date,
                             'FPU',
                             $terkunci->transaction_category_id,
                         )
@@ -2408,7 +2941,6 @@ class CashAdvanceController extends Controller
             | boleh, tetapi tetap harus jatuh pada hari kerja kasirnya.
             */
             if (!$this->canPayToday(
-                $cashAdvance->scheduled_payment_date,
                 'FPU',
                 $cashAdvance->transaction_category_id,
             )) {
@@ -2535,14 +3067,28 @@ class CashAdvanceController extends Controller
             | diberikan -- dan yang diubah di sini menentukan berkas siapa
             | saja yang ikut tercetak.
             */
-            $denganLampiran = $request->boolean('with_attachments');
+            /*
+            | Seluruh pilihan cetak ikut ke dalam tanda tangan URL-nya.
+            |
+            | Semula hanya lampirannya yang ikut, sehingga pilihan gabung
+            | perdin sampai ke sini lalu hilang -- layarnya mengirim, server
+            | menerimanya, dan URL yang dibentuk tidak membawanya. Cetakannya
+            | keluar tanpa perdin tanpa ada yang bersuara.
+            */
+            $pilihan = ['publicId' => $publicId];
+
+            if ($request->boolean('with_attachments')) {
+                $pilihan['with_attachments'] = 1;
+            }
+
+            if ($request->boolean('with_business_trip')) {
+                $pilihan['with_business_trip'] = 1;
+            }
 
             $relativeUrl = URL::temporarySignedRoute(
                 'fund-request.cash-advance.print-signed',
                 now()->addMinutes(10),
-                $denganLampiran
-                    ? ['publicId' => $publicId, 'with_attachments' => 1]
-                    : ['publicId' => $publicId],
+                $pilihan,
                 false,
             );
 
@@ -2588,6 +3134,7 @@ class CashAdvanceController extends Controller
                 'departmentData:id,kode,nama',
                 'transactionCategory:id,code,name',
                 'items.expenseCategory',
+                'items.transactionCategory:id,name',
                 'creator:id,name',
                 'submitter:id,name',
                 'receiver:id,name',
@@ -2665,6 +3212,67 @@ class CashAdvanceController extends Controller
                     'amount',
                 )
                 : null;
+
+            /*
+            | Cetakan gabungan dengan perjalanan dinasnya.
+            |
+            | Disisipkan di sini, setelah seluruh data tampilannya tersusun:
+            | yang perlu ditambahkan hanya data perdinnya, dan susunan
+            | halamannya pun sudah benar -- dokumen ini di atas, perdin
+            | menyusul.
+            |
+            | Syaratnya ditegakkan di sini, bukan di layar. URL cetak
+            | bertanda tangan membawa parameternya secara terbuka, dan
+            | parameter yang hanya dijaga layar bukan dijaga sama sekali.
+            */
+            if ($request->boolean('with_business_trip')) {
+                $penyusun = app(CombinedPrintComposer::class);
+
+                $penahan = $penyusun->tripBlocker($fpu);
+
+                if ($penahan) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $penahan,
+                    ], 422);
+                }
+
+                $trip = $penyusun->tripFor($fpu);
+
+                $lampiranTrip = $request->boolean('with_attachments')
+                    ? $penyusun->tripAttachments($trip)
+                    : ['pages' => [], 'others' => []];
+
+                $pdf = Pdf::loadView('pdf.combined', array_merge(
+                    app(BusinessTripController::class)->tripViewData($trip),
+                    [
+                        'judul' => $fpu->advance_number . ' + ' . $trip->trip_number,
+                        'gayaDokumen' => 'cash-advance-styles',
+                        'badanDokumen' => 'cash-advance-body',
+                        'fpu' => $fpu,
+                        'rincianPerdin' => $rincianPerdin,
+                        'totalAmount' => $totalAmount,
+                        'terbilang' => RupiahWords::of($totalAmount),
+                        'requester' => $this->buildRequesterSigner($fpu),
+                        'approvers' => $this->buildApproverSigners($fpu),
+
+                        'attachmentPages' => $attachmentPages,
+                        'attachmentOthers' => $attachmentOthers,
+
+                        /* Lampiran perdinnya, dipisah dari lampiran dokumen ini. */
+                        'tripAttachmentPages' => $lampiranTrip['pages'],
+                        'tripAttachmentOthers' => $lampiranTrip['others'],
+                    ],
+                ))->setPaper('a4', 'portrait');
+
+                return $this->pdfResponse(
+                    $pdf->output(),
+                    'FPU-' . $this->safeFileName(
+                        (string) $fpu->advance_number . '-' . $trip->trip_number,
+                        (string) $fpu->id,
+                    ),
+                );
+            }
 
             $pdf = Pdf::loadView('pdf.cash-advance', [
                 'fpu' => $fpu,
@@ -3519,6 +4127,17 @@ class CashAdvanceController extends Controller
                 'amount' => round($amount, 2),
 
                 /*
+                | Keterangan transaksi barisnya, dibawa apa adanya. Yang
+                | memeriksa keanggotaannya pada himpunan header adalah
+                | TransactionCategorySetService -- di sini belum diketahui
+                | himpunannya.
+                |
+                | Berlaku pada baris perdin MAUPUN non-perdin: keterangan
+                | transaksi bukan bagian dari bentuk rinciannya.
+                */
+                'transaction_category_id' => $item['transaction_category_id'] ?? null,
+
+                /*
                 | Dibawa apa adanya; yang memeriksanya dan menghitung
                 | nominalnya adalah BusinessTripExpenseBreakdownService.
                 | Kosong pada baris non-perdin.
@@ -3571,6 +4190,7 @@ class CashAdvanceController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'transaction_category_id' => $item['transaction_category_id'] ?? null,
                     'expense_category_id' => $item['expense_category_id'] ?? null,
                     'qty' => $item['qty'] ?? null,
                     'unit_price' => $item['unit_price'] ?? null,
@@ -3581,6 +4201,7 @@ class CashAdvanceController extends Controller
                     'date' => $item['date'],
                     'description' => $item['description'],
                     'amount' => $item['amount'],
+                    'transaction_category_id' => $item['transaction_category_id'] ?? null,
                     'expense_category_id' => $item['expense_category_id'] ?? null,
                     'qty' => $item['qty'] ?? null,
                     'unit_price' => $item['unit_price'] ?? null,
@@ -3955,6 +4576,21 @@ class CashAdvanceController extends Controller
             'request_type' => $cashAdvance->request_type,
 
             /*
+            | Himpunan keterangan transaksinya, berikut nama -- modal detail
+            | menampilkan nama, bukan id. Dikirim walau berisi satu: yang
+            | membacanya tidak perlu tahu kapan himpunan itu lebih panjang.
+            */
+            'transaction_categories' => $cashAdvance->transactionCategories()
+                ->orderBy('sort_order')
+                ->orderBy('fund_request_transaction_categories.id')
+                ->get(['fund_request_transaction_categories.id', 'name'])
+                ->map(fn ($satu): array => [
+                    'id' => (int) $satu->id,
+                    'name' => (string) $satu->name,
+                ])
+                ->all(),
+
+            /*
             | Perjalanan dinas yang mendasari FPU ini.
             |
             | Dibawa sampai ke detail, bukan hanya ke kotak konfirmasi Approve:
@@ -4014,6 +4650,24 @@ class CashAdvanceController extends Controller
                 : null,
             'approval_label' => $currentApproval?->label,
 
+            /*
+            | Riwayat revisinya, terbaru lebih dulu.
+            |
+            | Seluruhnya dikirim, bukan hanya yang terakhir: yang membaca
+            | dokumen yang bolak-balik tiga kali perlu melihat ketiganya
+            | untuk mengerti apa yang sebenarnya diperdebatkan.
+            |
+            | revision_open terisi hanya selama dokumennya di tangan pemohon.
+            | Itulah yang dibaca layar pemohon untuk menampilkan alasannya,
+            | dan dipisahkan supaya layarnya tidak perlu menebak mana di
+            | antara riwayatnya yang masih berlaku.
+            */
+            'revision_count' => (int) ($cashAdvance->revision_count ?? 0),
+            'revisions' => app(DocumentRevisionService::class)->riwayat($cashAdvance),
+            'revision_open' => ($terbuka = $cashAdvance->openRevision())
+                ? app(DocumentRevisionService::class)->sajikan($terbuka)
+                : null,
+
             'created_at' => $cashAdvance->created_at,
             'created_by' => $cashAdvance->created_by,
             'created_by_name' => $cashAdvance->creator?->name,
@@ -4036,7 +4690,6 @@ class CashAdvanceController extends Controller
             'received_at' => $cashAdvance->received_at,
             'scheduled_payment_date' => $cashAdvance->scheduled_payment_date,
             'can_pay_today' => $this->canPayToday(
-                $cashAdvance->scheduled_payment_date,
                 'FPU',
                 $cashAdvance->transaction_category_id,
             ),
@@ -4076,7 +4729,21 @@ class CashAdvanceController extends Controller
                     (int) $cashAdvance->id,
                     [],
                     'amount',
-                ))->pluck('name')->all()
+                ))
+
+                    /*
+                    | Nama BERIKUT catatannya, bukan nama saja.
+                    |
+                    | Catatan pemohon tidak punya tempat lain untuk muncul:
+                    | kategori yang diurus GA tidak punya baris rincian, jadi
+                    | tidak ada kolom keterangan yang bisa ditumpanginya.
+                    */
+                    ->map(fn (array $kelompok): array => [
+                        'name' => $kelompok['name'],
+                        'notes' => $kelompok['notes'] ?? null,
+                    ])
+                    ->values()
+                    ->all()
                 : [],
 
             'attachments' => $this->transformAttachments($cashAdvance),
@@ -4139,6 +4806,19 @@ class CashAdvanceController extends Controller
                 'expense_category_id' => $item->expense_category_id,
                 'expense_category_name' => $item->relationLoaded('expenseCategory')
                     ? optional($item->expenseCategory)->name
+                    : null,
+
+                /*
+                | Keterangan transaksi barisnya. Bukan expense_category di atas:
+                | yang ini Telpon atau Perjalanan Dinas, yang itu Tiket atau
+                | Penginapan.
+                |
+                | null berarti baris lama yang ikut keterangan headernya, bukan
+                | belum diisi -- yang menampilkannya memang harus jatuh ke sana.
+                */
+                'transaction_category_id' => $item->transaction_category_id,
+                'transaction_category_name' => $item->relationLoaded('transactionCategory')
+                    ? optional($item->transactionCategory)->name
                     : null,
                 'qty' => $item->qty !== null ? (float) $item->qty : null,
                 'unit_price' => $item->unit_price !== null ? (float) $item->unit_price : null,

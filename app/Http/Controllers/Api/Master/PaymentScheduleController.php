@@ -75,12 +75,29 @@ class PaymentScheduleController extends Controller
                     ])
                     ->all(),
 
+                /*
+                | Seluruhnya dikirim, berikut modul pemiliknya -- layar yang
+                | menyaring menurut modul yang sedang dipilih.
+                |
+                | Menyaringnya di sini berarti daftarnya harus diambil ulang
+                | setiap kali modulnya diganti, dan menyaringnya tanpa
+                | mengirim pemiliknya berarti layar menebak -- keduanya lebih
+                | mahal daripada satu kolom tambahan.
+                */
                 'transaction_categories' => DB::table('fund_request_transaction_categories')
                     ->whereNull('deleted_at')
                     ->where('is_active', true)
                     ->orderBy('name')
-                    ->get(['id', 'name'])
+                    ->get(['id', 'name', 'document_type'])
                     ->all(),
+
+                /*
+                | Modul mana memakai daftar siapa. Dikirim, bukan ditulis
+                | ulang di layar: aturan yang sama ditulis dua kali cepat
+                | atau lambat berbeda di salah satunya, dan yang berbeda itu
+                | menentukan pilihan mana yang boleh.
+                */
+                'category_scope' => PaymentSchedule::KATEGORI_MODUL,
             ],
         ], 200);
     }
@@ -180,6 +197,43 @@ class PaymentScheduleController extends Controller
             'cutoffs.*.payment_day' => ['required', 'integer', 'between:1,7'],
             'cutoffs.*.payment_week_offset' => ['required', 'integer', 'between:0,4'],
         ]);
+
+        /*
+        | Keterangan transaksinya harus milik modulnya.
+        |
+        | Tanpa ini, jadwal Claim bisa ditunjuk ke keterangan transaksi milik
+        | FPU: cakupan yang tidak akan pernah cocok dengan dokumen mana pun.
+        | Tidak ada galat yang terbit, tidak ada dokumen yang tertolak --
+        | jadwalnya hanya diam, dan yang membuatnya mengira sudah mengatur
+        | sesuatu.
+        |
+        | Ditahan di server juga, bukan hanya di layar: permintaan bisa
+        | datang tanpa lewat layar sama sekali.
+        */
+        $kategoriId = $validated['transaction_category_id'] ?? null;
+        $modul = $validated['document_type'] ?? null;
+
+        if ($kategoriId !== null) {
+            if ($modul === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('payment_schedule_messages.category_requires_module'),
+                ], 422);
+            }
+
+            $pemilik = DB::table('fund_request_transaction_categories')
+                ->where('id', $kategoriId)
+                ->value('document_type');
+
+            if ($pemilik !== PaymentSchedule::kategoriModul($modul)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('payment_schedule_messages.category_module_mismatch', [
+                        'module' => PaymentSchedule::documentTypeLabel($modul),
+                    ]),
+                ], 422);
+            }
+        }
 
         /*
         | Dua jadwal dengan cakupan yang sama persis membuat hasilnya

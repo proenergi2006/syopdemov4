@@ -283,6 +283,52 @@ class PurchaseRequestMailService
 
     /*
     |--------------------------------------------------------------------------
+    | Dokumen dikembalikan ke pemohon untuk direvisi
+    |--------------------------------------------------------------------------
+    | Email, bukan hanya notifikasi dalam aplikasi: begitu dikembalikan,
+    | dokumennya BERHENTI sampai pemohon mengerjakannya. Pemohon yang sedang
+    | tidak membuka aplikasi tidak akan tahu bahwa yang ditunggu sekarang
+    | adalah dirinya, dan dokumennya terdiam berhari-hari tanpa ada yang
+    | merasa sedang menahannya.
+    |
+    | Alasannya ikut dikirim utuh -- justru itu yang perlu ia bawa saat
+    | membuka formnya.
+    |--------------------------------------------------------------------------
+    */
+    public function sendReturnedForRevision(
+        PurchaseRequest $purchaseRequest,
+        User $actor,
+        ?string $reason = null,
+        ?int $revisionNumber = null,
+    ): void {
+        $penerima = $this->resolveCreator($purchaseRequest);
+
+        if (!$penerima || !filled($penerima->email)) {
+            Log::warning(
+                '[Purchase Request Mail] Pemohon tidak punya email untuk kabar pengembalian',
+                [
+                    'nomor_pr' => $purchaseRequest->nomor_pr,
+                ],
+            );
+
+            return;
+        }
+
+        Mail::to($penerima->email)
+            ->queue(
+                new PurchaseRequestApprovalMail(
+                    pr: $purchaseRequest,
+                    recipient: $penerima,
+                    mode: 'returned_for_revision',
+                    actor: $actor,
+                    notes: $reason,
+                    revisionNumber: $revisionNumber,
+                ),
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Resolve satu row approval menjadi user
     |--------------------------------------------------------------------------
     */

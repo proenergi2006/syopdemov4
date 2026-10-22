@@ -30,6 +30,8 @@ class FundRequestTransactionCategory extends Model
         'required_documents',
         'sort_order',
         'requires_business_trip',
+        'allows_routine',
+        'allows_non_routine',
         'is_active',
     ];
 
@@ -38,6 +40,8 @@ class FundRequestTransactionCategory extends Model
         'sort_order' => 'integer',
         'is_active' => 'boolean',
         'requires_business_trip' => 'boolean',
+        'allows_routine' => 'boolean',
+        'allows_non_routine' => 'boolean',
     ];
 
     /*
@@ -56,6 +60,43 @@ class FundRequestTransactionCategory extends Model
         self::DOCUMENT_TYPE_ADVANCE,
         self::DOCUMENT_TYPE_CLAIM,
     ];
+
+    /*
+    |----------------------------------------------------------------------
+    | Modul dokumen memakai daftar milik siapa
+    |----------------------------------------------------------------------
+    | Kuncinya jenis dokumen sebagaimana dikenal approval flow dan jadwal
+    | pembayaran: FPU, REALISASI, CLAIM.
+    |
+    | Realisasi TIDAK punya daftar sendiri -- keterangan transaksinya
+    | disalin dari FPU yang direalisasikan, jadi yang boleh ditunjuk pun
+    | daftar FPU.
+    |
+    | Jenis dokumen yang tidak ada di sini (PR, PO, Perdin) memang tidak
+    | mengenal keterangan transaksi sama sekali.
+    |----------------------------------------------------------------------
+    */
+    public const DOCUMENT_TYPE_BY_MODULE = [
+        'FPU' => self::DOCUMENT_TYPE_ADVANCE,
+        'REALISASI' => self::DOCUMENT_TYPE_ADVANCE,
+        'CLAIM' => self::DOCUMENT_TYPE_CLAIM,
+    ];
+
+    /**
+     * Daftar keterangan transaksi yang boleh dipakai sebuah modul dokumen.
+     *
+     * null berarti modul itu tidak mengenal keterangan transaksi, atau
+     * cakupannya menyeluruh sehingga tidak ada satu daftar pun yang
+     * mewakilinya.
+     */
+    public static function documentTypeForModule(?string $modul): ?string
+    {
+        if ($modul === null) {
+            return null;
+        }
+
+        return self::DOCUMENT_TYPE_BY_MODULE[strtoupper(trim($modul))] ?? null;
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -98,6 +139,55 @@ class FundRequestTransactionCategory extends Model
     public function scopeForDocumentType($query, string $documentType)
     {
         return $query->where('document_type', strtoupper(trim($documentType)));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sifat pengajuan
+    |--------------------------------------------------------------------------
+    | Nilainya ditulis apa adanya seperti yang tersimpan di cash_advances
+    | sejak awal -- 'Rutin' dan 'Non Rutin', berspasi dan berhuruf besar di
+    | depan. Dinormalkan menjadi slug di sini, kolom lamanya akan berisi dua
+    | bentuk untuk satu arti, dan setiap pembacanya harus mengenal dua-duanya.
+    |--------------------------------------------------------------------------
+    */
+    public const REQUEST_TYPE_ROUTINE = 'Rutin';
+    public const REQUEST_TYPE_NON_ROUTINE = 'Non Rutin';
+
+    public const REQUEST_TYPES = [
+        self::REQUEST_TYPE_ROUTINE,
+        self::REQUEST_TYPE_NON_ROUTINE,
+    ];
+
+    /**
+     * Menyaring menurut sifat pengajuan.
+     *
+     * Sifat yang tidak dikenali TIDAK menyaring apa pun, bukan mengosongkan
+     * hasilnya: daftar kosong tanpa sebab yang kelihatan jauh lebih sulit
+     * ditelusuri daripada daftar yang kelewat panjang.
+     */
+    public function scopeForRequestType($query, ?string $requestType)
+    {
+        $kolom = match (trim((string) $requestType)) {
+            self::REQUEST_TYPE_ROUTINE => 'allows_routine',
+            self::REQUEST_TYPE_NON_ROUTINE => 'allows_non_routine',
+            default => null,
+        };
+
+        return $kolom === null
+            ? $query
+            : $query->where($kolom, true);
+    }
+
+    /**
+     * Pada sifat pengajuan ini, FPU hanya boleh memilih satu keterangan.
+     *
+     * Aturan dokumen, bukan sifat kategori -- tetapi ditaruh di sini supaya
+     * yang menanyakannya hanya punya satu tempat untuk bertanya.
+     */
+    public static function allowsMultiple(?string $requestType): bool
+    {
+        return trim((string) $requestType) !== self::REQUEST_TYPE_NON_ROUTINE;
     }
 
     /**

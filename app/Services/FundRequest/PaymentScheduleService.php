@@ -28,6 +28,28 @@ use Illuminate\Support\Facades\Log;
 */
 class PaymentScheduleService
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Modul yang meminjam jadwal modul lain
+    |--------------------------------------------------------------------------
+    | Pembayaran kekurangan Realisasi dikerjakan kasir yang sama, pada hari
+    | yang sama, dengan batas setor yang sama seperti pencairan FPU. Membuat
+    | jadwal keduanya berarti dua tempat yang harus diubah bersamaan setiap
+    | kali hari kasirnya bergeser -- dan yang terlupa akan membayar pada hari
+    | yang sudah tidak berlaku, tanpa ada yang menolak.
+    |
+    | DIPINJAM, BUKAN DIPAKSAKAN.
+    |
+    | Jadwal milik modulnya sendiri tetap menang bila memang dibuat. Yang
+    | dipinjam hanya berlaku saat modulnya belum punya -- sehingga pilihan
+    | "Realisasi FPU" pada masternya tidak berubah menjadi pilihan yang
+    | diam-diam diabaikan.
+    |--------------------------------------------------------------------------
+    */
+    private const PINJAM_JADWAL = [
+        'REALISASI' => 'FPU',
+    ];
+
     /**
      * Tanggal pembayaran untuk berkas yang diterima pada waktu tertentu.
      *
@@ -96,6 +118,33 @@ class PaymentScheduleService
     public function resolve(
         ?string $documentType = null,
         ?int $transactionCategoryId = null,
+    ): ?PaymentSchedule {
+        $jadwal = $this->cariJadwal($documentType, $transactionCategoryId);
+
+        if ($jadwal) {
+            return $jadwal;
+        }
+
+        /*
+        | Belum punya jadwal sendiri: pinjam milik modul yang ditunjuk.
+        |
+        | Ditaruh di sini, bukan di tiap pemanggil, supaya seluruh jawabannya
+        | ikut -- tanggal bayarnya, hari kerjanya, kalimat penolakannya --
+        | tanpa ada satu pun yang tertinggal memakai jadwal yang lain.
+        */
+        $pinjaman = self::PINJAM_JADWAL[$documentType] ?? null;
+
+        return $pinjaman !== null
+            ? $this->cariJadwal($pinjaman, $transactionCategoryId)
+            : null;
+    }
+
+    /**
+     * Pencarian apa adanya, tanpa pinjam-meminjam.
+     */
+    private function cariJadwal(
+        ?string $documentType,
+        ?int $transactionCategoryId,
     ): ?PaymentSchedule {
         return PaymentSchedule::query()
             ->with('cutoffs')

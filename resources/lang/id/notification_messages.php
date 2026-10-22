@@ -173,21 +173,21 @@ return [
             'requester' => [
                 'cancelled' => [
                     'title' => 'FPU Gugur',
-                    'message' => 'FPU :advance_number gugur karena Perjalanan Dinas :trip_number dibatalkan.',
+                    'message' => ':advance_number gugur karena Perjalanan Dinas :trip_number dibatalkan.',
                 ],
                 'rejected' => [
                     'title' => 'FPU Gugur',
-                    'message' => 'FPU :advance_number gugur karena Perjalanan Dinas :trip_number ditolak.',
+                    'message' => ':advance_number gugur karena Perjalanan Dinas :trip_number ditolak.',
                 ],
             ],
             'approver' => [
                 'cancelled' => [
                     'title' => 'Persetujuan FPU Dihentikan',
-                    'message' => 'Persetujuan FPU :advance_number dihentikan karena Perjalanan Dinas :trip_number dibatalkan.',
+                    'message' => 'Persetujuan :advance_number dihentikan karena Perjalanan Dinas :trip_number dibatalkan.',
                 ],
                 'rejected' => [
                     'title' => 'Persetujuan FPU Dihentikan',
-                    'message' => 'Persetujuan FPU :advance_number dihentikan karena Perjalanan Dinas :trip_number ditolak.',
+                    'message' => 'Persetujuan :advance_number dihentikan karena Perjalanan Dinas :trip_number ditolak.',
                 ],
             ],
         ],
@@ -198,51 +198,59 @@ return [
         */
         'receipt_request' => [
             'title' => 'FPU Menunggu Diterima',
-            'message' => 'FPU :advance_number senilai Rp :total_amount menunggu Anda terima.',
+            'message' => ':advance_number senilai Rp :total_amount menunggu Anda terima.',
         ],
 
         'received' => [
             'title' => 'FPU Sudah Diterima',
-            'message' => 'FPU :advance_number sudah diterima oleh :receiver_name dan menunggu pencairan.',
-            'message_scheduled' => 'FPU :advance_number sudah diterima oleh :receiver_name dan dijadwalkan dibayarkan pada :payment_date.',
+            'message' => ':advance_number sudah diterima oleh :receiver_name dan menunggu pencairan.',
+            'message_scheduled' => ':advance_number sudah diterima oleh :receiver_name dan dijadwalkan dibayarkan pada :payment_date.',
         ],
 
         'disbursement_request' => [
             'title' => 'FPU Menunggu Pencairan',
-            'message' => 'FPU :advance_number sudah disetujui dan menunggu pencairan sebesar Rp :total_amount.',
+            'message' => ':advance_number senilai Rp :total_amount sudah diterima dan menunggu Anda bayarkan.',
         ],
         'approval_request' => [
             'title' => 'Approval FPU',
-            'message_with_label' => 'FPU :advance_number menunggu approval Anda pada tahap :step_order (:step_label).',
-            'message_without_label' => 'FPU :advance_number menunggu approval Anda pada tahap :step_order.',
+            'message_with_label' => ':advance_number menunggu approval Anda pada tahap :step_order (:step_label).',
+            'message_without_label' => ':advance_number menunggu approval Anda pada tahap :step_order.',
         ],
         'approval_step_pending' => [
             'title' => 'Tahap Approval FPU Disetujui',
-            'message' => 'FPU :advance_number telah disetujui oleh :approver_name pada tahap :step_order dan masih menunggu approval berikutnya.',
+            'message' => ':advance_number telah disetujui oleh :approver_name pada tahap :step_order dan masih menunggu approval berikutnya.',
         ],
         'approval_step_final' => [
             'title' => 'FPU Disetujui',
-            'message' => 'FPU :advance_number telah final disetujui oleh :approver_name.',
+            'message' => ':advance_number telah final disetujui oleh :approver_name.',
         ],
         'rejected' => [
             'title' => 'FPU Ditolak',
-            'message' => 'FPU :advance_number telah ditolak oleh :rejecter_name.',
+            'message' => ':advance_number telah ditolak oleh :rejecter_name.',
         ],
         'disbursed' => [
             'title' => 'FPU Sudah Dibayarkan',
-            'message' => 'FPU :advance_number telah dibayarkan oleh :disburser_name.',
+            'message' => ':advance_number telah dibayarkan oleh :disburser_name.',
 
 
             /*
-            | Yang menyimpang dari jadwal dikabarkan apa adanya, beserta
-            | keterangan Finance bila ada. Pemohon yang dijanjikan Rabu
-            | lalu menerima uangnya Senin berikutnya berhak tahu tanpa
-            | harus membuka rincian dokumennya sendiri.
+            | Yang TERLAMBAT dikabarkan apa adanya, beserta keterangan Finance
+            | bila ada. Pemohon yang dijanjikan Rabu lalu menerima uangnya Senin
+            | berikutnya berhak tahu tanpa harus membuka rincian dokumennya.
+            |
+            | YANG LEBIH AWAL TIDAK LAGI DIKABARKAN. Dibayar sebelum jadwal
+            | bukan penyimpangan yang merugikan pemohonnya, jadi kabarnya hanya
+            | menambah yang harus dibaca tanpa menambah yang harus dilakukan.
+            |
+            | Kalimat '_early'-nya SENGAJA DITINGGAL, tidak dihapus: notifikasi
+            | lama tersimpan bersama nama kuncinya dan diterjemahkan ulang saat
+            | dibaca. Menghapus kuncinya membuat kabar lama menampilkan nama
+            | kunci itu sendiri di layar orang.
             */
-            'message_early' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, lebih awal dari jadwal :scheduled_date.',
-            'message_early_reason' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, lebih awal dari jadwal :scheduled_date. Keterangan Finance: :reason',
-            'message_late' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, melewati jadwal :scheduled_date.',
-            'message_late_reason' => 'FPU :advance_number telah dibayarkan oleh :disburser_name, melewati jadwal :scheduled_date. Keterangan Finance: :reason',
+            'message_early' => ':advance_number telah dibayarkan oleh :disburser_name, lebih awal dari jadwal :scheduled_date.',
+            'message_early_reason' => ':advance_number telah dibayarkan oleh :disburser_name, lebih awal dari jadwal :scheduled_date. Keterangan Finance: :reason',
+            'message_late' => ':advance_number telah dibayarkan oleh :disburser_name, melewati jadwal :scheduled_date.',
+            'message_late_reason' => ':advance_number telah dibayarkan oleh :disburser_name, melewati jadwal :scheduled_date. Keterangan Finance: :reason',
         ],
 
         /*
@@ -253,7 +261,7 @@ return [
         */
         'amount_revised' => [
             'title' => 'Nominal FPU Direvisi',
-            'message' => 'Nominal FPU :advance_number diubah oleh :reviser_name dari :old_total menjadi :new_total. Alasan: :reason',
+            'message' => 'Nominal :advance_number diubah oleh :reviser_name dari :old_total menjadi :new_total. Alasan: :reason',
         ],
 
         /*
@@ -267,8 +275,8 @@ return [
         */
         'receipt_reverted' => [
             'title' => 'Penerimaan FPU Dibatalkan',
-            'with_date' => 'Penerimaan FPU :advance_number dibatalkan oleh :actor_name. Jadwal pembayaran :scheduled_date ikut batal. Dokumen kembali ke status disetujui. Alasan: :reason',
-            'without_date' => 'Penerimaan FPU :advance_number dibatalkan oleh :actor_name. Dokumen kembali ke status disetujui. Alasan: :reason',
+            'with_date' => 'Penerimaan :advance_number dibatalkan oleh :actor_name. Jadwal pembayaran :scheduled_date ikut batal. Dokumen kembali ke status disetujui. Alasan: :reason',
+            'without_date' => 'Penerimaan :advance_number dibatalkan oleh :actor_name. Dokumen kembali ke status disetujui. Alasan: :reason',
         ],
     ],
 
@@ -399,6 +407,41 @@ return [
 
             /* Nama penyedianya boleh kosong, kalimatnya tetap harus utuh. */
             'vendor_unset' => 'penyedia belum dicantumkan',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Revisi dokumen
+    |--------------------------------------------------------------------------
+    | Satu kelompok kalimat untuk empat modul. Nama modulnya datang sebagai
+    | parameter :module -- bukan karena hemat, melainkan karena kalimatnya
+    | memang sama: yang berbeda hanya dokumen apa yang dimaksud.
+    |
+    | Nomor revisinya ikut disebut pada kabar ke approver. Itu permintaan
+    | yang tegas: yang akan ia setujui bukan dokumen baru, melainkan dokumen
+    | yang pernah dikembalikan dan isinya sudah berubah.
+    |--------------------------------------------------------------------------
+    */
+    'fund_request_revision' => [
+        'returned' => [
+            'title' => 'Dokumen Dikembalikan untuk Direvisi',
+            'message' => ':number dikembalikan oleh :by untuk direvisi. Alasan: :reason',
+        ],
+
+        'being_revised' => [
+            'title' => 'Revisi Sedang Dikerjakan',
+            'message' => ':number yang Anda kembalikan sedang direvisi oleh pemohonnya.',
+        ],
+
+        'resubmitted' => [
+            'title' => 'Dokumen Revisi Menunggu Persetujuan',
+            'message' => ':number diajukan ulang sebagai revisi ke-:revision dan menunggu persetujuan Anda. Isinya sudah berubah dari pengajuan sebelumnya.',
+        ],
+
+        'resubmitted_returner' => [
+            'title' => 'Revisi Sudah Diajukan Ulang',
+            'message' => ':number yang Anda kembalikan sudah diperbaiki dan diajukan ulang sebagai revisi ke-:revision.',
         ],
     ],
 ];

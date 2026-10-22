@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
+import type { RevisionEntry } from '@/components/fund_request/revision'
 
 /*
 |--------------------------------------------------------------------------
@@ -58,6 +60,14 @@ interface ApprovalRow {
   notes: string | null
 }
 
+/** Satu orang yang ikut dalam perjalanan, selain pemohonnya. */
+interface ParticipantRow {
+  user_id: number
+  name: string
+  department_name: string | null
+  position_name: string | null
+}
+
 /*
 | Bentuk yang dibutuhkan kartu ini -- sama persis dengan yang dikirim
 | BusinessTripPresenter, dan itulah yang dipakai kedua halaman.
@@ -85,11 +95,35 @@ interface TripDetail {
   approvals: ApprovalRow[]
 
   /*
+  | Peserta lain yang ikut dalam perjalanan ini.
+  |
+  | Boleh tidak ada sama sekali -- perdin yang dibuat sebelum fitur ini ada
+  | tidak mengirimkannya, dan perjalanan yang dijalani sendiri memang tidak
+  | punya pesertanya.
+  |
+  | Nama, departemen, dan jabatannya adalah salinan keadaan saat dokumennya
+  | dibuat, bukan keadaan orangnya sekarang.
+  */
+  participants?: ParticipantRow[]
+
+  /*
   | Boleh tidak ada sama sekali: yang belum disetujui memang belum pernah
   | diurus pemesanannya, dan halaman lama yang belum meminta datanya tidak
   | semestinya jadi rusak karenanya.
   */
   arrangements?: ArrangementRow[]
+
+  /*
+  | Revisi: berapa kali dikembalikan, riwayatnya, dan yang sedang berjalan.
+  |
+  | Ikut ditampilkan juga saat kartu ini dibuka dari detail FPU, dan itu
+  | memang yang dibutuhkan di sana: perdin yang pernah dikembalikan berarti
+  | tanggal atau tujuannya sempat berubah, dan FPU yang menumpanginya
+  | dihitung dari angka-angka itu.
+  */
+  revision_count?: number
+  revisions?: RevisionEntry[]
+  revision_open?: RevisionEntry | null
 }
 
 const props = defineProps<{ trip: TripDetail | null }>()
@@ -104,6 +138,7 @@ const STATUS_COLORS: Record<string, string> = {
   'IN PROGRESS': 'warning',
   'REJECTED': 'error',
   'CANCELLED': 'secondary',
+  'NEED REVISION': 'warning',
 }
 
 const statusColor = (status: string): string => STATUS_COLORS[status] ?? 'info'
@@ -455,6 +490,48 @@ const arrangementPeriod = (baris: ArrangementRow): string => {
         </VCol>
       </VRow>
 
+      <!--
+        PESERTA LAIN
+
+        Ditampilkan hanya bila ada: perjalanan yang dijalani sendiri adalah
+        keadaan yang paling biasa, dan bagian kosong berjudul "Peserta Lain"
+        hanya akan membuat pembacanya mencari-cari isinya.
+
+        Jumlahnya disebut di judulnya, karena dari jumlah orang itulah
+        penyetuju menilai biaya penginapan, tiket, dan transportnya.
+
+        Departemen dan jabatannya ikut: dua orang bernama mirip hanya bisa
+        dibedakan dari keduanya.
+      -->
+      <template v-if="(trip.participants?.length ?? 0) > 0">
+        <div class="bt-detail__section-title mt-5">
+          <VIcon
+            icon="tabler-users"
+            size="18"
+          />
+          {{ t('businessTrip.detail.participants', { count: trip.participants!.length }) }}
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+          <VChip
+            v-for="(peserta, i) in trip.participants"
+            :key="`peserta-${i}`"
+            size="small"
+            variant="tonal"
+            color="primary"
+          >
+            {{ peserta.name }}
+            <span
+              v-if="peserta.department_name || peserta.position_name"
+              class="text-medium-emphasis ms-1"
+            >
+              &middot;
+              {{ [peserta.department_name, peserta.position_name].filter(Boolean).join(' / ') }}
+            </span>
+          </VChip>
+        </div>
+      </template>
+
       <!-- RUNDOWN: agenda per hari -->
       <div class="bt-detail__section-title mt-5">
         <VIcon
@@ -787,6 +864,22 @@ const arrangementPeriod = (baris: ArrangementRow): string => {
         >
           {{ t('businessTrip.detail.notSubmittedYet') }}
         </div>
+      </div>
+
+      <!--
+        Revisi: yang sedang berjalan, dan riwayatnya.
+
+        Ditaruh sesudah rantai approval, karena urutan itulah yang terjadi:
+        dokumennya berjalan, dikembalikan, lalu berjalan lagi.
+      -->
+      <div
+        v-if="trip.revision_open || (trip.revisions?.length ?? 0) > 0"
+        class="mt-5"
+      >
+        <RevisionHistory
+          :revisions="trip.revisions || []"
+          :open-revision="trip.revision_open || null"
+        />
       </div>
     </VCardText>
 

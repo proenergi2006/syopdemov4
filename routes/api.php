@@ -498,6 +498,18 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [PurchaseRequestController::class, 'cancel'],
             );
 
+            /*
+            | Kembalikan ke pemohon untuk direvisi.
+            |
+            | Satu pintu: approver yang sedang memegangnya. Tidak ada
+            | pintu Finance di sini -- kedua dokumen ini tidak melalui
+            | meja penerimaan berkas.
+            */
+            Route::patch(
+                'purchase-request/{publicId}/return-for-revision',
+                [PurchaseRequestController::class, 'returnForRevision'],
+            );
+
             Route::apiResource(
                 'purchase-request',
                 PurchaseRequestController::class,
@@ -563,6 +575,18 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             Route::patch(
                 'purchase-order/{publicId}/cancel',
                 [PurchaseOrderController::class, 'cancel'],
+            );
+
+            /*
+            | Kembalikan ke pemohon untuk direvisi.
+            |
+            | Satu pintu: approver yang sedang memegangnya. Tidak ada
+            | pintu Finance di sini -- kedua dokumen ini tidak melalui
+            | meja penerimaan berkas.
+            */
+            Route::patch(
+                'purchase-order/{publicId}/return-for-revision',
+                [PurchaseOrderController::class, 'returnForRevision'],
             );
 
             Route::apiResource(
@@ -795,6 +819,19 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [CashAdvanceController::class, 'cancel'],
             );
 
+            /*
+            | Kembalikan ke pemohon untuk direvisi.
+            |
+            | Satu rute untuk dua pintu -- approver yang sedang memegangnya,
+            | dan Finance yang berkasnya baru diterima. Statusnya yang
+            | memilih pintunya; bagi yang memakainya ini satu tindakan yang
+            | sama.
+            */
+            Route::patch(
+                'cash-advance/{publicId}/return-for-revision',
+                [CashAdvanceController::class, 'returnForRevision'],
+            );
+
             Route::post(
                 'cash-advance/bulk-receive',
                 [CashAdvanceController::class, 'bulkReceive'],
@@ -879,6 +916,12 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [CashAdvanceRealizationController::class, 'cancel'],
             );
 
+            /* Kembalikan ke pemohon untuk direvisi -- lihat FPU di atas. */
+            Route::patch(
+                'cash-advance-realization/{publicId}/return-for-revision',
+                [CashAdvanceRealizationController::class, 'returnForRevision'],
+            );
+
             /*
             | Penerimaan mendahului penyelesaian selisih: berkasnya dinyatakan
             | sudah di tangan, baru setelah itu uangnya berpindah.
@@ -902,15 +945,15 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [CashAdvanceRealizationController::class, 'unreceive'],
             );
 
+            Route::patch(
+                'cash-advance-realization/{publicId}/verify',
+                [CashAdvanceRealizationController::class, 'verify'],
+            );
+
             /*
             | Dua peristiwa berbeda, bukan satu aksi generik: sisa dikembalikan
             | pemohon, atau kekurangan dibayarkan Finance.
             */
-            Route::post(
-                'cash-advance-realization/bulk-return-difference',
-                [CashAdvanceRealizationController::class, 'bulkReturnDifference'],
-            );
-
             Route::post(
                 'cash-advance-realization/bulk-reimburse-difference',
                 [CashAdvanceRealizationController::class, 'bulkReimburseDifference'],
@@ -977,6 +1020,12 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             Route::patch(
                 'claim/{publicId}/cancel',
                 [ClaimController::class, 'cancel'],
+            );
+
+            /* Kembalikan ke pemohon untuk direvisi -- lihat FPU di atas. */
+            Route::patch(
+                'claim/{publicId}/return-for-revision',
+                [ClaimController::class, 'returnForRevision'],
             );
 
             /*
@@ -1076,6 +1125,17 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             Route::patch(
                 'perdin/{publicId}/cancel',
                 [BusinessTripController::class, 'cancel'],
+            );
+
+            /*
+            | Kembalikan ke pemohon untuk direvisi.
+            |
+            | Satu pintu saja -- approver yang sedang memegangnya. Perdin
+            | tidak punya meja Finance; lihat keterangan di controllernya.
+            */
+            Route::patch(
+                'perdin/{publicId}/return-for-revision',
+                [BusinessTripController::class, 'returnForRevision'],
             );
 
             /*

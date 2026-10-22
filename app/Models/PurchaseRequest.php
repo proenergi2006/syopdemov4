@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Concerns\HasRevisions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseRequest extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasRevisions, SoftDeletes;
 
     protected $table = 'purchase_requests';
 
@@ -34,6 +35,7 @@ class PurchaseRequest extends Model
         'total_amount',
 
         'status',
+        'revision_count',
         'status_po',
 
         'submitted_at',
@@ -70,6 +72,7 @@ class PurchaseRequest extends Model
     ];
 
     protected $casts = [
+        'revision_count' => 'integer',
         'tanggal_pr' => 'date',
         'submitted_at' => 'datetime',
         'requester_signed_at' => 'datetime',
@@ -314,6 +317,75 @@ class PurchaseRequest extends Model
     const STATUS_APPROVED = 'APPROVED';
     const STATUS_REJECTED = 'REJECTED';
     const STATUS_CANCELLED = 'CANCELLED';
+
+    /*
+    | Dikembalikan approver ke pemohon untuk diperbaiki.
+    |
+    | Statusnya HIDUP, dan justru di situ ia berbeda dari REJECTED yang sudah
+    | selesai: dokumennya masih berjalan dan masih akan menjadi PO, hanya
+    | sedang ada di tangan pemohonnya.
+    |
+    | Nomornya sengaja TIDAK dikembalikan ke DRAFT. Dokumen ini sudah pernah
+    | beredar; approver yang pernah membukanya harus masih bisa menemukannya
+    | dengan nomor yang sama.
+    */
+    const STATUS_NEED_REVISION = 'NEED REVISION';
+
+    /**
+     * Yang ikut dipotret saat dokumennya dikembalikan.
+     *
+     * Rincian dan lampirannya -- keduanya diisi pemohon, dan keduanya bisa
+     * menjadi sebab dokumennya dikembalikan.
+     *
+     * @return array<int, string>
+     */
+    public function revisionSnapshotRelations(): array
+    {
+        return ['items', 'attachments'];
+    }
+
+    /**
+     * Pengenal baris anak pada potret revisi.
+     *
+     * Rincian PR DITULIS ULANG seluruhnya setiap kali dokumennya disimpan --
+     * barisnya dihapus lalu dibuat kembali -- sehingga id-nya berganti pada
+     * setiap penyimpanan. Tidak ada pula satu kolom pun yang tetap: nama
+     * item boleh diubah, dan tidak ada kolom urutan.
+     *
+     * Karena itu barisnya dipasangkan menurut URUTANNYA. Itu bukan pengenal
+     * yang bisa dipercaya -- menghapus baris pertama menggeser seluruh
+     * sisanya -- tetapi tetap lebih menjelaskan daripada menganggap seluruh
+     * rinciannya baru setiap kali satu angka dibetulkan.
+     *
+     * Lampirannya lain: nama berkasnya dibangkitkan sistem dan tidak pernah
+     * berubah, jadi itulah yang mengenalinya.
+     */
+    public function revisionSnapshotRowKey(string $relasi): ?string
+    {
+        return match ($relasi) {
+            'items' => null,
+            'attachments' => 'filename',
+            default => $this->getKeyName(),
+        };
+    }
+
+    /**
+     * Kolom turunan yang tidak ikut dipotret.
+     *
+     * Ketiganya berubah karena PO dibuat dari PR ini, bukan karena pemohon
+     * mengetik apa pun: status_po menyatakan sudah dipesan atau belum,
+     * qty_po berapa yang sudah dipesan, qty_outstanding sisanya.
+     *
+     * Kalau ikut terekam, daftar perubahan revisi akan menyebut "Qty PO:
+     * 0 -> 5" dan menyalahkan pemohon atas pemesanan yang justru dilakukan
+     * bagian pembelian.
+     *
+     * @return array<int, string>
+     */
+    public function revisionSnapshotSkip(): array
+    {
+        return ['status_po', 'qty_po', 'qty_outstanding'];
+    }
 
     // Status PO
     const STATUS_PO_OPEN = 'OPEN';

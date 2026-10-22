@@ -85,8 +85,26 @@ class FundRequestLimitService
      *   memegang uang siapa pun. Menghitungnya juga akan menghukum pemohon
      *   atas dokumen yang macet di meja approver, bukan di mejanya sendiri.
      *
-     * - Realisasi baru melepaskan FPU-nya setelah APPROVED. Realisasi yang
-     *   masih berjalan berarti pertanggungjawabannya belum diterima.
+     * - Realisasi melepaskan FPU-nya sejak APPROVED. Realisasi yang masih
+     *   berjalan berarti pertanggungjawabannya belum diterima.
+     *
+     * DAFTARNYA MEMUAT SELURUH KEADAAN SESUDAH APPROVED, BUKAN SEBAGIANNYA.
+     *
+     * Semula hanya APPROVED dan SETTLED yang disebut, sementara RECEIVED
+     * berdiri di antara keduanya -- Finance menerima berkas realisasinya.
+     * Akibatnya FPU-nya dilepas saat disetujui, lalu DITAHAN LAGI begitu
+     * Finance menerimanya, lalu dilepas lagi saat selesai.
+     *
+     * Dan tahanan kedua itu tidak selalu sementara. Realisasi hanya sampai ke
+     * SETTLED lewat pengembalian atau pembayaran selisih; yang selisihnya
+     * nol -- difference_type NONE, yaitu hasil yang justru paling rapi --
+     * tidak punya selisih untuk ditutup, jadi ia berhenti di RECEIVED
+     * selamanya. FPU-nya ikut terhitung berjalan selamanya pula.
+     *
+     * Ditulis sebagai daftar yang MELEPAS, bukan daftar yang menahan: status
+     * baru yang lupa didaftarkan akan membuat FPU terhitung berjalan padahal
+     * sudah selesai -- kesalahan yang terlihat dan mengganggu. Kebalikannya
+     * melepas FPU yang belum dipertanggungjawabkan, diam-diam.
      */
     public function outstandingQuery(int $userId)
     {
@@ -100,6 +118,8 @@ class FundRequestLimitService
                     ->whereNull('r.deleted_at')
                     ->whereIn('r.status', [
                         CashAdvanceRealization::STATUS_APPROVED,
+                        CashAdvanceRealization::STATUS_RECEIVED,
+                        CashAdvanceRealization::STATUS_VERIFIED,
                         CashAdvanceRealization::STATUS_SETTLED,
                     ]);
             });
@@ -132,6 +152,28 @@ class FundRequestLimitService
 
         $berjalan = $this->outstandingQuery($userId)
             ->get(['id', 'advance_number', 'disbursed_at']);
+
+        /*
+        | Batas yang memang tidak membatasi apa pun.
+        |
+        | Jumlah FPU berjalan tetap dihitung dan dikirim -- itu kabar yang
+        | berguna, dan pemiliknya berhak tahu berapa yang masih dipegangnya.
+        | Yang tidak dikirim angka batasnya: tidak ada angka untuk dibanding,
+        | dan mengirim angka yang tidak berlaku membuat layar menggambar
+        | 'sudah 3 dari 3' pada orang yang justru dibebaskan.
+        */
+        if ($batas && $batas->is_unlimited) {
+            return [
+                'limit' => $batas,
+                'outstanding' => $berjalan->count(),
+                'max_outstanding' => null,
+                'max_days' => null,
+                'overdue' => [],
+                'blocked' => false,
+                'reasons' => [],
+                'unlimited' => true,
+            ];
+        }
 
         $hariIni = ($now ? Carbon::parse($now) : Carbon::now())->startOfDay();
 
@@ -179,6 +221,9 @@ class FundRequestLimitService
             */
             'blocked' => $batas !== null && $alasan !== [],
             'reasons' => $alasan,
+
+            /* Selalu ada, supaya yang membacanya tidak perlu memeriksa keberadaannya. */
+            'unlimited' => false,
         ];
     }
 

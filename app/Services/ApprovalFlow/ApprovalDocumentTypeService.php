@@ -2,6 +2,7 @@
 
 namespace App\Services\ApprovalFlow;
 
+use App\Models\FundRequestTransactionCategory;
 use App\Models\PermissionModule;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -175,6 +176,18 @@ class ApprovalDocumentTypeService
                 'uses_area_matrix' => (bool) $module->approval_uses_area_matrix,
                 'uses_transaction_category'
                 => (bool) $module->approval_uses_transaction_category,
+
+                /*
+                | Daftar keterangan transaksi milik siapa yang boleh dipilih.
+                |
+                | Tanpa ini layar menawarkan SELURUH master -- termasuk
+                | keterangan transaksi milik Claim pada flow FPU, yang tidak
+                | akan pernah cocok dengan dokumen mana pun.
+                */
+                'transaction_category_document_type'
+                => FundRequestTransactionCategory::documentTypeForModule(
+                    $module->approval_document_type,
+                ),
             ])
             ->values()
             ->all();

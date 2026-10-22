@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasRevisions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\Crypt;
 */
 class CashAdvance extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasRevisions, SoftDeletes;
 
     protected $table = 'cash_advances';
 
@@ -55,6 +56,7 @@ class CashAdvance extends Model
         'amount_revision_notes',
         'notes',
         'status',
+        'revision_count',
 
         'created_by',
         'updated_by',
@@ -91,6 +93,7 @@ class CashAdvance extends Model
     ];
 
     protected $casts = [
+        'revision_count' => 'integer',
         'date' => 'date',
         'department_id' => 'integer',
         'transaction_category_id' => 'integer',
@@ -120,6 +123,20 @@ class CashAdvance extends Model
     public const STATUS_APPROVED = 'APPROVED';
     public const STATUS_REJECTED = 'REJECTED';
     public const STATUS_CANCELLED = 'CANCELLED';
+
+    /*
+    | Dikembalikan approver ke pemohon untuk diperbaiki.
+    |
+    | Statusnya HIDUP, dan justru di situ ia berbeda dari REJECTED yang
+    | sudah selesai: dokumennya masih berjalan dan masih akan menjadi
+    | uang, hanya sedang ada di tangan pemohonnya.
+    |
+    | Nomornya sengaja TIDAK dikembalikan ke DRAFT. Dokumen ini sudah
+    | pernah beredar; approver yang pernah membukanya harus masih bisa
+    | menemukannya dengan nomor yang sama, dan nomor yang dipakai ulang
+    | adalah nomor yang menunjuk dua dokumen sekaligus.
+    */
+    public const STATUS_NEED_REVISION = 'NEED REVISION';
     /*
     | Dokumen sudah disetujui penuh dan diterima PIC, tetapi dananya belum
     | keluar. Tahap antara ini yang membedakan "berkasnya sudah di tangan"
@@ -207,12 +224,72 @@ class CashAdvance extends Model
         );
     }
 
+    /**
+     * Keterangan transaksi PENENTU.
+     *
+     * Satu, dan masih yang memilih alur approval serta jadwal pembayaran --
+     * dua hal yang hanya bisa satu per dokumen. Sejak keterangan transaksi
+     * bisa lebih dari satu, ia berisi yang pertama menurut urutan masternya;
+     * pada Non Rutin ia satu-satunya pilihan.
+     *
+     * Untuk melihat seluruh yang dipilih, pakai transactionCategories().
+     */
     public function transactionCategory()
     {
         return $this->belongsTo(
             FundRequestTransactionCategory::class,
             'transaction_category_id',
         );
+    }
+
+    /**
+     * Himpunan keterangan transaksi yang boleh dipakai baris rinciannya.
+     *
+     * Pada Non Rutin isinya tepat satu -- aturan dokumennya memang begitu.
+     * Pada Rutin bisa beberapa, dan tiap baris rincian memilih salah satunya.
+     */
+    /**
+     * Seluruh keterangan transaksinya, siap ditulis apa adanya.
+     *
+     * Dipakai cetakan FPU maupun Realisasi. Aturan jatuhnya ke keterangan
+     * tunggal -- untuk dokumen yang dibuat sebelum himpunan ini ada --
+     * ditulis SEKALI di sini: dua cetakan yang menjawabnya sendiri-sendiri
+     * cepat atau lambat berbeda pada dokumen yang sama, dan yang
+     * membandingkan keduanya tidak akan tahu mana yang benar.
+     */
+    public function transactionCategoryLabel(): string
+    {
+        /*
+        | Relasi yang sudah dimuat dipakai apa adanya.
+        |
+        | Tanpa ini, ekspor Excel -- yang memanggil label ini sekali per
+        | dokumen -- melahirkan satu kueri per baris daftarnya.
+        */
+        $himpunan = ($this->relationLoaded('transactionCategories')
+            ? $this->transactionCategories
+                ->sortBy([['sort_order', 'asc'], ['id', 'asc']])
+                ->pluck('name')
+            : $this->transactionCategories()
+                ->orderBy('sort_order')
+                ->orderBy('fund_request_transaction_categories.id')
+                ->pluck('name'))
+            ->filter(fn ($nama): bool => trim((string) $nama) !== '');
+
+        if ($himpunan->isNotEmpty()) {
+            return $himpunan->implode(', ');
+        }
+
+        return trim((string) ($this->transactionCategory?->name ?? '')) ?: '-';
+    }
+
+    public function transactionCategories()
+    {
+        return $this->belongsToMany(
+            FundRequestTransactionCategory::class,
+            'cash_advance_transaction_categories',
+            'cash_advance_id',
+            'transaction_category_id',
+        )->withTimestamps();
     }
 
     /**
