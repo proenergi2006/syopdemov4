@@ -11,11 +11,11 @@ use Illuminate\Support\Facades\DB;
 |--------------------------------------------------------------------------
 | Matriks approval flow
 |--------------------------------------------------------------------------
-| DIHASILKAN OLEH `php artisan approval-flow:export-seeder` pada 2026-10-19 10:47:03.
+| DIHASILKAN OLEH `php artisan approval-flow:export-seeder` pada 2026-10-23 14:18:09.
 | Jangan disunting dengan tangan -- isi matriksnya lewat layar master, lalu
 | jalankan perintah itu lagi.
 |
-| 45 flow.
+| 170 flow.
 |
 | SELURUH ACUAN BERUPA NAMA, BUKAN ID.
 |
@@ -408,6 +408,667 @@ class ApprovalFlowMatrixSeeder extends Seeder
     private const MATRIKS = [
       0 => [
         'document_type' => 'CLAIM',
+        'name' => 'Approval Claim Cabang',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim Cabang
+    Nominal 500.001 s/d 2.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 500001.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Commercial',
+          1 => 'Finance',
+          2 => 'General Affair',
+          3 => 'Information Technology',
+          4 => 'Logistic',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      1 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim Cabang',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim Cabang
+    Nominal 2.000.001 s/d 3.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 3000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Commercial',
+          1 => 'Finance',
+          2 => 'General Affair',
+          3 => 'Information Technology',
+          4 => 'Logistic',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Branch Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Samarinda',
+              2 => 'Pontianak',
+              3 => 'Banjarmasin',
+              4 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          10 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'ezar.mafazi',
+              'name' => 'Muhammad Ezar Mafazi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      2 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim Cabang',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim Cabang
+    Nominal 3.000.001 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 3000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Commercial',
+          1 => 'Finance',
+          2 => 'General Affair',
+          3 => 'Information Technology',
+          4 => 'Logistic',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Branch Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'ezar.mafazi',
+              'name' => 'Muhammad Ezar Mafazi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          10 => [
+            'step_order' => 3,
+            'label' => 'BM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Samarinda',
+              2 => 'Pontianak',
+              3 => 'Banjarmasin',
+              4 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          11 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          12 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          13 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      3 => [
+        'document_type' => 'CLAIM',
         'name' => 'Approval CLAIM – Board of Director',
         'module_name' => 'Claim',
         'description' => 'Pengajuan anggota BOD di-counter-sign anggota BOD lain, lalu disetujui Finance Manager. CEO melewati counter-sign karena tidak ada anggota BOD yang berada di atasnya.',
@@ -462,15 +1123,673 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      1 => [
+      4 => [
         'document_type' => 'CLAIM',
-        'name' => 'Approval Claim HO IT',
+        'name' => 'Approval Claim HO - FIN',
         'module_name' => 'Claim',
-        'description' => NULL,
+        'description' => 'Approval Claim HO - FIN
+    Nominal 500.001 s/d 2.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 1.0,
-        'max_amount' => NULL,
+        'min_amount' => 500001.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      5 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - FIN',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - FIN
+    Nominal 2.000.001 s/d 3.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 3000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      6 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - FIN',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - FIN
+    Nominal 3.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 3000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      7 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - GA',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - GA
+    Nominal 500.001 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 500001.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      8 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - GA',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - GA
+    Nominal 2.000.001 s/d 3.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 3000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      9 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - GA',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - GA
+    Nominal 3.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 3000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      10 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim Ho - HR',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim Ho - HR
+    Nominal 3.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 3000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      11 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - HR',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - HR
+    Nominal 500.001 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 500001.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      12 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - HR',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - HR
+    Nominal 2.000.001 s/d 3.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 3000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      13 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - IT',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - IT
+    Nominal 500.001 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 500001.0,
+        'max_amount' => 2000000.0,
         'is_active' => true,
         'all_departments' => false,
         'all_transaction_categories' => true,
@@ -483,12 +1802,12 @@ class ApprovalFlowMatrixSeeder extends Seeder
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'Atasan ke 1',
+            'label' => 'HOD/SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -499,31 +1818,13 @@ class ApprovalFlowMatrixSeeder extends Seeder
             ],
           ],
           1 => [
-            'step_order' => 2,
-            'label' => 'Atasan ke 2',
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Manager IT',
-            ],
-            'allow_peer_approval' => false,
-            'skip_for_roles' => [
-            ],
-            'branches' => [
-            ],
-            'special_approvers' => [
-            ],
-          ],
-          2 => [
-            'step_order' => 2,
-            'label' => 'Atasan ke 2',
-            'approval_mode' => 'ANY',
-            'approver_scope' => 'GLOBAL',
-            'approver' => [
-              'type' => 'USER',
-              'ref' => 'vica',
-              'name' => 'Vica Krisdianatha',
+              'ref' => 'Programmer SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -535,7 +1836,4785 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      2 => [
+      14 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - IT',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - IT
+    Nominal 2.000.001 s/d 3.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 3000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      15 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - IT',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - IT
+    Nominal 3.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 3000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      16 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - LOG',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - LOG
+    Nominal 500.001 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 500001.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Logistic Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'ridho',
+              'name' => 'Muhammad Ridho Husaini',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      17 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - LOG',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - LOG
+    Nominal 2.000.001 s/d 3.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 3000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Logistic Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'ridho',
+              'name' => 'Muhammad Ridho Husaini',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      18 => [
+        'document_type' => 'CLAIM',
+        'name' => 'Approval Claim HO - LOG',
+        'module_name' => 'Claim',
+        'description' => 'Approval Claim HO - LOG
+    Nominal 3.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 3000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'claim',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Logistic Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'ridho',
+              'name' => 'Muhammad Ridho Husaini',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 3,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      19 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU ALL - CABANG Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow ALL-CABANG (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+          1 => 'General Affair',
+          2 => 'Logistic',
+          3 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      20 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU ALL - CABANG Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow ALL-CABANG (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+          1 => 'Finance',
+          2 => 'General Affair',
+          3 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      21 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU ALL - CABANG Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow ALL-CABANG (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+          1 => 'Finance',
+          2 => 'General Affair',
+          3 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          10 => [
+            'step_order' => 6,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          11 => [
+            'step_order' => 6,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      22 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU COM - CABANG NON RUTIN (Entertain, Sumbangan, Parcel)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow COM-CABANG(Entertain, Sumbangan, Parcel) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'ENTERTAIN',
+          1 => 'SUMBANGAN',
+          2 => 'PARCEL',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      23 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU COM - CABANG NON RUTIN (Entertain, Sumbangan, Parcel)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow COM-CABANG(Entertain, Sumbangan, Parcel) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'ENTERTAIN',
+          1 => 'SUMBANGAN',
+          2 => 'PARCEL',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'OM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Operation Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'OM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      24 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU COM - CABANG NON RUTIN (Entertain, Sumbangan, Parcel)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow COM-CABANG(Entertain, Sumbangan, Parcel) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'ENTERTAIN',
+          1 => 'SUMBANGAN',
+          2 => 'PARCEL',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'OM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Operation Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'OM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      25 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      26 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      27 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      28 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          10 => [
+            'step_order' => 6,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          11 => [
+            'step_order' => 6,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      29 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'LEGALITAS_KENDARAAN',
+          3 => 'PANTRY',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      30 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      31 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Banjarmasin',
+              2 => 'Pontianak',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          10 => [
+            'step_order' => 6,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      32 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal diatas 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 50000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          10 => [
+            'step_order' => 6,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          11 => [
+            'step_order' => 7,
+            'label' => 'CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      33 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      34 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'LOGM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'LOGM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'ridho',
+              'name' => 'Muhammad Ridho Husaini',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      35 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'LOGM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      36 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'LOGM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      37 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      38 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'LISTRIK',
+          1 => 'TELPON',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'SERVICE_KENDARAAN',
+          6 => 'STATIONARY',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Banjarmasin',
+              2 => 'Pontianak',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      39 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Jakarta',
+              1 => 'Palembang',
+              2 => 'Pontianak',
+              3 => 'Surabaya',
+              4 => 'Banjarmasin',
+              5 => 'Palangkaraya',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          7 => [
+            'step_order' => 3,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'enny.puji',
+              'name' => 'Enny Puji Astuti',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          8 => [
+            'step_order' => 4,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          9 => [
+            'step_order' => 5,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          10 => [
+            'step_order' => 6,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      40 => [
         'document_type' => 'FPU',
         'name' => 'Approval FPU – Board of Director',
         'module_name' => 'Cash Advance',
@@ -591,39 +6670,35 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      3 => [
+      41 => [
         'document_type' => 'FPU',
-        'name' => 'Approval FPU IT HO > 10 Juta',
+        'name' => 'Approval FPU FIN - HO NON RUTIN (Operasional Kantor)',
         'module_name' => 'FPU (Form Pengajuan Uang)',
-        'description' => NULL,
+        'description' => 'Approval flow FIN-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 10000001.0,
-        'max_amount' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
         'is_active' => true,
         'all_departments' => false,
         'all_transaction_categories' => false,
         'permission_module' => 'cash_advance',
         'departments' => [
-          0 => 'Information Technology',
+          0 => 'Finance',
         ],
         'transaction_categories' => [
-          0 => 'TELPON',
-          1 => 'LISTRIK',
-          2 => 'PANTRY',
-          3 => 'LEGALITAS_KENDARAAN',
-          4 => 'UPL',
-          5 => 'STATIONARY',
+          0 => 'OPERASIONAL_KANTOR',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'Finance Spv',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -634,8 +6709,116 @@ class ApprovalFlowMatrixSeeder extends Seeder
             ],
           ],
           1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
             'step_order' => 2,
-            'label' => 'FM',
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      42 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU FIN - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
@@ -650,8 +6833,548 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'special_approvers' => [
             ],
           ],
+        ],
+      ],
+      43 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU FIN - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
           2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
             'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      44 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU FIN - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
+            'label' => 'CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      45 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU FIN - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      46 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU FIN - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      47 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU FIN - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
             'label' => 'CFO/CEO',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
@@ -667,8 +7390,8 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'special_approvers' => [
             ],
           ],
-          3 => [
-            'step_order' => 3,
+          6 => [
+            'step_order' => 5,
             'label' => 'CFO/CEO',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
@@ -686,11 +7409,1944 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      4 => [
+      48 => [
         'document_type' => 'FPU',
-        'name' => 'Approval FPU Perjalanan Dinas HO - IT',
+        'name' => 'Approval FPU GA - HO NON RUTIN (Operasional Kantor)',
         'module_name' => 'FPU (Form Pengajuan Uang)',
-        'description' => NULL,
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      49 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.000 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      50 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      51 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 5,
+            'label' => 'CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      52 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      53 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      54 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      55 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal 1 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'HOD',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      56 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU GA - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'HOD',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 4,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      57 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      58 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      59 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      60 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
+            'label' => 'CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      61 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU HR - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      62 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU HR - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      63 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU HR - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      64 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU IT - HO Non Rutin (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HR&GAM',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      65 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU IT - HO Non Rutin (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
+            'label' => 'CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      66 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU IT - HO Non Rutin (Operational Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      67 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU IT - HO Non Rutin (Operational Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      68 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU IT - HO Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
         'min_amount' => 1.0,
@@ -713,7 +9369,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -724,8 +9380,42 @@ class ApprovalFlowMatrixSeeder extends Seeder
             ],
           ],
           1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
             'step_order' => 2,
-            'label' => 'HRGA',
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
@@ -742,15 +9432,16 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      5 => [
+      69 => [
         'document_type' => 'FPU',
-        'name' => 'Approval Operasional Kantor (HO)',
+        'name' => 'Approval FPU IT - HO Non Rutin (Perjalanan Dinas)',
         'module_name' => 'FPU (Form Pengajuan Uang)',
-        'description' => NULL,
+        'description' => 'Approval flow IT-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 1.0,
-        'max_amount' => 2000000.0,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
         'is_active' => true,
         'all_departments' => false,
         'all_transaction_categories' => false,
@@ -759,17 +9450,17 @@ class ApprovalFlowMatrixSeeder extends Seeder
           0 => 'Information Technology',
         ],
         'transaction_categories' => [
-          0 => 'OPERASIONAL_KANTOR',
+          0 => 'PERDIN',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'Spv',
+            'label' => 'HOD/Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -780,8 +9471,42 @@ class ApprovalFlowMatrixSeeder extends Seeder
             ],
           ],
           1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
             'step_order' => 2,
-            'label' => 'HR&GAM',
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
@@ -796,13 +9521,304 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'special_approvers' => [
             ],
           ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
         ],
       ],
-      6 => [
+      70 => [
         'document_type' => 'FPU',
-        'name' => 'Form Pengajuan Uang',
+        'name' => 'Approval FPU IT - HO Non Rutin (Perjalanan Dinas)',
         'module_name' => 'FPU (Form Pengajuan Uang)',
-        'description' => 'Test',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      71 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU IT - HO Non Rutin (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HOD',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'vica',
+              'name' => 'Vica Krisdianatha',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 4,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      72 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU IT - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal 1 s/d 10.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
         'min_amount' => 1.0,
@@ -815,8 +9831,8 @@ class ApprovalFlowMatrixSeeder extends Seeder
           0 => 'Information Technology',
         ],
         'transaction_categories' => [
-          0 => 'LISTRIK',
-          1 => 'TELPON',
+          0 => 'TELPON',
+          1 => 'LISTRIK',
           2 => 'PANTRY',
           3 => 'LEGALITAS_KENDARAAN',
           4 => 'UPL',
@@ -825,12 +9841,47 @@ class ApprovalFlowMatrixSeeder extends Seeder
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HOD',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'vica',
+              'name' => 'Vica Krisdianatha',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -842,7 +9893,557 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      7 => [
+      73 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal 1 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HOD',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      74 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU LOG - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'HOD',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 4,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      75 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU PROC - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow PROC-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Procurement',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'General Manager Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      76 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU PROC - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow PROC-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Procurement',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'General Manager Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      77 => [
+        'document_type' => 'FPU',
+        'name' => 'Approval FPU PROC - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow PROC-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Procurement',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'General Manager Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 4,
+            'label' => 'Finance Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Finance Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          6 => [
+            'step_order' => 5,
+            'label' => 'CFO/CEO',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Chief Executive Officer',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      78 => [
         'document_type' => 'PERDIN',
         'name' => 'Approval PERDIN – Board of Director',
         'module_name' => 'Perjalanan Dinas',
@@ -863,6 +10464,23 @@ class ApprovalFlowMatrixSeeder extends Seeder
         'steps' => [
           0 => [
             'step_order' => 1,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
             'label' => 'HRGA Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
@@ -878,8 +10496,8 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'special_approvers' => [
             ],
           ],
-          1 => [
-            'step_order' => 2,
+          2 => [
+            'step_order' => 3,
             'label' => 'Counter-sign BOD',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
@@ -898,11 +10516,262 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      8 => [
+      79 => [
         'document_type' => 'PERDIN',
-        'name' => 'Approval Perdin HO',
+        'name' => 'Approval Perdin HO - FIN',
         'module_name' => 'Perjalanan Dinas',
-        'description' => NULL,
+        'description' => 'Approval perjalanan dinas HO - FIN',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => NULL,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'business_trip',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      80 => [
+        'document_type' => 'PERDIN',
+        'name' => 'Approval Perdin HO - GA',
+        'module_name' => 'Perjalanan Dinas',
+        'description' => 'Approval perjalanan dinas HO - GA',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => NULL,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'business_trip',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'chris',
+              'name' => 'Muhammad Chrisnaldi Abimanyu',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 3,
+            'label' => 'HRDGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      81 => [
+        'document_type' => 'PERDIN',
+        'name' => 'Approval Perdin HO - HR',
+        'module_name' => 'Perjalanan Dinas',
+        'description' => 'Approval perjalanan dinas HO - HR',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => NULL,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'business_trip',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      82 => [
+        'document_type' => 'PERDIN',
+        'name' => 'Approval Perdin HO - IT',
+        'module_name' => 'Perjalanan Dinas',
+        'description' => 'Approval perjalanan dinas HO - IT',
         'area_type' => 'HO',
         'cabang' => NULL,
         'min_amount' => NULL,
@@ -919,13 +10788,12 @@ class ApprovalFlowMatrixSeeder extends Seeder
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HRDGA',
+            'label' => 'HOD/SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
-              'type' => 'USER',
-              'ref' => 'donna',
-              'name' => 'Donna Delaila',
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -936,13 +10804,47 @@ class ApprovalFlowMatrixSeeder extends Seeder
             ],
           ],
           1 => [
-            'step_order' => 2,
-            'label' => 'HOD',
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -954,7 +10856,114 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      9 => [
+      83 => [
+        'document_type' => 'PERDIN',
+        'name' => 'Approval Perdin HO - LOG',
+        'module_name' => 'Perjalanan Dinas',
+        'description' => 'Approval perjalanan dinas HO - LOG',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => NULL,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => true,
+        'permission_module' => 'business_trip',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Logistic Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 1,
+            'label' => 'HOD/SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'ridho',
+              'name' => 'Muhammad Ridho Husaini',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'GA SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 3,
+            'label' => 'HRGA Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HRGA Manager',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      84 => [
         'document_type' => 'PO',
         'name' => 'Approval PO 10 Juta sampai 50 Juta',
         'module_name' => 'Procurement',
@@ -1017,7 +11026,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      10 => [
+      85 => [
         'document_type' => 'PO',
         'name' => 'Approval PO Di Atas 50 Juta',
         'module_name' => 'Procurement',
@@ -1097,7 +11106,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      11 => [
+      86 => [
         'document_type' => 'PO',
         'name' => 'Approval PO Semua Nilai',
         'module_name' => 'Procurement',
@@ -1143,7 +11152,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      12 => [
+      87 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -1363,7 +11372,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      13 => [
+      88 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -1584,7 +11593,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      14 => [
+      89 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -1741,7 +11750,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -1804,7 +11813,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      15 => [
+      90 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – Rp 1.000.000 s/d Rp 10.000.000',
         'module_name' => 'Procurement',
@@ -1973,7 +11982,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      16 => [
+      91 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – Rp 1.000.000 s/d Rp 10.000.000',
         'module_name' => 'Procurement',
@@ -2142,7 +12151,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      17 => [
+      92 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – Rp 1.000.000 s/d Rp 10.000.000',
         'module_name' => 'Procurement',
@@ -2312,7 +12321,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      18 => [
+      93 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – Rp 10.000.001 s/d Rp 50.000.000',
         'module_name' => 'Procurement',
@@ -2515,7 +12524,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      19 => [
+      94 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – Rp 10.000.001 s/d Rp 50.000.000',
         'module_name' => 'Procurement',
@@ -2719,7 +12728,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      20 => [
+      95 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – Cabang – Rp 10.000.001 s/d Rp 50.000.000',
         'module_name' => 'Procurement',
@@ -2876,7 +12885,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -2922,7 +12931,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      21 => [
+      96 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -3046,7 +13055,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      22 => [
+      97 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -3170,7 +13179,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      23 => [
+      98 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -3196,7 +13205,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -3294,7 +13303,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      24 => [
+      99 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -3320,7 +13329,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -3401,7 +13410,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      25 => [
+      100 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – Rp 1.000.000 s/d Rp 10.000.000',
         'module_name' => 'Procurement',
@@ -3474,7 +13483,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      26 => [
+      101 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – Rp 1.000.000 s/d Rp 10.000.000',
         'module_name' => 'Procurement',
@@ -3547,7 +13556,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      27 => [
+      102 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – Rp 1.000.000 s/d Rp 10.000.000',
         'module_name' => 'Procurement',
@@ -3573,7 +13582,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -3603,7 +13612,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      28 => [
+      103 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – Rp 10.000.001 s/d Rp 50.000.000',
         'module_name' => 'Procurement',
@@ -3710,7 +13719,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      29 => [
+      104 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – Rp 10.000.001 s/d Rp 50.000.000',
         'module_name' => 'Procurement',
@@ -3817,7 +13826,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      30 => [
+      105 => [
         'document_type' => 'PR',
         'name' => 'Approval PR – HO – Rp 10.000.001 s/d Rp 50.000.000',
         'module_name' => 'Procurement',
@@ -3843,7 +13852,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -3924,7 +13933,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      31 => [
+      106 => [
         'document_type' => 'PR',
         'name' => 'Matrix Approval PR – HO – > Rp 50.000.001',
         'module_name' => 'Procurement',
@@ -4031,7 +14040,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      32 => [
+      107 => [
         'document_type' => 'PR',
         'name' => 'PR Kapal',
         'module_name' => 'Procurement',
@@ -4078,7 +14087,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      33 => [
+      108 => [
         'document_type' => 'PR',
         'name' => 'PR Kapal',
         'module_name' => 'Procurement',
@@ -4142,7 +14151,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      34 => [
+      109 => [
         'document_type' => 'PR',
         'name' => 'PR Kapal',
         'module_name' => 'Procurement',
@@ -4223,39 +14232,38 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      35 => [
+      110 => [
         'document_type' => 'REALISASI',
-        'name' => 'Approval FPU HO IT > 10 juta',
-        'module_name' => 'Realisasi FPU',
-        'description' => NULL,
-        'area_type' => 'HO',
+        'name' => 'Approval REALISASI ALL - CABANG Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow ALL-CABANG (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'CABANG',
         'cabang' => NULL,
-        'min_amount' => 10000001.0,
-        'max_amount' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
         'is_active' => true,
         'all_departments' => false,
         'all_transaction_categories' => false,
-        'permission_module' => 'cash_advance_realization',
+        'permission_module' => 'cash_advance',
         'departments' => [
-          0 => 'Information Technology',
+          0 => 'General Affair',
+          1 => 'Logistic',
+          2 => 'Finance',
+          3 => 'Commercial',
         ],
         'transaction_categories' => [
-          0 => 'TELPON',
-          1 => 'LISTRIK',
-          2 => 'PANTRY',
-          3 => 'LEGALITAS_KENDARAAN',
-          4 => 'UPL',
-          5 => 'STATIONARY',
+          0 => 'PERDIN',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'ADH',
             'approval_mode' => 'ANY',
-            'approver_scope' => 'GLOBAL',
+            'approver_scope' => 'SAME_BRANCH',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'Admin Head',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4266,30 +14274,34 @@ class ApprovalFlowMatrixSeeder extends Seeder
             ],
           ],
           1 => [
-            'step_order' => 2,
-            'label' => 'FM',
+            'step_order' => 1,
+            'label' => 'ADH',
             'approval_mode' => 'ANY',
-            'approver_scope' => 'GLOBAL',
+            'approver_scope' => 'SELECTED_BRANCHES',
             'approver' => [
-              'type' => 'ROLE',
-              'ref' => 'Finance Manager',
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
             ],
             'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
             ],
             'special_approvers' => [
             ],
           ],
           2 => [
-            'step_order' => 3,
-            'label' => 'CFO/CEO',
+            'step_order' => 2,
+            'label' => 'Kacab',
             'approval_mode' => 'ANY',
-            'approver_scope' => 'GLOBAL',
+            'approver_scope' => 'SAME_BRANCH',
             'approver' => [
-              'type' => 'ROLE',
-              'ref' => 'Chief Finance Officer',
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4300,13 +14312,14 @@ class ApprovalFlowMatrixSeeder extends Seeder
             ],
           ],
           3 => [
-            'step_order' => 3,
-            'label' => 'CFO/CEO',
+            'step_order' => 2,
+            'label' => 'Kacab',
             'approval_mode' => 'ANY',
-            'approver_scope' => 'GLOBAL',
+            'approver_scope' => 'SAME_BRANCH',
             'approver' => [
-              'type' => 'ROLE',
-              'ref' => 'Chief Executive Officer',
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4316,9 +14329,2851 @@ class ApprovalFlowMatrixSeeder extends Seeder
             'special_approvers' => [
             ],
           ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
         ],
       ],
-      36 => [
+      111 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI ALL - CABANG Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow ALL-CABANG (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+          1 => 'Logistic',
+          2 => 'Finance',
+          3 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      112 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI ALL - CABANG Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow ALL-CABANG (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+          1 => 'Logistic',
+          2 => 'Finance',
+          3 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      113 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI COM - CABANG NON RUTIN (Entertain, Sumbangan, Parcel)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow COM-CABANG(Entertain, Sumbangan, Parcel) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'ENTERTAIN',
+          1 => 'SUMBANGAN',
+          2 => 'PARCEL',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      114 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI COM - CABANG NON RUTIN (Entertain, Sumbangan, Parcel)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow COM-CABANG(Entertain, Sumbangan, Parcel) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'ENTERTAIN',
+          1 => 'SUMBANGAN',
+          2 => 'PARCEL',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      115 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI COM - CABANG NON RUTIN (Entertain, Sumbangan, Parcel)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow COM-CABANG(Entertain, Sumbangan, Parcel) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Commercial',
+        ],
+        'transaction_categories' => [
+          0 => 'ENTERTAIN',
+          1 => 'SUMBANGAN',
+          2 => 'PARCEL',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      116 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      117 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      118 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      119 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      120 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      121 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      122 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Banjarmasin',
+              2 => 'Pontianak',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      123 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal diatas 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 50000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      124 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      125 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      126 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      127 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI LOG - CABANG NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-CABANG (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      128 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI LOG - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      129 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI LOG - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Banjarmasin',
+              2 => 'Pontianak',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      130 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI LOG - CABANG RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-CABANG(Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary, Service Kendaraan Operasional/Truk, Sumbangan perayaan) RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'CABANG',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Logistic',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+          6 => 'SERVICE_KENDARAAN',
+          7 => 'SUMBANGAN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Admin Head',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'ADH',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'samuel.andre',
+              'name' => 'Renhoar Samuel Piter Andre',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          2 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'lukman.prayoga',
+              'name' => 'Lukman Prayoga',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          3 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SAME_BRANCH',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'nicko.putra',
+              'name' => 'Nicko Putra',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          4 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'freza',
+              'name' => 'Freza Mahaztra Sandi',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Samarinda',
+              1 => 'Sulawesi',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          5 => [
+            'step_order' => 2,
+            'label' => 'Kacab',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'SELECTED_BRANCHES',
+            'approver' => [
+              'type' => 'USER',
+              'ref' => 'sony.hartono',
+              'name' => 'Sony Hartono',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+              0 => 'Palembang',
+              1 => 'Pontianak',
+              2 => 'Banjarmasin',
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      131 => [
         'document_type' => 'REALISASI',
         'name' => 'Approval REALISASI – Board of Director',
         'module_name' => 'Realisasi FPU',
@@ -4374,11 +17229,691 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      37 => [
+      132 => [
         'document_type' => 'REALISASI',
-        'name' => 'Approval realisasi FPU IT 0 - 10 juta',
-        'module_name' => 'Realisasi FPU',
-        'description' => NULL,
+        'name' => 'Approval REALISASI FIN - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      133 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI FIN - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      134 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI FIN - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      135 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI FIN - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      136 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI FIN - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      137 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI FIN - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      138 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI FIN - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow FIN-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Finance',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Spv',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Finance Accounting Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      139 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      140 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.000 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      141 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      142 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      143 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      144 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      145 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      146 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal 1 s/d 10.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
         'min_amount' => 1.0,
@@ -4386,7 +17921,895 @@ class ApprovalFlowMatrixSeeder extends Seeder
         'is_active' => true,
         'all_departments' => false,
         'all_transaction_categories' => false,
-        'permission_module' => 'cash_advance_realization',
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      147 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI GA - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'General Affair',
+        ],
+        'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor General Affair',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      148 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      149 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      150 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      151 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI HR - HO NON RUTIN (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow GA-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      152 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI HR - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      153 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI HR - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      154 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI HR - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow HR-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Human Resource Development',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Comben Industrial Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'HR Recruitment Development Supervisor',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      155 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 1 s/d 2.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 2000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      156 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Operasional Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      157 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Operational Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 2.000.001 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 2000001.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      158 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Operational Kantor)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'OPERASIONAL_KANTOR',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      159 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      160 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      161 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Operasional Kantor) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
+        'departments' => [
+          0 => 'Information Technology',
+        ],
+        'transaction_categories' => [
+          0 => 'PERDIN',
+        ],
+        'steps' => [
+          0 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+        ],
+      ],
+      162 => [
+        'document_type' => 'REALISASI',
+        'name' => 'Approval REALISASI IT - HO Non Rutin (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal diatas 10.000.000',
+        'area_type' => 'HO',
+        'cabang' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => NULL,
+        'is_active' => true,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
         'departments' => [
           0 => 'Information Technology',
         ],
@@ -4401,12 +18824,29 @@ class ApprovalFlowMatrixSeeder extends Seeder
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4418,32 +18858,57 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      38 => [
+      163 => [
         'document_type' => 'REALISASI',
-        'name' => 'UJI Realisasi Sementara',
-        'module_name' => 'Realisasi FPU (UJI)',
-        'description' => NULL,
+        'name' => 'Approval REALISASI IT - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow IT-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal 1 s/d 10.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 0.0,
-        'max_amount' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 10000000.0,
         'is_active' => true,
-        'all_departments' => true,
-        'all_transaction_categories' => true,
-        'permission_module' => NULL,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
         'departments' => [
+          0 => 'Information Technology',
         ],
         'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'IT Infrastructure SPV',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Programmer SPV',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4455,32 +18920,57 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      39 => [
+      164 => [
         'document_type' => 'REALISASI',
-        'name' => 'UJI Realisasi Sementara',
-        'module_name' => 'Realisasi FPU (UJI)',
-        'description' => NULL,
+        'name' => 'Approval REALISASI LOG - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal 1 s/d 10.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 0.0,
-        'max_amount' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 10000000.0,
         'is_active' => true,
-        'all_departments' => true,
-        'all_transaction_categories' => true,
-        'permission_module' => NULL,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
         'departments' => [
+          0 => 'Logistic',
         ],
         'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4492,32 +18982,57 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      40 => [
+      165 => [
         'document_type' => 'REALISASI',
-        'name' => 'UJI Realisasi Sementara',
-        'module_name' => 'Realisasi FPU (UJI)',
-        'description' => NULL,
+        'name' => 'Approval REALISASI LOG - HO RUTIN (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow LOG-HO (Telpon, Listrik, Pantry, Legalitas Kendaraan, UPL, Stationary) RUTIN
+    Nominal diatas 10.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 0.0,
+        'min_amount' => 10000001.0,
         'max_amount' => NULL,
         'is_active' => true,
-        'all_departments' => true,
-        'all_transaction_categories' => true,
-        'permission_module' => NULL,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
         'departments' => [
+          0 => 'Logistic',
         ],
         'transaction_categories' => [
+          0 => 'TELPON',
+          1 => 'LISTRIK',
+          2 => 'PANTRY',
+          3 => 'LEGALITAS_KENDARAAN',
+          4 => 'UPL',
+          5 => 'STATIONARY',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'SPV',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'Supervisor Logistik',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'SPV',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Manager Logistik',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4529,32 +19044,52 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      41 => [
+      166 => [
         'document_type' => 'REALISASI',
-        'name' => 'UJI Realisasi Sementara',
-        'module_name' => 'Realisasi FPU (UJI)',
-        'description' => NULL,
+        'name' => 'Approval REALISASI PROC - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow PROC-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 1 s/d 5.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 0.0,
-        'max_amount' => NULL,
+        'min_amount' => 1.0,
+        'max_amount' => 5000000.0,
         'is_active' => true,
-        'all_departments' => true,
-        'all_transaction_categories' => true,
-        'permission_module' => NULL,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
         'departments' => [
+          0 => 'Procurement',
         ],
         'transaction_categories' => [
+          0 => 'PERDIN',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'HOD/Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'Supervisor Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'General Manager Procurement',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4566,32 +19101,52 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      42 => [
+      167 => [
         'document_type' => 'REALISASI',
-        'name' => 'UJI Realisasi Sementara',
-        'module_name' => 'Realisasi FPU (UJI)',
-        'description' => NULL,
+        'name' => 'Approval REALISASI PROC - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow PROC-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 5.000.001 s/d 10.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 0.0,
-        'max_amount' => NULL,
+        'min_amount' => 5000001.0,
+        'max_amount' => 10000000.0,
         'is_active' => true,
-        'all_departments' => true,
-        'all_transaction_categories' => true,
-        'permission_module' => NULL,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
         'departments' => [
+          0 => 'Procurement',
         ],
         'transaction_categories' => [
+          0 => 'PERDIN',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'HOD/Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'General Manager Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Procurement',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4603,32 +19158,52 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      43 => [
+      168 => [
         'document_type' => 'REALISASI',
-        'name' => 'UJI Realisasi Sementara',
-        'module_name' => 'Realisasi FPU (UJI)',
-        'description' => NULL,
+        'name' => 'Approval REALISASI PROC - HO NON RUTIN (Perjalanan Dinas)',
+        'module_name' => 'FPU (Form Pengajuan Uang)',
+        'description' => 'Approval flow PROC-HO (Perjalanan Dinas) NON RUTIN
+    Nominal 10.000.001 s/d 50.000.000',
         'area_type' => 'HO',
         'cabang' => NULL,
-        'min_amount' => 0.0,
-        'max_amount' => NULL,
+        'min_amount' => 10000001.0,
+        'max_amount' => 50000000.0,
         'is_active' => true,
-        'all_departments' => true,
-        'all_transaction_categories' => true,
-        'permission_module' => NULL,
+        'all_departments' => false,
+        'all_transaction_categories' => false,
+        'permission_module' => 'cash_advance',
         'departments' => [
+          0 => 'Procurement',
         ],
         'transaction_categories' => [
+          0 => 'PERDIN',
         ],
         'steps' => [
           0 => [
             'step_order' => 1,
-            'label' => 'HOD',
+            'label' => 'HOD/Manager',
             'approval_mode' => 'ANY',
             'approver_scope' => 'GLOBAL',
             'approver' => [
               'type' => 'ROLE',
-              'ref' => 'Supervisor IT',
+              'ref' => 'General Manager Procurement',
+            ],
+            'allow_peer_approval' => false,
+            'skip_for_roles' => [
+            ],
+            'branches' => [
+            ],
+            'special_approvers' => [
+            ],
+          ],
+          1 => [
+            'step_order' => 1,
+            'label' => 'HOD/Manager',
+            'approval_mode' => 'ANY',
+            'approver_scope' => 'GLOBAL',
+            'approver' => [
+              'type' => 'ROLE',
+              'ref' => 'Supervisor Procurement',
             ],
             'allow_peer_approval' => false,
             'skip_for_roles' => [
@@ -4640,7 +19215,7 @@ class ApprovalFlowMatrixSeeder extends Seeder
           ],
         ],
       ],
-      44 => [
+      169 => [
         'document_type' => 'Vendor',
         'name' => 'Approval master vendor',
         'module_name' => 'Master Vendor',
