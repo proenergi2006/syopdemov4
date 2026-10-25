@@ -55,6 +55,28 @@ class CashAdvanceModuleSeeder extends Seeder
                 'approval_document_label' => 'FPU (Form Pengajuan Uang)',
                 'approval_uses_area_matrix' => true,
 
+                /*
+                | Alur FPU juga dibedakan menurut keterangan transaksinya.
+                | Kolom inilah yang memunculkan medan "Keterangan Transaksi"
+                | pada form approval flow; tanpa nilai true, medannya tidak
+                | pernah digambar.
+                |
+                | DISEBUT DI SINI, BUKAN HANYA DI MIGRASINYA.
+                |
+                | Migrasi yang menambah kolom ini juga mengisinya lewat satu
+                | UPDATE pada baris cash_advance. Itu bekerja di tempat yang
+                | barisnya sudah ada saat migrasi dijalankan -- dan DIAM-DIAM
+                | tidak mengenai apa pun di tempat yang modulnya baru dibuat
+                | sesudahnya, karena UPDATE pada nol baris bukan galat.
+                | Migrasinya pun tidak akan terulang.
+                |
+                | Akibatnya tidak terlihat sebagai kesalahan: jenis dokumen
+                | FPU tetap muncul, hanya keterangan transaksinya yang hilang
+                | dari form -- dan flow yang disimpan dari sana diam-diam
+                | berlaku untuk SEMUA keterangan transaksi.
+                */
+                'approval_uses_transaction_category' => true,
+
                 'updated_at' => $now,
             ],
         );
