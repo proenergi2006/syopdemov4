@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\UserHomeAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -179,47 +180,72 @@ class AccountController extends Controller
 
         /*
     |--------------------------------------------------------------------------
-    | Fallback dari master user
+    | Cabang dan department bawaan akun
     |--------------------------------------------------------------------------
-    | Untuk jaga-jaga kalau user belum punya row di user_access_assignments.
+    | SELALU ikut, bukan hanya ketika daftarnya kosong.
+    |
+    | Dulu bagian ini berbunyi "kalau user belum punya row sama sekali".
+    | Akibatnya satu baris akses tambahan sudah cukup membuat cabang asal
+    | pemohon lenyap dari pilihan -- menambah akses berubah menjadi
+    | mengganti akses.
+    |
+    | Aturannya sekarang: bawaan akun berupa baris sungguhan yang tidak boleh
+    | dinonaktifkan. Penggabungan di sini tinggal jaring pengaman untuk akun
+    | yang barisnya belum sempat dibuat.
     |--------------------------------------------------------------------------
     */
-        if ($assignments->isEmpty()) {
-            $branchId = (int) ($user->cabang_id ?? 0);
-            $departmentId = (int) ($user->departemen_id ?? 0);
+        $bawaan = UserHomeAccess::kombinasi($user);
 
-            if ($branchId > 0 && $departmentId > 0) {
-                $fallback = DB::table('cabang as c')
-                    ->crossJoin('departments as d')
-                    ->where('c.id', $branchId)
-                    ->where('d.id', $departmentId)
-                    ->select([
-                        'c.id as branch_id',
-                        'c.nama_cabang as branch_name',
-                        'c.inisial_cabang as branch_code',
+        $sudahAda = $bawaan !== null
+            && $assignments->contains(
+                fn($item) => (int) $item->branch_id === $bawaan['branch_id']
+                    && (int) $item->department_id === $bawaan['department_id']
+            );
 
-                        'd.id as department_id',
-                        'd.kode as department_code',
-                        'd.nama as department_name',
-                    ])
-                    ->first();
+        if ($bawaan !== null && !$sudahAda) {
+            $barisBawaan = DB::table('cabang as c')
+                ->crossJoin('departments as d')
+                ->where('c.id', $bawaan['branch_id'])
+                ->where('d.id', $bawaan['department_id'])
+                ->select([
+                    'c.id as branch_id',
+                    'c.nama_cabang as branch_name',
+                    'c.inisial_cabang as branch_code',
 
-                if ($fallback) {
-                    $assignments = collect([
-                        (object) [
-                            'id' => null,
-                            'branch_id' => (int) $fallback->branch_id,
-                            'department_id' => (int) $fallback->department_id,
-                            'is_primary' => true,
+                    'd.id as department_id',
+                    'd.kode as department_code',
+                    'd.nama as department_name',
+                ])
+                ->first();
 
-                            'branch_name' => $fallback->branch_name,
-                            'branch_code' => $fallback->branch_code,
+            if ($barisBawaan) {
+                /*
+                | Bertanda utama hanya bila belum ada baris lain yang
+                | memegang tanda itu -- admin boleh memindahkannya ke akses
+                | tambahan.
+                */
+                $adaUtama = $assignments->contains(fn($item) => (bool) $item->is_primary);
 
-                            'department_code' => $fallback->department_code,
-                            'department_name' => $fallback->department_name,
-                        ],
-                    ]);
-                }
+                $assignments = $assignments->push((object) [
+                    'id' => null,
+                    'branch_id' => (int) $barisBawaan->branch_id,
+                    'department_id' => (int) $barisBawaan->department_id,
+                    'is_primary' => !$adaUtama,
+
+                    'branch_name' => $barisBawaan->branch_name,
+                    'branch_code' => $barisBawaan->branch_code,
+
+                    'department_code' => $barisBawaan->department_code,
+                    'department_name' => $barisBawaan->department_name,
+                ]);
+
+                /*
+                | Yang bertanda utama tetap paling depan, karena pilihan
+                | pertamalah yang terbuka saat form dibuka.
+                */
+                $assignments = $assignments
+                    ->sortByDesc(fn($item) => (bool) $item->is_primary)
+                    ->values();
             }
         }
 

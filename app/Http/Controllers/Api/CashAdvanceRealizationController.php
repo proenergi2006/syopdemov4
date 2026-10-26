@@ -7,6 +7,7 @@ use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
+use App\Support\UserHomeAccess;
 use App\Services\FundRequest\CombinedPrintComposer;
 use App\Http\Controllers\Api\BusinessTripController;
 use App\Services\FundRequest\PrintAttachmentCollector;
@@ -4107,19 +4108,13 @@ class CashAdvanceRealizationController extends Controller
             ->unique(fn($item) => $item['branch_id'] . '-' . $item['department_id'])
             ->values();
 
-        if ($assignments->isEmpty()) {
-            $branchId = (int) ($user->cabang_id ?? 0);
-            $departmentId = (int) ($user->departemen_id ?? 0);
-
-            if ($branchId > 0 && $departmentId > 0) {
-                $assignments->push([
-                    'branch_id' => $branchId,
-                    'department_id' => $departmentId,
-                ]);
-            }
-        }
-
-        return $assignments->values();
+        /*
+        | Cabang dan department bawaan akun SELALU ikut, bukan hanya ketika
+        | daftarnya kosong. Lihat App\Support\UserHomeAccess -- syarat
+        | "kosong" yang lama membuat satu akses tambahan menghapus cabang
+        | asal pemohon dari pilihan.
+        */
+        return collect(UserHomeAccess::gabungkan($user, $assignments));
     }
 
     /*

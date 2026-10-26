@@ -11,6 +11,7 @@ use App\Models\MasterMaterialGroup;
 use App\Models\PrAttachment;
 use App\Models\SpecialDocumentType;
 use App\Support\DocumentNumberLock;
+use App\Support\UserHomeAccess;
 use Illuminate\Http\Request;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
@@ -874,33 +875,14 @@ class PurchaseRequestController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Fallback user lama
+        | Cabang dan department bawaan akun
         |--------------------------------------------------------------------------
-        | Kalau user belum punya assignment sama sekali, pakai master user lama.
+        | SELALU ikut, bukan hanya ketika daftarnya kosong. Lihat
+        | App\Support\UserHomeAccess -- syarat "kosong" yang lama membuat satu
+        | akses tambahan menghapus cabang asal pemohon dari pilihan.
         |--------------------------------------------------------------------------
         */
-        if ($assignments->isEmpty()) {
-            $branchId = (int) (
-                $user->cabang_id
-                ?? $user->branch_id
-                ?? 0
-            );
-
-            $departmentId = (int) (
-                $user->departemen_id
-                ?? $user->department_id
-                ?? 0
-            );
-
-            if ($branchId > 0 && $departmentId > 0) {
-                $assignments->push([
-                    'branch_id' => $branchId,
-                    'department_id' => $departmentId,
-                ]);
-            }
-        }
-
-        return $assignments->values();
+        return collect(UserHomeAccess::gabungkan($user, $assignments));
     }
 
     /**
