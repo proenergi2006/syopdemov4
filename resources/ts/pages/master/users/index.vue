@@ -119,6 +119,13 @@ interface UserAccessAssignmentRow {
   department_code?: string | null
   is_primary: boolean
   is_active: boolean
+
+  /*
+   * Baris bawaan akun -- cabang dan department yang melekat pada master user.
+   * Tidak boleh dinonaktifkan maupun dipindah dari layar ini; memindahkan
+   * orangnya dikerjakan dengan mengubah master akunnya.
+   */
+  is_home?: boolean
 }
 
 interface UserAccessAssignmentForm {
@@ -843,6 +850,7 @@ const normalizeAccessAssignmentItems = (payload: any): UserAccessAssignmentRow[]
       is_active: item.is_active === undefined || item.is_active === null
         ? true
         : Boolean(item.is_active),
+      is_home: Boolean(item.is_home),
     }
   })
 }
@@ -1064,10 +1072,102 @@ const submitAccessAssignment = async (): Promise<void> => {
   }
 }
 
+/*
+|--------------------------------------------------------------------------
+| Memindahkan tanda Utama
+|--------------------------------------------------------------------------
+| Utama menentukan cabang dan department mana yang sudah terisi ketika form
+| FPU, Realisasi, Claim, atau Perdin dibuka. Bawaannya adalah cabang yang
+| melekat pada akun, tetapi admin boleh memindahkannya ke akses tambahan --
+| misalnya untuk orang yang sehari-hari memang bekerja di cabang lain.
+|--------------------------------------------------------------------------
+*/
+const setAccessAssignmentPrimary = async (assignment: UserAccessAssignmentRow): Promise<void> => {
+  if (isTogglingAccessAssignment.value || !selectedAccessUser.value?.id)
+    return
+
+  if (assignment.is_primary)
+    return
+
+  const shouldReopenDialog = isAccessDialogOpen.value
+
+  isAccessDialogOpen.value = false
+  await nextTick()
+
+  const confirm = await showConfirmAlert({
+    title: 'Jadikan Akses Utama?',
+    text: 'Cabang dan department ini akan terpilih lebih dulu saat user membuka form pengajuan. Tanda utama yang lama akan dilepas.',
+    confirmButtonText: 'Ya, jadikan utama',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed) {
+    if (shouldReopenDialog)
+      isAccessDialogOpen.value = true
+
+    return
+  }
+
+  isTogglingAccessAssignment.value = true
+
+  try {
+    showLoadingAlert('Memindahkan Akses Utama', 'Mohon tunggu sebentar')
+
+    const response = await axios.put(
+      `/master/users/${selectedAccessUser.value.id}/access-assignments/${assignment.id}`,
+      {
+        branch_id: assignment.branch_id,
+        department_id: assignment.department_id,
+        is_primary: true,
+        is_active: true,
+      },
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+
+    closeAlert()
+
+    const assignments = extractAccessAssignments(response.data)
+
+    if (assignments.length)
+      accessAssignments.value = normalizeAccessAssignmentItems(assignments)
+    else
+      await fetchAccessAssignments()
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text: 'Akses utama berhasil dipindahkan.',
+    })
+  }
+  catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(error, 'Gagal memindahkan akses utama.'),
+    })
+  }
+  finally {
+    isTogglingAccessAssignment.value = false
+
+    if (shouldReopenDialog)
+      isAccessDialogOpen.value = true
+  }
+}
+
 const toggleAccessAssignmentActive = async (assignment: UserAccessAssignmentRow): Promise<void> => {
   if (isTogglingAccessAssignment.value || !selectedAccessUser.value?.id)
     return
 
+  /*
+  | Baris bawaan akun tidak boleh dicabut. Tombolnya sudah dimatikan di layar,
+  | dan penjaga sebenarnya ada di sisi server -- jadi tidak perlu diulang di
+  | sini.
+  */
   const nextStatus = !assignment.is_active
 
   /*
@@ -1956,15 +2056,6 @@ onMounted(async () => {
                 </VCol>
 
                 <VCol cols="12" md="4" class="d-flex flex-column justify-center gap-2">
-                  <!-- <VCheckbox
-                    v-model="accessForm.is_primary"
-                    label="Jadikan akses utama"
-                    color="primary"
-                    density="compact"
-                    hide-details
-                    :disabled="isSavingAccessAssignment"
-                  /> -->
-
                   <VSwitch
                     v-model="accessForm.is_active"
                     color="success"
@@ -1973,6 +2064,20 @@ onMounted(async () => {
                     hide-details
                     :label="accessForm.is_active ? 'Aktif' : 'Nonaktif'"
                     :disabled="isSavingAccessAssignment"
+                  />
+
+                  <!--
+                    Bawaannya cabang akun sendiri yang menjadi utama. Pilihan
+                    ini untuk orang yang sehari-hari bekerja di cabang lain.
+                  -->
+                  <VSwitch
+                    v-model="accessForm.is_primary"
+                    color="primary"
+                    density="compact"
+                    inset
+                    hide-details
+                    label="Jadikan akses utama"
+                    :disabled="isSavingAccessAssignment || !accessForm.is_active"
                   />
                 </VCol>
 
@@ -2038,7 +2143,7 @@ onMounted(async () => {
             type="info"
             variant="tonal"
           >
-            User belum memiliki access assignment. Tambahkan minimal satu akses sesuai master cabang dan department user.
+            User belum memiliki access assignment. Biasanya karena cabang atau department pada master akunnya masih kosong — lengkapi dulu data user-nya, atau tambahkan aksesnya di sini.
           </VAlert>
 
           <div
@@ -2066,6 +2171,13 @@ onMounted(async () => {
                   <td>
                     <div class="table-text-wrap">
                       {{ getAssignmentBranchTitle(assignment) }}
+                    </div>
+
+                    <div
+                      v-if="assignment.is_home"
+                      class="text-caption text-medium-emphasis"
+                    >
+                      Bawaan akun
                     </div>
                   </td>
 
@@ -2095,6 +2207,18 @@ onMounted(async () => {
                       Utama
                     </VChip>
 
+                    <VBtn
+                      v-else-if="assignment.is_active"
+                      size="small"
+                      variant="text"
+                      color="primary"
+                      class="text-none px-1"
+                      :disabled="isSavingAccessAssignment || isTogglingAccessAssignment"
+                      @click="setAccessAssignmentPrimary(assignment)"
+                    >
+                      Jadikan utama
+                    </VBtn>
+
                     <span v-else class="text-medium-emphasis">
                       -
                     </span>
@@ -2107,12 +2231,16 @@ onMounted(async () => {
                         size="small"
                         color="primary"
                         variant="tonal"
-                        :disabled="isSavingAccessAssignment || isTogglingAccessAssignment"
+                        :disabled="assignment.is_home
+                          || isSavingAccessAssignment
+                          || isTogglingAccessAssignment"
                         @click="editAccessAssignment(assignment)"
                       >
                         <VIcon icon="tabler-edit" />
                         <VTooltip activator="parent" location="top">
-                          Edit Akses
+                          {{ assignment.is_home
+                            ? 'Mengikuti master akun, ubah dari data user'
+                            : 'Edit Akses' }}
                         </VTooltip>
                       </VBtn>
 
@@ -2121,12 +2249,18 @@ onMounted(async () => {
                         size="small"
                         :color="assignment.is_active ? 'warning' : 'success'"
                         variant="tonal"
+                        :disabled="assignment.is_home && assignment.is_active"
                         :loading="isTogglingAccessAssignment"
                         @click="toggleAccessAssignmentActive(assignment)"
                       >
                         <VIcon :icon="assignment.is_active ? 'tabler-circle-off' : 'tabler-circle-check'" />
                         <VTooltip activator="parent" location="top">
-                          {{ assignment.is_active ? 'Nonaktifkan Akses' : 'Aktifkan Akses' }}
+                          <template v-if="assignment.is_home && assignment.is_active">
+                            Cabang bawaan akun selalu aktif
+                          </template>
+                          <template v-else>
+                            {{ assignment.is_active ? 'Nonaktifkan Akses' : 'Aktifkan Akses' }}
+                          </template>
                         </VTooltip>
                       </VBtn>
                     </div>
