@@ -283,49 +283,52 @@ const selectedDocumentTypeLabel = computed(() => {
   return getApprovalFlowDocumentTypeLabel(selectedDocumentType.value)
 })
 
-const getCreatorDepartmentLabel = (item: ApprovalFlowItem): string => {
-  if (item.all_departments)
-    return 'Semua Divisi'
+/*
+ * Daftar department yang dicakup flow, satu label per department.
+ *
+ * Dulu keduanya digabung menjadi satu kalimat yang disambung koma. Flow yang
+ * mencakup empat department lebih terbaca sebagai empat penanda daripada
+ * sebagai satu baris panjang.
+ *
+ * Kosong berarti flow berlaku untuk seluruh divisi, dan penandanya cukup satu.
+ */
+const gabungKodeNama = (code?: string | null, name?: string | null): string => {
+  const kode = code || ''
+  const nama = name || ''
 
-  /*
-   * Satu flow bisa mencakup beberapa department. Kolom tunggal lama dipakai
-   * sebagai cadangan untuk flow yang belum punya baris pivot.
-   */
-  if (Array.isArray(item.departments) && item.departments.length) {
-    return item.departments
-      .map(department => {
-        const code = department.code || ''
-        const name = department.name || ''
+  if (kode && nama)
+    return `${kode} - ${nama}`
 
-        return code && name ? `${code} - ${name}` : (name || code || '-')
-      })
-      .join(', ')
-  }
-
-  const code = item.creator_department_code || ''
-  const name = item.creator_department_name || ''
-
-  if (code && name)
-    return `${code} - ${name}`
-
-  return name || code || '-'
+  return nama || kode || ''
 }
 
-/**
- * Label keterangan transaksi yang dicakup flow.
- * Mengembalikan string kosong bila flow tidak dibatasi kategori, sehingga
- * barisnya tidak perlu ditampilkan sama sekali.
- */
-const getTransactionCategoryLabel = (item: ApprovalFlowItem): string => {
+const getFlowDepartmentLabels = (item: ApprovalFlowItem): string[] => {
+  if (item.all_departments)
+    return []
+
+  if (Array.isArray(item.departments) && item.departments.length)
+    return item.departments.map(department => gabungKodeNama(department.code, department.name) || '-')
+
+  /* Cadangan untuk flow lama yang belum punya baris pivot. */
+  const tunggal = gabungKodeNama(
+    item.creator_department_code,
+    item.creator_department_name,
+  )
+
+  return tunggal ? [tunggal] : []
+}
+
+/* Keterangan transaksi, satu label per kategori. Lihat alasan di atas. */
+const getFlowTransactionCategoryLabels = (item: ApprovalFlowItem): string[] => {
   if (item.all_transaction_categories !== false)
-    return ''
+    return []
 
   if (!Array.isArray(item.transaction_categories) || !item.transaction_categories.length)
-    return ''
+    return []
 
-  return item.transaction_categories
-    .map(category => category.name || category.code || '-')
-    .join(', ')
+  return item.transaction_categories.map(
+    category => category.name || category.code || '-',
+  )
 }
 
 const normalizeNumberInput = (value: unknown): number | null => {
@@ -1826,36 +1829,75 @@ onMounted(async () => {
 
                     <div
                       v-if="usesAreaMatrix(flow)"
-                      class="d-flex flex-wrap gap-2 mb-2"
+                      class="mb-2"
                     >
-                      <VChip
-                        color="secondary"
-                        variant="tonal"
-                        size="small"
-                      >
-                        Area: {{ flow.area_type || '-' }}
-                      </VChip>
+                      <div class="d-flex flex-wrap gap-2 mb-2">
+                        <VChip
+                          color="secondary"
+                          variant="tonal"
+                          size="small"
+                        >
+                          Area: {{ flow.area_type || '-' }}
+                        </VChip>
 
-                      <VChip
-                        :color="flow.all_departments ? 'primary' : 'secondary'"
-                        variant="tonal"
-                        size="small"
+                        <!--
+                          Flow yang berlaku untuk seluruh divisi cukup satu
+                          penanda; yang dibatasi digambar sebagai daftar di
+                          bawah, supaya empat department tidak menyambung
+                          menjadi satu baris panjang.
+                        -->
+                        <VChip
+                          v-if="flow.all_departments"
+                          color="primary"
+                          variant="tonal"
+                          size="small"
+                        >
+                          Department: Semua Divisi
+                        </VChip>
+                      </div>
+
+                      <div
+                        v-if="getFlowDepartmentLabels(flow).length"
+                        class="mb-2"
                       >
-                        Department: {{ getCreatorDepartmentLabel(flow) }}
-                      </VChip>
+                        <div class="text-caption text-medium-emphasis mb-1">
+                          Department ({{ getFlowDepartmentLabels(flow).length }})
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-1">
+                          <VChip
+                            v-for="label in getFlowDepartmentLabels(flow)"
+                            :key="`${flow.public_id}-dept-${label}`"
+                            color="secondary"
+                            variant="tonal"
+                            size="x-small"
+                          >
+                            {{ label }}
+                          </VChip>
+                        </div>
+                      </div>
 
                       <!--
                         Hanya muncul bila flow dibatasi keterangan transaksi
                         tertentu; flow "semua kategori" tidak perlu penanda.
                       -->
-                      <VChip
-                        v-if="getTransactionCategoryLabel(flow)"
-                        color="warning"
-                        variant="tonal"
-                        size="small"
-                      >
-                        Keterangan Transaksi: {{ getTransactionCategoryLabel(flow) }}
-                      </VChip>
+                      <div v-if="getFlowTransactionCategoryLabels(flow).length">
+                        <div class="text-caption text-medium-emphasis mb-1">
+                          Keterangan Transaksi ({{ getFlowTransactionCategoryLabels(flow).length }})
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-1">
+                          <VChip
+                            v-for="label in getFlowTransactionCategoryLabels(flow)"
+                            :key="`${flow.public_id}-cat-${label}`"
+                            color="warning"
+                            variant="tonal"
+                            size="x-small"
+                          >
+                            {{ label }}
+                          </VChip>
+                        </div>
+                      </div>
                     </div>
 
                     <VDivider class="my-4" />
