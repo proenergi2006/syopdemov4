@@ -2991,13 +2991,38 @@ class ClaimController extends Controller
                     return;
                 }
 
+                /*
+                | OWN_CABANG = cabang sendiri DAN department sendiri.
+                |
+                | Urutan keluasannya, dari paling luas:
+                |
+                |   ALL            seluruh data
+                |   OWN_DEPARTMENT department sendiri, seluruh cabang
+                |   OWN_CABANG     cabang sendiri, department sendiri
+                |   OWN_DATA       dokumen buatan sendiri
+                |
+                | Tanpa saringan department, OWN_CABANG memperlihatkan seluruh
+                | department di cabang itu -- lebih luas daripada
+                | OWN_DEPARTMENT yang mestinya berada di atasnya, sehingga
+                | urutannya terbalik.
+                |
+                | Department yang dipakai adalah seluruh department yang
+                | benar-benar dipegang akun ini, termasuk dari akses tambahan,
+                | bukan hanya department bawaannya.
+                */
                 if ($scope === 'OWN_CABANG') {
-                    $branchIds->isEmpty()
-                        ? $scopeQuery->whereRaw('1 = 0')
-                        : $scopeQuery->whereIn(
+                    if ($branchIds->isEmpty() || $departmentIds->isEmpty()) {
+                        $scopeQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $scopeQuery
+                        ->whereIn(
                             'claims.branch',
                             $branchIds->map(fn($id) => (string) $id)->all(),
-                        );
+                        )
+                        ->whereIn('claims.department_id', $departmentIds->all());
 
                     return;
                 }
