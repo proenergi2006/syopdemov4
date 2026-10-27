@@ -24,10 +24,23 @@ injectSkinClasses()
         lg="8"
         class="d-none d-lg-flex auth-left"
       >
+        <!--
+          Lapisan isi ruang: gambar yang sama, dipotong dan diburamkan.
+          Gambarnya 16:9 sementara kolom ini jauh lebih jangkung, jadi selalu
+          ada sisa ruang di atas dan di bawah. Diisi begini, sisa itu menyambung
+          ke gambarnya alih-alih tampak sebagai bingkai kosong -- dan gambar
+          utamanya tetap utuh, tidak terpotong sedikit pun.
+        -->
+        <div
+          class="auth-background-fill"
+          :style="{ backgroundImage: `url(${loginBackground})` }"
+          aria-hidden="true"
+        />
+
         <VImg
           :src="loginBackground"
           alt="Pro Energi Oil and Gas"
-          cover
+          contain
           eager
           class="auth-background-image"
         />
@@ -82,25 +95,45 @@ injectSkinClasses()
   margin: 0 !important;
 }
 
+/*
+ * Warna cadangan diambil dari rata-rata tepi atas dan bawah gambar login,
+ * dipakai selama lapisan buram belum termuat.
+ */
 .auth-left {
   position: relative;
   min-height: 100vh;
   padding: 0 !important;
   overflow: hidden;
-  background-color: #eef4fa;
+  background-image: linear-gradient(180deg, #a27e68 0%, #956440 50%, #9a623b 100%);
+}
+
+.auth-background-fill {
+  position: absolute;
+  inset: 0;
+  background-position: center center;
+  background-size: cover;
+
+  /*
+   * Diperbesar sedikit supaya tepi yang memudar akibat blur tidak
+   * menyisakan garis terang di pinggir kolom.
+   */
+  filter: blur(36px) brightness(0.72) saturate(1.1);
+  transform: scale(1.12);
 }
 
 .auth-background-image {
+  position: relative;
   width: 100%;
   height: 100vh;
   min-height: 100vh;
 }
 
 /*
- * Memastikan gambar VImg memenuhi seluruh area sebelah kiri.
+ * Gambar ditampilkan utuh, tidak dipotong. Konsekuensinya ia tidak memenuhi
+ * seluruh kolom -- itu yang ditanggung oleh gradasi di .auth-left.
  */
 .auth-background-image :deep(.v-img__img) {
-  object-fit: cover;
+  object-fit: contain;
   object-position: center center;
 }
 

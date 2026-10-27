@@ -2425,13 +2425,28 @@ class BusinessTripController extends Controller
                     return;
                 }
 
+                /*
+                | OWN_CABANG = cabang sendiri DAN department sendiri.
+                |
+                | Urutan keluasannya: ALL > OWN_DEPARTMENT (department sendiri
+                | di seluruh cabang) > OWN_CABANG > OWN_DATA. Tanpa saringan
+                | department, OWN_CABANG memperlihatkan seluruh department di
+                | cabang itu -- lebih luas daripada OWN_DEPARTMENT yang
+                | mestinya berada di atasnya.
+                */
                 if ($scope === 'OWN_CABANG') {
-                    $context['branchIds']->isEmpty()
-                        ? $cakupan->whereRaw('1 = 0')
-                        : $cakupan->whereIn(
+                    if ($context['branchIds']->isEmpty() || $context['departmentIds']->isEmpty()) {
+                        $cakupan->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $cakupan
+                        ->whereIn(
                             'business_trips.branch',
                             $context['branchIds']->map(fn (int $id): string => (string) $id)->all(),
-                        );
+                        )
+                        ->whereIn('business_trips.department_id', $context['departmentIds']->all());
 
                     return;
                 }

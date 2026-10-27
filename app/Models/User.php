@@ -832,12 +832,29 @@ class User extends Authenticatable
             : 'NONE';
     }
 
+    /*
+    | Urutan keluasan cakupan, dari paling luas:
+    |
+    |   ALL            seluruh data
+    |   OWN_DEPARTMENT department sendiri, SELURUH cabang
+    |   OWN_CABANG     cabang sendiri, department sendiri
+    |   OWN_DATA       dokumen buatan sendiri
+    |
+    | OWN_DEPARTMENT berada di atas OWN_CABANG karena melintasi cabang,
+    | sedangkan OWN_CABANG dibatasi dua-duanya sekaligus. Sebelumnya urutan
+    | keduanya terbalik, sehingga pemilik dua role bisa mendapat cakupan yang
+    | lebih sempit dari yang seharusnya.
+    |
+    | Dipakai hanya saat satu permission datang dari beberapa role: yang
+    | paling luas yang menang. Permission langsung pada user tetap menimpa
+    | seluruh role.
+    */
     private function getScopePriority(string $scope): int
     {
         return match (strtoupper($scope)) {
             'ALL' => 4,
-            'OWN_CABANG' => 3,
-            'OWN_DEPARTMENT' => 2,
+            'OWN_DEPARTMENT' => 3,
+            'OWN_CABANG' => 2,
             'OWN_DATA' => 1,
             default => 0,
         };

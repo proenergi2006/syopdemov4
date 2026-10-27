@@ -3835,13 +3835,28 @@ class CashAdvanceRealizationController extends Controller
                     return;
                 }
 
+                /*
+                | OWN_CABANG = cabang sendiri DAN department sendiri.
+                |
+                | Urutan keluasannya: ALL > OWN_DEPARTMENT (department sendiri
+                | di seluruh cabang) > OWN_CABANG > OWN_DATA. Tanpa saringan
+                | department, OWN_CABANG memperlihatkan seluruh department di
+                | cabang itu -- lebih luas daripada OWN_DEPARTMENT yang
+                | mestinya berada di atasnya.
+                */
                 if ($scope === 'OWN_CABANG') {
-                    $branchIds->isEmpty()
-                        ? $scopeQuery->whereRaw('1 = 0')
-                        : $scopeQuery->whereIn(
+                    if ($branchIds->isEmpty() || $departmentIds->isEmpty()) {
+                        $scopeQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $scopeQuery
+                        ->whereIn(
                             'cash_advance_realizations.branch',
                             $branchIds->map(fn($id) => (string) $id)->all(),
-                        );
+                        )
+                        ->whereIn('cash_advance_realizations.department_id', $departmentIds->all());
 
                     return;
                 }
@@ -3887,13 +3902,20 @@ class CashAdvanceRealizationController extends Controller
             return;
         }
 
+        /* OWN_CABANG = cabang sendiri DAN department sendiri. */
         if ($scope === 'OWN_CABANG') {
-            $branchIds->isEmpty()
-                ? $query->whereRaw('1 = 0')
-                : $query->whereIn(
+            if ($branchIds->isEmpty() || $departmentIds->isEmpty()) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query
+                ->whereIn(
                     'cash_advances.branch',
                     $branchIds->map(fn($id) => (string) $id)->all(),
-                );
+                )
+                ->whereIn('cash_advances.department_id', $departmentIds->all());
 
             return;
         }
