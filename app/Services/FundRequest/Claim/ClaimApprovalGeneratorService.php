@@ -53,18 +53,36 @@ class ClaimApprovalGeneratorService
 
         $requesterId = $this->resolveRequesterId($claim);
 
-        $approvalFlow = $this->findMatchingFlow($claim);
+        $totalAmount = $this->calculateTotalAmount($claim);
+
+        if ($totalAmount <= 0) {
+            throw ValidationException::withMessages([
+                'total_amount' => [
+                    'Total nilai Claim harus lebih besar dari 0.',
+                ],
+            ]);
+        }
+
+        $approvalFlow = $this->findMatchingFlow($claim, $totalAmount);
 
         if (!$approvalFlow) {
             $claim->loadMissing('departmentData');
 
+            /*
+            | Nominalnya ikut disebut sejak rentang nominal benar-benar
+            | dipakai. Tanpa itu, admin membaca pesan ini lalu memeriksa
+            | department-nya -- padahal yang belum tercakup justru rentang
+            | nominalnya.
+            */
             throw ValidationException::withMessages([
                 'approval_flow' => [
                     sprintf(
-                        'Approval flow Claim tidak ditemukan untuk area %s dan department %s.'
+                        'Approval flow Claim tidak ditemukan untuk area %s, department %s,'
+                        . ' dan nominal Rp %s.'
                         . ' Lengkapi matriks approval Claim untuk kombinasi tersebut.',
                         $claim->getApprovalAreaType() ?: '-',
                         $claim->departmentData?->nama ?? '-',
+                        number_format($totalAmount, 0, ',', '.'),
                     ),
                 ],
             ]);
@@ -456,7 +474,29 @@ class ClaimApprovalGeneratorService
     |--------------------------------------------------------------------------
     */
 
-    private function findMatchingFlow(Claim $claim): ?ApprovalFlow
+    /**
+     * Total nilai Claim.
+     *
+     * Header dipakai lebih dulu karena ia yang sudah dibekukan saat submit;
+     * penjumlahan baris hanya cadangan untuk dokumen yang headernya belum
+     * terisi.
+     */
+    private function calculateTotalAmount(Claim $claim): float
+    {
+        $claim->loadMissing('items');
+
+        $headerTotal = (float) ($claim->total_amount ?? 0);
+
+        if ($headerTotal > 0) {
+            return $headerTotal;
+        }
+
+        return (float) $claim
+            ->items
+            ->sum(fn($item) => (float) ($item->amount ?? 0));
+    }
+
+    private function findMatchingFlow(Claim $claim, float $totalAmount): ?ApprovalFlow
     {
         $areaType = $claim->getApprovalAreaType();
         $departmentId = $claim->department_id;
@@ -475,6 +515,7 @@ class ClaimApprovalGeneratorService
             'branch_id' => $claim->branch,
             'area_type' => $areaType,
             'creator_department_id' => (int) $departmentId,
+            'total_amount' => $totalAmount,
         ]);
 
         $flow = ApprovalFlow::query()
@@ -514,11 +555,59 @@ class ClaimApprovalGeneratorService
             })
 
             /*
-            | Department tertentu mengalahkan "Semua Divisi". Nominal dan
-            | keterangan transaksi tidak ikut diurutkan karena tidak dipakai
-            | sama sekali pada Claim.
+            |------------------------------------------------------------------
+            | Rentang nominal
+            |------------------------------------------------------------------
+            | DULU TIDAK DIBANDINGKAN SAMA SEKALI.
+            |
+            | Admin tetap mengisi rentangnya di layar matriks, dan rentang itu
+            | tersimpan -- tetapi tidak pernah dibaca saat memilih flow. Yang
+            | menang hanyalah urutan terakhir, yaitu id terbesar. Akibatnya
+            | SELURUH Claim pada satu area+department jatuh ke satu flow yang
+            | sama, berapa pun nominalnya:
+            |
+            |   - Claim di bawah rentang terendah tetap lolos, padahal tidak
+            |     ada flow yang mencakupnya;
+            |   - Claim di atas rentang tertinggi juga lolos;
+            |   - dan dua rentang lainnya tidak pernah terpakai sama sekali.
+            |
+            | Sekarang dibandingkan, persis seperti FPU. Nominal yang tidak
+            | tercakup rentang mana pun berarti tidak ada flow -- dan dokumennya
+            | ditolak saat submit, bukan diloloskan diam-diam.
+            |------------------------------------------------------------------
+            */
+            ->where(function ($query) use ($totalAmount) {
+                $query
+                    ->whereNull('min_amount')
+                    ->orWhere('min_amount', '<=', $totalAmount);
+            })
+
+            // max_amount null atau 0 berarti tidak berbatas.
+            ->where(function ($query) use ($totalAmount) {
+                $query
+                    ->whereNull('max_amount')
+                    ->orWhere('max_amount', 0)
+                    ->orWhere('max_amount', '>=', $totalAmount);
+            })
+
+            /*
+            | Bila beberapa flow cocok, yang paling spesifik menang: department
+            | tertentu mengalahkan "Semua Divisi", lalu rentang nominal yang
+            | paling sempit.
+            |
+            | COALESCE dipakai karena PostgreSQL menempatkan NULL di urutan
+            | pertama pada ORDER BY DESC -- tanpa itu, flow "semua nilai"
+            | justru menang atas flow yang rentangnya lebih sempit.
+            |
+            | Keterangan transaksi sengaja tidak ikut: alur Claim memang tidak
+            | bergantung padanya (permission_modules.
+            | approval_uses_transaction_category bernilai false untuk claim),
+            | karena keterangan transaksi Claim berbentuk himpunan per baris,
+            | bukan satu penentu per dokumen.
             */
             ->orderBy('all_departments')
+            ->orderByRaw('COALESCE(min_amount, 0) DESC')
+            ->orderByRaw('COALESCE(NULLIF(max_amount, 0), 999999999999999999) ASC')
             ->orderByDesc('id')
             ->first();
 
@@ -529,6 +618,8 @@ class ClaimApprovalGeneratorService
             'area_type' => $flow?->area_type,
             'all_departments' => $flow?->all_departments,
             'department_ids' => $flow?->resolvedDepartmentIds(),
+            'min_amount' => $flow?->min_amount,
+            'max_amount' => $flow?->max_amount,
         ]);
 
         return $flow;

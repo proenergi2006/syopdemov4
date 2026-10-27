@@ -1797,11 +1797,40 @@ class ApprovalFlowController extends Controller
                 ->values()
                 ->all(),
 
+            /*
+            | Bentuk berkode untuk layar.
+            |
+            | Tanpa ini layar jatuh ke creator_department_id -- kolom tunggal
+            | lama -- sehingga flow yang mencakup empat department hanya
+            | menampilkan satu, dan tidak ada yang terlihat salah.
+            */
+            'departments' => $departments
+                ->map(fn($department) => [
+                    'id' => (int) $department->id,
+                    'code' => $department->kode ?? null,
+                    'name' => $department->nama ?? $department->name ?? null,
+                ])
+                ->values()
+                ->all(),
+
             'all_transaction_categories' => (bool) $flow->all_transaction_categories,
 
             'transaction_category_ids' => $categories
                 ->pluck('id')
                 ->map(fn($id) => (int) $id)
+                ->values()
+                ->all(),
+
+            /*
+            | Sama sebabnya: tanpa bentuk ini, chip "Keterangan Transaksi"
+            | tidak pernah tergambar sama sekali -- bukan hanya kurang.
+            */
+            'transaction_categories' => $categories
+                ->map(fn($category) => [
+                    'id' => (int) $category->id,
+                    'code' => $category->code ?? null,
+                    'name' => $category->name ?? null,
+                ])
                 ->values()
                 ->all(),
 
