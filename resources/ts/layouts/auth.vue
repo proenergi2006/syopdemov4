@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useSkins } from '@core/composable/useSkins'
-import loginBackground from '@images/pages/bg2.png'
+import loginBackground from '@images/pages/Auth-login.jpeg'
 import LanguageSwitcher from '@/layouts/components/NavBarI18n.vue'
 
 const { injectSkinClasses } = useSkins()
