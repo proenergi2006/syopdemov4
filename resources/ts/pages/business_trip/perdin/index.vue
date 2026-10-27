@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import SignaturePad from 'signature_pad'
 import axios from '@axios'
 import {
   closeAlert,
@@ -722,12 +723,127 @@ const goToEdit = (row: TripRow): void => {
   router.push(`/business_trip/perdin/edit?id=${encodeURIComponent(row.public_id)}`)
 }
 
+/*
+|--------------------------------------------------------------------------
+| Tanda tangan digital
+|--------------------------------------------------------------------------
+| Mengajukan dan menyetujui perdin sama-sama membubuhkan tanda tangan, dan
+| backend menolak keduanya bila akun itu belum punya. Tanpa layar ini
+| penolakannya buntu: orang diberi tahu ia belum punya tanda tangan, tetapi
+| tidak diberi jalan untuk membuatnya.
+|
+| Pola dan endpoint-nya sama dengan FPU, Realisasi, Claim, dan PR.
+*/
+const signatureDialog = ref(false)
+const signatureCanvasRef = ref<HTMLCanvasElement | null>(null)
+const signaturePad = ref<SignaturePad | null>(null)
+const signatureAgree = ref(false)
+const signatureError = ref('')
+const signatureLoading = ref(false)
+
+/* Aksi yang tertunda menunggu tanda tangan, dilanjutkan sesudah tersimpan. */
+const pendingRow = ref<TripRow | null>(null)
+const pendingAction = ref<'submit' | 'approve' | null>(null)
+
+const checkUserSignature = async (): Promise<boolean> => {
+  const response = await axios.get('/master/user/check-signature', {
+    headers: { Accept: 'application/json' },
+  })
+
+  return response.data?.has_signature === true
+}
+
+const resizeSignatureCanvas = (): void => {
+  const canvas = signatureCanvasRef.value
+
+  if (!canvas)
+    return
+
+  const ratio = Math.max(window.devicePixelRatio || 1, 1)
+  const rect = canvas.getBoundingClientRect()
+
+  canvas.width = rect.width * ratio
+  canvas.height = rect.height * ratio
+
+  const context = canvas.getContext('2d')
+
+  if (!context)
+    return
+
+  context.setTransform(ratio, 0, 0, ratio, 0, 0)
+
+  signaturePad.value?.clear()
+}
+
+const initSignaturePad = (): void => {
+  const canvas = signatureCanvasRef.value
+
+  if (!canvas)
+    return
+
+  const rect = canvas.getBoundingClientRect()
+
+  /* Kanvas belum punya ukuran selama dialognya masih beranimasi. */
+  if (!rect.width || !rect.height) {
+    setTimeout(initSignaturePad, 200)
+
+    return
+  }
+
+  signaturePad.value?.off()
+
+  signaturePad.value = new SignaturePad(canvas, {
+    minWidth: 0.8,
+    maxWidth: 2.4,
+    throttle: 16,
+    penColor: 'black',
+    backgroundColor: 'rgba(255,255,255,0)',
+  })
+
+  resizeSignatureCanvas()
+}
+
+const openSignatureDialog = async (): Promise<void> => {
+  signatureError.value = ''
+  signatureAgree.value = false
+  signatureDialog.value = true
+
+  await nextTick()
+
+  setTimeout(initSignaturePad, 300)
+}
+
 /** Satu pembungkus untuk semua aksi: konfirmasi, loading, muat ulang. */
 const runAction = async (
   row: TripRow,
   aksi: 'submit' | 'approve' | 'delete',
   body: Record<string, unknown> = {},
 ): Promise<void> => {
+  /*
+  | Diperiksa sebelum konfirmasi, bukan sesudahnya: percuma menanyakan
+  | "yakin menyetujui?" bila langkah berikutnya pasti ditolak.
+  */
+  if (aksi === 'submit' || aksi === 'approve') {
+    pendingRow.value = row
+    pendingAction.value = aksi
+
+    try {
+      if (!await checkUserSignature()) {
+        await openSignatureDialog()
+
+        return
+      }
+    }
+    catch (error: unknown) {
+      showErrorToast({
+        title: t('common.alert.error'),
+        text: getApiErrorMessage(error, 'Gagal memeriksa tanda tangan digital.'),
+      })
+
+      return
+    }
+  }
+
   const konfirmasi = await showConfirmAlert({
     title: t(`businessTrip.action.${aksi}.title`),
     text: t(`businessTrip.action.${aksi}.text`, { number: row.trip_number }),
@@ -766,6 +882,56 @@ const runAction = async (
       title: t('common.alert.error'),
       text: getApiErrorMessage(error, t(`businessTrip.action.${aksi}.failed`)),
     })
+  }
+}
+
+/*
+| Disimpan, lalu aksi yang tadi tertunda dijalankan kembali -- kali ini
+| pemeriksaan tanda tangannya lolos.
+*/
+const saveSignatureAndContinue = async (): Promise<void> => {
+  if (!signaturePad.value || signaturePad.value.isEmpty()) {
+    signatureError.value = 'Tanda tangan wajib diisi.'
+
+    return
+  }
+
+  if (!signatureAgree.value) {
+    signatureError.value = 'Anda wajib menyetujui penggunaan tanda tangan digital.'
+
+    return
+  }
+
+  try {
+    signatureLoading.value = true
+    signatureError.value = ''
+
+    await axios.post(
+      '/master/user/store-signature',
+      { signature: signaturePad.value.toDataURL('image/png') },
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+
+    signatureDialog.value = false
+
+    await nextTick()
+
+    if (pendingRow.value && pendingAction.value)
+      await runAction(pendingRow.value, pendingAction.value)
+  }
+  catch (error: unknown) {
+    signatureError.value = getApiErrorMessage(
+      error,
+      'Gagal menyimpan tanda tangan digital.',
+    )
+  }
+  finally {
+    signatureLoading.value = false
   }
 }
 
@@ -2366,6 +2532,81 @@ onMounted(async () => {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <!-- DIALOG TANDA TANGAN -->
+    <VDialog
+      v-model="signatureDialog"
+      max-width="560"
+      persistent
+    >
+      <VCard>
+        <VCardTitle class="text-h6 font-weight-bold">
+          Tanda Tangan Digital
+        </VCardTitle>
+
+        <VCardText>
+          <div class="text-body-2 text-medium-emphasis mb-4">
+            Anda belum memiliki tanda tangan digital. Bubuhkan tanda tangan
+            Anda di bawah ini untuk melanjutkan.
+          </div>
+
+          <div class="bt-signature-wrapper">
+            <canvas
+              ref="signatureCanvasRef"
+              class="bt-signature-canvas"
+            />
+          </div>
+
+          <VBtn
+            size="small"
+            variant="text"
+            color="secondary"
+            class="text-none mt-2"
+            @click="signaturePad?.clear()"
+          >
+            Bersihkan
+          </VBtn>
+
+          <VCheckbox
+            v-model="signatureAgree"
+            class="mt-2"
+            label="Saya menyetujui penggunaan tanda tangan digital ini."
+            hide-details
+          />
+
+          <VAlert
+            v-if="signatureError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ signatureError }}
+          </VAlert>
+        </VCardText>
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="signatureLoading"
+            @click="signatureDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="primary"
+            class="text-none"
+            :loading="signatureLoading"
+            @click="saveSignatureAndContinue"
+          >
+            Simpan &amp; Lanjutkan
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </section>
 </template>
 
@@ -2374,6 +2615,20 @@ onMounted(async () => {
 
 .bt-table-scroll {
   overflow-x: auto;
+}
+
+.bt-signature-wrapper {
+  border: 1px dashed rgba(var(--v-border-color), 0.5);
+  border-radius: 8px;
+  block-size: 180px;
+}
+
+/* touch-action dimatikan supaya menggoreskan tanda tangan di layar sentuh
+   tidak ikut menggeser halaman. */
+.bt-signature-canvas {
+  block-size: 100%;
+  inline-size: 100%;
+  touch-action: none;
 }
 
 .bt-number-action {
