@@ -8,9 +8,21 @@ class Role extends Model
 {
     protected $table = 'roles';
 
-    protected $fillable = ['kode', 'nama', 'is_active'];
+    /*
+    | 'level' wajib ada di sini.
+    |
+    | Controller sudah memvalidasi dan meneruskannya, tetapi Eloquent
+    | membuang atribut yang tidak fillable tanpa mengeluh. Akibatnya form
+    | melaporkan berhasil sementara tingkat jabatannya tetap kosong -- dan
+    | role tanpa tingkat tidak ikut aturan "bawahan tidak menyetujui
+    | atasan", jadi diamnya kegagalan ini berakibat jauh.
+    */
+    protected $fillable = ['kode', 'nama', 'level', 'is_active'];
 
-    protected $casts = ['is_active' => 'boolean'];
+    protected $casts = [
+        'is_active' => 'boolean',
+        'level' => 'integer',
+    ];
 
     public function menus()
     {

@@ -60,9 +60,36 @@ class ReceiveStageDutySplitSeeder extends Seeder
      * @var array<string, string[]>
      */
     private const BUKAN_TUGASNYA = [
+        /*
+        | Meja Admin Finance mengurus REALISASI saja.
+        |
+        | Semula hanya tahap penerimaan yang dicabut dari sini, karena saat itu
+        | pencairan dan pembayaran memang masih tugasnya. Pembagiannya kemudian
+        | dipertegas: seluruh urusan FPU dan Claim -- menerima berkas,
+        | menariknya kembali, merevisi nominal, mencairkan, dan membayar --
+        | ada di meja Finance.
+        |
+        | Yang dicabut di sini bukan sekadar kabar. Penerima email ditentukan
+        | dari kepemilikan permission aksinya, jadi "tidak perlu dikabari"
+        | berarti "tidak mengurus", dan keduanya memang satu saklar.
+        */
         'Admin Finance' => [
             'cash_advance.receive',
+            'cash_advance.unreceive',
+            'cash_advance.revise_amount',
+            'cash_advance.disburse',
+
             'claim.receive',
+            'claim.unreceive',
+            'claim.revise_amount',
+            'claim.pay',
+
+            /*
+            | Pembayaran kekurangan realisasi ikut ke meja Finance, sekalipun
+            | dokumennya realisasi: yang mengeluarkan uang tetap satu meja.
+            | Verifikasi realisasinya tetap di Admin Finance.
+            */
+            'cash_advance_realization.reimburse',
         ],
     ];
 

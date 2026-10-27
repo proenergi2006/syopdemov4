@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ApprovalFlow;
 use App\Models\ApprovalFlowStep;
+use App\Models\PermissionModule;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -60,6 +61,25 @@ class MirrorRealisasiApprovalFlow extends Command
     {
         $dryRun = (bool) $this->option('dry-run');
         $dilewati = array_map('intval', (array) $this->option('skip-flow'));
+
+        /*
+        | Modulnya Realisasi, bukan FPU.
+        |
+        | Lingkup flow memang diturunkan dari FPU, tetapi modulnya tidak:
+        | layar master memvalidasi bahwa dokumen REALISASI memakai module
+        | cash_advance_realization. Flow yang membawa module FPU lolos saat
+        | dibuat di sini, lalu menolak disimpan saat seseorang membukanya.
+        */
+        $modul = PermissionModule::query()
+            ->where('code', 'cash_advance_realization')
+            ->where('is_active', true)
+            ->first();
+
+        if (!$modul) {
+            $this->error('Module aktif "cash_advance_realization" tidak ada. Jalankan seeder permission module lebih dulu.');
+
+            return self::FAILURE;
+        }
 
         $sumber = ApprovalFlow::query()
             ->where('document_type', 'FPU')
@@ -182,9 +202,9 @@ class MirrorRealisasiApprovalFlow extends Command
                 continue;
             }
 
-            DB::transaction(function () use ($fpu, $steps, $deptIds, $katIds, $nama): void {
+            DB::transaction(function () use ($fpu, $steps, $deptIds, $katIds, $nama, $modul): void {
                 $baru = ApprovalFlow::create([
-                    'module_name' => $fpu->module_name,
+                    'module_name' => $modul->name,
                     'name' => $nama,
                     'document_type' => 'REALISASI',
                     'is_active' => $fpu->is_active,
@@ -192,7 +212,7 @@ class MirrorRealisasiApprovalFlow extends Command
                     'area_type' => $fpu->area_type,
                     'cabang' => $fpu->cabang,
                     'creator_department_id' => $fpu->creator_department_id,
-                    'permission_module_id' => $fpu->permission_module_id,
+                    'permission_module_id' => $modul->id,
                     'all_departments' => $fpu->all_departments,
                     'all_transaction_categories' => $fpu->all_transaction_categories,
                     'min_amount' => $fpu->min_amount,
