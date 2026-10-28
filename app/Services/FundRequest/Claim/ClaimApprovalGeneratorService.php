@@ -302,11 +302,24 @@ class ClaimApprovalGeneratorService
 
             if ($resolved !== null) {
                 $barisStep = [];
+                $idAktif = $this->saringAkunAktif($resolved);
 
                 foreach ($resolved as $user) {
                     $userId = (int) $user->id;
 
                     if ($userId <= 0) {
+                        continue;
+                    }
+
+                    /*
+                    | Akun nonaktif tidak masuk ke rantai approval.
+                    |
+                    | Orang yang akunnya sudah dimatikan tidak akan pernah
+                    | menyetujui apa pun; barisnya hanya menambah nama di
+                    | riwayat approval dan membuat "cukup satu dari 3
+                    | approver" terbaca lebih longgar daripada kenyataannya.
+                    */
+                    if (!in_array($userId, $idAktif, true)) {
                         continue;
                     }
 
@@ -352,6 +365,19 @@ class ClaimApprovalGeneratorService
                         ),
                     ],
                 ]);
+            }
+
+            /*
+            | Step yang menunjuk satu akun tertentu, dan akun itu sudah
+            | nonaktif. Dilewati seperti kandidat nonaktif lainnya; bila
+            | tingkatnya jadi tanpa penyetuju sama sekali, assertApproverAda
+            | yang akan melaporkannya dengan jelas.
+            */
+            if (
+                $approverType === ApprovalFlowStep::APPROVER_TYPE_USER
+                && !$this->akunAktif($approverId)
+            ) {
+                continue;
             }
 
             $key = sprintf('%d-%s-%d', $stepOrder, $approverType, $approverId);
@@ -630,6 +656,46 @@ class ClaimApprovalGeneratorService
     | Resolver approver
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Id akun yang masih aktif di antara kandidat yang diberikan.
+     *
+     * Diperiksa sekali di muara, bukan di tiap resolver: kandidat datang dari
+     * tiga jalur -- SAME_BRANCH, SELECTED_BRANCHES, dan resolveConcreteApprovers
+     * -- dan dua yang pertama membawa model User utuh sementara yang ketiga
+     * hanya id dan nama. Membaca $user->is_active langsung akan menghasilkan
+     * null pada jalur ketiga, dan null berarti seluruh kandidatnya terbuang
+     * diam-diam.
+     *
+     * @param  iterable<int, object>  $kandidat
+     * @return array<int, int>
+     */
+    private function saringAkunAktif(iterable $kandidat): array
+    {
+        $ids = collect($kandidat)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return User::query()
+            ->whereIn('id', $ids->all())
+            ->where('is_active', true)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+    }
+
+    private function akunAktif(int $userId): bool
+    {
+        return $userId > 0
+            && User::query()->whereKey($userId)->where('is_active', true)->exists();
+    }
 
     private function resolveSameBranchApprovers(
         ApprovalFlowStep $flowStep,
