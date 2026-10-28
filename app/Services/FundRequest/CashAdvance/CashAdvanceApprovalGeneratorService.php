@@ -370,6 +370,19 @@ class CashAdvanceApprovalGeneratorService
                 ]);
             }
 
+            /*
+            | Step yang menunjuk satu akun tertentu, dan akun itu sudah
+            | nonaktif. Dilewati seperti kandidat nonaktif lainnya; bila
+            | tingkatnya jadi tanpa penyetuju sama sekali, pemeriksaan
+            | "setiap step wajib punya approver" yang akan melaporkannya.
+            */
+            if (
+                $approverType === CashAdvanceApproval::APPROVER_TYPE_USER
+                && !$this->akunAktif($approverId)
+            ) {
+                continue;
+            }
+
             $snapshotKey = sprintf(
                 '%d-%s-%d',
                 $stepOrder,
@@ -435,10 +448,24 @@ class CashAdvanceApprovalGeneratorService
         array &$resolvedSnapshotKeys,
         array &$createdApproversPerStep,
     ): void {
+        $idAktif = $this->saringAkunAktif($resolvedUsers);
+
         foreach ($resolvedUsers as $resolvedUser) {
             $userId = (int) $resolvedUser->id;
 
             if ($userId <= 0) {
+                continue;
+            }
+
+            /*
+            | Akun nonaktif tidak masuk ke rantai approval.
+            |
+            | Orang yang sudah tidak lagi memegang akun tidak akan pernah
+            | menyetujui apa pun; barisnya hanya menambah nama di riwayat
+            | approval dan membuat "cukup satu dari 3 approver" terbaca lebih
+            | longgar daripada kenyataannya.
+            */
+            if (!in_array($userId, $idAktif, true)) {
                 continue;
             }
 
@@ -476,6 +503,42 @@ class CashAdvanceApprovalGeneratorService
             $createdApproversPerStep[$stepOrder] =
                 ($createdApproversPerStep[$stepOrder] ?? 0) + 1;
         }
+    }
+
+    /**
+     * Id akun yang masih aktif di antara kandidat yang diberikan.
+     *
+     * Diperiksa sekali di muara, bukan di tiap resolver: ada lima jalur yang
+     * bermuara ke snapshot, sebagian membawa model User utuh sementara
+     * sebagian lagi hanya id dan nama. Membaca $user->is_active langsung akan
+     * menghasilkan null pada jalur yang kedua -- dan null berarti seluruh
+     * kandidatnya terbuang diam-diam.
+     */
+    private function saringAkunAktif(Collection $kandidat): array
+    {
+        $ids = $kandidat
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return User::query()
+            ->whereIn('id', $ids->all())
+            ->where('is_active', true)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+    }
+
+    private function akunAktif(int $userId): bool
+    {
+        return $userId > 0
+            && User::query()->whereKey($userId)->where('is_active', true)->exists();
     }
 
     private function resolveSameBranchApprovers(
