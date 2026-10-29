@@ -1800,7 +1800,7 @@ onMounted(async () => {
               <thead>
                 <tr>
                   <th width="50">No</th>
-                  <th>Item</th>
+                  <th class="gr-item-name">Item</th>
                   <th class="text-end">Qty PO</th>
                   <th class="text-end">Sudah GR</th>
                   <th class="text-end">Qty Receipt</th>
@@ -1822,7 +1822,7 @@ onMounted(async () => {
                     }}
                   </td>
 
-                  <td>
+                  <td class="gr-item-name">
                     <div class="font-weight-medium">
                       {{ toTitleCase(item.nama_item) }}
                     </div>
@@ -2487,7 +2487,7 @@ onMounted(async () => {
                             No
                           </th>
 
-                          <th>
+                          <th class="gr-item-name">
                             Item
                           </th>
 
@@ -2533,7 +2533,7 @@ onMounted(async () => {
                             {{ itemIndex + 1 }}
                           </td>
 
-                          <td>
+                          <td class="gr-item-name">
                             <div class="font-weight-medium">
                               {{
                                 toTitleCase(
@@ -2856,6 +2856,22 @@ onMounted(async () => {
 .filter-card {
   border-radius: 5px;
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+/*
+| Nama item boleh turun ke bawah.
+|
+| Tabel detail memakai text-no-wrap supaya kolom angka tidak patah di tengah
+| bilangan. Spesifikasi barang -- yang bisa sepanjang 275 karakter -- ikut
+| kena dan mendorong kolom lain keluar dari dialog. Hanya kolom ini yang
+| dikecualikan.
+*/
+.gr-item-name {
+  inline-size: 100%;
+  min-inline-size: 240px;
+  max-inline-size: 440px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .gr-number-header,
