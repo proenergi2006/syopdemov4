@@ -27,11 +27,23 @@ use Illuminate\Validation\ValidationException;
 class ApprovalStepRuleService
 {
     /**
-     * Role yang dipegang seseorang: pivot user_roles, berikut role utamanya.
+     * Role yang dipegang seseorang.
      *
-     * Keduanya dibaca -- ada akun yang rolenya hanya tertulis di kolom
-     * id_role dan belum punya baris pivot, dan aturan yang hanya membaca
-     * pivot akan menganggapnya tidak berperan apa pun.
+     * PIVOT user_roles YANG MENENTUKAN. Kolom users.id_role hanya dipakai
+     * sebagai cadangan, untuk akun lama yang belum punya satu pun baris
+     * pivot.
+     *
+     * Keduanya dulu digabung, dan itu keliru: layar master user menulis ke
+     * pivot dan TIDAK PERNAH memperbarui id_role, sehingga kolom itu menyimpan
+     * role lama selamanya. Karena levelOf() mengambil tingkat TERTINGGI dari
+     * gabungan itu, satu role basi diam-diam mengangkat tingkat jabatan
+     * seseorang -- seorang Service Advisor (lv1) terbaca sebagai Operation
+     * Manager (lv4), lalu aturan "bawahan tidak menyetujui atasan"
+     * menggugurkan atasannya yang sebenarnya dan pengajuannya buntu.
+     *
+     * Permission sudah lama memperlakukan pivot sebagai satu-satunya sumber
+     * -- getActiveRoleId() tidak pernah membaca id_role. Jadi perubahan ini
+     * membuat keduanya sepakat, bukan menciptakan aturan baru.
      *
      * @return array<int, int>
      */
@@ -41,22 +53,23 @@ class ApprovalStepRuleService
             return [];
         }
 
-        $dariPivot = DB::table('user_roles')
-            ->where('user_id', $userId)
-            ->pluck('role_id')
-            ->all();
+        $dariPivot = array_values(array_unique(array_filter(
+            array_map('intval', DB::table('user_roles')
+                ->where('user_id', $userId)
+                ->pluck('role_id')
+                ->all()),
+            fn (int $id): bool => $id > 0,
+        )));
 
-        $utama = DB::table('users')
+        if ($dariPivot !== []) {
+            return $dariPivot;
+        }
+
+        $utama = (int) DB::table('users')
             ->where('id', $userId)
             ->value('id_role');
 
-        $gabungan = array_map('intval', $dariPivot);
-
-        if ($utama) {
-            $gabungan[] = (int) $utama;
-        }
-
-        return array_values(array_unique(array_filter($gabungan, fn (int $id): bool => $id > 0)));
+        return $utama > 0 ? [$utama] : [];
     }
 
     /**
