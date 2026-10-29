@@ -794,7 +794,7 @@ onMounted(async () => {
                     <thead>
                         <tr>
                         <th width="50">{{ t('goodsReceive.create.items.table.no') }}</th>
-                        <th>{{ t('goodsReceive.create.items.table.item') }}</th>
+                        <th class="gr-item-name">{{ t('goodsReceive.create.items.table.item') }}</th>
                         <th width="120" class="text-end">{{ t('goodsReceive.create.items.table.qtyPo') }}</th>
                         <th width="140" class="text-end">{{ t('goodsReceive.create.items.table.sudahGr') }}</th>
                         <th width="140" class="text-end">{{ t('goodsReceive.create.items.table.sisa') }}</th>
@@ -816,7 +816,7 @@ onMounted(async () => {
                         >
                         <td>{{ index + 1 }}</td>
 
-                        <td>
+                        <td class="gr-item-name">
                             <div class="font-weight-medium">
                             {{ toTitleCase(item.item_name) }}
                             </div>
@@ -932,3 +932,21 @@ onMounted(async () => {
   </VContainer>
   </section>
 </template>
+
+<style lang="scss" scoped>
+/*
+| Nama item boleh turun ke bawah.
+|
+| Tabelnya memakai text-no-wrap supaya kolom angka tidak patah di tengah
+| bilangan. Spesifikasi barang -- yang bisa sepanjang 275 karakter -- ikut
+| kena, mendorong kolom Qty Receipt dan Catatan keluar dari kartu sampai
+| harus digeser mendatar. Hanya kolom ini yang dikecualikan.
+*/
+.gr-item-name {
+  inline-size: 100%;
+  min-inline-size: 240px;
+  max-inline-size: 440px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+</style>

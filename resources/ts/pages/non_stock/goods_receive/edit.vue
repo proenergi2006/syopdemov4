@@ -961,7 +961,7 @@ onMounted(async () => {
                 <thead>
                     <tr>
                         <th width="50">{{ t('goodsReceive.edit.items.table.no') }}</th>
-                        <th>{{ t('goodsReceive.edit.items.table.item') }}</th>
+                        <th class="gr-item-name">{{ t('goodsReceive.edit.items.table.item') }}</th>
                         <th width="120" class="text-end">{{ t('goodsReceive.edit.items.table.qtyPo') }}</th>
                         <th width="140" class="text-end">{{ t('goodsReceive.edit.items.table.sudahGr') }}</th>
                         <th width="140" class="text-end">{{ t('goodsReceive.edit.items.table.sisa') }}</th>
@@ -977,7 +977,7 @@ onMounted(async () => {
                     >
                         <td>{{ index + 1 }}</td>
 
-                        <td>
+                        <td class="gr-item-name">
                             <div class="font-weight-medium">
                             {{ toTitleCase(item.item_name) }}
                             </div>
@@ -1098,3 +1098,14 @@ onMounted(async () => {
     </VRow>
   </VContainer>
 </template>
+
+<style lang="scss" scoped>
+/* Lihat create.vue: hanya kolom nama item yang dikecualikan dari text-no-wrap. */
+.gr-item-name {
+  inline-size: 100%;
+  min-inline-size: 240px;
+  max-inline-size: 440px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+</style>
