@@ -895,7 +895,7 @@ const returnForRevision = async (): Promise<void> => {
     )
 
     const response = await axios.patch(
-      `/non-stock/purchase-request/${encodeURIComponent(returnTarget.value.public_id)}/return-for-revision`,
+      `/transaction/purchase-request/${encodeURIComponent(returnTarget.value.public_id)}/return-for-revision`,
       { reason: returnReason.value.trim() },
       { headers: { Accept: 'application/json' } },
     )
