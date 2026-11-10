@@ -4104,6 +4104,17 @@ onMounted(async () => {
                         >
                           {{ t('cashAdvanceRealization.form.items.extra') }}
                         </VChip>
+                        <!--
+                          Keterangan barisnya. Pada baris yang dinolkan inilah alasan
+                          pengeluarannya tidak jadi -- tanpa ini approver melihat nol
+                          tanpa tahu sebabnya.
+                        -->
+                        <div
+                          v-if="item.notes"
+                          class="text-caption text-medium-emphasis mt-1"
+                        >
+                          {{ item.notes }}
+                        </div>
                       </td>
 
                       <td class="text-center">
@@ -4277,6 +4288,17 @@ onMounted(async () => {
                       >
                         {{ t('cashAdvanceRealization.form.items.extra') }}
                       </VChip>
+                      <!--
+                        Keterangan barisnya. Pada baris yang dinolkan inilah alasan
+                        pengeluarannya tidak jadi -- tanpa ini approver melihat nol
+                        tanpa tahu sebabnya.
+                      -->
+                      <div
+                        v-if="item.notes"
+                        class="text-caption text-medium-emphasis mt-1"
+                      >
+                        {{ item.notes }}
+                      </div>
                     </td>
 
                     <td class="text-end text-medium-emphasis">
