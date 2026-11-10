@@ -633,6 +633,36 @@ const breakdownCategoryIssue = (daftar: RealizationItemForm[]): string | null =>
 const lineTotal = (item: RealizationItemForm): number =>
   Math.round((Number(item.qty) || 0) * (Number(item.unit_price) || 0) * 100) / 100
 
+/* Nominal baris, apa pun bentuk rinciannya. */
+const nilaiBaris = (item: RealizationItemForm): number =>
+  (needsBusinessTrip.value
+    ? lineTotal(item)
+    : Number(item.realization_amount || 0))
+
+/*
+| Baris asal FPU yang pengeluarannya tidak jadi terjadi.
+|
+| Barisnya tidak boleh dihapus -- kolom Pengajuan di sebelahnya akan
+| kehilangan pasangan, dan selisihnya jadi tidak bisa dipertanggung-
+| jawabkan. Jalan keluarnya menolkannya, dan baris nol dibebaskan dari
+| kewajiban bukti: yang tidak dikeluarkan memang tidak punya kuitansi.
+|
+| Gantinya alasan. Approver yang melihat baris nol tanpa keterangan
+| tidak bisa membedakan dana yang kembali dari baris yang lupa diisi.
+*/
+const barisBatal = (item: RealizationItemForm): boolean =>
+  item.cash_advance_item_id !== null
+  && nilaiBaris(item) === 0
+  && Number(item.qty || 0) >= 0
+  && Number(item.unit_price || 0) >= 0
+
+const batalTanpaAlasan = (item: RealizationItemForm): boolean =>
+  barisBatal(item) && !String(item.notes ?? '').trim()
+
+/* Nomor urut baris pertama yang dinolkan tanpa alasan; -1 bila tidak ada. */
+const cariBatalTanpaAlasan = (daftar: RealizationItemForm[]): number =>
+  daftar.findIndex(item => batalTanpaAlasan(item))
+
 /* Baris yang sedang disunting, dikelompokkan menurut kategorinya. */
 const tempItemsByCategory = computed<{
   category: ExpenseCategoryOption
@@ -754,6 +784,38 @@ const addItemRowTo = (categoryId: number): void => {
   })
 }
 
+/*
+| Keluhan pada satu baris rincian perdin, atau null bila sudah layak.
+|
+| Dipisah dari perulangannya supaya tiap aturan berdiri sendiri dan bisa
+| dibaca tanpa menelusuri cabang yang lain.
+*/
+const keluhanBarisPerdin = (item: RealizationItemForm, nomor: number): string | null => {
+  if (!Number(item.expense_category_id))
+    return t('cashAdvanceRealization.form.breakdown.toastCategory', { number: nomor })
+
+  if (!item.description.trim())
+    return t('cashAdvanceRealization.form.validation.itemDescription')
+
+  /*
+  | Baris asal FPU yang dinolkan: pengeluarannya tidak jadi. Qty dan
+  | Rincian Biaya tidak diperiksa -- yang diperiksa alasannya.
+  */
+  if (barisBatal(item)) {
+    return batalTanpaAlasan(item)
+      ? t('cashAdvanceRealization.form.toast.cancelledReasonRequired', { number: nomor })
+      : null
+  }
+
+  if (!(Number(item.qty) > 0))
+    return t('cashAdvanceRealization.form.breakdown.toastQty', { number: nomor })
+
+  if (!(Number(item.unit_price) > 0))
+    return t('cashAdvanceRealization.form.breakdown.toastUnitPrice', { number: nomor })
+
+  return null
+}
+
 /**
  * Memeriksa rincian perdin, dan mengembalikan true bila sudah layak.
  *
@@ -779,39 +841,12 @@ const validateBreakdownRows = (): boolean => {
   }
 
   for (const [index, item] of tempItems.value.entries()) {
-    const nomor = index + 1
+    const keluhan = keluhanBarisPerdin(item, index + 1)
 
-    if (!Number(item.expense_category_id)) {
+    if (keluhan) {
       showWarningToast({
         title: t('common.alert.warning'),
-        text: t('cashAdvanceRealization.form.breakdown.toastCategory', { number: nomor }),
-      })
-
-      return false
-    }
-
-    if (!item.description.trim()) {
-      showWarningToast({
-        title: t('common.alert.warning'),
-        text: t('cashAdvanceRealization.form.validation.itemDescription'),
-      })
-
-      return false
-    }
-
-    if (!(Number(item.qty) > 0)) {
-      showWarningToast({
-        title: t('common.alert.warning'),
-        text: t('cashAdvanceRealization.form.breakdown.toastQty', { number: nomor }),
-      })
-
-      return false
-    }
-
-    if (!(Number(item.unit_price) > 0)) {
-      showWarningToast({
-        title: t('common.alert.warning'),
-        text: t('cashAdvanceRealization.form.breakdown.toastUnitPrice', { number: nomor }),
+        text: keluhan,
       })
 
       return false
@@ -967,7 +1002,30 @@ const saveItemsFromDialog = (): void => {
     return
   }
 
-  const withoutAttachment = tempItems.value.findIndex(item => item.attachments.length + item.existing.length < 1)
+  /*
+  | Baris yang dinolkan wajib berketerangan. Nol tanpa alasan tidak bisa
+  | dibedakan dari baris yang lupa diisi, dan approver tidak punya dasar
+  | untuk menyetujui dana yang katanya kembali.
+  */
+  const tanpaAlasan = cariBatalTanpaAlasan(tempItems.value)
+
+  if (tanpaAlasan !== -1) {
+    isSubmitted.value = true
+
+    showWarningToast({
+      title: t('common.alert.warning'),
+      text: t('cashAdvanceRealization.form.toast.cancelledReasonRequired', {
+        number: tanpaAlasan + 1,
+      }),
+    })
+
+    return
+  }
+
+  /* Baris yang dinolkan dilewati: yang tidak dikeluarkan tidak berkuitansi. */
+  const withoutAttachment = tempItems.value.findIndex(
+    item => !barisBatal(item) && item.attachments.length + item.existing.length < 1,
+  )
 
   if (withoutAttachment !== -1) {
     isSubmitted.value = true
@@ -1138,7 +1196,7 @@ const lineMissingAttachment = (index: number): boolean => {
   if (!row)
     return true
 
-  return row.attachments.length + row.existing.length < 1
+  return !barisBatal(row) && row.attachments.length + row.existing.length < 1
 }
 
 /*
@@ -1267,8 +1325,28 @@ const validateForm = (): boolean => {
    * Setiap baris wajib berbukti, dihitung dari gabungan bukti lama yang masih
    * ada dan berkas yang baru dipilih.
    */
+  /*
+  | Baris yang dinolkan wajib berketerangan. Nol tanpa alasan tidak bisa
+  | dibedakan dari baris yang lupa diisi, dan approver tidak punya dasar
+  | untuk menyetujui dana yang katanya kembali.
+  */
+  const tanpaAlasan = cariBatalTanpaAlasan(form.items)
+
+  if (tanpaAlasan !== -1) {
+    isSubmitted.value = true
+
+    showWarningToast({
+      title: t('common.alert.warning'),
+      text: t('cashAdvanceRealization.form.toast.cancelledReasonRequired', {
+        number: tanpaAlasan + 1,
+      }),
+    })
+
+    return false
+  }
+
   const withoutAttachment = form.items.findIndex(
-    item => item.attachments.length + item.existing.length < 1,
+    item => !barisBatal(item) && item.attachments.length + item.existing.length < 1,
   )
 
   if (withoutAttachment !== -1) {
@@ -2239,6 +2317,21 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
                           ? t('cashAdvanceRealization.form.items.fromAdvance')
                           : t('cashAdvanceRealization.form.items.extra') }}
                       </VChip>
+                      <!--
+                        Muncul hanya saat barisnya dinolkan. Di luar itu ia cuma
+                        menambah kotak yang tidak menanyakan apa-apa.
+                      -->
+                      <VTextField
+                        v-if="barisBatal(item)"
+                        v-model="item.notes"
+                        density="compact"
+                        variant="outlined"
+                        hide-details="auto"
+                        class="mt-2"
+                        :label="t('cashAdvanceRealization.form.items.cancelledReasonLabel')"
+                        :placeholder="t('cashAdvanceRealization.form.items.cancelledReasonPlaceholder')"
+                        :error="isSubmitted && batalTanpaAlasan(item)"
+                      />
                     </td>
 
                     <td class="text-end text-medium-emphasis">
@@ -2593,6 +2686,21 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
                               ? t('cashAdvanceRealization.form.items.fromAdvance')
                               : t('cashAdvanceRealization.form.items.extra') }}
                           </VChip>
+                          <!--
+                            Muncul hanya saat barisnya dinolkan. Di luar itu ia cuma
+                            menambah kotak yang tidak menanyakan apa-apa.
+                          -->
+                          <VTextField
+                            v-if="barisBatal(baris.item)"
+                            v-model="baris.item.notes"
+                            density="compact"
+                            variant="outlined"
+                            hide-details="auto"
+                            class="mt-2"
+                            :label="t('cashAdvanceRealization.form.items.cancelledReasonLabel')"
+                            :placeholder="t('cashAdvanceRealization.form.items.cancelledReasonPlaceholder')"
+                            :error="isSubmitted && batalTanpaAlasan(baris.item)"
+                          />
                         </td>
 
                         <td>
@@ -2604,7 +2712,7 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
                             density="compact"
                             variant="outlined"
                             hide-details="auto"
-                            :error="isSubmitted && !(Number(baris.item.qty) > 0)"
+                            :error="isSubmitted && !barisBatal(baris.item) && !(Number(baris.item.qty) > 0)"
                           />
                         </td>
 
@@ -2616,7 +2724,7 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
                             hide-details="auto"
                             prefix="Rp"
                             inputmode="numeric"
-                            :error="isSubmitted && !(Number(baris.item.unit_price) > 0)"
+                            :error="isSubmitted && !barisBatal(baris.item) && !(Number(baris.item.unit_price) > 0)"
                             @input="handleUnitPriceInput($event, baris.index)"
                           />
                         </td>
