@@ -52,12 +52,14 @@ class BusinessTripExpenseBreakdownService
      * @param  array<int, array<string, mixed>>  $items
      * @param  int[]  $arrangedCategoryIds  Kategori yang ditandai diurus GA
      * @param  string  $messagePrefix  Kelompok kalimat modulnya
+     * @param  bool  $izinkanBatal  Baris asal FPU boleh bernominal nol
      * @return array<int, array<string, mixed>>
      */
     public function normalize(
         array $items,
         array $arrangedCategoryIds,
         string $messagePrefix,
+        bool $izinkanBatal = false,
     ): array {
         $kategori = BusinessTripExpenseCategory::query()
             ->whereIn('id', $this->kumpulkanKategori($items, $arrangedCategoryIds))
@@ -77,6 +79,52 @@ class BusinessTripExpenseBreakdownService
 
             $qty = $this->angka($baris['qty'] ?? null);
             $harga = $this->angka($baris['unit_price'] ?? null);
+
+            /*
+            | Baris realisasi yang pengeluarannya tidak jadi terjadi.
+            |
+            | Hanya berlaku bila pemanggilnya mengizinkan ($izinkanBatal),
+            | dan hanya pada baris yang berasal dari FPU. Baris seperti itu
+            | tidak boleh dihapus -- kolom pengajuan di sebelahnya akan
+            | kehilangan pasangan, dan selisihnya jadi tidak bisa
+            | dipertanggungjawabkan. Menolkannya adalah satu-satunya cara
+            | menyatakan "tidak jadi".
+            |
+            | Gantinya keterangan, dan itu wajib: baris nol tanpa keterangan
+            | tidak bisa dibedakan dari baris yang lupa diisi, dan approver
+            | tidak punya dasar untuk menyetujui dana yang katanya kembali.
+            |
+            | Pada FPU aturan ini tidak berlaku. Di sana baris bernominal nol
+            | memang tidak perlu ada, dan menghapusnya tidak merusak apa pun.
+            |
+            | Syaratnya ditulis sama persis dengan yang dipakai layar
+            | (barisBatal di halaman Realisasi). Dua aturan yang berbeda
+            | sedikit saja berarti layar meluluskan apa yang ditolak server.
+            */
+            $batal = $izinkanBatal
+                && ($baris['cash_advance_item_id'] ?? null) !== null
+                && ($qty ?? 0) >= 0
+                && ($harga ?? 0) >= 0
+                && round((float) ($qty ?? 0) * (float) ($harga ?? 0), 2) === 0.0;
+
+            if ($batal) {
+                if (trim((string) ($baris['notes'] ?? '')) === '') {
+                    $this->tolak(
+                        $messagePrefix . '.cancelled_reason_required',
+                        ['row' => $index + 1],
+                    );
+                }
+
+                $baris['qty'] = $qty ?? 0;
+                $baris['unit_price'] = $harga ?? 0;
+                $baris['amount'] = 0.0;
+
+                $terpakai[$baris['expense_category_id']] = true;
+
+                $hasil[] = $baris;
+
+                continue;
+            }
 
             /*
             | Qty harus lebih dari nol. Qty nol menghasilkan nominal nol, dan

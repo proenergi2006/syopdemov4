@@ -228,6 +228,10 @@ class PurchaseRequestController extends Controller
                 'purchase_request.submit',
             );
 
+            $canUpdate = $user->hasPermission(
+                'purchase_request.update',
+            );
+
             /*
             |--------------------------------------------------------------------------
             | Abilities
@@ -244,9 +248,7 @@ class PurchaseRequestController extends Controller
                     'purchase_request.create',
                 ),
 
-                'can_update' => $user->hasPermission(
-                    'purchase_request.update',
-                ),
+                'can_update' => $canUpdate,
 
                 'can_submit' => $canSubmit,
 
@@ -533,6 +535,7 @@ class PurchaseRequestController extends Controller
                     $user,
                     $approvalService,
                     $canSubmit,
+                    $canUpdate,
                 ): array {
                     $prStatus = strtoupper(
                         trim((string) $pr->status),
@@ -547,20 +550,42 @@ class PurchaseRequestController extends Controller
                         === (int) $user->departemen_id
                     );
 
+                    /*
+                    | Draft dan dokumen revisian sama-sama ada di tangan
+                    | pemohon dan tidak sedang menunggu keputusan siapa pun,
+                    | jadi keduanya boleh diajukan dan disunting.
+                    */
+                    $bisaDisunting = in_array(
+                        $prStatus,
+                        [
+                            PurchaseRequest::STATUS_DRAFT,
+                            PurchaseRequest::STATUS_NEED_REVISION,
+                        ],
+                        true,
+                    );
+
                     $rowCanSubmit = (
                         $canSubmit
-                        && in_array(
-                            $prStatus,
-                            [
-                                PurchaseRequest::STATUS_DRAFT,
-                                PurchaseRequest::STATUS_NEED_REVISION,
-                            ],
-                            true,
-                        )
+                        && $bisaDisunting
                         && (
                             $isCreator
                             || $isSameDepartment
                         )
+                    );
+
+                    /*
+                    | Hak sunting per baris.
+                    |
+                    | Dihitung di sini, bukan dari status di layar: layar
+                    | yang menebak sendiri akan ketinggalan setiap kali
+                    | daftar status yang bisa disunting berubah -- dan itu
+                    | yang terjadi waktu NEED REVISION ditambahkan.
+                    |
+                    | Bentuknya sengaja sama dengan PO.
+                    */
+                    $rowCanUpdate = (
+                        $canUpdate
+                        && $bisaDisunting
                     );
 
                     $currentApproval = $pr->approvals
@@ -627,6 +652,7 @@ class PurchaseRequestController extends Controller
                             ->values(),
 
                         'can_submit' => $rowCanSubmit,
+                        'can_update' => $rowCanUpdate,
                         'can_approve' => $currentApproval !== null,
 
                         /*

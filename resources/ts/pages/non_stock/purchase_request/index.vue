@@ -83,6 +83,15 @@ interface PurchaseRequestItem {
   can_approve?: boolean | number | string | null
   revision_count?: number
   can_submit?: boolean | number | string | null
+
+  /*
+  | Hak sunting barisnya, datang dari server.
+  |
+  | Bukan dihitung dari status di sini: dokumen yang dikembalikan untuk
+  | revisi juga boleh disunting, dan layar yang menebak sendiri sempat
+  | menyembunyikan tombolnya justru pada saat ia paling dibutuhkan.
+  */
+  can_update?: boolean | number | string | null
   approval_id?: number | null
   approval_step_order?: number | null
   approval_label?: string | null
@@ -1162,10 +1171,6 @@ const cancelPurchaseRequisition = async (): Promise<void> => {
 
 const canCreatePurchaseRequest = computed(() => {
   return abilities.value.can_create
-})
-
-const canUpdatePurchaseRequest = computed(() => {
-  return abilities.value.can_update
 })
 
 const canDeletePurchaseRequest = computed(() => {
@@ -2823,10 +2828,7 @@ onBeforeUnmount(() => {
                     </VListItem>
 
                     <VListItem
-                      v-if="
-                        String(v.status).toLowerCase() === 'draft'
-                          && canUpdatePurchaseRequest
-                      "
+                      v-if="v.can_update"
                       href="javascript:void(0)"
                       @click="goToEdit(v.public_id)"
                     >
@@ -3149,10 +3151,7 @@ onBeforeUnmount(() => {
                     </VListItem>
 
                     <VListItem
-                      v-if="
-                        String(v.status).toLowerCase() === 'draft'
-                          && canUpdatePurchaseRequest
-                      "
+                      v-if="v.can_update"
                       href="javascript:void(0)"
                       @click="goToEdit(v.public_id)"
                     >
