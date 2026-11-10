@@ -7,6 +7,7 @@ use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
+use App\Support\DocumentActionScope;
 use App\Support\UserHomeAccess;
 use App\Services\FundRequest\CombinedPrintComposer;
 use App\Http\Controllers\Api\BusinessTripController;
@@ -631,6 +632,13 @@ class CashAdvanceRealizationController extends Controller
                     $items,
                     $arrangedCategories,
                     'cash_advance_realization_messages.breakdown',
+
+                    /*
+                    | Realisasi boleh menolkan baris asal FPU: pengeluarannya
+                    | tidak jadi, dan barisnya tidak bisa dihapus. FPU tidak
+                    | diberi izin ini -- di sana barisnya tinggal dihapus.
+                    */
+                    izinkanBatal: true,
                 );
 
                 foreach ($items as $i => $baris) {
@@ -962,6 +970,29 @@ class CashAdvanceRealizationController extends Controller
                 ->findOrFail($id);
 
             /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance_realization.update" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance_realization.update', $realization, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Realisasi FPU tidak ditemukan.',
+                ], 404);
+            }
+
+            /*
             | Draft, dan dokumen yang sedang butuh revisi.
             |
             | Keduanya sama-sama berada di tangan pemohon dan tidak sedang
@@ -1063,6 +1094,13 @@ class CashAdvanceRealizationController extends Controller
                     $items,
                     $arrangedCategories,
                     'cash_advance_realization_messages.breakdown',
+
+                    /*
+                    | Realisasi boleh menolkan baris asal FPU: pengeluarannya
+                    | tidak jadi, dan barisnya tidak bisa dihapus. FPU tidak
+                    | diberi izin ini -- di sana barisnya tinggal dihapus.
+                    */
+                    izinkanBatal: true,
                 );
 
                 foreach ($items as $i => $baris) {
@@ -1210,6 +1248,29 @@ class CashAdvanceRealizationController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance_realization.delete" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance_realization.delete', $realization, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Realisasi FPU tidak ditemukan.',
+                ], 404);
+            }
+
             if (
                 strtoupper((string) $realization->status)
                 !== CashAdvanceRealization::STATUS_DRAFT
@@ -1277,6 +1338,29 @@ class CashAdvanceRealizationController extends Controller
             $realization = CashAdvanceRealization::with(['items'])
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance_realization.submit" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance_realization.submit', $realization, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Realisasi FPU tidak ditemukan.',
+                ], 404);
+            }
 
             /*
             | Draft, dan dokumen revisian yang sudah diperbaiki.
@@ -1899,6 +1983,29 @@ class CashAdvanceRealizationController extends Controller
             $realization = CashAdvanceRealization::query()
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance_realization.cancel" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance_realization.cancel', $realization, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Realisasi FPU tidak ditemukan.',
+                ], 404);
+            }
 
             /*
             | Hanya yang BELUM diterima Finance.
@@ -2920,8 +3027,8 @@ class CashAdvanceRealizationController extends Controller
                     'message' => __(
                         "cash_advance_realization_messages.{$messageKey}.amount_mismatch",
                         [
-                            'expected' => number_format($expectedAmount, 0, ',', '.'),
-                            'given' => number_format($paidAmount, 0, ',', '.'),
+                            'expected' => angka($expectedAmount, 0),
+                            'given' => angka($paidAmount, 0),
                         ],
                     ),
                     'errors' => [
@@ -2929,8 +3036,8 @@ class CashAdvanceRealizationController extends Controller
                             __(
                                 "cash_advance_realization_messages.{$messageKey}.amount_mismatch",
                                 [
-                                    'expected' => number_format($expectedAmount, 0, ',', '.'),
-                                    'given' => number_format($paidAmount, 0, ',', '.'),
+                                    'expected' => angka($expectedAmount, 0),
+                                    'given' => angka($paidAmount, 0),
                                 ],
                             ),
                         ],
@@ -3546,6 +3653,32 @@ class CashAdvanceRealizationController extends Controller
                 ]);
             }
 
+            $catatan = $this->clean($item['notes'] ?? '') ?: null;
+
+            /*
+            | Baris asal FPU yang dinolkan wajib berketerangan.
+            |
+            | Rincian perdin diperiksa BusinessTripExpenseBreakdownService;
+            | baris non-perdin tidak melewatinya, jadi aturan yang sama
+            | ditegakkan di sini -- kalau hanya ada di layar, ia bukan aturan.
+            |
+            | Baris di luar rencana tidak terkena: yang itu memang boleh
+            | dihapus, jadi tidak perlu dinolkan.
+            */
+            if (
+                !$rincianPerdin
+                && $advanceItemId !== null
+                && $realizationAmount === 0.0
+                && $catatan === null
+            ) {
+                throw ValidationException::withMessages([
+                    'items' => [
+                        __('cash_advance_realization_messages.items.cancelled_reason_required', [
+                            'row' => $index + 1,
+                        ]),
+                    ],
+                ]);
+            }
             /*
             | Id baris realisasi lama dibawa formulir supaya barisnya bisa
             | diperbarui di tempat, bukan dihapus lalu dibuat ulang -- id itu
@@ -3560,7 +3693,7 @@ class CashAdvanceRealizationController extends Controller
                 'description' => $description,
                 'advance_amount' => $advanceAmount,
                 'realization_amount' => $realizationAmount,
-                'notes' => $this->clean($item['notes'] ?? '') ?: null,
+                'notes' => $catatan,
 
                 /*
                 | Dibawa apa adanya; yang memeriksanya dan menghitung

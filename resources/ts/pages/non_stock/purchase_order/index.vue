@@ -1,32 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import axios from '@axios'
 import SignaturePad from 'signature_pad'
+import axios from '@axios'
 
 import {
+  closeAlert,
+  showConfirmAlert,
+  showErrorToast,
   showLoadingAlert,
   showSuccessToast,
   showWarningToast,
-  showErrorToast,
-  closeAlert,
-  showConfirmAlert,
 } from '@/utils/alert'
 import { useNavigationStore } from '@/stores/navigation'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
 import { useNativeDatePicker } from '@core/composable/useNativeDatePicker'
 import { useDeleteConfirm } from '@core/composable/useDeleteConfirm'
-import { formatDate, formatStatusPKP, formatNumberWithoutRp, toTitleCase, formatDecimalQty } from '@/utils/textFormatter'
+import { formatDate, formatDecimalQty, formatNumberWithoutRp, formatStatusPKP, toTitleCase } from '@/utils/textFormatter'
 import { usePolling } from '@core/composable/usePolling'
 import ApprovalHistoryDialog from '@core/components/ApprovalHistoryPODialog.vue'
 import {
+  type ModuleAbilities,
   defaultModuleAbilities,
   normalizeModuleAbilities,
-  type ModuleAbilities,
 } from '@/types/abilities'
 import { usePermissionStore } from '@/stores/permission'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 interface ApprovalHistoryItem {
   id?: number
@@ -97,10 +98,6 @@ const canView = computed(() => {
 
 const canCreate = computed(() => {
   return permissionStore.can('purchase_order.create')
-})
-
-const canUpdate = computed(() => {
-  return permissionStore.can('purchase_order.update')
 })
 
 const canDelete = computed(() => {
@@ -223,7 +220,8 @@ const openApprovalHistory = async (item: any): Promise<void> => {
       : []
 
     isApprovalHistoryDialogOpen.value = true
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     closeAlert()
 
     showErrorToast({
@@ -259,7 +257,8 @@ const detailItemPerPageItems = [
 const paginatedDetailItems = computed(() => {
   const items = detailItems.value || []
 
-  if (detailItemPerPage.value === 'ALL') return items
+  if (detailItemPerPage.value === 'ALL')
+    return items
 
   const start = (detailItemPage.value - 1) * Number(detailItemPerPage.value)
   const end = start + Number(detailItemPerPage.value)
@@ -270,15 +269,15 @@ const paginatedDetailItems = computed(() => {
 const detailItemTotalPage = computed(() => {
   const items = detailItems.value || []
 
-  if (detailItemPerPage.value === 'ALL') return 1
+  if (detailItemPerPage.value === 'ALL')
+    return 1
 
   return Math.ceil(items.length / Number(detailItemPerPage.value)) || 1
 })
 
 const detailItems = computed(() => detailPurchaseOrder.value?.items || [])
 
-
-type SimpleApprovalHistory = {
+interface SimpleApprovalHistory {
   id: number | string
   step_order: number
   label: string
@@ -291,8 +290,8 @@ type SimpleApprovalHistory = {
 const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
   const detail = detailPurchaseOrder.value as any
 
-  const rawHistories =
-    detail?.approvals
+  const rawHistories
+    = detail?.approvals
     ?? detail?.approval_histories
     ?? detail?.approvalHistories
     ?? detail?.approval_history
@@ -352,6 +351,7 @@ const detailApprovalHistories = computed<SimpleApprovalHistory[]>(() => {
           ?? item.title
           ?? `Tahap ${stepOrder}`,
         status,
+
         /*
         |--------------------------------------------------------------------------
         | Diproses Oleh
@@ -467,7 +467,8 @@ const statusItems = computed(() => [
 ])
 
 const paginationData = computed(() => {
-  if (!totalData.value) return '0-0 of 0'
+  if (!totalData.value)
+    return '0-0 of 0'
 
   const firstIndex = (currentPage.value - 1) * rowPerPage.value + 1
   const lastIndex = Math.min(currentPage.value * rowPerPage.value, totalData.value)
@@ -476,28 +477,39 @@ const paginationData = computed(() => {
 })
 
 const formatStatus = (status: string | null): string => {
-  if (!status) return '-'
+  if (!status)
+    return '-'
 
   const normalized = String(status).toLowerCase()
 
-  if (normalized === 'draft') return 'Draft'
-  if (normalized === 'in progress') return 'In Progress'
-  if (normalized === 'approved') return 'Approved'
-  if (normalized === 'rejected') return 'Rejected'
-  if (normalized === 'cancelled') return 'Cancelled'
-  if (normalized === 'need revision') return 'Needs Revision'
+  if (normalized === 'draft')
+    return 'Draft'
+  if (normalized === 'in progress')
+    return 'In Progress'
+  if (normalized === 'approved')
+    return 'Approved'
+  if (normalized === 'rejected')
+    return 'Rejected'
+  if (normalized === 'cancelled')
+    return 'Cancelled'
+  if (normalized === 'need revision')
+    return 'Needs Revision'
 
   return status
 }
 
 const formatStatusReceive = (status: string | null): string => {
-  if (!status) return '-'
+  if (!status)
+    return '-'
 
   const normalized = String(status).toLowerCase()
 
-  if (normalized === 'open') return 'Open'
-  if (normalized === 'partial') return 'Partial'
-  if (normalized === 'completed') return 'Completed'
+  if (normalized === 'open')
+    return 'Open'
+  if (normalized === 'partial')
+    return 'Partial'
+  if (normalized === 'completed')
+    return 'Completed'
 
   return status
 }
@@ -505,12 +517,18 @@ const formatStatusReceive = (status: string | null): string => {
 const getStatusColor = (status: string | null): string => {
   const normalized = String(status || '').toLowerCase()
 
-  if (normalized === 'draft') return 'secondary'
-  if (normalized === 'in progress') return 'warning'
-  if (normalized === 'approved') return 'success'
-  if (normalized === 'rejected') return 'error'
-  if (normalized === 'cancelled') return 'error'
-  if (normalized === 'need revision') return 'warning'
+  if (normalized === 'draft')
+    return 'secondary'
+  if (normalized === 'in progress')
+    return 'warning'
+  if (normalized === 'approved')
+    return 'success'
+  if (normalized === 'rejected')
+    return 'error'
+  if (normalized === 'cancelled')
+    return 'error'
+  if (normalized === 'need revision')
+    return 'warning'
 
   return 'secondary'
 }
@@ -518,15 +536,18 @@ const getStatusColor = (status: string | null): string => {
 const getStatusReceiveColor = (status: string | null): string => {
   const normalized = String(status || '').toLowerCase()
 
-  if (normalized === 'open') return 'info'
-  if (normalized === 'partial') return 'warning'
-  if (normalized === 'completed') return 'success'
+  if (normalized === 'open')
+    return 'info'
+  if (normalized === 'partial')
+    return 'warning'
+  if (normalized === 'completed')
+    return 'success'
 
   return 'secondary'
 }
 
 const formatCurrency = (value: number | null): string => {
-  return new Intl.NumberFormat('id-ID', {
+  return new Intl.NumberFormat(LOCALE_ANGKA, {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
@@ -542,7 +563,8 @@ const loadCurrentUser = async (): Promise<void> => {
     currentUser.value = res.data?.data || null
 
     // console.log('CURRENT USER', currentUser.value)
-  } catch (error) {
+  }
+  catch (error) {
     // console.error('[AUTH] Failed load current user', error)
     currentUser.value = null
   }
@@ -590,7 +612,8 @@ const fetchPurchaseOrders = async (): Promise<void> => {
     totalData.value = Number(meta?.total ?? rows.value.length ?? 0)
     totalPage.value = Number(meta?.last_page ?? 1)
     currentPage.value = Number(meta?.current_page ?? 1)
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     const err = error as AxiosErrorShape
     const status = err.response?.status
 
@@ -625,7 +648,8 @@ const fetchPurchaseOrders = async (): Promise<void> => {
     rows.value = []
     totalData.value = 0
     totalPage.value = 1
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -734,7 +758,8 @@ const openRejectPO = (po: any): void => {
 }
 
 const rejectPurchaseOrder = async (): Promise<void> => {
-  if (!rejectTarget.value || rejectLoading.value) return
+  if (!rejectTarget.value || rejectLoading.value)
+    return
 
   const target = { ...rejectTarget.value }
   const notes = rejectNotes.value || null
@@ -754,6 +779,7 @@ const rejectPurchaseOrder = async (): Promise<void> => {
   if (!confirm.isConfirmed) {
     // kalau batal, buka lagi modal notes agar catatan tidak hilang
     rejectDialog.value = true
+
     return
   }
 
@@ -766,7 +792,7 @@ const rejectPurchaseOrder = async (): Promise<void> => {
       notes,
     }, {
       headers: {
-        Accept: 'application/json',
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
     })
@@ -787,7 +813,8 @@ const rejectPurchaseOrder = async (): Promise<void> => {
     // refresh modal detail jika sedang terbuka untuk PO ini
     if (detailDialog.value && detailPurchaseOrderPublicId.value === target.public_id)
       await openDetail(target.public_id)
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     closeAlert()
 
     // kalau gagal, modal notes dibuka lagi supaya user bisa koreksi/ulang
@@ -797,7 +824,8 @@ const rejectPurchaseOrder = async (): Promise<void> => {
       title: t('common.alert.error'),
       text: getApiErrorMessage(error, t('purchaseOrder.list.toast.rejectFailedFallback')),
     })
-  } finally {
+  }
+  finally {
     rejectLoading.value = false
   }
 }
@@ -809,7 +837,8 @@ const openCancelPO = (po: any): void => {
 }
 
 const cancelPurchaseOrder = async (): Promise<void> => {
-  if (!cancelTarget.value || cancelLoading.value) return
+  if (!cancelTarget.value || cancelLoading.value)
+    return
 
   if (!cancelNotes.value.trim()) {
     showErrorToast({
@@ -839,6 +868,7 @@ const cancelPurchaseOrder = async (): Promise<void> => {
   if (!confirm.isConfirmed) {
     // kalau batal, buka lagi modal notes agar catatan tidak hilang
     cancelDialog.value = true
+
     return
   }
 
@@ -851,7 +881,7 @@ const cancelPurchaseOrder = async (): Promise<void> => {
       cancel_notes: notes,
     }, {
       headers: {
-        Accept: 'application/json',
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
     })
@@ -872,7 +902,8 @@ const cancelPurchaseOrder = async (): Promise<void> => {
     // refresh modal detail jika sedang terbuka untuk PO ini
     if (detailDialog.value && detailPurchaseOrderPublicId.value === target.public_id)
       await openDetail(target.public_id)
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     closeAlert()
 
     // kalau gagal, modal notes dibuka lagi supaya user bisa koreksi/ulang
@@ -882,7 +913,8 @@ const cancelPurchaseOrder = async (): Promise<void> => {
       title: t('common.alert.error'),
       text: getApiErrorMessage(error, t('purchaseOrder.list.toast.cancelFailedFallback')),
     })
-  } finally {
+  }
+  finally {
     cancelLoading.value = false
   }
 }
@@ -895,6 +927,7 @@ const openSubmitPO = async (po: any): Promise<void> => {
 
   if (!hasSignature) {
     openSignatureDialog()
+
     return
   }
 
@@ -952,7 +985,8 @@ const openSignatureDialog = async (): Promise<void> => {
 
 const resizeSignatureCanvas = (): void => {
   const canvas = signatureCanvasRef.value
-  if (!canvas) return
+  if (!canvas)
+    return
 
   const ratio = Math.max(window.devicePixelRatio || 1, 1)
   const rect = canvas.getBoundingClientRect()
@@ -961,7 +995,8 @@ const resizeSignatureCanvas = (): void => {
   canvas.height = rect.height * ratio
 
   const context = canvas.getContext('2d')
-  if (!context) return
+  if (!context)
+    return
 
   context.setTransform(ratio, 0, 0, ratio, 0, 0)
 
@@ -970,12 +1005,14 @@ const resizeSignatureCanvas = (): void => {
 
 const initSignaturePad = (): void => {
   const canvas = signatureCanvasRef.value
-  if (!canvas) return
+  if (!canvas)
+    return
 
   const rect = canvas.getBoundingClientRect()
 
   if (!rect.width || !rect.height) {
     setTimeout(initSignaturePad, 200)
+
     return
   }
 
@@ -993,11 +1030,13 @@ const initSignaturePad = (): void => {
 const saveSignatureAndContinue = async (): Promise<void> => {
   if (!signaturePad.value || signaturePad.value.isEmpty()) {
     signatureError.value = 'Tanda tangan wajib diisi.'
+
     return
   }
 
   if (!signatureAgree.value) {
     signatureError.value = 'Anda wajib menyetujui penggunaan tanda tangan digital.'
+
     return
   }
 
@@ -1014,19 +1053,20 @@ const saveSignatureAndContinue = async (): Promise<void> => {
 
     signatureDialog.value = false
 
-    if (pendingAction.value === 'submit') {
+    if (pendingAction.value === 'submit')
       await submitPurchaseOrder()
-    }
 
     if (pendingAction.value === 'approve') {
       showApprovePODialog()
 
       return
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error(error)
     signatureError.value = 'Gagal menyimpan tanda tangan digital.'
-  } finally {
+  }
+  finally {
     signatureLoading.value = false
   }
 }
@@ -1037,9 +1077,8 @@ const openPrintLanguageDialog = (
   if (
     !publicId
     || printLoadingId.value
-  ) {
+  )
     return
-  }
 
   selectedPrintPublicId.value = publicId
   printLanguageDialog.value = true
@@ -1318,7 +1357,8 @@ const openDetail = async (publicId: string): Promise<void> => {
 
     closeAlert()
     detailDialog.value = true
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     closeAlert()
 
     const err = error as AxiosErrorShape
@@ -1407,7 +1447,8 @@ const exportExcel = async (): Promise<void> => {
       title: t('common.alert.success'),
       text: t('purchaseOrder.list.toast.exportSuccess'),
     })
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     closeAlert()
 
     showErrorToast({
@@ -1416,7 +1457,8 @@ const exportExcel = async (): Promise<void> => {
     })
 
     console.error('[Purchase Order] EXPORT ERROR:', error)
-  } finally {
+  }
+  finally {
     isExporting.value = false
   }
 }
@@ -1445,7 +1487,8 @@ const openDelete = async (row: any): Promise<void> => {
     cancelButtonText: t('common.actions.cancel'),
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   try {
     showLoadingAlert(t('purchaseOrder.list.toast.deleteLoading'), t('common.alert.pleaseWait'))
@@ -1476,7 +1519,8 @@ const openDelete = async (row: any): Promise<void> => {
       title: t('common.alert.error'),
       text: response.data?.message || t('purchaseOrder.list.toast.deleteFailedFallback'),
     })
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     showErrorToast({
@@ -1487,7 +1531,8 @@ const openDelete = async (row: any): Promise<void> => {
 }
 
 const submitPurchaseOrder = async (): Promise<void> => {
-  if (!selectedPo.value || submitLoading.value) return
+  if (!selectedPo.value || submitLoading.value)
+    return
 
   const confirm = await showConfirmAlert({
     title: t('purchaseOrder.list.toast.submitConfirmTitle'),
@@ -1496,7 +1541,8 @@ const submitPurchaseOrder = async (): Promise<void> => {
     cancelButtonText: t('common.actions.cancel'),
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   submitLoading.value = true
 
@@ -1505,7 +1551,7 @@ const submitPurchaseOrder = async (): Promise<void> => {
 
     await axios.patch(`/transaction/purchase-order/${selectedPo.value.public_id}/submit`, {}, {
       headers: {
-        Accept: 'application/json',
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
     })
@@ -1519,14 +1565,16 @@ const submitPurchaseOrder = async (): Promise<void> => {
 
     await fetchPurchaseOrders()
     await navigationStore.refreshBadges()
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     closeAlert()
 
     showErrorToast({
       title: t('common.alert.error'),
       text: getApiErrorMessage(error, t('purchaseOrder.list.toast.submitFailedFallback')),
     })
-  } finally {
+  }
+  finally {
     submitLoading.value = false
   }
 }
@@ -1543,9 +1591,8 @@ const approvePurchaseOrder = async (): Promise<void> => {
   if (
     !selectedPo.value
     || approveLoading.value
-  ) {
+  )
     return
-  }
 
   const target = {
     ...selectedPo.value,
@@ -1585,7 +1632,7 @@ const approvePurchaseOrder = async (): Promise<void> => {
       },
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -1619,9 +1666,8 @@ const approvePurchaseOrder = async (): Promise<void> => {
       if (
         item.public_id
         !== target.public_id
-      ) {
+      )
         return item
-      }
 
       return {
         ...item,
@@ -1712,8 +1758,9 @@ watch([searchQuery, selectedStatus, tanggalMulai, tanggalSelesai, onlyWaitingMyA
   await fetchPurchaseOrders()
 })
 
-watch(tanggalSelesai, async (newValue) => {
-  if (!newValue || !tanggalMulai.value) return
+watch(tanggalSelesai, async newValue => {
+  if (!newValue || !tanggalMulai.value)
+    return
 
   const startDate = new Date(tanggalMulai.value)
   const endDate = new Date(newValue)
@@ -1728,8 +1775,9 @@ watch(tanggalSelesai, async (newValue) => {
   }
 })
 
-watch(tanggalMulai, async (newValue) => {
-  if (!newValue || !tanggalSelesai.value) return
+watch(tanggalMulai, async newValue => {
+  if (!newValue || !tanggalSelesai.value)
+    return
 
   const startDate = new Date(newValue)
   const endDate = new Date(tanggalSelesai.value)
@@ -1749,6 +1797,7 @@ onMounted(async () => {
 
   if (!canView.value) {
     await router.replace('/forbidden')
+
     return
   }
 
@@ -1935,7 +1984,14 @@ onBeforeUnmount(() => {
     <!-- Table -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
-        <VBtn color="primary" @click="goToCreate" class="text-none" v-if="canCreate" prepend-icon="tabler-plus"> {{ t('purchaseOrder.list.createButton') }}
+        <VBtn
+          v-if="canCreate"
+          color="primary"
+          class="text-none"
+          prepend-icon="tabler-plus"
+          @click="goToCreate"
+        >
+          {{ t('purchaseOrder.list.createButton') }}
         </VBtn>
 
         <!--
@@ -1984,22 +2040,72 @@ onBeforeUnmount(() => {
       <VTable class="text-no-wrap">
         <thead>
           <tr>
-            <th scope="col" class="text-center">{{ t('purchaseOrder.list.table.no') }}</th>
-            <th scope="col" class="text-center">{{ t('purchaseOrder.list.table.nomorPo') }}</th>
-            <th scope="col" class="text-center">{{ t('purchaseOrder.list.table.tanggal') }}</th>
-            <th scope="col" class="text-center">{{ t('purchaseOrder.list.table.cabang') }}</th>
-            <th scope="col" class="text-center">{{ t('purchaseOrder.list.table.department') }}</th>
-            <th scope="col" class="text-right">{{ t('purchaseOrder.list.table.total') }}</th>
-            <th scope="col" class="text-center">{{ t('purchaseOrder.list.table.statusApproval') }}</th>
-            <th scope="col" class="text-center">{{ t('purchaseOrder.list.table.statusGr') }}</th>
-            <th scope="col" class="text-center" style="width: 5rem;">{{ t('purchaseOrder.list.table.actions') }}</th>
+            <th
+              scope="col"
+              class="text-center"
+            >
+              {{ t('purchaseOrder.list.table.no') }}
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+            >
+              {{ t('purchaseOrder.list.table.nomorPo') }}
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+            >
+              {{ t('purchaseOrder.list.table.tanggal') }}
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+            >
+              {{ t('purchaseOrder.list.table.cabang') }}
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+            >
+              {{ t('purchaseOrder.list.table.department') }}
+            </th>
+            <th
+              scope="col"
+              class="text-right"
+            >
+              {{ t('purchaseOrder.list.table.total') }}
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+            >
+              {{ t('purchaseOrder.list.table.statusApproval') }}
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+            >
+              {{ t('purchaseOrder.list.table.statusGr') }}
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+              style="width: 5rem;"
+            >
+              {{ t('purchaseOrder.list.table.actions') }}
+            </th>
           </tr>
         </thead>
 
         <tbody>
-          <tr v-for="(v, index) in rows" :key="v.id" :class="{
-            'po-row-need-approval': canApprovePO(v),
-          }">
+          <tr
+            v-for="(v, index) in rows"
+            :key="v.id"
+            :class="{
+              'po-row-need-approval': canApprovePO(v),
+            }"
+          >
             <td class="text-medium-emphasis text-center">
               {{ ((currentPage - 1) * rowPerPage) + Number(index) + 1 }}
             </td>
@@ -2051,151 +2157,173 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
 
-                  <VList>
-                    <VListItem
-                      href="javascript:void(0)"
-                      @click="openDetail(v.public_id)"
-                    >
-                      <template #prepend>
-                        <VIcon icon="tabler-eye" :size="20" class="me-3" />
-                      </template>
+                <VList>
+                  <VListItem
+                    href="javascript:void(0)"
+                    @click="openDetail(v.public_id)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-eye"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
 
-                      <VListItemTitle>
-                        {{ t('purchaseOrder.list.menu.viewDetail') }}
-                      </VListItemTitle>
-                    </VListItem>
+                    <VListItemTitle>
+                      {{ t('purchaseOrder.list.menu.viewDetail') }}
+                    </VListItemTitle>
+                  </VListItem>
 
-                    <VListItem @click="openApprovalHistory(v)">
-                      <template #prepend>
-                        <VIcon icon="tabler-history" :size="20" class="me-3" />
-                      </template>
+                  <VListItem @click="openApprovalHistory(v)">
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-history"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
 
-                      <VListItemTitle>{{ t('purchaseOrder.list.menu.approvalHistory') }}</VListItemTitle>
-                    </VListItem>
+                    <VListItemTitle>{{ t('purchaseOrder.list.menu.approvalHistory') }}</VListItemTitle>
+                  </VListItem>
 
-                    <VListItem
-                      v-if="
-                        String(v.status).toLowerCase() === 'approved'
+                  <VListItem
+                    v-if="
+                      String(v.status).toLowerCase() === 'approved'
                         && String(v.status).toLowerCase() !== 'rejected'
-                      "
-                      href="javascript:void(0)"
-                      :disabled="printLoadingId === v.public_id"
-                      @click="openPrintLanguageDialog(v.public_id)"
-                    >
-                      <template #prepend>
-                        <VProgressCircular
-                          v-if="printLoadingId === v.public_id"
-                          indeterminate
-                          size="18"
-                          width="2"
-                          class="me-3"
-                        />
+                    "
+                    href="javascript:void(0)"
+                    :disabled="printLoadingId === v.public_id"
+                    @click="openPrintLanguageDialog(v.public_id)"
+                  >
+                    <template #prepend>
+                      <VProgressCircular
+                        v-if="printLoadingId === v.public_id"
+                        indeterminate
+                        size="18"
+                        width="2"
+                        class="me-3"
+                      />
 
-                        <VIcon
-                          v-else
-                          icon="tabler-printer"
-                          :size="20"
-                          class="me-3"
-                        />
-                      </template>
+                      <VIcon
+                        v-else
+                        icon="tabler-printer"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
 
-                      <VListItemTitle>
-                        {{
-                          printLoadingId === v.public_id
-                            ? t('purchaseOrder.list.menu.printLoading')
-                            : t('purchaseOrder.list.menu.print')
-                        }}
-                      </VListItemTitle>
-                    </VListItem>
+                    <VListItemTitle>
+                      {{
+                        printLoadingId === v.public_id
+                          ? t('purchaseOrder.list.menu.printLoading')
+                          : t('purchaseOrder.list.menu.print')
+                      }}
+                    </VListItemTitle>
+                  </VListItem>
 
-                    <VListItem
-                      v-if="canApprovePO(v)"
-                      @click="openApprovePO(v)"
-                    >
-                      <template #prepend>
-                        <VIcon
-                          icon="tabler-circle-check"
-                          :size="20"
-                          class="me-3 text-success"
-                        />
-                      </template>
+                  <VListItem
+                    v-if="canApprovePO(v)"
+                    @click="openApprovePO(v)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-circle-check"
+                        :size="20"
+                        class="me-3 text-success"
+                      />
+                    </template>
 
-                      <VListItemTitle class="text-success">
-                        {{ t('purchaseOrder.list.menu.approve') }}
-                      </VListItemTitle>
-                    </VListItem>
+                    <VListItemTitle class="text-success">
+                      {{ t('purchaseOrder.list.menu.approve') }}
+                    </VListItemTitle>
+                  </VListItem>
 
-                    <VListItem
-                      v-if="canApprovePO(v)"
-                      @click="openRejectPO(v)"
-                    >
-                      <template #prepend>
-                        <VIcon
-                          icon="mdi-close-circle-outline"
-                          :size="20"
-                          color="error"
-                          class="me-3"
-                        />
-                      </template>
+                  <VListItem
+                    v-if="canApprovePO(v)"
+                    @click="openRejectPO(v)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="mdi-close-circle-outline"
+                        :size="20"
+                        color="error"
+                        class="me-3"
+                      />
+                    </template>
 
-                      <VListItemTitle class="text-error">
-                        {{ t('purchaseOrder.list.menu.reject') }}
-                      </VListItemTitle>
-                    </VListItem>
+                    <VListItemTitle class="text-error">
+                      {{ t('purchaseOrder.list.menu.reject') }}
+                    </VListItemTitle>
+                  </VListItem>
 
-                    <VListItem
-                      v-if="String(v.status).toUpperCase() === 'APPROVED' && String(v.status_receive).toUpperCase() === 'OPEN' && canCancelPO"
-                      href="javascript:void(0)"
-                      @click="openCancelPO(v)"
-                    >
-                      <template #prepend>
-                        <VIcon
-                          icon="tabler-ban"
-                          :size="20"
-                          color="error"
-                          class="me-3"
-                        />
-                      </template>
+                  <VListItem
+                    v-if="String(v.status).toUpperCase() === 'APPROVED' && String(v.status_receive).toUpperCase() === 'OPEN' && canCancelPO"
+                    href="javascript:void(0)"
+                    @click="openCancelPO(v)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-ban"
+                        :size="20"
+                        color="error"
+                        class="me-3"
+                      />
+                    </template>
 
-                      <VListItemTitle class="text-error">
-                        {{ t('purchaseOrder.list.toast.cancelMenuLabel') }}
-                      </VListItemTitle>
-                    </VListItem>
+                    <VListItemTitle class="text-error">
+                      {{ t('purchaseOrder.list.toast.cancelMenuLabel') }}
+                    </VListItemTitle>
+                  </VListItem>
 
-                    <VListItem
-                      v-if="v.can_submit"
-                      href="javascript:void(0)"
-                      @click="openSubmitPO(v)"
-                    >
-                      <template #prepend>
-                        <VIcon icon="mdi-send-outline" :size="20" class="me-3" />
-                      </template>
+                  <VListItem
+                    v-if="v.can_submit"
+                    href="javascript:void(0)"
+                    @click="openSubmitPO(v)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="mdi-send-outline"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
 
-                      <VListItemTitle>{{ t('purchaseOrder.list.menu.submit') }}</VListItemTitle>
-                    </VListItem>
+                    <VListItemTitle>{{ t('purchaseOrder.list.menu.submit') }}</VListItemTitle>
+                  </VListItem>
 
-                    <VListItem
-                      v-if="String(v.status).toLowerCase() === 'draft' && canUpdate"
-                      href="javascript:void(0)"
-                      @click="goToEdit(v.public_id)"
-                    >
-                      <template #prepend>
-                        <VIcon icon="mdi-pencil-outline" :size="20" class="me-3" />
-                      </template>
-                      <VListItemTitle>{{ t('purchaseOrder.list.menu.edit') }}</VListItemTitle>
-                    </VListItem>
+                  <VListItem
+                    v-if="v.can_update"
+                    href="javascript:void(0)"
+                    @click="goToEdit(v.public_id)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="mdi-pencil-outline"
+                        :size="20"
+                        class="me-3"
+                      />
+                    </template>
+                    <VListItemTitle>{{ t('purchaseOrder.list.menu.edit') }}</VListItemTitle>
+                  </VListItem>
 
-                    <VListItem
-                      v-if="String(v.status).toLowerCase() === 'draft' && canDelete"
-                      href="javascript:void(0)"
-                      @click="openDelete(v)"
-                    >
-                      <template #prepend>
-                        <VIcon icon="tabler-trash" :size="20" class="me-3 text-error" />
-                      </template>
-                      <VListItemTitle class="text-error">{{ t('purchaseOrder.list.menu.delete') }}</VListItemTitle>
-                    </VListItem>
-                  </VList>
+                  <VListItem
+                    v-if="String(v.status).toLowerCase() === 'draft' && canDelete"
+                    href="javascript:void(0)"
+                    @click="openDelete(v)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-trash"
+                        :size="20"
+                        class="me-3 text-error"
+                      />
+                    </template>
+                    <VListItemTitle class="text-error">
+                      {{ t('purchaseOrder.list.menu.delete') }}
+                    </VListItemTitle>
+                  </VListItem>
+                </VList>
               </VMenu>
             </td>
 
@@ -2203,8 +2331,12 @@ onBeforeUnmount(() => {
               {{ formatDate(v.tanggal_po) }}
             </td>
 
-            <td class="text-medium-emphasis text-center">{{ v.cabang || '-' }}</td>
-            <td class="text-medium-emphasis text-center">{{ v.department || '-' }}</td>
+            <td class="text-medium-emphasis text-center">
+              {{ v.cabang || '-' }}
+            </td>
+            <td class="text-medium-emphasis text-center">
+              {{ v.department || '-' }}
+            </td>
 
             <td class="text-end text-medium-emphasis">
               {{ formatCurrency(v.total_nilai) }}
@@ -2236,7 +2368,7 @@ onBeforeUnmount(() => {
                 </VChip>
               </div>
             </td>
-            
+
             <td class="text-center">
               <VChip
                 v-if="String(v.status || '').toUpperCase() === 'APPROVED'"
@@ -2255,18 +2387,36 @@ onBeforeUnmount(() => {
               </span>
             </td>
 
-            <td class="text-center" style="width: 5rem;">
-              <VBtn size="x-small" color="default" variant="plain" icon>
-                <VIcon size="24" icon="mdi-dots-vertical" />
+            <td
+              class="text-center"
+              style="width: 5rem;"
+            >
+              <VBtn
+                size="x-small"
+                color="default"
+                variant="plain"
+                icon
+              >
+                <VIcon
+                  size="24"
+                  icon="mdi-dots-vertical"
+                />
 
-                <VMenu activator="parent" location="bottom end">
+                <VMenu
+                  activator="parent"
+                  location="bottom end"
+                >
                   <VList>
                     <VListItem
                       href="javascript:void(0)"
                       @click="openDetail(v.public_id)"
                     >
                       <template #prepend>
-                        <VIcon icon="tabler-eye" :size="20" class="me-3" />
+                        <VIcon
+                          icon="tabler-eye"
+                          :size="20"
+                          class="me-3"
+                        />
                       </template>
 
                       <VListItemTitle>
@@ -2276,7 +2426,11 @@ onBeforeUnmount(() => {
 
                     <VListItem @click="openApprovalHistory(v)">
                       <template #prepend>
-                        <VIcon icon="tabler-history" :size="20" class="me-3" />
+                        <VIcon
+                          icon="tabler-history"
+                          :size="20"
+                          class="me-3"
+                        />
                       </template>
 
                       <VListItemTitle>{{ t('purchaseOrder.list.menu.approvalHistory') }}</VListItemTitle>
@@ -2285,7 +2439,7 @@ onBeforeUnmount(() => {
                     <VListItem
                       v-if="
                         String(v.status).toLowerCase() === 'approved'
-                        && String(v.status).toLowerCase() !== 'rejected'
+                          && String(v.status).toLowerCase() !== 'rejected'
                       "
                       href="javascript:void(0)"
                       :disabled="printLoadingId === v.public_id"
@@ -2397,19 +2551,27 @@ onBeforeUnmount(() => {
                       @click="openSubmitPO(v)"
                     >
                       <template #prepend>
-                        <VIcon icon="mdi-send-outline" :size="20" class="me-3" />
+                        <VIcon
+                          icon="mdi-send-outline"
+                          :size="20"
+                          class="me-3"
+                        />
                       </template>
 
                       <VListItemTitle>{{ t('purchaseOrder.list.menu.submit') }}</VListItemTitle>
                     </VListItem>
 
                     <VListItem
-                      v-if="String(v.status).toLowerCase() === 'draft' && canUpdate"
+                      v-if="v.can_update"
                       href="javascript:void(0)"
                       @click="goToEdit(v.public_id)"
                     >
                       <template #prepend>
-                        <VIcon icon="mdi-pencil-outline" :size="20" class="me-3" />
+                        <VIcon
+                          icon="mdi-pencil-outline"
+                          :size="20"
+                          class="me-3"
+                        />
                       </template>
                       <VListItemTitle>{{ t('purchaseOrder.list.menu.edit') }}</VListItemTitle>
                     </VListItem>
@@ -2420,9 +2582,15 @@ onBeforeUnmount(() => {
                       @click="openDelete(v)"
                     >
                       <template #prepend>
-                        <VIcon icon="tabler-trash" :size="20" class="me-3 text-error" />
+                        <VIcon
+                          icon="tabler-trash"
+                          :size="20"
+                          class="me-3 text-error"
+                        />
                       </template>
-                      <VListItemTitle class="text-error">{{ t('purchaseOrder.list.menu.delete') }}</VListItemTitle>
+                      <VListItemTitle class="text-error">
+                        {{ t('purchaseOrder.list.menu.delete') }}
+                      </VListItemTitle>
                     </VListItem>
                   </VList>
                 </VMenu>
@@ -2433,7 +2601,10 @@ onBeforeUnmount(() => {
 
         <tfoot v-show="!rows.length && !loading">
           <tr>
-            <td colspan="9" class="text-center">
+            <td
+              colspan="9"
+              class="text-center"
+            >
               {{ t('purchaseOrder.list.pagination.noDataAvailable') }}
             </td>
           </tr>
@@ -2443,7 +2614,10 @@ onBeforeUnmount(() => {
       <VDivider />
 
       <VCardText class="d-flex align-center flex-wrap justify-end gap-4 pa-2">
-        <div class="d-flex align-center me-3" style="width: 220px;">
+        <div
+          class="d-flex align-center me-3"
+          style="width: 220px;"
+        >
           <span class="text-no-wrap me-3">{{ t('purchaseOrder.list.pagination.rowsPerPage') }}</span>
 
           <VSelect
@@ -2514,8 +2688,8 @@ onBeforeUnmount(() => {
                 color="primary"
                 variant="tonal"
                 :disabled="Boolean(printLoadingId)"
-                @click="printPurchaseOrder('id')"
                 class="text-none"
+                @click="printPurchaseOrder('id')"
               >
                 {{ t('purchaseOrder.list.printLanguageDialog.indonesian') }}
               </VBtn>
@@ -2531,8 +2705,8 @@ onBeforeUnmount(() => {
                 color="primary"
                 variant="tonal"
                 :disabled="Boolean(printLoadingId)"
-                @click="printPurchaseOrder('en')"
                 class="text-none"
+                @click="printPurchaseOrder('en')"
               >
                 {{ t('purchaseOrder.list.printLanguageDialog.english') }}
               </VBtn>
@@ -2547,8 +2721,8 @@ onBeforeUnmount(() => {
             variant="text"
             color="secondary"
             :disabled="Boolean(printLoadingId)"
-            @click="closePrintLanguageDialog"
             class="text-none"
+            @click="closePrintLanguageDialog"
           >
             {{ t('purchaseOrder.list.printLanguageDialog.cancelButton') }}
           </VBtn>
@@ -2565,7 +2739,11 @@ onBeforeUnmount(() => {
       <VCard class="po-detail-card">
         <VCardTitle class="po-detail-header px-6 py-5">
           <div class="d-flex align-center gap-3">
-            <VAvatar color="primary" variant="tonal" size="42">
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              size="42"
+            >
               <VIcon icon="tabler-file-invoice" />
             </VAvatar>
 
@@ -2601,7 +2779,10 @@ onBeforeUnmount(() => {
         <VCardText class="pa-6">
           <div v-if="detailPurchaseOrder">
             <VRow class="mb-5">
-              <VCol cols="12" md="8">
+              <VCol
+                cols="12"
+                md="8"
+              >
                 <VCard class="h-100 rounded-lg po-info-card">
                   <VCardText>
                     <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
@@ -2625,18 +2806,28 @@ onBeforeUnmount(() => {
                     </div>
 
                     <VRow>
-                      <VCol cols="12" md="6">
+                      <VCol
+                        cols="12"
+                        md="6"
+                      >
                         <div class="info-box">
-                          <div class="info-label">Vendor</div>
+                          <div class="info-label">
+                            Vendor
+                          </div>
                           <div class="info-value">
                             {{ detailPurchaseOrder.vendor_data?.nama_vendor || detailPurchaseOrder.vendor || '-' }}
                           </div>
                         </div>
                       </VCol>
 
-                      <VCol cols="12" md="6">
+                      <VCol
+                        cols="12"
+                        md="6"
+                      >
                         <div class="info-box">
-                          <div class="info-label">Status PKP</div>
+                          <div class="info-label">
+                            Status PKP
+                          </div>
                           <div class="info-value">
                             {{
                               formatStatusPKP(
@@ -2649,9 +2840,14 @@ onBeforeUnmount(() => {
                         </div>
                       </VCol>
 
-                      <VCol cols="12" md="6">
+                      <VCol
+                        cols="12"
+                        md="6"
+                      >
                         <div class="info-box">
-                          <div class="info-label">Jenis Pembayaran</div>
+                          <div class="info-label">
+                            Jenis Pembayaran
+                          </div>
                           <div class="info-value">
                             {{
                               detailPurchaseOrder.jenis_pembayaran
@@ -2662,9 +2858,14 @@ onBeforeUnmount(() => {
                         </div>
                       </VCol>
 
-                      <VCol cols="12" md="6">
+                      <VCol
+                        cols="12"
+                        md="6"
+                      >
                         <div class="info-box">
-                          <div class="info-label">TOP</div>
+                          <div class="info-label">
+                            TOP
+                          </div>
                           <div class="info-value">
                             {{
                               Number(
@@ -2679,24 +2880,42 @@ onBeforeUnmount(() => {
                         </div>
                       </VCol>
 
-                      <VCol cols="12" md="6">
+                      <VCol
+                        cols="12"
+                        md="6"
+                      >
                         <div class="info-box">
-                          <div class="info-label">Cabang</div>
-                          <div class="info-value">{{ detailPurchaseOrder.cabang || '-' }}</div>
+                          <div class="info-label">
+                            Cabang
+                          </div>
+                          <div class="info-value">
+                            {{ detailPurchaseOrder.cabang || '-' }}
+                          </div>
                         </div>
                       </VCol>
 
-                      <VCol cols="12" md="6">
+                      <VCol
+                        cols="12"
+                        md="6"
+                      >
                         <div class="info-box">
-                          <div class="info-label">Department</div>
-                          <div class="info-value">{{ detailPurchaseOrder.department || '-' }}</div>
+                          <div class="info-label">
+                            Department
+                          </div>
+                          <div class="info-value">
+                            {{ detailPurchaseOrder.department || '-' }}
+                          </div>
                         </div>
                       </VCol>
 
                       <VCol cols="12">
                         <div class="info-box">
-                          <div class="info-label">Notes</div>
-                          <div class="info-value">{{ detailPurchaseOrder.notes || '-' }}</div>
+                          <div class="info-label">
+                            Notes
+                          </div>
+                          <div class="info-value">
+                            {{ detailPurchaseOrder.notes || '-' }}
+                          </div>
                         </div>
                       </VCol>
                     </VRow>
@@ -2762,7 +2981,10 @@ onBeforeUnmount(() => {
                 </VCard>
               </VCol>
 
-              <VCol cols="12" md="4">
+              <VCol
+                cols="12"
+                md="4"
+              >
                 <VCard class="h-100 rounded-lg total-card">
                   <VCardText>
                     <div class="d-flex align-center justify-space-between mb-3">
@@ -2940,7 +3162,10 @@ onBeforeUnmount(() => {
               </VCardText>
             </VCard>
 
-            <VCard flat class="rounded-lg">
+            <VCard
+              flat
+              class="rounded-lg"
+            >
               <VCardText>
                 <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-4">
                   <div class="text-subtitle-1 font-weight-bold">
@@ -2961,15 +3186,33 @@ onBeforeUnmount(() => {
                   <VTable class="detail-po-table">
                     <thead>
                       <tr>
-                        <th class="text-center col-no">{{ t('common.itemTable.no') }}</th>
-                        <th class="col-item">{{ t('common.itemTable.namaItem') }}</th>
-                        <th class="col-note">{{ t('common.itemTable.keterangan') }}</th>
-                        <th class="text-center col-qty">{{ t('common.itemTable.qtyPo') }}</th>
-                        <th class="text-center col-qty">{{ t('purchaseOrder.list.table.sudahGr') }}</th>
-                        <th class="text-center col-qty">{{ t('purchaseOrder.list.table.sisaGr') }}</th>
-                        <th class="text-center col-unit">{{ t('common.itemTable.satuan') }}</th>
-                        <th class="text-end col-money">{{ t('common.itemTable.hargaUnit') }}</th>
-                        <th class="text-end col-money">{{ t('common.itemTable.subtotal') }}</th>
+                        <th class="text-center col-no">
+                          {{ t('common.itemTable.no') }}
+                        </th>
+                        <th class="col-item">
+                          {{ t('common.itemTable.namaItem') }}
+                        </th>
+                        <th class="col-note">
+                          {{ t('common.itemTable.keterangan') }}
+                        </th>
+                        <th class="text-center col-qty">
+                          {{ t('common.itemTable.qtyPo') }}
+                        </th>
+                        <th class="text-center col-qty">
+                          {{ t('purchaseOrder.list.table.sudahGr') }}
+                        </th>
+                        <th class="text-center col-qty">
+                          {{ t('purchaseOrder.list.table.sisaGr') }}
+                        </th>
+                        <th class="text-center col-unit">
+                          {{ t('common.itemTable.satuan') }}
+                        </th>
+                        <th class="text-end col-money">
+                          {{ t('common.itemTable.hargaUnit') }}
+                        </th>
+                        <th class="text-end col-money">
+                          {{ t('common.itemTable.subtotal') }}
+                        </th>
                       </tr>
                     </thead>
 
@@ -3331,8 +3574,8 @@ onBeforeUnmount(() => {
 
           <VBtn
             variant="tonal"
-            @click="detailDialog = false"
             class="text-none"
+            @click="detailDialog = false"
           >
             Tutup
           </VBtn>
@@ -3429,8 +3672,8 @@ onBeforeUnmount(() => {
             variant="tonal"
             color="secondary"
             :disabled="signatureLoading"
-            @click="signatureDialog = false"
             class="text-none"
+            @click="signatureDialog = false"
           >
             Batal
           </VBtn>
@@ -3438,8 +3681,8 @@ onBeforeUnmount(() => {
           <VBtn
             color="primary"
             :loading="signatureLoading"
-            @click="saveSignatureAndContinue"
             class="text-none"
+            @click="saveSignatureAndContinue"
           >
             Simpan & Lanjutkan
           </VBtn>
@@ -3735,7 +3978,6 @@ onBeforeUnmount(() => {
 </style>
 
 <style lang="scss" scoped>
-
 .po-detail-card {
   border-radius: 10px !important;
 }
@@ -4275,7 +4517,6 @@ onBeforeUnmount(() => {
   }
 }
 
-
 .po-filter-card {
   border: 1px solid rgba(var(--v-theme-primary), 0.08);
 }
@@ -4364,7 +4605,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   text-align: left;
 }
-
 
 .approval-simple-box {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));

@@ -1819,6 +1819,12 @@ onMounted(async () => {
                           {{ item.qty ?? '-' }}
                           &times; Rp {{ formatMoney(item.unit_price) || '0' }}
                         </div>
+                        <div
+                          v-if="barisBatal(item)"
+                          class="text-caption text-warning mt-1"
+                        >
+                          {{ item.notes }}
+                        </div>
                       </div>
 
                       <div class="font-weight-bold text-no-wrap">
@@ -1868,6 +1874,12 @@ onMounted(async () => {
                         <span class="mx-1">•</span>
                         {{ t('cashAdvanceRealization.form.items.tableDifference') }}:
                         <strong>{{ item.cash_advance_item_id ? formatSigned(itemDifference(item)) : '—' }}</strong>
+                      </div>
+                      <div
+                        v-if="barisBatal(item)"
+                        class="text-caption text-warning mt-1"
+                      >
+                        {{ item.notes }}
                       </div>
 
                       <div class="d-flex align-center flex-wrap gap-2 mt-2">
