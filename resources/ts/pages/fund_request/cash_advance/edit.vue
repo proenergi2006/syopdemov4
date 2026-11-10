@@ -17,6 +17,7 @@ import type { RevisionEntry } from '@/components/fund_request/revision'
 import { formatSanitizedNumberInput } from '@/utils/textFormatter'
 import { usePermissionStore } from '@/stores/permission'
 import { useDialogDatePicker } from '@core/composable/useDialogDatePicker'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 interface CashAdvanceItemForm {
 
@@ -725,7 +726,7 @@ const formatMoney = (value: number | null | undefined): string => {
   if (!value)
     return ''
 
-  return new Intl.NumberFormat('id-ID').format(Number(value))
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(Number(value))
 }
 
 const getExtension = (fileName: string): string =>
@@ -3674,7 +3675,7 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
                                 color="primary"
                                 closable
                                 :title="file.name"
-                                @click:close="removeLineFile(baris.index, fileIndex)"
+                                @click:close="removeLineAttachment(baris.index, fileIndex)"
                               >
                                 {{ shortFileName(file.name) }}
                               </VChip>

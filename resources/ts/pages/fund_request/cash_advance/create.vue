@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '@/utils/apiHelper'
 import { formatSanitizedNumberInput } from '@/utils/textFormatter'
 import { usePermissionStore } from '@/stores/permission'
 import { useDialogDatePicker } from '@core/composable/useDialogDatePicker'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 interface CashAdvanceItemForm {
   date: string | null
@@ -658,7 +659,7 @@ const formatMoney = (value: number | null | undefined): string => {
   if (!value)
     return ''
 
-  return new Intl.NumberFormat('id-ID').format(Number(value))
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(Number(value))
 }
 
 const getExtension = (fileName: string): string =>
@@ -3285,7 +3286,7 @@ onMounted(async () => {
                                 color="primary"
                                 closable
                                 :title="file.name"
-                                @click:close="removeLineFile(baris.index, fileIndex)"
+                                @click:close="removeLineAttachment(baris.index, fileIndex)"
                               >
                                 {{ shortFileName(file.name) }}
                               </VChip>

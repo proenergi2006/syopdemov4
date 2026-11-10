@@ -16,6 +16,7 @@ import type { RevisionEntry } from '@/components/fund_request/revision'
 import { formatSanitizedNumberInput } from '@/utils/textFormatter'
 import { usePermissionStore } from '@/stores/permission'
 import { useDialogDatePicker } from '@core/composable/useDialogDatePicker'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 /*
 |--------------------------------------------------------------------------
@@ -206,7 +207,7 @@ const formatMoney = (value: number | null | undefined): string => {
   if (!value)
     return ''
 
-  return new Intl.NumberFormat('id-ID').format(Number(value))
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(Number(value))
 }
 
 /**
@@ -220,7 +221,7 @@ const formatSigned = (value: number): string => {
 
   const prefix = rounded > 0 ? '+' : '-'
 
-  return prefix + new Intl.NumberFormat('id-ID').format(Math.abs(rounded))
+  return prefix + new Intl.NumberFormat(LOCALE_ANGKA).format(Math.abs(rounded))
 }
 
 const getExtension = (fileName: string): string =>
@@ -2674,7 +2675,7 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
                                 variant="tonal"
                                 color="primary"
                                 closable
-                                @click:close="removeLineFile(baris.index, fileIndex)"
+                                @click:close="removeLineAttachment(baris.index, fileIndex)"
                               >
                                 {{ file.name }}
                               </VChip>
@@ -2688,9 +2689,19 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
                             size="small"
                             variant="text"
                             color="error"
-                            @click="removeItemRow(baris.index)"
+                            :disabled="baris.item.cash_advance_item_id !== null"
+                            @click="removeItem(baris.index)"
                           >
                             <VIcon icon="tabler-trash" />
+                            <VTooltip
+                              activator="parent"
+                              location="top"
+                              max-width="260"
+                            >
+                              {{ baris.item.cash_advance_item_id !== null
+                                ? t('cashAdvanceRealization.form.items.removeHint')
+                                : t('common.actions.delete') }}
+                            </VTooltip>
                           </VBtn>
                         </td>
                       </tr>
