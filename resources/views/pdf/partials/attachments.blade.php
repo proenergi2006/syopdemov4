@@ -3,17 +3,28 @@
     |--------------------------------------------------------------------------
     | Halaman lampiran, disisipkan di belakang cetakan dokumen
     |--------------------------------------------------------------------------
-    | Dipakai FPU, Realisasi, dan Claim. Ketiganya mencetak lampiran dengan
-    | aturan yang sama, jadi tampilannya satu berkas -- tiga salinan yang
-    | berawal sama selalu berakhir berbeda.
+    | Dipakai FPU, Realisasi, Claim, dan Perdin. Keempatnya mencetak lampiran
+    | dengan aturan yang sama, jadi tampilannya satu berkas -- empat salinan
+    | yang berawal sama selalu berakhir berbeda.
     |
-    | Dua gambar per halaman. Satu menyisakan separuh kertas kosong; tiga sudah
-    | terlalu kecil untuk dibaca angkanya.
+    | SATU GAMBAR PER HALAMAN.
     |
-    | Tingginya dipatok, bukan dibiarkan mengikuti gambarnya. Nota yang
-    | dipotret tegak dan yang dipotret melintang punya perbandingan sisi yang
-    | jauh berbeda; tanpa patokan, satu halaman bisa memuat dua nota mungil dan
-    | halaman berikutnya satu nota yang meluber ke halaman ketiga.
+    | Sebelumnya dua, untuk menghemat kertas. Alasan itu kalah oleh alasan
+    | lampirannya diikutkan sejak awal: nota dan kuitansi disertakan supaya
+    | angkanya bisa DIBACA oleh yang memeriksa, dan setengah halaman A4 terlalu
+    | kecil untuk foto nota yang dipotret dari jarak biasa. Kertas yang dihemat
+    | tidak ada gunanya kalau isinya tidak terbaca.
+    |
+    | Jumlah per halaman diatur di PrintAttachmentCollector::paginate(), bukan
+    | di sini. Keduanya harus sejalan: ukuran di bawah dihitung untuk satu
+    | gambar yang mengisi hampir seluruh tinggi halaman, jadi dua gambar dengan
+    | ukuran ini akan mendorong yang kedua ke halaman berikutnya dengan kotak
+    | yang terpotong di tengah.
+    |
+    | Tinggi gambarnya dibatasi, bukan dibiarkan apa adanya. Nota yang dipotret
+    | tegak dan yang dipotret melintang punya perbandingan sisi yang jauh
+    | berbeda; tanpa batas, foto beresolusi tinggi akan meluber melewati tepi
+    | halaman.
     |
     | Seluruhnya di dalam @if: dokumen tanpa lampiran tidak boleh menghasilkan
     | satu pun halaman tambahan, bahkan halaman kosong berjudul "Lampiran".
@@ -40,8 +51,14 @@
 
         .lampiran-item {
             margin-bottom: 10px;
-            /* Dipatok supaya dua gambar selalu muat pada satu halaman. */
-            height: 340px;
+            /*
+            | Tinggi mengikuti gambarnya, tidak dipatok: dengan satu gambar per
+            | halaman, mematoknya hanya membuat kotak bergaris panjang menganga
+            | di bawah foto yang dipotret melintang.
+            |
+            | overflow tetap dipasang sebagai pengaman terakhir, kalau-kalau
+            | dompdf mengabaikan batas tinggi pada gambar tertentu.
+            */
             overflow: hidden;
             border: 1px solid #bbb;
             text-align: center;
@@ -60,9 +77,27 @@
         }
 
         .lampiran-img {
-            /* Muat di dalam kotaknya tanpa terpotong, apa pun bentuk aslinya. */
+            /*
+            | Muat di dalam kotaknya tanpa terpotong, apa pun bentuk aslinya.
+            |
+            | 980px dihitung dari ruang yang benar-benar tersedia pada A4 tegak
+            | dengan margin @page 22px/26px/28px:
+            |
+            |   tinggi halaman          1122px
+            |   - margin atas + bawah     50px
+            |   - judul "LAMPIRAN n"      28px
+            |   - bingkai + jarak bawah   12px
+            |   - keterangan berkas       18px
+            |   ----------------------------------
+            |   tersisa                 1014px
+            |
+            | Dipakai 980px, menyisakan sedikit kelonggaran untuk selisih tinggi
+            | baris antar huruf. Lebihnya sengaja, bukan kelebihan hitung: satu
+            | piksel yang meleset berarti satu halaman tambahan yang isinya
+            | hanya tepi bawah sebuah foto.
+            */
             max-width: 100%;
-            max-height: 300px;
+            max-height: 980px;
         }
 
         .lampiran-lain {

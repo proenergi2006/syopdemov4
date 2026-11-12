@@ -101,16 +101,22 @@ class PrintAttachmentCollector
     }
 
     /**
-     * Gambar dua-dua per halaman.
+     * Satu gambar per halaman.
      *
-     * Satu gambar per halaman menyisakan separuh kertas kosong, dan cetakan
-     * sepuluh nota menjadi sepuluh lembar yang setengahnya putih. Tiga sudah
-     * terlalu kecil untuk dibaca angkanya.
+     * Sebelumnya dua, dengan alasan menghemat kertas. Alasan itu kalah oleh
+     * alasan lampirannya diikutkan sejak awal: nota dan kuitansi disertakan
+     * supaya angkanya bisa DIBACA oleh yang memeriksa. Setengah halaman A4
+     * membuat foto nota yang dipotret dari jarak biasa terlalu kecil untuk
+     * itu, sehingga kertas yang dihemat justru tidak berguna.
+     *
+     * Satu per halaman juga membuat penomorannya jujur: "LAMPIRAN 2 DARI 5"
+     * sekarang berarti lampiran kedua dari lima lampiran, bukan halaman kedua
+     * dari lima halaman yang isinya sepuluh gambar.
      *
      * @param  array<int, array{label: string, name: string, path: string}>  $images
      * @return array<int, array<int, array{label: string, name: string, path: string}>>
      */
-    public function paginate(array $images, int $perPage = 2): array
+    public function paginate(array $images, int $perPage = 1): array
     {
         return $images === [] ? [] : array_chunk($images, max(1, $perPage));
     }
