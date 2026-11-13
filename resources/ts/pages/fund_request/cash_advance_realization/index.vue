@@ -564,7 +564,28 @@ const selectedIds = ref<string[]>([])
 const bulkMode = ref<'RECEIVE' | 'REIMBURSE' | null>(null)
 const bulkLoading = ref(false)
 
+/*
+|--------------------------------------------------------------------------
+| Nomor urut permintaan daftar
+|--------------------------------------------------------------------------
+| Daftar ini disegarkan dari banyak arah: polling tiap 30 detik, kembali ke
+| tab, berpindah halaman, berganti penyaring, dan setiap tindakan yang
+| selesai. Permintaan-permintaan itu bisa berangkat bersamaan, dan yang
+| berangkat lebih dulu tidak selalu tiba lebih dulu.
+|
+| Tanpa nomor urut, jawaban lama yang tiba belakangan menimpa jawaban baru
+| yang sudah tampil. Itulah sebabnya status yang baru diubah lewat tindakan
+| massal sempat terlihat benar lalu berubah kembali seolah-olah batal,
+| padahal datanya sudah tersimpan dengan benar di server.
+|
+| Hanya jawaban dari permintaan terakhir yang boleh dipakai.
+|--------------------------------------------------------------------------
+*/
+let nomorPermintaanDaftar = 0
+
 const fetchRealizations = async (): Promise<void> => {
+  const nomorPermintaan = ++nomorPermintaanDaftar
+
   loading.value = true
   loadError.value = false
 
@@ -579,6 +600,13 @@ const fetchRealizations = async (): Promise<void> => {
     })
 
     const payload = response.data
+
+    /*
+    | Jawaban basi: sudah ada permintaan yang lebih baru sesudah yang ini
+    | berangkat, jadi hasilnya dibuang tanpa menyentuh apa pun di layar.
+    */
+    if (nomorPermintaan !== nomorPermintaanDaftar)
+      return
 
     rows.value = Array.isArray(payload?.data) ? payload.data : []
 
@@ -604,6 +632,9 @@ const fetchRealizations = async (): Promise<void> => {
     currentPage.value = Number(payload?.meta?.current_page ?? 1)
   }
   catch (error: unknown) {
+    /* Kegagalan dari permintaan basi juga tidak boleh mengubah layar. */
+    if (nomorPermintaan !== nomorPermintaanDaftar)
+      return
     const status = (error as any)?.response?.status
 
     /*
@@ -632,11 +663,32 @@ const fetchRealizations = async (): Promise<void> => {
     totalPage.value = 1
   }
   finally {
-    loading.value = false
+    /*
+    | Hanya permintaan terakhir yang berhak memadamkan penanda memuat.
+    | Bila tidak, jawaban basi akan memadamkannya padahal permintaan yang
+    | lebih baru masih berjalan.
+    */
+    if (nomorPermintaan === nomorPermintaanDaftar)
+      loading.value = false
   }
 }
 
-usePolling(fetchRealizations, { interval: 30000 })
+usePolling(fetchRealizations, {
+  interval: 30000,
+
+  /*
+  | Penyegaran otomatis ditahan pada dua keadaan, dan keduanya adalah saat
+  | mengganti isi daftar paling merugikan:
+  |
+  | 1. Ada tindakan massal sedang berjalan -- penyegaran yang berangkat di
+  |    tengahnya membaca data sebelum tindakan itu tersimpan.
+  | 2. Ada baris yang tercentang -- daftar yang berganti isi akan menghapus
+  |    pilihan pengguna di tengah jalan, tanpa sebab yang terlihat.
+  |
+  | Jadwalnya tidak berhenti; giliran yang ditahan hanya dilewati.
+  */
+  canPoll: () => !bulkLoading.value && selectedIds.value.length === 0,
+})
 
 /**
  * Memuat isi kedua dropdown filter.
@@ -3652,7 +3704,10 @@ onMounted(async () => {
           Kepala modal: identitas dokumen dan FPU induknya dijadikan satu blok,
           karena realisasi selalu dibaca berpasangan dengan pengajuannya.
         -->
-        <div :class="['car-detail__header', `car-detail__header--${detailAccent}`]">
+        <div
+          class="car-detail__header"
+          :class="[`car-detail__header--${detailAccent}`]"
+        >
           <div class="d-flex align-center justify-space-between gap-3">
             <div class="car-detail__eyebrow">
               <VIcon
@@ -3791,7 +3846,10 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <div :class="['car-detail__money-tile', `car-detail__money-tile--${detailDifference.color}`]">
+              <div
+                class="car-detail__money-tile"
+                :class="[`car-detail__money-tile--${detailDifference.color}`]"
+              >
                 <div class="car-detail__label d-flex align-center gap-1">
                   <VIcon
                     :icon="detailDifference.icon"
@@ -3800,7 +3858,10 @@ onMounted(async () => {
                   {{ t('cashAdvanceRealization.detail.difference') }}
                 </div>
 
-                <div :class="['car-detail__money-value', `text-${detailDifference.color}`]">
+                <div
+                  class="car-detail__money-value"
+                  :class="[`text-${detailDifference.color}`]"
+                >
                   Rp {{ formatNumberWithoutRp(Math.abs(Number(detail.difference_amount || 0))) }}
                 </div>
 
@@ -4205,7 +4266,6 @@ onMounted(async () => {
               v-if="!detailHasBreakdown"
 
               class="car-detail__table"
-
             >
               <VTable density="compact">
                 <thead>

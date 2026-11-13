@@ -611,7 +611,28 @@ const selectedIds = ref<string[]>([])
 const bulkMode = ref<'RECEIVE' | 'DISBURSE' | null>(null)
 const bulkLoading = ref(false)
 
+/*
+|--------------------------------------------------------------------------
+| Nomor urut permintaan daftar
+|--------------------------------------------------------------------------
+| Daftar ini disegarkan dari banyak arah: polling tiap 30 detik, kembali ke
+| tab, berpindah halaman, berganti penyaring, dan setiap tindakan yang
+| selesai. Permintaan-permintaan itu bisa berangkat bersamaan, dan yang
+| berangkat lebih dulu tidak selalu tiba lebih dulu.
+|
+| Tanpa nomor urut, jawaban lama yang tiba belakangan menimpa jawaban baru
+| yang sudah tampil. Itulah sebabnya status yang baru diubah lewat tindakan
+| massal sempat terlihat benar lalu berubah kembali seolah-olah batal,
+| padahal datanya sudah tersimpan dengan benar di server.
+|
+| Hanya jawaban dari permintaan terakhir yang boleh dipakai.
+|--------------------------------------------------------------------------
+*/
+let nomorPermintaanDaftar = 0
+
 const fetchCashAdvances = async (): Promise<void> => {
+  const nomorPermintaan = ++nomorPermintaanDaftar
+
   loading.value = true
   loadError.value = false
 
@@ -626,6 +647,13 @@ const fetchCashAdvances = async (): Promise<void> => {
     })
 
     const payload = response.data
+
+    /*
+    | Jawaban basi: sudah ada permintaan yang lebih baru sesudah yang ini
+    | berangkat, jadi hasilnya dibuang tanpa menyentuh apa pun di layar.
+    */
+    if (nomorPermintaan !== nomorPermintaanDaftar)
+      return
 
     rows.value = Array.isArray(payload?.data) ? payload.data : []
 
@@ -652,6 +680,9 @@ const fetchCashAdvances = async (): Promise<void> => {
     currentPage.value = Number(payload?.meta?.current_page ?? 1)
   }
   catch (error: unknown) {
+    /* Kegagalan dari permintaan basi juga tidak boleh mengubah layar. */
+    if (nomorPermintaan !== nomorPermintaanDaftar)
+      return
     const status = (error as any)?.response?.status
 
     /*
@@ -680,11 +711,32 @@ const fetchCashAdvances = async (): Promise<void> => {
     totalPage.value = 1
   }
   finally {
-    loading.value = false
+    /*
+    | Hanya permintaan terakhir yang berhak memadamkan penanda memuat.
+    | Bila tidak, jawaban basi akan memadamkannya padahal permintaan yang
+    | lebih baru masih berjalan.
+    */
+    if (nomorPermintaan === nomorPermintaanDaftar)
+      loading.value = false
   }
 }
 
-usePolling(fetchCashAdvances, { interval: 30000 })
+usePolling(fetchCashAdvances, {
+  interval: 30000,
+
+  /*
+  | Penyegaran otomatis ditahan pada dua keadaan, dan keduanya adalah saat
+  | mengganti isi daftar paling merugikan:
+  |
+  | 1. Ada tindakan massal sedang berjalan -- penyegaran yang berangkat di
+  |    tengahnya membaca data sebelum tindakan itu tersimpan.
+  | 2. Ada baris yang tercentang -- daftar yang berganti isi akan menghapus
+  |    pilihan pengguna di tengah jalan, tanpa sebab yang terlihat.
+  |
+  | Jadwalnya tidak berhenti; giliran yang ditahan hanya dilewati.
+  */
+  canPoll: () => !bulkLoading.value && selectedIds.value.length === 0,
+})
 
 /**
  * Memuat isi kedua dropdown filter.
@@ -1764,9 +1816,10 @@ interface ReviseLine {
   /* Angka yang diajukan pemohon -- pembanding yang tidak ikut berubah. */
   submitted: number
 
-  /* Isian yang sedang disunting. Teks, bukan angka: kotak yang dikosongkan
-  | harus boleh kosong sejenak tanpa berubah sendiri menjadi nol. */
-  amount: string
+  /* Isian yang sedang disunting. null selagi kosong, bukan nol: kotak yang
+  | dikosongkan harus boleh kosong sejenak tanpa berubah sendiri menjadi
+  | nol, dan nol adalah angka yang sah di sini. */
+  amount: number | null
 }
 
 const reviseDialog = ref(false)
@@ -1823,7 +1876,7 @@ const openRevise = async (row: CashAdvanceRow): Promise<void> => {
       date: (baris.date as string | null) ?? null,
       description: String(baris.description ?? ''),
       submitted: Number(baris.amount ?? 0),
-      amount: String(Number(baris.amount ?? 0)),
+      amount: Number(baris.amount ?? 0),
     }))
 
     reviseRow.value = row
@@ -1849,7 +1902,7 @@ const submitRevise = async (): Promise<void> => {
   reviseError.value = ''
 
   const salah = reviseLines.value.find(baris =>
-    baris.amount.trim() === '' || Number.isNaN(Number(baris.amount)) || Number(baris.amount) < 0)
+    baris.amount === null || Number.isNaN(Number(baris.amount)) || Number(baris.amount) < 0)
 
   if (salah) {
     reviseError.value = t('cashAdvance.list.revise.invalidAmount', { name: salah.description })
@@ -4921,11 +4974,8 @@ onMounted(async () => {
                   </td>
 
                   <td>
-                    <VTextField
+                    <AppNumberField
                       v-model="baris.amount"
-                      type="number"
-                      min="0"
-                      step="1"
                       density="compact"
                       hide-details
                       variant="outlined"
