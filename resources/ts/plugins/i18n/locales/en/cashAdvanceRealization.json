@@ -304,7 +304,9 @@
             "emptyAlert": "No lines yet. Pick a cash advance first, then click \"{action}\".",
             "extra": "Unplanned",
             "fromAdvance": "From cash advance",
-            "removeHint": "Lines copied from the cash advance cannot be removed. Enter 0 if unused.",
+            "removeHint": "Lines copied from the cash advance cannot be removed. Enter zero if the expense did not happen, then state the reason.",
+            "cancelledReasonLabel": "Reason it did not happen",
+            "cancelledReasonPlaceholder": "e.g. the driver did not travel after all",
             "sectionSubtitle": "Cash advance lines are copied automatically. Fill in what was actually spent.",
             "sectionTitle": "Realization Lines",
             "tableActions": "Actions",
@@ -317,14 +319,19 @@
             "tableRealization": "Realized",
             "totalAdvance": "Total Disbursed",
             "totalRealization": "Total Realized",
-            "tableTransactionCategory": "Transaction Category"
+            "tableTransactionCategory": "Transaction Category",
+            "tableSourceAttachment": "FPU attachments"
         },
         "attachment": {
             "title": "Receipts",
             "addButton": "Upload Evidence",
             "empty": "No receipts yet. Accepted formats: PDF, JPG, JPEG, PNG, up to 3MB each.",
             "deleteButton": "Remove",
-            "existingTitle": "Saved Receipts"
+            "existingTitle": "Saved Receipts",
+            "sourceTitle": "FPU attachments",
+            "sourceHint": "The basis of the request, from the FPU. View only -- these are not saved as realisation evidence.",
+            "sourceEmpty": "This FPU row has no attachment.",
+            "ownTitle": "Realisation evidence"
         },
         "buttons": {
             "cancel": "Cancel",
@@ -339,6 +346,7 @@
             "completeItemRow": "Please complete the line on row {number}.",
             "itemDateRequired": "Date on row {number} is required.",
             "itemAttachmentRequired": "Row {number} requires at least one attachment.",
+            "cancelledReasonRequired": "Row {number} is zero. State the reason -- an expense that did not happen still needs an explanation.",
             "invalidFileTitle": "Invalid File",
             "invalidFileType": "\"{name}\" is not a PDF/JPG/JPEG/PNG file.",
             "invalidFileSize": "\"{name}\" is larger than 3MB.",
@@ -436,6 +444,7 @@
         "paymentEarly": "Paid ahead of schedule.",
         "paymentOnTime": "Paid exactly on schedule.",
         "paymentLate": "Paid after its schedule.",
-        "itemTransactionCategory": "Transaction Category"
+        "itemTransactionCategory": "Transaction Category",
+        "itemSourceAttachment": "FPU attachments"
     }
 }

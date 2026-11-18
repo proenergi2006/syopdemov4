@@ -304,7 +304,9 @@
             "emptyAlert": "Belum ada rincian. Pilih FPU terlebih dahulu, lalu klik \"{action}\".",
             "extra": "Di luar rencana",
             "fromAdvance": "Dari FPU",
-            "removeHint": "Baris yang berasal dari FPU tidak dapat dihapus. Isi 0 bila tidak terpakai.",
+            "removeHint": "Baris yang berasal dari FPU tidak dapat dihapus. Isi nol bila pengeluarannya tidak jadi, lalu tuliskan alasannya.",
+            "cancelledReasonLabel": "Alasan tidak jadi",
+            "cancelledReasonPlaceholder": "Misal: driver tidak jadi berangkat",
             "sectionSubtitle": "Baris FPU tersalin otomatis. Isi nominal yang benar-benar dikeluarkan.",
             "sectionTitle": "Rincian Realisasi",
             "tableActions": "Aksi",
@@ -317,14 +319,19 @@
             "tableRealization": "Realisasi",
             "totalAdvance": "Total Dicairkan",
             "totalRealization": "Total Realisasi",
-            "tableTransactionCategory": "Keterangan Transaksi"
+            "tableTransactionCategory": "Keterangan Transaksi",
+            "tableSourceAttachment": "Lampiran FPU"
         },
         "attachment": {
             "title": "Bukti Pengeluaran",
             "addButton": "Unggah Bukti",
             "empty": "Belum ada bukti. Format yang diterima: PDF, JPG, JPEG, PNG, maksimal 3MB per file.",
             "deleteButton": "Hapus",
-            "existingTitle": "Bukti Tersimpan"
+            "existingTitle": "Bukti Tersimpan",
+            "sourceTitle": "Lampiran FPU",
+            "sourceHint": "Dasar pengajuan dari FPU. Hanya bisa dilihat, tidak ikut tersimpan sebagai bukti realisasi.",
+            "sourceEmpty": "Baris FPU ini tidak berlampiran.",
+            "ownTitle": "Bukti realisasi"
         },
         "buttons": {
             "cancel": "Batal",
@@ -339,6 +346,7 @@
             "completeItemRow": "Lengkapi rincian pada baris {number}.",
             "itemDateRequired": "Tanggal pada baris {number} wajib diisi.",
             "itemAttachmentRequired": "Bukti pada baris {number} wajib diisi minimal satu berkas.",
+            "cancelledReasonRequired": "Baris {number} bernilai nol. Tuliskan alasannya -- pengeluaran yang tidak jadi tetap perlu keterangan.",
             "invalidFileTitle": "File Tidak Valid",
             "invalidFileType": "\"{name}\" bukan file PDF/JPG/JPEG/PNG.",
             "invalidFileSize": "\"{name}\" lebih dari 3MB.",
@@ -436,6 +444,7 @@
         "paymentEarly": "Dibayarkan lebih awal dari jadwalnya.",
         "paymentOnTime": "Dibayarkan tepat pada jadwalnya.",
         "paymentLate": "Dibayarkan setelah jadwalnya.",
-        "itemTransactionCategory": "Keterangan Transaksi"
+        "itemTransactionCategory": "Keterangan Transaksi",
+        "itemSourceAttachment": "Lampiran FPU"
     }
 }

@@ -7,6 +7,8 @@ use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
+use App\Support\DocumentActionScope;
+use App\Support\LineAttachment;
 use App\Support\UserHomeAccess;
 use App\Services\FundRequest\CombinedPrintComposer;
 use App\Http\Controllers\Api\BusinessTripController;
@@ -39,6 +41,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -525,7 +528,15 @@ class CashAdvanceController extends Controller
                     'mimes:' . self::ATTACHMENT_MIMES,
                     'max:' . self::ATTACHMENT_MAX_KB,
                 ],
-            ]);
+
+                /*
+                | Jumlah lampiran yang DINYATAKAN layar. Dipakai
+                | ExplainUploadFailure untuk menangkap berkas yang dibuang
+                | PHP tanpa jejak; di sini cukup dipastikan bentuknya.
+                */
+                'attachment_count' => ['nullable', 'integer', 'min:0'],
+
+            ], LineAttachment::messages(), LineAttachment::attributes($request));
 
             $this->assertUserAccessAssignment(
                 $user,
@@ -1009,6 +1020,29 @@ class CashAdvanceController extends Controller
                 ->findOrFail($id);
 
             /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance.update" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance.update', $cashAdvance, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'FPU tidak ditemukan.',
+                ], 404);
+            }
+
+            /*
             | Draft, dan dokumen yang sedang butuh revisi.
             |
             | Keduanya sama-sama berada di tangan pemohon dan tidak sedang
@@ -1091,7 +1125,15 @@ class CashAdvanceController extends Controller
                     'mimes:' . self::ATTACHMENT_MIMES,
                     'max:' . self::ATTACHMENT_MAX_KB,
                 ],
-            ]);
+
+                /*
+                | Jumlah lampiran yang DINYATAKAN layar. Dipakai
+                | ExplainUploadFailure untuk menangkap berkas yang dibuang
+                | PHP tanpa jejak; di sini cukup dipastikan bentuknya.
+                */
+                'attachment_count' => ['nullable', 'integer', 'min:0'],
+
+            ], LineAttachment::messages(), LineAttachment::attributes($request));
 
             $this->assertUserAccessAssignment(
                 $user,
@@ -1345,6 +1387,29 @@ class CashAdvanceController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance.delete" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance.delete', $cashAdvance, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'FPU tidak ditemukan.',
+                ], 404);
+            }
+
             if (strtoupper((string) $cashAdvance->status) !== CashAdvance::STATUS_DRAFT) {
                 DB::rollBack();
 
@@ -1456,6 +1521,29 @@ class CashAdvanceController extends Controller
             $cashAdvance = CashAdvance::with(['items'])
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance.submit" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance.submit', $cashAdvance, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'FPU tidak ditemukan.',
+                ], 404);
+            }
 
             /*
             | Draft, dan dokumen revisian yang sudah diperbaiki.
@@ -2164,6 +2252,29 @@ class CashAdvanceController extends Controller
             $cashAdvance = CashAdvance::query()
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "cash_advance.cancel" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'cash_advance.cancel', $cashAdvance, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'FPU tidak ditemukan.',
+                ], 404);
+            }
 
             /*
             | Hanya yang BELUM diterima Finance.
@@ -4339,8 +4450,25 @@ class CashAdvanceController extends Controller
         }
 
         foreach ($files as $file) {
-            if (!$file || !$file->isValid()) {
-                continue;
+            /*
+            | DULU DILEWATI DIAM-DIAM.
+            |
+            | Berkas yang tidak utuh cukup di-continue, sehingga dokumennya
+            | tersimpan lengkap sementara buktinya tidak ada -- dan tidak
+            | satu kalimat pun menyebutkannya. Sekarang penyimpanannya
+            | dibatalkan: dokumen pengeluaran tanpa bukti lebih buruk
+            | daripada dokumen yang gagal disimpan.
+            */
+            if (!$file instanceof UploadedFile || !$file->isValid()) {
+                throw ValidationException::withMessages([
+                    'line_attachments' => [
+                        __('upload.not_received', [
+                            'file' => $file instanceof UploadedFile
+                                ? ($file->getClientOriginalName() ?: $file->getFilename())
+                                : '-',
+                        ]),
+                    ],
+                ]);
             }
 
             $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
@@ -4404,7 +4532,21 @@ class CashAdvanceController extends Controller
         foreach ($grouped as $index => $files) {
             $itemId = $itemIdsByIndex[(int) $index] ?? null;
 
-            if ($itemId === null || !is_array($files)) {
+            /*
+            | Lampiran yang menunjuk baris yang tidak ada pada rincian.
+            | Dulu dibuang diam-diam, jadi berkasnya lenyap tanpa jejak --
+            | padahal ini pertanda kiriman dan layar sudah tidak sejalan,
+            | yang justru harus diketahui, bukan ditutupi.
+            */
+            if ($itemId === null) {
+                throw ValidationException::withMessages([
+                    "line_attachments.{$index}" => [
+                        __('upload.orphan_row', ['row' => (int) $index + 1]),
+                    ],
+                ]);
+            }
+
+            if (!is_array($files)) {
                 continue;
             }
 

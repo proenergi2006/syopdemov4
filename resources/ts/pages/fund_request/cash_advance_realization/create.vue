@@ -2,7 +2,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import axios from '@axios'
+import axios, { UPLOAD_TIMEOUT_MS } from '@axios'
+
 import {
   closeAlert,
   showConfirmAlert,
@@ -57,6 +58,31 @@ interface RealizationItemForm {
    * bersama buktinya sendiri. Wajib minimal satu berkas.
    */
   attachments: File[]
+
+  /*
+   * Lampiran baris FPU yang direalisasikan baris ini. BUKAN bagian dari
+   * yang dikirim: ia milik dokumen lain, ditampilkan sebagai rujukan.
+   *
+   * Dipisahkan dari attachments di atas dengan sengaja. Lampiran FPU
+   * adalah dasar pengajuan -- penawaran, perkiraan harga. Lampiran
+   * realisasi adalah bukti uangnya benar-benar keluar -- kuitansi, struk.
+   * Dicampur, perkiraan harga akan terbaca sebagai bukti pengeluaran,
+   * dan itu persis yang harus dicegah oleh dokumen realisasi.
+   *
+   * Kosong untuk baris di luar rencana: baris itu tidak punya pasangan
+   * di FPU, bukan kehilangan lampirannya.
+   */
+  source_attachments: SourceAttachment[]
+}
+
+/** Lampiran milik FPU. Hanya dibaca -- tidak pernah diubah dari sini. */
+interface SourceAttachment {
+  id: number
+  filename: string
+  original_filename: string | null
+  mime_type: string | null
+  file_size: number | null
+  url: string | null
 }
 
 interface CashAdvanceOption {
@@ -95,6 +121,8 @@ interface CashAdvanceOption {
     expense_category_id: number | null
     qty: number | null
     unit_price: number | null
+    transaction_category_id?: number | null
+    source_attachments?: SourceAttachment[]
   }>
 }
 
@@ -411,6 +439,11 @@ const applyCashAdvanceItems = (): void => {
     notes: '',
     attachments: [],
 
+    /* Rujukan dari FPU, tidak ikut dikirim kembali. */
+    source_attachments: Array.isArray(line.source_attachments)
+      ? line.source_attachments
+      : [],
+
     /*
     | Keterangan transaksinya ikut tersalin -- jawabannya sudah ada di
     | FPU-nya, dan memintanya ulang hanya menambah pekerjaan yang tidak
@@ -450,6 +483,9 @@ const cloneItems = (items: RealizationItemForm[]): RealizationItemForm[] =>
   items.map(item => ({
     ...item,
     attachments: [...item.attachments],
+
+    /* Ikut disalin dangkal supaya batal-sunting tidak ikut membuangnya. */
+    source_attachments: [...item.source_attachments],
   }))
 
 /*
@@ -776,6 +812,10 @@ const addItemRowTo = (categoryId: number): void => {
     realization_amount: 0,
     notes: '',
     attachments: [],
+
+    /* Baris di luar rencana tidak punya pasangan di FPU. */
+    source_attachments: [],
+
     expense_category_id: Number(categoryId),
     qty: 1,
     unit_price: 0,
@@ -1050,6 +1090,9 @@ const addExtraItem = (): void => {
     notes: '',
     attachments: [],
 
+    /* Baris di luar rencana tidak punya pasangan di FPU. */
+    source_attachments: [],
+
     /* Diisi hanya pada bentuk perdin, lewat tombol milik kategorinya. */
     expense_category_id: null,
     qty: null,
@@ -1155,6 +1198,24 @@ const handleLineFileUpload = (event: Event, index: number): void => {
   }
 
   input.value = ''
+}
+
+/**
+ * Ikon menurut jenis berkas tersimpan.
+ *
+ * Berkas yang baru dipilih memakai getFileType() -- yang itu punya objek
+ * File di tangan, yang ini hanya punya mime_type dari server.
+ */
+const getAttachmentIcon = (mimeType: string | null | undefined): string => {
+  const normalized = String(mimeType || '').toLowerCase()
+
+  if (normalized.includes('pdf'))
+    return 'mdi-file-pdf-box'
+
+  if (normalized.startsWith('image/'))
+    return 'mdi-file-image-outline'
+
+  return 'mdi-file-outline'
 }
 
 const removeLineAttachment = (index: number, fileIndex: number): void => {
@@ -1386,6 +1447,27 @@ const buildFormData = (): FormData => {
     })
   })
 
+  /*
+   * MENYATAKAN BERAPA BERKAS YANG DIBERANGKATKAN.
+   *
+   * PHP membatasi jumlah berkas per pengiriman (max_file_uploads, bawaannya
+   * 20). Berkas selebihnya tidak ditolak -- mereka hanya tidak sampai, tanpa
+   * kode galat dan tanpa jejak apa pun yang tersisa di sisi server. Pernah
+   * terukur: 25 lampiran dikirim, 20 tersimpan, dokumennya dinyatakan
+   * berhasil disimpan, dan lima bukti pengeluaran hilang tanpa seorang pun
+   * diberi tahu.
+   *
+   * Angka ini satu-satunya pembanding yang dipunyai server. Dibaca
+   * ExplainUploadFailure, yang membatalkan penyimpanan bila jumlahnya tidak
+   * cocok dengan yang sampai.
+   */
+  const jumlahLampiran = form.items.reduce(
+    (total, item) => total + item.attachments.length,
+    0,
+  )
+
+  formData.append('attachment_count', String(jumlahLampiran))
+
   return formData
 }
 
@@ -1425,6 +1507,18 @@ const save = async (event?: Event): Promise<void> => {
      */
     await axios.post(ENDPOINT, buildFormData(), {
       headers: { Accept: 'application/json' },
+
+      /*
+       * Tenggat dilonggarkan khusus untuk pengiriman berlampiran.
+       *
+       * Tenggat bawaan axios 30 detik dihitung sejak permintaan berangkat,
+       * jadi ia ikut membatasi waktu MENGUNGGAH, bukan sekadar menunggu
+       * jawaban. Beberapa lampiran 3 MB di jaringan kantor biasa sudah
+       * melewati angka itu, dan begitu tenggatnya habis pengiriman
+       * diputus di tengah jalan -- server tidak pernah menerima
+       * kirimannya utuh, sehingga tidak ada yang tersimpan.
+       */
+      timeout: UPLOAD_TIMEOUT_MS,
     })
 
     closeAlert()
@@ -1882,6 +1976,34 @@ onMounted(async () => {
                         {{ item.notes }}
                       </div>
 
+                      <!--
+                        Rujukan dari FPU. Warnanya dibedakan dari bukti
+                        realisasi di bawahnya -- di ringkasan sesempit ini,
+                        dua kelompok berwarna sama akan terbaca sebagai satu.
+                      -->
+                      <div
+                        v-if="(item.source_attachments || []).length"
+                        class="d-flex align-center flex-wrap gap-2 mt-2"
+                      >
+                        <span class="text-caption text-medium-emphasis">
+                          {{ t('cashAdvanceRealization.form.attachment.sourceTitle') }}:
+                        </span>
+
+                        <VChip
+                          v-for="berkas in item.source_attachments"
+                          :key="`summary-item-${index}-fpu-${berkas.id}`"
+                          size="x-small"
+                          variant="outlined"
+                          color="secondary"
+                          prepend-icon="tabler-file-search"
+                          :href="berkas.url || undefined"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          link
+                        >
+                          {{ berkas.original_filename || berkas.filename }}
+                        </VChip>
+                      </div>
                       <div class="d-flex align-center flex-wrap gap-2 mt-2">
                         <VChip
                           v-for="(file, fileIndex) in item.attachments"
@@ -2227,6 +2349,61 @@ onMounted(async () => {
                     <!-- Bukti milik baris ini -->
                     <td>
                       <div class="d-flex flex-column gap-2">
+                        <!--
+                          LAMPIRAN FPU, BUKAN BUKTI REALISASI.
+
+                          Ditaruh di atas tombol unggah dan diberi bingkai sendiri supaya
+                          tidak terbaca sebagai berkas yang baru saja dipilih. Tidak ada
+                          tombol hapus di sini: berkas ini milik dokumen FPU, dan menghapusnya
+                          dari layar realisasi tidak akan -- dan tidak boleh -- berarti apa pun.
+                        -->
+                        <div
+                          v-if="(item.source_attachments || []).length"
+                          class="car-source-files"
+                        >
+                          <div class="car-source-files__title">
+                            <VIcon
+                              icon="tabler-file-search"
+                              size="14"
+                            />
+
+                            {{ t('cashAdvanceRealization.form.attachment.sourceTitle') }}
+                          </div>
+
+                          <a
+                            v-for="berkas in item.source_attachments"
+                            :key="`fpu-${index}-${berkas.id}`"
+                            class="car-source-files__item"
+                            :href="berkas.url || undefined"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            :title="berkas.original_filename || berkas.filename"
+                          >
+                            <VIcon
+                              :icon="getAttachmentIcon(berkas.mime_type)"
+                              size="14"
+                            />
+
+                            <span class="car-source-files__name">
+                              {{ berkas.original_filename || berkas.filename }}
+                            </span>
+                          </a>
+                        </div>
+
+                        <!--
+                          Mulai dari sini bukti milik realisasi ini sendiri.
+
+                          Namanya hanya ditulis bila di atasnya memang ada kelompok lain.
+                          Pada baris tanpa lampiran FPU tidak ada yang perlu dibedakan, dan
+                          satu label menyendiri justru membuat sel sempit ini penuh tanpa
+                          menambah keterangan apa pun.
+                        -->
+                        <div
+                          v-if="(item.source_attachments || []).length"
+                          class="car-own-files__title"
+                        >
+                          {{ t('cashAdvanceRealization.form.attachment.ownTitle') }}
+                        </div>
                         <input
                           :ref="el => setLineFileRef(el, index)"
                           type="file"
@@ -2562,6 +2739,61 @@ onMounted(async () => {
 
                         <td>
                           <div class="d-flex flex-column gap-2">
+                            <!--
+                              LAMPIRAN FPU, BUKAN BUKTI REALISASI.
+
+                              Ditaruh di atas tombol unggah dan diberi bingkai sendiri supaya
+                              tidak terbaca sebagai berkas yang baru saja dipilih. Tidak ada
+                              tombol hapus di sini: berkas ini milik dokumen FPU, dan menghapusnya
+                              dari layar realisasi tidak akan -- dan tidak boleh -- berarti apa pun.
+                            -->
+                            <div
+                              v-if="(baris.item.source_attachments || []).length"
+                              class="car-source-files"
+                            >
+                              <div class="car-source-files__title">
+                                <VIcon
+                                  icon="tabler-file-search"
+                                  size="14"
+                                />
+
+                                {{ t('cashAdvanceRealization.form.attachment.sourceTitle') }}
+                              </div>
+
+                              <a
+                                v-for="berkas in baris.item.source_attachments"
+                                :key="`fpu-${baris.index}-${berkas.id}`"
+                                class="car-source-files__item"
+                                :href="berkas.url || undefined"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                :title="berkas.original_filename || berkas.filename"
+                              >
+                                <VIcon
+                                  :icon="getAttachmentIcon(berkas.mime_type)"
+                                  size="14"
+                                />
+
+                                <span class="car-source-files__name">
+                                  {{ berkas.original_filename || berkas.filename }}
+                                </span>
+                              </a>
+                            </div>
+
+                            <!--
+                              Mulai dari sini bukti milik realisasi ini sendiri.
+
+                              Namanya hanya ditulis bila di atasnya memang ada kelompok lain.
+                              Pada baris tanpa lampiran FPU tidak ada yang perlu dibedakan, dan
+                              satu label menyendiri justru membuat sel sempit ini penuh tanpa
+                              menambah keterangan apa pun.
+                            -->
+                            <div
+                              v-if="(baris.item.source_attachments || []).length"
+                              class="car-own-files__title"
+                            >
+                              {{ t('cashAdvanceRealization.form.attachment.ownTitle') }}
+                            </div>
                             <input
                               :ref="el => setLineFileRef(el, baris.index)"
                               type="file"
@@ -2939,6 +3171,60 @@ onMounted(async () => {
 .car-col-bd-adv {
   inline-size: 9.5rem;
   min-inline-size: 9.5rem;
+}
+
+/*
+  Rujukan lampiran FPU.
+
+  Sengaja dibedakan dari kartu berkas di atas: yang ini bukan milik
+  dokumen yang sedang diisi, dan tampilannya harus langsung mengatakan
+  begitu -- latar redup, tanpa bingkai kartu, tanpa tombol apa pun.
+*/
+.car-source-files {
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  gap: 0.125rem;
+  padding-block: 0.375rem;
+  padding-inline: 0.5rem;
+}
+
+.car-source-files__title {
+  display: flex;
+  align-items: center;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 0.7rem;
+  gap: 0.25rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.car-source-files__item {
+  display: flex;
+  align-items: center;
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  gap: 0.25rem;
+  min-inline-size: 0;
+  text-decoration: none;
+}
+
+.car-source-files__item:hover .car-source-files__name {
+  text-decoration: underline;
+}
+
+.car-source-files__name {
+  overflow: hidden;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.car-own-files__title {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 /* Kartu berkas yang menempel pada satu baris rincian. */

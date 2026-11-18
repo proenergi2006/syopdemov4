@@ -55,6 +55,7 @@
     },
     "httpStatus": {
         "noConnection": "Tidak dapat terhubung ke server.",
+        "uploadTimeout": "Pengiriman melebihi batas waktu sebelum seluruh lampiran selesai diunggah, sehingga dokumen TIDAK tersimpan. Kurangi atau perkecil lampirannya, lalu coba lagi.",
         "badRequest": "Permintaan tidak valid.",
         "sessionExpired": "Sesi Anda telah berakhir. Silakan login kembali.",
         "forbidden": "Anda tidak memiliki akses.",

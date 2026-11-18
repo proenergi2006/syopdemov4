@@ -2,7 +2,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import axios from '@axios'
+import axios, { UPLOAD_TIMEOUT_MS } from '@axios'
+
 import {
   closeAlert,
   showConfirmAlert,
@@ -17,6 +18,7 @@ import type { RevisionEntry } from '@/components/fund_request/revision'
 import { formatSanitizedNumberInput } from '@/utils/textFormatter'
 import { usePermissionStore } from '@/stores/permission'
 import { useDialogDatePicker } from '@core/composable/useDialogDatePicker'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 interface ClaimItemForm {
 
@@ -500,7 +502,7 @@ const formatMoney = (value: number | null | undefined): string => {
   if (!value)
     return ''
 
-  return new Intl.NumberFormat('id-ID').format(Number(value))
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(Number(value))
 }
 
 const getExtension = (fileName: string): string =>
@@ -1344,6 +1346,27 @@ const buildFormData = (): FormData => {
     })
   })
 
+  /*
+   * MENYATAKAN BERAPA BERKAS YANG DIBERANGKATKAN.
+   *
+   * PHP membatasi jumlah berkas per pengiriman (max_file_uploads, bawaannya
+   * 20). Berkas selebihnya tidak ditolak -- mereka hanya tidak sampai, tanpa
+   * kode galat dan tanpa jejak apa pun yang tersisa di sisi server. Pernah
+   * terukur: 25 lampiran dikirim, 20 tersimpan, dokumennya dinyatakan
+   * berhasil disimpan, dan lima bukti pengeluaran hilang tanpa seorang pun
+   * diberi tahu.
+   *
+   * Angka ini satu-satunya pembanding yang dipunyai server. Dibaca
+   * ExplainUploadFailure, yang membatalkan penyimpanan bila jumlahnya tidak
+   * cocok dengan yang sampai.
+   */
+  const jumlahLampiran = form.items.reduce(
+    (total, item) => total + item.attachments.length,
+    0,
+  )
+
+  formData.append('attachment_count', String(jumlahLampiran))
+
   return formData
 }
 
@@ -1380,7 +1403,21 @@ const updateClaim = async (event?: Event): Promise<void> => {
     await axios.post(
       `/fund-request/claim/${publicId.value}`,
       buildFormData(),
-      { headers: { Accept: 'application/json' } },
+      {
+        headers: { Accept: 'application/json' },
+
+        /*
+         * Tenggat dilonggarkan khusus untuk pengiriman berlampiran.
+         *
+         * Tenggat bawaan axios 30 detik dihitung sejak permintaan berangkat,
+         * jadi ia ikut membatasi waktu MENGUNGGAH, bukan sekadar menunggu
+         * jawaban. Beberapa lampiran 3 MB di jaringan kantor biasa sudah
+         * melewati angka itu, dan begitu tenggatnya habis pengiriman
+         * diputus di tengah jalan -- server tidak pernah menerima
+         * kirimannya utuh, sehingga tidak ada yang tersimpan.
+         */
+        timeout: UPLOAD_TIMEOUT_MS,
+      },
     )
 
     closeAlert()
