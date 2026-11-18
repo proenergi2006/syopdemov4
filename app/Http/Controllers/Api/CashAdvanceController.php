@@ -345,6 +345,35 @@ class CashAdvanceController extends Controller
 
                         'can_submit' => $rowCanSubmit,
                         'can_approve' => $currentApproval !== null,
+                        /*
+                        | Penentu tombol "Batalkan", DIHITUNG PER BARIS.
+                        |
+                        | Izin batal punya cakupannya sendiri -- OWN_DATA,
+                        | OWN_CABANG, dan seterusnya -- dan cakupan itu
+                        | selama ini hanya ditegakkan di server. Layarnya
+                        | cukup bertanya "punya izin batal atau tidak",
+                        | sehingga tombolnya muncul di SETIAP dokumen yang
+                        | boleh dilihat, termasuk milik orang lain.
+                        |
+                        | Yang menekannya memang tidak berhasil membatalkan
+                        | apa pun; servernya menjawab "tidak ditemukan". Tapi
+                        | kalimat itu tiba setelah ia mengetik alasan
+                        | pembatalan, dan yang ia simpulkan bukan "saya tidak
+                        | berhak" melainkan "sistemnya rusak".
+                        |
+                        | Dihitung dengan penjaga yang SAMA PERSIS dengan
+                        | yang dipakai cancel(), bukan aturan tiruan.
+                        */
+                        'can_cancel' => DocumentActionScope::allows(
+                            $user,
+                            'cash_advance.cancel',
+                            $cashAdvance,
+                            [
+                                'branch' => 'branch',
+                                'department' => 'department_id',
+                                'owner' => 'created_by',
+                            ],
+                        ),
 
                         /*
                         | Penanda revisi untuk daftar.
@@ -2041,23 +2070,27 @@ class CashAdvanceController extends Controller
     |--------------------------------------------------------------------------
     | Kembalikan FPU ke pemohon untuk direvisi
     |--------------------------------------------------------------------------
-    | DUA PINTU, DAN STATUSNYA YANG MEMILIH.
+    | SATU PINTU: APPROVER YANG SEDANG MEMEGANG DOKUMENNYA.
     |
-    |  - IN PROGRESS : approver yang sedang memegang dokumennya. Penjaganya
-    |                  sama dengan tombol Setujui -- getUserCurrentApproval
-    |                  sekaligus menolak pemohon atas dokumennya sendiri.
+    | Statusnya harus IN PROGRESS, dan penjaganya sama dengan tombol Setujui --
+    | getUserCurrentApproval sekaligus menolak pemohon atas dokumennya sendiri.
     |
-    |  - RECEIVED    : Finance yang berkasnya baru diterima. Di sini
-    |                  penerimaannya ikut ditarik dan tanggal pembayaran yang
-    |                  sudah dijanjikan dibatalkan, jadi penjaganya izin
-    |                  cash_advance.unreceive -- izin yang memang sudah
-    |                  mengatur pekerjaan itu.
+    | PINTU PENERIMAAN SENGAJA DITUTUP.
     |
-    | Yang sudah dicairkan tidak lewat pintu mana pun: uangnya sudah keluar,
-    | dan yang tersisa adalah dokumen Realisasi, bukan revisi.
+    | Dahulu Finance pun bisa menyuruh revisi dari status RECEIVED lewat izin
+    | unreceive. Itu menaruh dua wewenang berbeda di satu tombol: menarik
+    | penerimaan berkas urusan Finance, sedangkan menilai isi dokumen dan
+    | menyuruh memperbaikinya urusan approver. Pemegang izin unreceive belum
+    | tentu pernah menilai dokumen itu, sementara dokumen yang ia kembalikan
+    | berputar ulang lewat SELURUH rantai approval atas penilaian orang yang
+    | tidak berdiri di dalam rantai itu.
     |
-    | Satu endpoint untuk keduanya, karena bagi yang memakainya ini satu
-    | tindakan yang sama: mengembalikan dokumen kepada pemohonnya.
+    | Jalan mundur Finance tetap utuh lewat "Batalkan Terima": dokumennya
+    | kembali ke APPROVED, jadwal pembayarannya dibatalkan, isinya tidak
+    | disentuh, dan tidak ada yang perlu mengulang approval.
+    |
+    | Yang sudah dicairkan juga tidak lewat sini: uangnya sudah keluar, dan
+    | yang tersisa adalah dokumen Realisasi, bukan revisi.
     |--------------------------------------------------------------------------
     */
     public function returnForRevision(
@@ -2115,15 +2148,6 @@ class CashAdvanceController extends Controller
                     from: FundRequestRevision::FROM_APPROVAL,
                     stepOrder: (int) $approval->step_order,
                     stepLabel: $approval->label,
-                );
-            } elseif ($status === CashAdvance::STATUS_RECEIVED) {
-                $hasil = $revisionService->kembalikan(
-                    document: $cashAdvance,
-                    user: $user,
-                    reason: $validated['reason'],
-                    permission: 'cash_advance.unreceive',
-                    from: FundRequestRevision::FROM_RECEIPT,
-                    approvedStatus: CashAdvance::STATUS_APPROVED,
                 );
             } else {
                 DB::rollBack();

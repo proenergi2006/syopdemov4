@@ -170,6 +170,22 @@ class DocumentRevisionService
         | bahwa tanggal pembayaran harus ikut batal, dan itu satu-satunya
         | tempat aturan tersebut tinggal.
         */
+        /*
+        | TIDAK ADA PEMANGGIL LAGI, per 18 November 2026.
+        |
+        | FPU, Claim, dan Realisasi dahulu bertiga membuka pintu ini: Finance
+        | boleh menyuruh revisi dari status RECEIVED lewat izin unreceive.
+        | Ketiganya ditutup karena itu menaruh dua wewenang berbeda di satu
+        | tombol -- menarik penerimaan berkas urusan Finance, menilai isi
+        | dokumen urusan approver. Mengembalikan dokumen untuk direvisi kini
+        | hanya lewat FROM_APPROVAL.
+        |
+        | Cabangnya DIBIARKAN berdiri, bukan karena ada yang memakainya,
+        | melainkan karena ia yang memegang aturan "penerimaan ditarik dulu,
+        | jadwal pembayaran ikut batal". Modul yang kelak memerlukan pintu
+        | serupa tidak perlu menyusunnya ulang dari awal -- dan menyusunnya
+        | ulang adalah cara paling mudah melupakan pembatalan jadwalnya.
+        */
         if ($from === FundRequestRevision::FROM_RECEIPT) {
             /*
             | Pintu ini menuntut keduanya: status tujuan penarikannya, dan

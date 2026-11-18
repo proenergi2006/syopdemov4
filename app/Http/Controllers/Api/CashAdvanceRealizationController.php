@@ -26,6 +26,8 @@ use App\Models\CashAdvanceRealization;
 use App\Models\CashAdvanceRealizationApproval;
 use App\Models\CashAdvanceRealizationAttachment;
 use App\Models\CashAdvanceRealizationItem;
+use App\Models\CashAdvanceRealizationReturnDeclaration;
+use App\Models\User;
 use App\Services\FundRequest\Realization\CashAdvanceRealizationApprovalGeneratorService;
 use App\Services\FundRequest\Realization\CashAdvanceRealizationApprovalService;
 use App\Services\FundRequest\Realization\CashAdvanceRealizationMailService;
@@ -132,6 +134,20 @@ class CashAdvanceRealizationController extends Controller
                 'can_verify' => $user->hasPermission(self::PERMISSION_PREFIX . '.verify'),
                 'can_return' => $user->hasPermission(self::PERMISSION_PREFIX . '.return'),
                 'can_reimburse' => $user->hasPermission(self::PERMISSION_PREFIX . '.reimburse'),
+
+                /*
+                | Tiga izin tersendiri, bukan turunan dari .receive.
+                |
+                | Mengonfirmasi menutup dokumen, menolak melemparkannya
+                | kembali ke pemohon, dan approve tanpa selisih menutup
+                | dokumen yang tidak pernah melibatkan perpindahan uang.
+                | Ketiganya penilaian yang berbeda dari sekadar menerima
+                | berkas, jadi mejanya bisa dipisahkan lewat matriks tanpa
+                | menyentuh kode.
+                */
+                'can_confirm_return' => $user->hasPermission(self::PERMISSION_PREFIX . '.confirm_return'),
+                'can_reject_return' => $user->hasPermission(self::PERMISSION_PREFIX . '.reject_return'),
+                'can_finalize' => $user->hasPermission(self::PERMISSION_PREFIX . '.finalize'),
             ];
 
             $query = CashAdvanceRealization::query()
@@ -280,6 +296,49 @@ class CashAdvanceRealizationController extends Controller
                         'can_submit' => $rowCanSubmit,
                         'can_approve' => $currentApproval !== null,
                         'approval_label' => $currentApproval?->label,
+
+                        /*
+                        | Penentu tombol "Kembalikan Sisa Dana". Izinnya saja
+                        | tidak cukup: yang memegang uangnya hanya pemohon,
+                        | dan tanpa penanda ini layar akan menawarkan tombol
+                        | itu pada dokumen orang lain -- lalu servernya yang
+                        | menolak, sesudah formulirnya diisi.
+                        */
+                        'is_requester' => $this->isRequesterOf($realization, $user),
+
+                        /*
+                        | Penentu tombol "Batalkan", DIHITUNG PER BARIS.
+                        |
+                        | Izin batal punya cakupannya sendiri -- OWN_DATA,
+                        | OWN_CABANG, dan seterusnya -- dan cakupan itu
+                        | selama ini hanya ditegakkan di server. Layarnya
+                        | cukup bertanya "punya izin batal atau tidak",
+                        | sehingga tombolnya muncul di SETIAP dokumen yang
+                        | boleh dilihat, termasuk milik orang lain.
+                        |
+                        | Yang menekannya memang tidak berhasil membatalkan
+                        | apa pun; servernya menjawab "tidak ditemukan". Tapi
+                        | kalimat itu tiba setelah ia mengetik alasan
+                        | pembatalan, dan yang ia simpulkan bukan "saya tidak
+                        | berhak" melainkan "sistemnya rusak".
+                        |
+                        | Dihitung dengan penjaga yang SAMA PERSIS dengan
+                        | yang dipakai cancel(), bukan aturan tiruan: dua
+                        | aturan yang berdiri sendiri-sendiri pada akhirnya
+                        | akan berselisih, dan yang berselisih di sini
+                        | memunculkan kembali tombol yang baru saja
+                        | disembunyikan.
+                        */
+                        'can_cancel' => DocumentActionScope::allows(
+                            $user,
+                            self::PERMISSION_PREFIX . '.cancel',
+                            $realization,
+                            [
+                                'branch' => 'branch',
+                                'department' => 'department_id',
+                                'owner' => 'created_by',
+                            ],
+                        ),
 
                         /*
                         | Penanda revisi untuk daftar. Inilah satu-satunya
@@ -735,7 +794,7 @@ class CashAdvanceRealizationController extends Controller
 
             $itemIdsByIndex = $this->writeItems($realization, $items);
 
-            $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, []);
+            $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, [], $items);
 
             /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
             app(BusinessTripExpenseBreakdownService::class)->syncArranged(
@@ -842,6 +901,8 @@ class CashAdvanceRealizationController extends Controller
                 'canceller:id,name',
                 'receiver:id,name',
                 'settler:id,name',
+                'returnDeclarer:id,name',
+                'verifier:id,name',
                 'approvals' => function ($approvalQuery) {
                     $approvalQuery->orderBy('step_order')->orderBy('id');
                 },
@@ -858,7 +919,7 @@ class CashAdvanceRealizationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => __('cash_advance_realization_messages.show.loaded'),
-                'data' => $this->transformDetail($realization, $currentApproval),
+                'data' => $this->transformDetail($realization, $currentApproval, $user),
             ], 200);
         } catch (\Throwable $e) {
             Log::error('[Realisasi FPU] Show error', [
@@ -1214,7 +1275,7 @@ class CashAdvanceRealizationController extends Controller
 
             $deletedIds = $this->requestedDeletedAttachmentIds($request);
 
-            $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, $deletedIds);
+            $this->assertEveryLineHasAttachment($request, $itemIdsByIndex, $deletedIds, $items);
 
             /* Penanda kategori yang diurus GA, ditulis ulang seluruhnya. */
             app(BusinessTripExpenseBreakdownService::class)->syncArranged(
@@ -1865,18 +1926,24 @@ class CashAdvanceRealizationController extends Controller
     |--------------------------------------------------------------------------
     | Kembalikan Realisasi ke pemohon untuk direvisi
     |--------------------------------------------------------------------------
-    | DUA PINTU, DAN STATUSNYA YANG MEMILIH.
+    | SATU PINTU: APPROVER YANG SEDANG MEMEGANG DOKUMENNYA.
     |
-    |  - IN PROGRESS : approver yang sedang memegang dokumennya. Penjaganya
-    |                  sama dengan tombol Setujui.
+    | Statusnya harus IN PROGRESS, dan penjaganya sama persis dengan tombol
+    | Setujui -- yang berhak menyuruh memperbaiki adalah yang berhak menilai.
     |
-    |  - RECEIVED    : Finance yang berkasnya baru diterima. Penerimaannya
-    |                  ikut ditarik dan tanggal pembayarannya dibatalkan,
-    |                  jadi penjaganya izin cash_advance_realization.unreceive.
+    | PINTU PENERIMAAN SENGAJA DITUTUP.
     |
-    | VERIFIED dan SETTLED sengaja TIDAK termasuk. Yang sudah diverifikasi
-    | sudah diteruskan ke tahap berikutnya, dan yang sudah selesai sudah
-    | tuntas perhitungannya -- keduanya bukan lagi berkas yang baru diterima.
+    | Dahulu Finance pun bisa menyuruh revisi dari status RECEIVED, lewat izin
+    | unreceive. Pada praktiknya itu menaruh dua wewenang berbeda di satu
+    | tombol: menarik penerimaan berkas adalah urusan Finance, sedangkan
+    | menilai isi dokumen dan menyuruh memperbaikinya adalah urusan approver.
+    | Yang memegang izin unreceive belum tentu pernah menilai dokumen itu,
+    | dan dokumen yang dikembalikan olehnya berputar ulang lewat SELURUH
+    | rantai approval atas penilaian orang yang tidak ada dalam rantai itu.
+    |
+    | Finance tetap punya jalan mundurnya sendiri lewat "Batalkan Terima":
+    | dokumennya kembali ke APPROVED tanpa menyentuh isinya dan tanpa
+    | memaksa siapa pun mengulang approval.
     |--------------------------------------------------------------------------
     */
     public function returnForRevision(
@@ -1934,15 +2001,6 @@ class CashAdvanceRealizationController extends Controller
                     from: FundRequestRevision::FROM_APPROVAL,
                     stepOrder: (int) $approval->step_order,
                     stepLabel: $approval->label,
-                );
-            } elseif ($status === CashAdvanceRealization::STATUS_RECEIVED) {
-                $hasil = $revisionService->kembalikan(
-                    document: $realization,
-                    user: $user,
-                    reason: $validated['reason'],
-                    permission: 'cash_advance_realization.unreceive',
-                    from: FundRequestRevision::FROM_RECEIPT,
-                    approvedStatus: CashAdvanceRealization::STATUS_APPROVED,
                 );
             } else {
                 DB::rollBack();
@@ -2362,44 +2420,33 @@ class CashAdvanceRealizationController extends Controller
             $diterimaPada = now();
 
             /*
-            | Realisasi yang selisihnya nol ditutup saat diterima.
+            | Realisasi yang selisihnya nol masuk ke pemeriksaan, BUKAN
+            | langsung ditutup.
             |
-            | Tidak ada yang perlu dibayarkan dan tidak ada yang perlu
-            | dikembalikan, jadi tidak ada langkah kedua yang masuk akal.
-            | Tombol terpisah yang jawabannya selalu sama bukan pilihan, ia
-            | hambatan.
+            | Dahulu ia ditutup di detik yang sama dengan diterimanya, dengan
+            | alasan tidak ada uang yang perlu berpindah sehingga tidak ada
+            | langkah kedua yang masuk akal. Alasan itu keliru pada satu hal:
+            | tidak ada uang yang berpindah bukan berarti tidak ada yang perlu
+            | diperiksa. Angka yang kebetulan pas justru paling mudah dilewatkan
+            | begitu saja -- dan sekali dokumennya tertutup, tidak ada lagi
+            | yang bisa membukanya.
             |
-            | Diterima DAN selesai dicatat sekaligus: keduanya memang terjadi,
-            | oleh orang yang sama, pada saat yang sama. received_* tetap
-            | terisi -- fakta bahwa berkasnya pernah diterima tidak hilang
-            | hanya karena penutupannya menyusul dalam detik yang sama.
+            | Sekarang ia berhenti di ON CHECKING sampai ada yang menyatakan
+            | angkanya memang sudah benar, lewat izin .finalize.
             */
             $tanpaSelisih = strtoupper((string) $realization->difference_type)
                 === CashAdvanceRealization::DIFFERENCE_NONE;
 
-            $perubahan = [
+            $realization->update([
                 'status' => $tanpaSelisih
-                    ? CashAdvanceRealization::STATUS_SETTLED
+                    ? CashAdvanceRealization::STATUS_ON_CHECKING
                     : CashAdvanceRealization::STATUS_RECEIVED,
 
                 'received_by' => $user->id,
                 'received_at' => $diterimaPada,
                 'receipt_notes' => $this->clean($validated['notes'] ?? '') ?: null,
                 'scheduled_payment_date' => $this->jadwalBayarRealisasi($realization, $diterimaPada),
-            ];
-
-            if ($tanpaSelisih) {
-                /*
-                | Nominal penyelesaiannya nol, bukan null: tidak ada uang yang
-                | berpindah, dan itu angka yang diketahui -- bukan angka yang
-                | belum diisi.
-                */
-                $perubahan['settled_by'] = $user->id;
-                $perubahan['settled_at'] = $diterimaPada;
-                $perubahan['settlement_amount'] = 0;
-            }
-
-            $realization->update($perubahan);
+            ]);
 
             $storedPaths = $this->storeAttachments(
                 $request,
@@ -2613,10 +2660,28 @@ class CashAdvanceRealizationController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
+            /*
+            | Status asalnya mengikuti cabang dokumennya.
+            |
+            | Yang berselisih menunggu di RECEIVED, yang nilainya pas menunggu
+            | di ON CHECKING -- dua nama untuk satu keadaan yang sama:
+            | berkasnya sudah di tangan Finance dan belum ditutup. Keduanya
+            | sama-sama boleh ditarik kembali.
+            |
+            | Dibaca dari dokumennya, bukan ditebak dari jenis selisihnya:
+            | layanannya akan menolak bila statusnya ternyata bukan salah satu
+            | dari keduanya, dan penolakan itulah penjaganya.
+            */
+            $statusSekarang = strtoupper((string) $realization->status);
+
+            $statusAsal = $statusSekarang === CashAdvanceRealization::STATUS_ON_CHECKING
+                ? CashAdvanceRealization::STATUS_ON_CHECKING
+                : CashAdvanceRealization::STATUS_RECEIVED;
+
             $hasil = app(ReceiptReversalService::class)->revert(
                 document: $realization,
                 approvedStatus: CashAdvanceRealization::STATUS_APPROVED,
-                receivedStatus: CashAdvanceRealization::STATUS_RECEIVED,
+                receivedStatus: $statusAsal,
                 user: $user,
                 permission: 'cash_advance_realization.unreceive',
                 notes: $validated['notes'],
@@ -2714,8 +2779,20 @@ class CashAdvanceRealizationController extends Controller
 
                     $diterimaPada = now();
 
+                    /*
+                    | Percabangannya sama persis dengan receive() satuan.
+                    | Dua jalan masuk ke satu meja yang menulis status
+                    | berbeda adalah cara paling mudah melahirkan dokumen
+                    | yang tersangkut: yang masuk lewat centang massal akan
+                    | berhenti di RECEIVED tanpa ada satu pun tombol yang
+                    | melayani status itu pada cabang tanpa selisih.
+                    */
                     $terkunci->update([
-                        'status' => CashAdvanceRealization::STATUS_RECEIVED,
+                        'status' => strtoupper((string) $terkunci->difference_type)
+                            === CashAdvanceRealization::DIFFERENCE_NONE
+                                ? CashAdvanceRealization::STATUS_ON_CHECKING
+                                : CashAdvanceRealization::STATUS_RECEIVED,
+
                         'received_by' => $user->id,
                         'received_at' => $diterimaPada,
                         'scheduled_payment_date' => $this->jadwalBayarRealisasi($terkunci, $diterimaPada),
@@ -2908,32 +2985,728 @@ class CashAdvanceRealizationController extends Controller
         ], 200);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pemohon menyatakan sisa dananya sudah dikembalikan
+    |--------------------------------------------------------------------------
+    | UANGNYA BERPINDAH DI LUAR SISTEM. Pemohon mentransfer atau menyerahkan
+    | sisa dananya ke Finance, lalu menandainya di sini. Yang direkam aksi ini
+    | hanya pengakuan beserta buktinya -- tidak ada uang yang berpindah karena
+    | tombol ini ditekan.
+    |
+    | YANG MENEKAN HARUS PEMOHONNYA SENDIRI.
+    |
+    | Ini pembeda terbesarnya dari pembayaran kekurangan di seberangnya. Yang
+    | membayar kekurangan adalah Finance, dan Finance boleh mengerjakan dokumen
+    | siapa pun. Yang mengembalikan sisa dana adalah orang yang memegang
+    | uangnya, dan hanya satu orang yang memegang uang itu: pemohon dokumen
+    | ini. Tanpa penjagaan di bawah, siapa pun pemegang izin bisa menyatakan
+    | uang orang lain sudah kembali -- dan dokumennya tertutup sementara
+    | uangnya masih di tangan orang yang tidak pernah diminta mengembalikannya.
+    |
+    | PENGAKUANNYA TIDAK MENUTUP DOKUMEN.
+    |
+    | Statusnya berhenti di RETURN DECLARED, bukan SETTLED. Yang mengaku adalah
+    | pihak yang berkepentingan atas pengakuannya sendiri; yang berhak menyebut
+    | uangnya benar-benar masuk adalah yang menghitungnya, dan itu Finance --
+    | lihat confirmReturnDifference() di bawah.
+    |
+    | Hari pembayaran TIDAK diperiksa di sini. Yang dibatasi hari kasir adalah
+    | uang yang keluar dari kas, sedangkan ini uang yang masuk, dan tanggal
+    | transfernya sudah lewat sebelum layar ini dibuka. Pemeriksaannya ada di
+    | langkah konfirmasi, di meja yang memang memakai kalender itu.
+    |--------------------------------------------------------------------------
+    */
     public function returnDifference(
         string $publicId,
         Request $request,
         CashAdvanceRealizationNotificationService $notificationService,
         CashAdvanceRealizationMailService $mailService,
     ): JsonResponse {
-        return $this->closeDifference(
-            $publicId,
-            $request,
-            $notificationService,
-            $mailService,
-            CashAdvanceRealization::DIFFERENCE_RETURN,
-            self::PERMISSION_PREFIX . '.return',
-            'return',
+        $user = $request->user();
+
+        if (!$user || !$user->hasPermission(self::PERMISSION_PREFIX . '.return')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.return.forbidden'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'settlement_amount' => ['required', 'numeric', 'min:0'],
 
             /*
             | Bukti transfer WAJIB.
             |
-            | Yang menyerahkan uang adalah pihak yang juga membuat dokumennya;
-            | tanpa bukti, tidak ada yang bisa memverifikasi bahwa uangnya
-            | benar-benar berpindah. Berbeda dari pembayaran kekurangan, yang
-            | dicatat Finance sendiri dan akan diprotes pemohon bila tidak
-            | benar-benar diterima.
+            | Yang menyerahkan uang adalah pihak yang berkepentingan atas
+            | pengakuannya sendiri. Tanpa bukti, Finance diminta mengonfirmasi
+            | sesuatu yang tidak bisa ia periksa.
             */
-            attachmentRequired: true,
-        );
+            'attachments' => ['required', 'array'],
+            'attachments.*' => [
+                'file',
+                'mimes:' . self::ATTACHMENT_MIMES,
+                'max:' . self::ATTACHMENT_MAX_KB,
+            ],
+        ], [
+            'attachments.required' => __(
+                'cash_advance_realization_messages.return.attachment_required',
+            ),
+        ]);
+
+        DB::beginTransaction();
+
+        $storedPaths = [];
+
+        try {
+            $id = Crypt::decryptString($publicId);
+
+            $realization = CashAdvanceRealization::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (strtoupper((string) $realization->status) !== CashAdvanceRealization::STATUS_RECEIVED) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_realization_messages.return.only_received'),
+                ], 422);
+            }
+
+            if (
+                strtoupper((string) $realization->difference_type)
+                !== CashAdvanceRealization::DIFFERENCE_RETURN
+            ) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_realization_messages.return.wrong_difference'),
+                ], 422);
+            }
+
+            if (!$this->isRequesterOf($realization, $user)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_realization_messages.return.only_requester'),
+                ], 403);
+            }
+
+            /*
+            | Nominalnya harus sama persis dengan selisih dokumen. Pengembalian
+            | sebagian tidak bisa dicatat: dokumennya hanya punya satu tempat
+            | untuk satu angka, jadi sisa yang belum kembali tidak akan punya
+            | tempat tinggal.
+            */
+            $expectedAmount = round(abs((float) $realization->difference_amount), 2);
+            $paidAmount = round((float) $validated['settlement_amount'], 2);
+
+            if ($paidAmount !== $expectedAmount) {
+                DB::rollBack();
+
+                $pesan = __('cash_advance_realization_messages.return.amount_mismatch', [
+                    'expected' => angka($expectedAmount, 0),
+                    'given' => angka($paidAmount, 0),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $pesan,
+                    'errors' => ['settlement_amount' => [$pesan]],
+                ], 422);
+            }
+
+            $dinyatakanPada = now();
+            $catatan = $this->clean($validated['notes'] ?? '') ?: null;
+
+            $realization->update([
+                'status' => CashAdvanceRealization::STATUS_RETURN_DECLARED,
+                'return_declared_by' => $user->id,
+                'return_declared_at' => $dinyatakanPada,
+                'return_declaration_notes' => $catatan,
+
+                /*
+                | Nominalnya ikut direkam sekarang, bukan menunggu konfirmasi.
+                | Angka yang diakui pemohon adalah bagian dari pengakuannya;
+                | menyimpannya belakangan berarti layar Finance menampilkan
+                | angka yang tidak pernah benar-benar dinyatakan siapa pun.
+                */
+                'settlement_amount' => $paidAmount,
+            ]);
+
+            /*
+            | Barisnya sendiri untuk percobaan ini.
+            |
+            | Nomornya dihitung dari yang sudah ada, di dalam transaksi yang
+            | sudah mengunci dokumennya -- jadi dua pernyataan yang tiba
+            | bersamaan tidak bisa melahirkan dua percobaan bernomor sama.
+            */
+            $percobaan = CashAdvanceRealizationReturnDeclaration::create([
+                'cash_advance_realization_id' => $realization->id,
+                'attempt' => 1 + (int) CashAdvanceRealizationReturnDeclaration::query()
+                    ->where('cash_advance_realization_id', $realization->id)
+                    ->max('attempt'),
+                'declared_by' => $user->id,
+                'declared_at' => $dinyatakanPada,
+                'declared_amount' => $paidAmount,
+                'declaration_notes' => $catatan,
+                'status' => CashAdvanceRealizationReturnDeclaration::STATUS_PENDING,
+            ]);
+
+            $storedPaths = $this->storeAttachments(
+                $request,
+                $realization,
+                CashAdvanceRealizationAttachment::TYPE_SETTLEMENT,
+            );
+
+            /*
+            | Buktinya diikat ke percobaan ini.
+            |
+            | Tanpa ini, bukti yang ditolak pada percobaan pertama berbaur
+            | dengan bukti percobaan kedua dalam satu daftar, dan yang
+            | membacanya tidak punya cara membedakan mana yang keliru.
+            |
+            | Diikat lewat jalur yang baru saja ditulis, bukan "semua
+            | SETTLEMENT milik dokumen ini": yang kedua akan ikut menyeret
+            | bukti percobaan sebelumnya.
+            */
+            if ($storedPaths !== []) {
+                CashAdvanceRealizationAttachment::query()
+                    ->where('cash_advance_realization_id', $realization->id)
+                    ->where('attachment_type', CashAdvanceRealizationAttachment::TYPE_SETTLEMENT)
+                    ->whereNull('return_declaration_id')
+                    ->whereIn('filepath', $storedPaths)
+                    ->update(['return_declaration_id' => $percobaan->id]);
+            }
+
+            DB::commit();
+
+            $realization->refresh();
+
+            try {
+                $notificationService->notifyReturnDeclared($realization, $user);
+
+                $mailService->sendReturnDeclared($realization, $user);
+            } catch (\Throwable $notifyError) {
+                Log::error('[Realisasi FPU] Notify pernyataan pengembalian gagal', [
+                    'cash_advance_realization_id' => $realization->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('cash_advance_realization_messages.return.success'),
+                'data' => [
+                    'id' => $realization->id,
+                    'public_id' => $realization->encrypted_id,
+                    'status' => $realization->status,
+                    'return_declared_at' => $realization->return_declared_at,
+
+                    'settlement_attachments' => $this->transformSettlementAttachments(
+                        $realization->load('attachments'),
+                    ),
+                ],
+            ], 200);
+        } catch (DecryptException | ModelNotFoundException $e) {
+            DB::rollBack();
+            $this->cleanupStoredFiles($storedPaths);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.not_found'),
+            ], 404);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $this->cleanupStoredFiles($storedPaths);
+
+            Log::error('[Realisasi FPU] Pernyataan pengembalian error', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.return.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Finance mengonfirmasi uangnya benar-benar masuk
+    |--------------------------------------------------------------------------
+    | Titik dokumennya benar-benar tutup. Sampai aksi ini dijalankan, yang ada
+    | barulah pengakuan pemohon.
+    |
+    | Penjaganya IZIN TERSENDIRI, bukan izin penerimaan dan bukan pula izin
+    | pengembalian. Menerima berkas dan menyatakan uang sudah masuk ke
+    | rekening perusahaan adalah dua penilaian berbeda, dan yang kedua menutup
+    | dokumen; selama keduanya satu izin, memisahkan mejanya kelak berarti
+    | mengubah kode, bukan mengubah matriks. Izin pengembalian sendiri sudah
+    | menjadi milik pemohon, jadi memakainya di sini akan mengembalikan
+    | persoalan yang baru saja dipisahkan.
+    |
+    | Hari pembayaran diperiksa DI SINI, bukan pada pengakuannya: kalender itu
+    | kalender kasir, dan inilah langkah yang dikerjakan kasir.
+    |--------------------------------------------------------------------------
+    */
+    public function confirmReturnDifference(
+        string $publicId,
+        Request $request,
+        CashAdvanceRealizationNotificationService $notificationService,
+        CashAdvanceRealizationMailService $mailService,
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (!$user || !$user->hasPermission(self::PERMISSION_PREFIX . '.confirm_return')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.confirm_return.forbidden'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+
+            /* Bukti tambahan dari sisi Finance -- mutasi rekening, misalnya. */
+            'attachments' => ['nullable', 'array'],
+            'attachments.*' => [
+                'file',
+                'mimes:' . self::ATTACHMENT_MIMES,
+                'max:' . self::ATTACHMENT_MAX_KB,
+            ],
+        ]);
+
+        DB::beginTransaction();
+
+        $storedPaths = [];
+
+        try {
+            $id = Crypt::decryptString($publicId);
+
+            $realization = CashAdvanceRealization::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (
+                strtoupper((string) $realization->status)
+                !== CashAdvanceRealization::STATUS_RETURN_DECLARED
+            ) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_realization_messages.confirm_return.only_declared'),
+                ], 422);
+            }
+
+            if (!$this->canPayToday('REALISASI', $realization->transaction_category_id)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('payment_schedule_messages.not_payment_day', [
+                        'days' => $this->paymentDaysText('REALISASI', $realization->transaction_category_id),
+                    ]),
+                ], 422);
+            }
+
+            $ditutupPada = now();
+            $catatan = $this->clean($validated['notes'] ?? '') ?: null;
+
+            $realization->update([
+                'status' => CashAdvanceRealization::STATUS_SETTLED,
+                'settled_by' => $user->id,
+                'settled_at' => $ditutupPada,
+                'settlement_notes' => $catatan,
+            ]);
+
+            /* Percobaan yang sedang berjalan ditutup dengan hasilnya. */
+            $this->percobaanBerjalan($realization)?->update([
+                'status' => CashAdvanceRealizationReturnDeclaration::STATUS_CONFIRMED,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => $ditutupPada,
+                'review_notes' => $catatan,
+            ]);
+
+            $storedPaths = $this->storeAttachments(
+                $request,
+                $realization,
+                CashAdvanceRealizationAttachment::TYPE_SETTLEMENT,
+            );
+
+            DB::commit();
+
+            $realization->refresh();
+
+            try {
+                $notificationService->notifySettled($realization, $user);
+
+                $mailService->sendSettled($realization, $user);
+            } catch (\Throwable $notifyError) {
+                Log::error('[Realisasi FPU] Notify konfirmasi pengembalian gagal', [
+                    'cash_advance_realization_id' => $realization->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('cash_advance_realization_messages.confirm_return.success'),
+                'data' => [
+                    'id' => $realization->id,
+                    'public_id' => $realization->encrypted_id,
+                    'status' => $realization->status,
+                    'settled_at' => $realization->settled_at,
+
+                    'settlement_attachments' => $this->transformSettlementAttachments(
+                        $realization->load('attachments'),
+                    ),
+                ],
+            ], 200);
+        } catch (DecryptException | ModelNotFoundException $e) {
+            DB::rollBack();
+            $this->cleanupStoredFiles($storedPaths);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.not_found'),
+            ], 404);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $this->cleanupStoredFiles($storedPaths);
+
+            Log::error('[Realisasi FPU] Konfirmasi pengembalian error', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.confirm_return.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Finance menolak pernyataan pengembalian
+    |--------------------------------------------------------------------------
+    | Tanpa pintu ini, langkah konfirmasi jadi perangkap. Uang yang ternyata
+    | tidak pernah masuk -- salah rekening, bukti keliru, nominalnya kurang --
+    | menyisakan dokumen yang tidak bisa dikonfirmasi dan tidak bisa pula
+    | dibatalkan, sehingga Finance tinggal punya dua pilihan: mengakui uang
+    | yang tidak ia terima, atau membiarkannya menggantung selamanya.
+    |
+    | Dokumennya kembali ke RECEIVED, bukan ke status lain: tempatnya sebelum
+    | pemohon menyatakan, dan dari sana pemohon bisa menyatakannya lagi dengan
+    | bukti yang benar.
+    |
+    | Percobaan yang ditolak TETAP TERSIMPAN sebagai barisnya sendiri, lengkap
+    | dengan alasan penolakannya dan bukti yang diunggahnya. Pemohon yang
+    | ditolak dua kali perlu bisa membaca lagi apa yang salah pada percobaan
+    | pertamanya, dan tidak seorang pun boleh kehilangan kenyataan bahwa
+    | dokumen ini sempat ditolak sebelum akhirnya diterima.
+    |
+    | Izinnya terpisah dari konfirmasi, sejalan dengan receive dan unreceive:
+    | mengonfirmasi menutup dokumen, menolak melemparkannya kembali ke pemohon
+    | beserta alasan yang akan ia baca.
+    |--------------------------------------------------------------------------
+    */
+    public function rejectReturnDeclaration(
+        string $publicId,
+        Request $request,
+        CashAdvanceRealizationNotificationService $notificationService,
+        CashAdvanceRealizationMailService $mailService,
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (!$user || !$user->hasPermission(self::PERMISSION_PREFIX . '.reject_return')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.reject_return.forbidden'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $id = Crypt::decryptString($publicId);
+
+            $realization = CashAdvanceRealization::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (
+                strtoupper((string) $realization->status)
+                !== CashAdvanceRealization::STATUS_RETURN_DECLARED
+            ) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_realization_messages.reject_return.only_declared'),
+                ], 422);
+            }
+
+            $alasan = $this->clean($validated['reason']);
+            $ditolakPada = now();
+
+            /* Ditutup lebih dulu, selagi nilainya masih yang ditolak. */
+            $this->percobaanBerjalan($realization)?->update([
+                'status' => CashAdvanceRealizationReturnDeclaration::STATUS_REJECTED,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => $ditolakPada,
+                'review_notes' => $alasan,
+            ]);
+
+            $realization->update([
+                'status' => CashAdvanceRealization::STATUS_RECEIVED,
+
+                /*
+                | Ketiga kolom cermin ini dikosongkan supaya dokumennya
+                | kembali terbaca sebagai "belum dinyatakan" -- riwayat
+                | lengkapnya sudah aman di barisnya sendiri.
+                */
+                'return_declared_by' => null,
+                'return_declared_at' => null,
+                'return_declaration_notes' => __(
+                    'cash_advance_realization_messages.reject_return.rejected_note',
+                    ['reason' => $alasan],
+                ),
+                'settlement_amount' => null,
+            ]);
+
+            DB::commit();
+
+            $realization->refresh();
+
+            try {
+                $notificationService->notifyReturnRejected($realization, $user, $alasan);
+
+                $mailService->sendReturnRejected($realization, $user, $alasan);
+            } catch (\Throwable $notifyError) {
+                Log::error('[Realisasi FPU] Notify penolakan pengembalian gagal', [
+                    'cash_advance_realization_id' => $realization->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('cash_advance_realization_messages.reject_return.success'),
+                'data' => [
+                    'id' => $realization->id,
+                    'public_id' => $realization->encrypted_id,
+                    'status' => $realization->status,
+                ],
+            ], 200);
+        } catch (DecryptException | ModelNotFoundException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.not_found'),
+            ], 404);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[Realisasi FPU] Penolakan pengembalian error', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.reject_return.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * Percobaan pengembalian yang sedang menunggu diperiksa, bila ada.
+     *
+     * Dicari menurut STATUS-nya, bukan menurut yang terbaru. Percobaan
+     * terbaru belum tentu yang menunggu -- dan menutup percobaan yang sudah
+     * ditolak sekali lagi akan menimpa alasan penolakan yang justru sedang
+     * dibaca pemohon.
+     */
+    private function percobaanBerjalan(
+        CashAdvanceRealization $realization,
+    ): ?CashAdvanceRealizationReturnDeclaration {
+        return CashAdvanceRealizationReturnDeclaration::query()
+            ->where('cash_advance_realization_id', $realization->id)
+            ->where('status', CashAdvanceRealizationReturnDeclaration::STATUS_PENDING)
+            ->orderByDesc('attempt')
+            ->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Approve realisasi yang nilainya PAS
+    |--------------------------------------------------------------------------
+    | Cabang ketiga, dan satu-satunya yang tidak melibatkan perpindahan uang.
+    | Realisasinya sama persis dengan pengajuannya: tidak ada kekurangan yang
+    | perlu dibayarkan, tidak ada sisa yang perlu dikembalikan.
+    |
+    | Justru karena itu ia dahulu tidak punya meja sama sekali -- dokumennya
+    | ditutup pada detik yang sama dengan diterimanya. Yang terlewat: tidak
+    | ada uang yang berpindah bukan berarti tidak ada yang perlu diperiksa,
+    | dan angka yang kebetulan pas adalah angka yang paling mudah dilewatkan.
+    |
+    | SEKALI DISETUJUI, TIDAK BISA DITARIK LAGI. Tidak ada tombol mundur dari
+    | SETTLED di cabang mana pun, dan cabang ini tidak membuat perkecualian.
+    |--------------------------------------------------------------------------
+    */
+    public function finalizeNoDifference(
+        string $publicId,
+        Request $request,
+        CashAdvanceRealizationNotificationService $notificationService,
+        CashAdvanceRealizationMailService $mailService,
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (!$user || !$user->hasPermission(self::PERMISSION_PREFIX . '.finalize')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.finalize.forbidden'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $id = Crypt::decryptString($publicId);
+
+            $realization = CashAdvanceRealization::query()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (
+                strtoupper((string) $realization->status)
+                !== CashAdvanceRealization::STATUS_ON_CHECKING
+            ) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_realization_messages.finalize.only_on_checking'),
+                ], 422);
+            }
+
+            /*
+            | Jenis selisihnya ikut dijaga, walau statusnya saja sudah hampir
+            | cukup. Hampir, bukan cukup: status ditulis beberapa tempat,
+            | sedangkan arah uang adalah sifat dokumennya. Yang menutup
+            | dokumen berselisih lewat pintu ini akan menutupnya tanpa ada
+            | sepeser pun yang benar-benar berpindah.
+            */
+            if (
+                strtoupper((string) $realization->difference_type)
+                !== CashAdvanceRealization::DIFFERENCE_NONE
+            ) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => __('cash_advance_realization_messages.finalize.only_no_difference'),
+                ], 422);
+            }
+
+            $realization->update([
+                'status' => CashAdvanceRealization::STATUS_SETTLED,
+                'settled_by' => $user->id,
+                'settled_at' => now(),
+                'settlement_notes' => $this->clean($validated['notes'] ?? '') ?: null,
+
+                /*
+                | Nol, bukan null: tidak ada uang yang berpindah, dan itu
+                | angka yang DIKETAHUI -- bukan angka yang belum diisi.
+                */
+                'settlement_amount' => 0,
+            ]);
+
+            DB::commit();
+
+            $realization->refresh();
+
+            try {
+                $notificationService->notifyFinalized($realization, $user);
+
+                $mailService->sendFinalized($realization, $user);
+            } catch (\Throwable $notifyError) {
+                Log::error('[Realisasi FPU] Notify approve tanpa selisih gagal', [
+                    'cash_advance_realization_id' => $realization->id,
+                    'message' => $notifyError->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => __('cash_advance_realization_messages.finalize.success'),
+                'data' => [
+                    'id' => $realization->id,
+                    'public_id' => $realization->encrypted_id,
+                    'status' => $realization->status,
+                    'settled_at' => $realization->settled_at,
+                ],
+            ], 200);
+        } catch (DecryptException | ModelNotFoundException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.not_found'),
+            ], 404);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('[Realisasi FPU] Approve tanpa selisih error', [
+                'public_id' => $publicId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('cash_advance_realization_messages.finalize.failed'),
+                'debug' => app()->environment('local') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * Apakah user ini pemohon dokumen tersebut.
+     *
+     * Diteruskan ke service approval, BUKAN dihitung ulang di sini. Aturannya
+     * sudah dipakai menentukan siapa yang tidak boleh menyetujui dokumennya
+     * sendiri; dua definisi "pemohon" yang berdiri sendiri-sendiri pada
+     * akhirnya akan berselisih, dan yang berselisih di sini menentukan siapa
+     * yang boleh menyatakan uang sudah kembali.
+     */
+    private function isRequesterOf(CashAdvanceRealization $realization, $user): bool
+    {
+        if (!$user instanceof User) {
+            return false;
+        }
+
+        return app(CashAdvanceRealizationApprovalService::class)
+            ->isRequester($realization, $user);
     }
 
     /** Finance membayar kekurangan kepada pemohon. Bukti opsional. */
@@ -2956,12 +3729,18 @@ class CashAdvanceRealizationController extends Controller
     }
 
     /**
-     * Inti kedua aksi penyelesaian selisih.
+     * Penutupan selisih di cabang KEKURANGAN.
      *
-     * Alurnya identik -- yang berbeda hanya jenis selisih yang dilayani,
-     * permission-nya, dan wajib-tidaknya lampiran. Disatukan supaya aturan
-     * status dan penanganan berkasnya tidak berpeluang menyimpang satu sama
-     * lain seiring waktu.
+     * Dahulu melayani kedua cabang sekaligus, karena keduanya memang satu
+     * peristiwa: Finance menekan tombol, dokumennya tertutup. Cabang
+     * pengembalian kini dua peristiwa di dua meja -- pemohon menyatakan,
+     * Finance mengonfirmasi -- sehingga ia punya jalurnya sendiri di
+     * returnDifference() dan confirmReturnDifference().
+     *
+     * Parameternya sengaja DIPERTAHANKAN apa adanya. Menyederhanakannya
+     * menjadi khusus-kekurangan berarti menghapus penjagaan jenis selisih
+     * dan permission dari badannya, dan penjagaan itu yang membuat satu
+     * cabang tidak bisa menutup dokumen cabang lain.
      */
     private function closeDifference(
         string $publicId,
@@ -3027,9 +3806,9 @@ class CashAdvanceRealizationController extends Controller
             | serah-terimanya -- tanpa ini status pemeriksaannya hanya hiasan
             | yang boleh dilewati.
             |
-            | Yang mencatat uang kembali tetap menuntut RECEIVED. Di sana
-            | tidak ada meja kedua: orang yang menerima dokumennya pula yang
-            | mencatat uangnya masuk.
+            | Cabang pengembalian tidak lagi lewat sini -- ia punya dua meja
+            | sendiri. Cabangnya tetap ditulis supaya pemanggil yang keliru
+            | tertahan di status, bukan menutup dokumen yang salah.
             */
             $statusDibutuhkan = $expectedDifferenceType === CashAdvanceRealization::DIFFERENCE_REIMBURSE
                 ? CashAdvanceRealization::STATUS_VERIFIED
@@ -3309,6 +4088,8 @@ class CashAdvanceRealizationController extends Controller
                         CashAdvanceRealization::STATUS_APPROVED,
                         CashAdvanceRealization::STATUS_RECEIVED,
                         CashAdvanceRealization::STATUS_VERIFIED,
+                        CashAdvanceRealization::STATUS_ON_CHECKING,
+                        CashAdvanceRealization::STATUS_RETURN_DECLARED,
                         CashAdvanceRealization::STATUS_SETTLED,
                     ],
                     true,
@@ -4283,6 +5064,13 @@ class CashAdvanceRealizationController extends Controller
                 CashAdvanceRealization::DIFFERENCE_RETURN,
             ],
 
+            /* Sudah dinyatakan pemohon, menunggu Finance mengonfirmasi. */
+            'CONFIRM_RETURN' => [
+                CashAdvanceRealization::STATUS_ON_CHECKING,
+                CashAdvanceRealization::STATUS_RETURN_DECLARED,
+                CashAdvanceRealization::DIFFERENCE_RETURN,
+            ],
+
             default => null,
         };
 
@@ -4543,6 +5331,7 @@ class CashAdvanceRealizationController extends Controller
         Request $request,
         array $itemIdsByIndex,
         array $deletedIds,
+        array $items = [],
     ): void {
         $grouped = $request->file('line_attachments');
         $grouped = is_array($grouped) ? $grouped : [];
@@ -4550,6 +5339,32 @@ class CashAdvanceRealizationController extends Controller
         $errors = [];
 
         foreach ($itemIdsByIndex as $index => $itemId) {
+            /*
+            | BARIS YANG DINOLKAN DIBEBASKAN.
+            |
+            | Dana sudah cair, lalu pengeluarannya tidak jadi. Barisnya tidak
+            | bisa dihapus -- ia berasal dari FPU dan harus tetap terlihat --
+            | jadi nominalnya ditulis nol supaya seluruh dananya kembali ke
+            | Finance.
+            |
+            | Menuntut bukti di situ adalah menuntut kuitansi atas belanja
+            | yang tidak pernah terjadi. Tidak ada berkas yang bisa diunggah
+            | siapa pun, sehingga dokumennya TIDAK BISA DISIMPAN SAMA SEKALI.
+            |
+            | Layar sudah lama membebaskannya; server belum, sehingga
+            | pemohon lolos di layar lalu tertolak di server dengan kalimat
+            | yang menyuruhnya melampirkan sesuatu yang tidak ada.
+            |
+            | Penggantinya bukan ketiadaan, melainkan ALASAN: baris bernilai
+            | nol wajib berketerangan, dan itu sudah ditegakkan decodeItems()
+            | untuk rincian biasa dan BusinessTripExpenseBreakdownService
+            | untuk rincian perdin. Jadi yang dibebaskan di sini tetap
+            | membawa penjelasannya sendiri.
+            */
+            if ($this->barisDinolkan($items[$index] ?? null)) {
+                continue;
+            }
+
             $uploaded = collect($grouped[$index] ?? [])
                 ->filter(fn($file) => $file && $file->isValid())
                 ->count();
@@ -4575,6 +5390,31 @@ class CashAdvanceRealizationController extends Controller
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * Baris yang pengeluarannya tidak jadi: nominalnya nol, asalnya dari FPU.
+     *
+     * Dua syarat, bukan satu. Nol saja tidak cukup -- baris di luar rencana
+     * yang bernilai nol bukan "tidak jadi", melainkan baris kosong yang
+     * seharusnya dihapus. Yang berasal dari FPU memang tidak bisa dihapus,
+     * dan justru itu sebabnya ia perlu dinolkan.
+     *
+     * Aturannya ditiru persis dari barisBatal() di layarnya; keduanya harus
+     * tetap sama, sebab yang berbeda pendapat di sini akan meloloskan baris
+     * di satu sisi lalu menolaknya di sisi lain.
+     *
+     * @param  array<string, mixed>|null  $item
+     */
+    private function barisDinolkan(?array $item): bool
+    {
+        if ($item === null) {
+            return false;
+        }
+
+        $asalFpu = ($item['cash_advance_item_id'] ?? null) !== null;
+
+        return $asalFpu && round((float) ($item['realization_amount'] ?? 0), 2) === 0.0;
     }
 
     /**
@@ -4666,6 +5506,7 @@ class CashAdvanceRealizationController extends Controller
     private function transformDetail(
         CashAdvanceRealization $realization,
         ?CashAdvanceRealizationApproval $currentApproval,
+        $user = null,
     ): array {
         return [
             'id' => $realization->id,
@@ -4693,6 +5534,41 @@ class CashAdvanceRealizationController extends Controller
 
             'can_approve' => $currentApproval !== null,
             'approval_label' => $currentApproval?->label,
+
+            /* Penentu tombol "Kembalikan Sisa Dana" -- lihat daftarnya. */
+            'is_requester' => $this->isRequesterOf($realization, $user),
+
+            /*
+            | Serah-terima dari pemeriksa ke pembayar, pada cabang kekurangan.
+            |
+            | Sudah lama direkam ke basis data, tetapi TIDAK PERNAH dikirim ke
+            | layar -- sehingga satu-satunya langkah yang memindahkan dokumen
+            | antar meja justru tidak terlihat di riwayatnya. Yang membuka
+            | detail hanya melihat "diterima" lalu "dibayar", seolah tidak ada
+            | pemeriksaan di antaranya.
+            */
+            'verified_at' => $realization->verified_at,
+            'verified_by_name' => $realization->verifier?->name,
+            'verification_notes' => $realization->verification_notes,
+
+            /*
+            | Jejak pernyataan pengembalian. Dipakai layar Finance untuk
+            | menampilkan siapa yang menyatakan dan kapan, berdampingan
+            | dengan bukti transfernya -- tanpa itu konfirmasinya dikerjakan
+            | tanpa melihat apa pun yang bisa diperiksa.
+            */
+            'return_declared_at' => $realization->return_declared_at,
+            'return_declared_by_name' => $realization->returnDeclarer?->name,
+            'return_declaration_notes' => $realization->return_declaration_notes,
+
+            /*
+            | Riwayat lengkap tiap percobaan pengembalian, terlama lebih dulu.
+            |
+            | Inilah yang dibaca pemohon untuk tahu APA yang salah pada
+            | percobaannya yang ditolak -- tanpa ini ia hanya tahu bahwa
+            | dokumennya kembali, lalu menyatakan ulang hal yang sama.
+            */
+            'return_declarations' => $this->transformReturnDeclarations($realization),
 
             /*
             | Riwayat revisinya, terbaru lebih dulu; revision_open hanya
@@ -4987,6 +5863,57 @@ class CashAdvanceRealizationController extends Controller
             $realization,
             CashAdvanceRealizationAttachment::TYPE_SETTLEMENT,
         );
+    }
+
+    /**
+     * Riwayat percobaan pengembalian sisa dana, siap dibaca layar.
+     *
+     * Tiap baris membawa buktinya sendiri. Bukti yang ditolak TIDAK
+     * disembunyikan: justru itu yang perlu dilihat berdampingan dengan alasan
+     * penolakannya, supaya pemohon tahu berkas mana yang keliru.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function transformReturnDeclarations(CashAdvanceRealization $realization): array
+    {
+        $realization->loadMissing([
+            'returnDeclarations.declarer:id,name',
+            'returnDeclarations.reviewer:id,name',
+            'returnDeclarations.attachments',
+        ]);
+
+        return $realization->returnDeclarations
+            ->map(fn(CashAdvanceRealizationReturnDeclaration $baris): array => [
+                'id' => $baris->id,
+                'attempt' => (int) $baris->attempt,
+                'status' => $baris->status,
+
+                'declared_by_name' => $baris->declarer?->name,
+                'declared_at' => $baris->declared_at,
+                'declared_amount' => (float) $baris->declared_amount,
+                'declaration_notes' => $baris->declaration_notes,
+
+                'reviewed_by_name' => $baris->reviewer?->name,
+                'reviewed_at' => $baris->reviewed_at,
+
+                /* Alasan penolakan, atau catatan Finance saat mengonfirmasi. */
+                'review_notes' => $baris->review_notes,
+
+                'attachments' => $baris->attachments
+                    ->map(fn(CashAdvanceRealizationAttachment $berkas): array => [
+                        'id' => $berkas->id,
+                        'filename' => $berkas->filename,
+                        'original_filename' => $berkas->original_filename,
+                        'mime_type' => $berkas->mime_type,
+                        'file_size' => $berkas->file_size,
+                        'url' => $berkas->filepath
+                            ? Storage::disk('public')->url($berkas->filepath)
+                            : null,
+                    ])
+                    ->values(),
+            ])
+            ->values()
+            ->all();
     }
 
     private function mapAttachments(

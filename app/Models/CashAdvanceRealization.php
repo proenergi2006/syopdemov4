@@ -76,6 +76,10 @@ class CashAdvanceRealization extends Model
         'verified_by',
         'verified_at',
         'verification_notes',
+
+        'return_declared_by',
+        'return_declared_at',
+        'return_declaration_notes',
         'receipt_reverted_by',
         'receipt_reverted_at',
         'receipt_reversal_notes',
@@ -105,6 +109,7 @@ class CashAdvanceRealization extends Model
         'cancelled_at' => 'datetime',
         'received_at' => 'datetime',
         'verified_at' => 'datetime',
+        'return_declared_at' => 'datetime',
         'receipt_reverted_at' => 'datetime',
         'scheduled_payment_date' => 'date',
         'settled_at' => 'datetime',
@@ -143,6 +148,23 @@ class CashAdvanceRealization extends Model
     public const STATUS_RECEIVED = 'RECEIVED';
 
     /*
+    | Berkasnya diterima dan sedang diperiksa, pada realisasi yang nilainya
+    | PAS.
+    |
+    | HANYA ADA PADA CABANG TANPA SELISIH, dan ia sepadan dengan RECEIVED di
+    | dua cabang lain: tempat dokumennya menunggu sementara seseorang
+    | mengerjakan sesuatu atasnya.
+    |
+    | Dahulu cabang ini tidak punya tahap antara sama sekali -- dokumennya
+    | ditutup SETTLED dalam detik yang sama dengan diterimanya, dengan alasan
+    | tidak ada uang yang perlu berpindah. Yang terlewat di situ: tidak ada
+    | uang yang berpindah bukan berarti tidak ada yang perlu diperiksa.
+    | Angka yang kebetulan pas justru yang paling mudah dilewatkan begitu
+    | saja, dan sekali tertutup dokumennya tidak bisa dibuka lagi.
+    */
+    public const STATUS_ON_CHECKING = 'ON CHECKING';
+
+    /*
     | Sudah diperiksa, menunggu kekurangannya dibayarkan.
     |
     | HANYA ADA PADA CABANG KELEBIHAN. Realisasi yang nilainya melebihi
@@ -156,6 +178,22 @@ class CashAdvanceRealization extends Model
     | sisanya kembali. Keduanya memang tidak berpindah meja.
     */
     public const STATUS_VERIFIED = 'VERIFIED';
+
+    /*
+    | Pemohon menyatakan sisa dananya sudah dikembalikan, menunggu Finance
+    | mengonfirmasi uangnya benar-benar masuk.
+    |
+    | HANYA ADA PADA CABANG PENGEMBALIAN, dan ia cermin dari VERIFIED di
+    | seberangnya: yang kurang dibayarkan perusahaan setelah diperiksa, yang
+    | lebih dikembalikan pemohon lalu diperiksa.
+    |
+    | Uangnya berpindah di luar sistem, jadi yang direkam di sini hanya
+    | pengakuan beserta bukti transfernya. Pengakuan itu sengaja TIDAK
+    | menutup dokumennya: yang mengaku adalah pihak yang berkepentingan, dan
+    | dokumen yang ditutup oleh pengakuan sendiri tidak pernah dihitung
+    | siapa pun.
+    */
+    public const STATUS_RETURN_DECLARED = 'RETURN DECLARED';
 
     public const STATUS_SETTLED = 'SETTLED';
 
@@ -308,6 +346,27 @@ class CashAdvanceRealization extends Model
     public function settler()
     {
         return $this->belongsTo(User::class, 'settled_by');
+    }
+
+    /** Pemohon yang menyatakan sisa dananya sudah dikembalikan. */
+    public function returnDeclarer()
+    {
+        return $this->belongsTo(User::class, 'return_declared_by');
+    }
+
+    /**
+     * Riwayat percobaan pengembalian sisa dana, terlama lebih dulu.
+     *
+     * Urutannya dipasang di relasinya, bukan diserahkan ke tiap pemanggil:
+     * riwayat yang urutannya berbeda-beda antar layar membuat "percobaan
+     * pertama" menunjuk baris yang berlainan di tiap tempat.
+     */
+    public function returnDeclarations()
+    {
+        return $this->hasMany(
+            CashAdvanceRealizationReturnDeclaration::class,
+            'cash_advance_realization_id',
+        )->orderBy('attempt');
     }
 
     /*

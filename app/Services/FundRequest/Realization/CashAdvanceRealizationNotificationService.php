@@ -44,6 +44,13 @@ class CashAdvanceRealizationNotificationService
     */
     private const PERMISSION_RECEIVE = 'cash_advance_realization.receive';
 
+    /*
+    | Memeriksa pengembalian yang dinyatakan pemohon. Izinnya sendiri, bukan
+    | .receive: menerima berkas dan menyatakan uang sudah masuk ke rekening
+    | perusahaan adalah dua penilaian berbeda.
+    */
+    private const PERMISSION_CONFIRM_RETURN = 'cash_advance_realization.confirm_return';
+
     public function __construct(
         private readonly PermissionRecipientService $permissionRecipients,
     ) {
@@ -268,7 +275,7 @@ class CashAdvanceRealizationNotificationService
 
         $messageParams = [
             'realization_number' => $realization->realization_number,
-            'total_amount' => number_format((float) $realization->total_realization_amount, 0, ',', '.'),
+            'total_amount' => angka((float) $realization->total_realization_amount, 0),
         ];
 
         foreach ($recipients as $user) {
@@ -402,10 +409,34 @@ class CashAdvanceRealizationNotificationService
         ]);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Selisihnya menunggu diselesaikan
+    |--------------------------------------------------------------------------
+    | DUA ARAH, DUA PENERIMA, DAN ITU BUKAN KEBETULAN.
+    |
+    | Kekurangan dibayarkan perusahaan, jadi yang perlu dipanggil adalah
+    | pemegang izin pembayarannya -- pemohon tidak mengerjakan apa pun di sana
+    | selain menunggu.
+    |
+    | Sisa dana dikembalikan PEMOHON. Yang harus bertindak adalah orang yang
+    | memegang uangnya, dan hanya ada satu orang seperti itu untuk tiap
+    | dokumen. Dahulu cabang ini pun dikirim ke pemegang izin, sehingga 38
+    | akun dari 15 role diberi tahu tentang uang yang bukan urusan mereka,
+    | sementara satu-satunya orang yang berutang tidak diberi tahu sama sekali.
+    |--------------------------------------------------------------------------
+    */
     public function notifyDifferenceSettlementRequest(
         CashAdvanceRealization $realization,
     ): void {
         $differenceType = strtoupper(trim((string) $realization->difference_type));
+
+        if ($differenceType === CashAdvanceRealization::DIFFERENCE_RETURN) {
+            $this->notifyReturnRequestToRequester($realization);
+
+            return;
+        }
+
         $permission = self::PERMISSION_BY_DIFFERENCE[$differenceType] ?? null;
 
         if (!$permission) {
@@ -436,12 +467,7 @@ class CashAdvanceRealizationNotificationService
 
         $messageParams = [
             'realization_number' => $realization->realization_number,
-            'difference_amount' => number_format(
-                abs((float) $realization->difference_amount),
-                0,
-                ',',
-                '.',
-            ),
+            'difference_amount' => angka(abs((float) $realization->difference_amount), 0),
         ];
 
         foreach ($recipients as $user) {
@@ -472,6 +498,183 @@ class CashAdvanceRealizationNotificationService
                 'url' => self::URL,
             ]);
         }
+    }
+
+    /** Pemohon diberi tahu sisa dananya perlu dikembalikan ke Finance. */
+    private function notifyReturnRequestToRequester(
+        CashAdvanceRealization $realization,
+    ): void {
+        $requesterId = $this->getRequesterUserId($realization);
+
+        if (!$requesterId) {
+            Log::warning('[Realisasi FPU Notification] Pemohon tidak ditemukan untuk pengembalian', [
+                'cash_advance_realization_id' => $realization->id,
+                'realization_number' => $realization->realization_number,
+            ]);
+
+            return;
+        }
+
+        $this->buatSekali(
+            $requesterId,
+            'cash_advance_realization_return_request',
+            $realization,
+            'return_request',
+            [
+                'realization_number' => $realization->realization_number,
+                'difference_amount' => angka(abs((float) $realization->difference_amount), 0),
+            ],
+        );
+    }
+
+    /**
+     * Finance diberi tahu pemohon menyatakan sudah mengembalikan dananya.
+     *
+     * Penerimanya pemegang izin PENERIMAAN, bukan izin pengembalian: meja
+     * yang menerima berkasnya pula yang menghitung uangnya masuk.
+     */
+    public function notifyReturnDeclared(
+        CashAdvanceRealization $realization,
+        User $declarer,
+    ): void {
+        $recipients = $this->permissionRecipients
+            ->usersWithPermission(self::PERMISSION_CONFIRM_RETURN);
+
+        if ($recipients->isEmpty()) {
+            Log::warning('[Realisasi FPU Notification] Pemegang izin konfirmasi pengembalian tidak ditemukan', [
+                'cash_advance_realization_id' => $realization->id,
+                'realization_number' => $realization->realization_number,
+            ]);
+
+            return;
+        }
+
+        $params = [
+            'realization_number' => $realization->realization_number,
+            'difference_amount' => angka(abs((float) $realization->difference_amount), 0),
+            'requester_name' => $declarer->name ?? '-',
+        ];
+
+        foreach ($recipients as $user) {
+            $this->buatSekali(
+                (int) $user->id,
+                'cash_advance_realization_return_declared',
+                $realization,
+                'return_declared',
+                $params,
+            );
+        }
+    }
+
+    /**
+     * Pemohon diberi tahu realisasinya yang nilainya pas sudah disetujui.
+     *
+     * Terpisah dari notifySettled, dan kalimatnya pun berbeda. "Selisih
+     * Realisasi telah diselesaikan" pada dokumen yang tidak punya selisih
+     * menyuruh pembacanya mencari perpindahan uang yang tidak pernah ada.
+     */
+    public function notifyFinalized(
+        CashAdvanceRealization $realization,
+        User $approver,
+    ): void {
+        $requesterId = $this->getRequesterUserId($realization);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        $this->buatSekali(
+            $requesterId,
+            'cash_advance_realization_finalized',
+            $realization,
+            'finalized',
+            [
+                'realization_number' => $realization->realization_number,
+                'actor_name' => $approver->name ?? '-',
+            ],
+        );
+    }
+
+    /** Pemohon diberi tahu pernyataannya ditolak Finance. */
+    public function notifyReturnRejected(
+        CashAdvanceRealization $realization,
+        User $actor,
+        ?string $reason = null,
+    ): void {
+        $requesterId = $this->getRequesterUserId($realization);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        $this->buatSekali(
+            $requesterId,
+            'cash_advance_realization_return_rejected',
+            $realization,
+            'return_rejected',
+            [
+                'realization_number' => $realization->realization_number,
+                'actor_name' => $actor->name ?? '-',
+                'reason' => $reason ?: '-',
+            ],
+
+            /*
+            | Penolakan TIDAK boleh dilewati walau ada yang belum dibaca.
+            | Dokumen yang sama bisa ditolak lebih dari sekali dengan alasan
+            | berbeda, dan yang kedua justru alasan yang masih berlaku.
+            */
+            sekaliSaja: false,
+        );
+    }
+
+    /**
+     * Membuat satu notifikasi, melewatinya bila yang sama masih belum dibaca.
+     *
+     * Penjagaan "belum dibaca" itu yang mencegah daftar notifikasi dipenuhi
+     * kalimat yang sama ketika satu aksi dijalankan berulang -- terima,
+     * batalkan terima, terima lagi.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function buatSekali(
+        int $userId,
+        string $type,
+        CashAdvanceRealization $realization,
+        string $group,
+        array $params,
+        bool $sekaliSaja = true,
+    ): void {
+        if ($sekaliSaja) {
+            $sudahAda = Notification::query()
+                ->where('user_id', $userId)
+                ->where('type', $type)
+                ->where('reference_type', CashAdvanceRealization::class)
+                ->where('reference_id', $realization->id)
+                ->whereNull('read_at')
+                ->exists();
+
+            if ($sudahAda) {
+                return;
+            }
+        }
+
+        $titleKey = "notification_messages.cash_advance_realization.{$group}.title";
+        $messageKey = "notification_messages.cash_advance_realization.{$group}.message";
+
+        Notification::create([
+            'user_id' => $userId,
+            'type' => $type,
+            'title' => __($titleKey),
+            'title_key' => $titleKey,
+            'message' => __($messageKey, $params),
+            'message_key' => $messageKey,
+            'message_params' => $params,
+            'module' => self::MODULE,
+            'reference_type' => CashAdvanceRealization::class,
+            'reference_id' => $realization->id,
+            'reference_public_id' => $realization->encrypted_id,
+            'url' => self::URL,
+        ]);
     }
 
     public function notifySettled(

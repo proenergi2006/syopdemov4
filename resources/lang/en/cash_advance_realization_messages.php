@@ -111,15 +111,55 @@ return [
         'failed' => 'Failed to receive the realization.',
     ],
 
+    /*
+    | The requester states the surplus has been returned.
+    |
+    | The money moves outside the system; what happens here is the marking.
+    | This declaration does NOT close the document -- see confirm_return below.
+    */
     'return' => [
-        'only_received' => 'Only received realizations can have their difference settled.',
-        'forbidden' => 'You do not have permission to record a fund return.',
+        'only_received' => 'The surplus can only be returned once Finance has received the realization paperwork.',
+        'forbidden' => 'You do not have permission to mark a fund return.',
         'only_approved' => 'Only approved realizations can be settled.',
+        'only_requester' => 'Only the requester of this realization can mark the surplus as returned, since they hold the money.',
         'wrong_difference' => 'This realization has no remaining funds to return.',
-        'attachment_required' => 'At least one proof of return must be attached.',
+        'attachment_required' => 'At least one transfer receipt must be attached.',
         'amount_mismatch' => 'The returned amount must be exactly Rp :expected, but Rp :given was entered. Partial returns cannot be recorded.',
-        'success' => 'The fund return has been recorded.',
-        'failed' => 'Failed to record the fund return.',
+        'success' => 'The fund return has been marked and is awaiting confirmation by Finance.',
+        'failed' => 'Failed to mark the fund return.',
+    ],
+
+    /* Finance confirms the money actually arrived -- this is where it closes. */
+    'confirm_return' => [
+        'forbidden' => 'You do not have permission to confirm a fund return.',
+        'only_declared' => 'Only realizations whose return has been declared by the requester can be confirmed.',
+        'success' => 'The fund return has been confirmed and the realization is closed.',
+        'failed' => 'Failed to confirm the fund return.',
+    ],
+
+    /*
+    | Rejecting a return declaration. Its permission is separate from
+    | confirming, mirroring receive and unreceive: one closes the document,
+    | the other throws it back to the requester with a reason they will read.
+    */
+    'reject_return' => [
+        'forbidden' => 'You do not have permission to reject a return declaration.',
+        'only_declared' => 'Only realizations whose return has been declared by the requester can be rejected.',
+        'success' => 'The return declaration was rejected and the document went back to the requester.',
+        'failed' => 'Failed to reject the return declaration.',
+        'rejected_note' => 'Return declaration rejected by Finance: :reason',
+    ],
+
+    /*
+    | The third branch: a realization whose value matches exactly. No money
+    | moves, so all that is left is checking the figures and closing it.
+    */
+    'finalize' => [
+        'forbidden' => 'You do not have permission to approve a realization with no difference.',
+        'only_on_checking' => 'Only realizations currently being checked can be approved here.',
+        'only_no_difference' => 'This realization has a difference, so it closes through a shortfall payment or a fund return, not through this approval.',
+        'success' => 'The realization has been approved and is now complete.',
+        'failed' => 'Failed to approve the realization.',
     ],
 
     'reimburse' => [
@@ -190,6 +230,7 @@ return [
         'attachment_required' => 'Row :row requires at least one attachment.',
         'unknown_source' => 'Row :row refers to an unknown cash advance line.',
         'duplicate_source' => 'Row :row refers to a cash advance line already used by another row.',
+        'cancelled_reason_required' => 'Row :row is zero. State the reason -- an expense that did not happen still needs an explanation.',
     ],
 
     /*
@@ -203,6 +244,7 @@ return [
         'category_required' => 'Row :row: the expense category is not selected. Business trip lines are grouped by category.',
         'qty_required' => 'Row :row: Qty is required and must be greater than zero.',
         'unit_price_required' => 'Row :row: Unit cost is required and must be greater than zero.',
+        'cancelled_reason_required' => 'Row :row is zero. State the reason -- an expense that did not happen still needs an explanation.',
         'arranged_has_items' => 'Category :category is marked as arranged by GA, so it cannot have any lines. Remove the lines, or turn the marker off.',
         'arranged_not_allowed' => 'Category :category is not handled by GA, so the marker cannot be set. Its lines are filled in by the requester. This is configured in the Business Trip Expense Category master.',
     ],

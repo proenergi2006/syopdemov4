@@ -176,7 +176,10 @@ return [
             'settled' => 'Realization Difference Settled - :realization_number',
             'received' => 'Realization Received - :realization_number',
             'receipt_request' => 'Realization Awaiting Receipt - :realization_number',
-            'return_request' => 'Realization Surplus Awaiting Return - :realization_number',
+            'return_request' => 'Surplus You Need to Return - :realization_number',
+            'return_declared' => 'Returned Surplus Awaiting Confirmation - :realization_number',
+            'return_rejected' => 'Return Declaration Rejected - :realization_number',
+            'finalized' => 'Realization Completed - :realization_number',
             'reimburse_request' => 'Realization Shortfall Awaiting Payment - :realization_number',
 
             'default' => 'Realization Approval Request - :realization_number',
@@ -188,7 +191,10 @@ return [
             'settled' => 'Realization Difference Settled',
             'received' => 'Realization Received',
             'receipt_request' => 'Realization Awaiting Receipt',
-            'return_request' => 'Realization Surplus Awaiting Return',
+            'return_request' => 'Surplus You Need to Return',
+            'return_declared' => 'Returned Surplus Awaiting Confirmation',
+            'return_rejected' => 'Return Declaration Rejected',
+            'finalized' => 'Realization Completed',
             'reimburse_request' => 'Realization Shortfall Awaiting Payment',
 
             'default' => 'Realization Approval',
@@ -200,7 +206,29 @@ return [
             'settled' => 'The difference on your realization has been settled by :actor_name.',
             'received' => 'The realization was received by :actor_name.',
             'receipt_request' => 'There is an approved realization awaiting your receipt.',
-            'return_request' => 'The realization below has been approved and leaves a surplus the requester must return to Finance.',
+            /*
+            | Second person, deliberately. The old sentence spoke ABOUT the
+            | requester to somebody else, and was then sent to 38 permission
+            | holders while the requester never received it at all.
+            */
+            'return_request' => 'Your realization has been approved and Finance has received the paperwork.'
+                . ' A surplus of :difference_amount still needs to be returned to Finance.'
+                . ' Once you have transferred it, open the document, mark the return and attach the transfer receipt.',
+
+            'return_declared' => ':actor_name states that the surplus on the realization below has been returned,'
+                . ' with the transfer receipt attached. Please check it and confirm once the money has actually arrived.',
+
+            'return_rejected' => 'Your return declaration was rejected by :actor_name.'
+                . ' Check the reason below, then declare it again with the right evidence.',
+            /*
+            | A realization with no difference. The sentence deliberately does
+            | NOT mention settling a difference -- there is none, and saying so
+            | sends the reader looking for a money movement that never happened.
+            */
+            'finalized' => 'Your realization has been checked and approved by :actor_name.'
+                . ' Its value matches the request exactly, so nothing needs to be paid or returned.'
+                . ' This document is complete.',
+
             'reimburse_request' => 'The realization below has been approved and its shortfall must be paid to the requester.',
 
             'default' => 'There is a realization awaiting your approval.',

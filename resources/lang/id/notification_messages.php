@@ -296,12 +296,30 @@ return [
         ],
 
         /*
-        | Di luar approval flow: penerimanya pemegang permission penyelesaian
-        | selisih, dipilih mengikuti arah uangnya.
+        | Di luar approval flow, dan penerimanya berbeda menurut arah uangnya.
+        |
+        | Kekurangan dibayarkan perusahaan, jadi yang dipanggil pemegang izin
+        | pembayarannya. Sisa dana dikembalikan PEMOHON, jadi yang dipanggil
+        | pemohonnya sendiri -- dialah satu-satunya yang memegang uang itu.
         */
         'return_request' => [
-            'title' => 'Selisih Realisasi Menunggu Pengembalian',
-            'message' => 'Realisasi :realization_number sudah disetujui dan menyisakan dana Rp :difference_amount yang perlu dikembalikan pemohon.',
+            'title' => 'Sisa Dana Perlu Anda Kembalikan',
+            'message' => 'Realisasi FPU :realization_number sudah diterima Finance dan menyisakan Rp :difference_amount yang perlu Anda kembalikan. Tandai pengembaliannya setelah ditransfer, lengkap dengan bukti transfer.',
+        ],
+
+        'return_declared' => [
+            'title' => 'Pengembalian Sisa Dana Menunggu Konfirmasi',
+            'message' => ':requester_name menyatakan sisa dana Rp :difference_amount pada Realisasi FPU :realization_number sudah dikembalikan. Mohon diperiksa dan dikonfirmasi.',
+        ],
+
+        'finalized' => [
+            'title' => 'Realisasi FPU Telah Selesai',
+            'message' => 'Realisasi FPU :realization_number sudah diperiksa dan disetujui oleh :actor_name. Nilainya sama persis dengan pengajuan, jadi tidak ada dana yang perlu dibayarkan maupun dikembalikan.',
+        ],
+
+        'return_rejected' => [
+            'title' => 'Pernyataan Pengembalian Ditolak',
+            'message' => 'Pernyataan pengembalian sisa dana Realisasi FPU :realization_number ditolak oleh :actor_name. Alasan: :reason',
         ],
 
         'reimburse_request' => [
@@ -442,6 +460,68 @@ return [
         'resubmitted_returner' => [
             'title' => 'Revisi Sudah Diajukan Ulang',
             'message' => ':number yang Anda kembalikan sudah diperbaiki dan diajukan ulang sebagai revisi ke-:revision.',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Petty Cash
+    |--------------------------------------------------------------------------
+    | Pesan peringatan saldo menyebut tiga angka sekaligus: saldo sekarang,
+    | plafonnya, dan berapa yang akan dibawa top up. Yang membacanya adalah
+    | ADH yang harus memutuskan mengajukan top up atau belum -- dan keputusan
+    | itu tidak bisa diambil dari kata "saldo menipis" saja.
+    |--------------------------------------------------------------------------
+    */
+    'petty_cash' => [
+        'approval_request' => [
+            'title' => 'Petty Cash Menunggu Persetujuan',
+            'message' => ':number sebesar Rp :amount dari cabang :branch menunggu persetujuan Anda.',
+        ],
+
+        'topup_approval_request' => [
+            'title' => 'Top Up Petty Cash Menunggu Persetujuan',
+            'message' => ':number sebesar Rp :amount untuk kas kecil cabang :branch menunggu persetujuan Anda.',
+        ],
+
+        'step_approved' => [
+            'title' => 'Satu Tahap Disetujui',
+            'message' => ':number disetujui oleh :approver dan lanjut ke tahap berikutnya.',
+        ],
+
+        'approved' => [
+            'title' => 'Petty Cash Disetujui Penuh',
+            'message' => ':number sebesar Rp :amount sudah disetujui penuh oleh :approver dan siap dicairkan.',
+        ],
+
+        'topup_approved' => [
+            'title' => 'Top Up Disetujui, Saldo Bertambah',
+            'message' => ':number sebesar Rp :amount sudah disetujui :approver. Saldo kas kecil Anda sudah kembali ke plafon.',
+        ],
+
+        'rejected' => [
+            'title' => 'Pengajuan Ditolak',
+            'message' => ':number ditolak oleh :approver. Alasan: :reason',
+        ],
+
+        'disbursed' => [
+            'title' => 'Petty Cash Sudah Dicairkan',
+            'message' => ':number sebesar Rp :amount sudah dicairkan. Claim di dalamnya ditandai sudah dibayar.',
+        ],
+
+        /*
+        | Dikirim ke pemohon claim-nya, bukan ke pemegang kas kecil. Tanpa ini
+        | pemohon tidak punya cara mengetahui uangnya sudah dibayarkan selain
+        | membuka daftar claim sendiri.
+        */
+        'claim_paid' => [
+            'title' => 'Claim Anda Sudah Dibayar',
+            'message' => ':number sebesar Rp :amount sudah dibayarkan tunai dari kas kecil cabang.',
+        ],
+
+        'low_balance' => [
+            'title' => 'Saldo Kas Kecil Menipis',
+            'message' => 'Saldo kas kecil cabang :branch tinggal Rp :balance dari plafon Rp :ceiling, di bawah batas :percentage%. Ajukan top up sebesar Rp :topup supaya claim kecil berikutnya tetap bisa dibayar.',
         ],
     ],
 ];

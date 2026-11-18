@@ -114,6 +114,26 @@ class DocumentActionScope
      */
     private static function wilayah(User $user): array
     {
+        /*
+        | Diingat selama satu request.
+        |
+        | Sejak scope aksi ikut dihitung PER BARIS pada daftar dokumen --
+        | supaya tombolnya tidak ditawarkan pada dokumen yang servernya akan
+        | tolak -- fungsi ini dipanggil sebanyak jumlah baris di halaman.
+        | Tanpa ingatan ini, satu halaman berisi 50 dokumen menembakkan 50
+        | kueri yang jawabannya persis sama.
+        |
+        | Aman disimpan sepanjang request: penugasan cabang seseorang tidak
+        | berubah di tengah satu permintaan HTTP.
+        */
+        static $ingatan = [];
+
+        $kunci = (int) $user->id;
+
+        if (isset($ingatan[$kunci])) {
+            return $ingatan[$kunci];
+        }
+
         $penugasan = DB::table('user_access_assignments')
             ->where('user_id', $user->id)
             ->where('is_active', true)
@@ -131,7 +151,9 @@ class DocumentActionScope
             ->unique()
             ->values();
 
-        return [$branchIds, $departmentIds];
+        $ingatan[$kunci] = [$branchIds, $departmentIds];
+
+        return $ingatan[$kunci];
     }
 
     private static function departmentDitugaskan(User $user): Collection

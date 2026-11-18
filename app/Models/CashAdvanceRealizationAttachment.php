@@ -34,6 +34,14 @@ class CashAdvanceRealizationAttachment extends Model
         'cash_advance_realization_id',
         'cash_advance_realization_item_id',
         'attachment_type',
+
+        /*
+        | Terisi hanya pada bukti transfer pengembalian sisa dana, menunjuk
+        | percobaan mana yang mengunggahnya. Null pada jenis lampiran lain --
+        | dan pada bukti lama, yang memang diunggah sebelum percobaannya
+        | punya baris sendiri.
+        */
+        'return_declaration_id',
         'filename',
         'original_filename',
         'mime_type',
@@ -44,6 +52,7 @@ class CashAdvanceRealizationAttachment extends Model
     protected $casts = [
         'cash_advance_realization_id' => 'integer',
         'cash_advance_realization_item_id' => 'integer',
+        'return_declaration_id' => 'integer',
         'file_size' => 'integer',
     ];
 

@@ -12,7 +12,7 @@
 
     $translationMode = in_array(
         $currentMode,
-        ['returned_for_revision', 'final_approved', 'rejected', 'settled', 'return_request', 'reimburse_request', 'received', 'receipt_request'],
+        ['returned_for_revision', 'final_approved', 'rejected', 'settled', 'return_request', 'return_declared', 'return_rejected', 'reimburse_request', 'received', 'receipt_request', 'finalized'],
         true,
     ) ? $currentMode : 'default';
 
@@ -20,9 +20,16 @@
 
     $actorName = optional($actor)->name ?? '-';
 
+    /*
+    | Nominal selisihnya ikut masuk ke kalimatnya, bukan hanya ke tabel di
+    | bawah. Email yang berkata "ada dana yang perlu dikembalikan" tanpa
+    | menyebut berapa memaksa pembacanya membuka aplikasi hanya untuk
+    | mengetahui satu angka -- padahal justru angka itu yang perlu ia bawa.
+    */
     $description = __('mail.realisasi.description.' . $translationMode, [
         'actor_name' => $actorName,
         'revision' => $revisionNumber ?? 0,
+        'difference_amount' => 'Rp ' . angka(abs((float) $realization->difference_amount), 0),
     ]);
 
     /*
@@ -33,7 +40,15 @@
     */
     $displayStatus = match ($currentMode) {
         'final_approved', 'receipt_request' => 'APPROVED',
-        'received', 'return_request', 'reimburse_request' => 'RECEIVED',
+
+        /*
+        | return_rejected ikut RECEIVED, dan itu memang tempatnya kembali:
+        | pernyataan yang ditolak mengembalikan dokumennya ke meja sebelum
+        | pemohon menyatakan, bukan ke status tersendiri.
+        */
+        'received', 'return_request', 'return_rejected', 'reimburse_request' => 'RECEIVED',
+        'return_declared' => 'RETURN DECLARED',
+        'finalized' => 'SETTLED',
         'rejected' => 'REJECTED',
         'settled' => 'SETTLED',
         'returned_for_revision' => 'NEED REVISION',
@@ -43,16 +58,21 @@
     $statusColor = match ($currentMode) {
         'final_approved', 'receipt_request' => '#1b7f4f',
         'received', 'return_request', 'reimburse_request' => '#0d6b7d',
+        'return_declared' => '#6b4fa0',
+        'finalized' => '#1f4e78',
+        'return_rejected' => '#b3261e',
         'rejected' => '#b3261e',
         'settled' => '#1f4e78',
         'returned_for_revision' => '#b26a00',
         default => '#8a6d1f',
     };
 
-    $accentColor = $currentMode === 'rejected' ? '#b3261e' : '#1f4e78';
+    $accentColor = in_array($currentMode, ['rejected', 'return_rejected'], true)
+        ? '#b3261e'
+        : '#1f4e78';
 
     $rupiah = static fn ($value): string =>
-        'Rp ' . number_format((float) $value, 0, ',', '.');
+        'Rp ' . angka((float) $value, 0);
 
     $labelSelisih = match ($realization->difference_type) {
         'RETURN' => __('mail.realisasi.difference_return'),

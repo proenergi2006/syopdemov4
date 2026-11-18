@@ -299,8 +299,23 @@ return [
         | holders, picked according to which way the money moves.
         */
         'return_request' => [
-            'title' => 'Realization Surplus Awaiting Return',
-            'message' => 'Realization :realization_number has been approved and leaves Rp :difference_amount for the requester to return.',
+            'title' => 'Surplus You Need to Return',
+            'message' => 'Finance has received realization :realization_number, which leaves Rp :difference_amount for you to return. Mark the return once you have transferred it, with the transfer receipt attached.',
+        ],
+
+        'return_declared' => [
+            'title' => 'Returned Surplus Awaiting Confirmation',
+            'message' => ':requester_name states that the Rp :difference_amount surplus on realization :realization_number has been returned. Please check and confirm it.',
+        ],
+
+        'finalized' => [
+            'title' => 'Realization Completed',
+            'message' => 'Realization :realization_number has been checked and approved by :actor_name. Its value matches the request exactly, so nothing needs to be paid or returned.',
+        ],
+
+        'return_rejected' => [
+            'title' => 'Return Declaration Rejected',
+            'message' => 'Your return declaration for realization :realization_number was rejected by :actor_name. Reason: :reason',
         ],
 
         'reimburse_request' => [
@@ -436,6 +451,53 @@ return [
         'resubmitted_returner' => [
             'title' => 'Revision Resubmitted',
             'message' => ':number, which you returned, has been corrected and resubmitted as revision :revision.',
+        ],
+    ],
+
+    'petty_cash' => [
+        'approval_request' => [
+            'title' => 'Petty Cash Awaiting Approval',
+            'message' => ':number for Rp :amount from branch :branch is awaiting your approval.',
+        ],
+
+        'topup_approval_request' => [
+            'title' => 'Petty Cash Top Up Awaiting Approval',
+            'message' => ':number for Rp :amount for the branch :branch petty cash is awaiting your approval.',
+        ],
+
+        'step_approved' => [
+            'title' => 'One Step Approved',
+            'message' => ':number was approved by :approver and moved to the next step.',
+        ],
+
+        'approved' => [
+            'title' => 'Petty Cash Fully Approved',
+            'message' => ':number for Rp :amount was fully approved by :approver and is ready to disburse.',
+        ],
+
+        'topup_approved' => [
+            'title' => 'Top Up Approved, Balance Restored',
+            'message' => ':number for Rp :amount was approved by :approver. Your petty cash balance is back to its ceiling.',
+        ],
+
+        'rejected' => [
+            'title' => 'Request Rejected',
+            'message' => ':number was rejected by :approver. Reason: :reason',
+        ],
+
+        'disbursed' => [
+            'title' => 'Petty Cash Disbursed',
+            'message' => ':number for Rp :amount has been disbursed. The claims inside it are marked as paid.',
+        ],
+
+        'claim_paid' => [
+            'title' => 'Your Claim Has Been Paid',
+            'message' => ':number for Rp :amount has been paid in cash from the branch petty cash.',
+        ],
+
+        'low_balance' => [
+            'title' => 'Petty Cash Balance Running Low',
+            'message' => 'The branch :branch petty cash balance is down to Rp :balance of its Rp :ceiling ceiling, below the :percentage% mark. Request a top up of Rp :topup so the next small claims can still be paid.',
         ],
     ],
 ];

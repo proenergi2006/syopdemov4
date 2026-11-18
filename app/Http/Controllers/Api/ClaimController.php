@@ -287,6 +287,35 @@ class ClaimController extends Controller
 
                         'can_submit' => $rowCanSubmit,
                         'can_approve' => $currentApproval !== null,
+                        /*
+                        | Penentu tombol "Batalkan", DIHITUNG PER BARIS.
+                        |
+                        | Izin batal punya cakupannya sendiri -- OWN_DATA,
+                        | OWN_CABANG, dan seterusnya -- dan cakupan itu
+                        | selama ini hanya ditegakkan di server. Layarnya
+                        | cukup bertanya "punya izin batal atau tidak",
+                        | sehingga tombolnya muncul di SETIAP dokumen yang
+                        | boleh dilihat, termasuk milik orang lain.
+                        |
+                        | Yang menekannya memang tidak berhasil membatalkan
+                        | apa pun; servernya menjawab "tidak ditemukan". Tapi
+                        | kalimat itu tiba setelah ia mengetik alasan
+                        | pembatalan, dan yang ia simpulkan bukan "saya tidak
+                        | berhak" melainkan "sistemnya rusak".
+                        |
+                        | Dihitung dengan penjaga yang SAMA PERSIS dengan
+                        | yang dipakai cancel(), bukan aturan tiruan.
+                        */
+                        'can_cancel' => DocumentActionScope::allows(
+                            $user,
+                            'claim.cancel',
+                            $claim,
+                            [
+                                'branch' => 'branch',
+                                'department' => 'department_id',
+                                'owner' => 'created_by',
+                            ],
+                        ),
 
                         'approval_id' => $currentApproval?->id,
                         'approval_step_order' => $currentApproval
@@ -2459,18 +2488,27 @@ class ClaimController extends Controller
     |--------------------------------------------------------------------------
     | Kembalikan Claim ke pemohon untuk direvisi
     |--------------------------------------------------------------------------
-    | DUA PINTU, DAN STATUSNYA YANG MEMILIH.
+    | SATU PINTU: APPROVER YANG SEDANG MEMEGANG DOKUMENNYA.
     |
-    |  - IN PROGRESS : approver yang sedang memegang dokumennya. Penjaganya
-    |                  sama dengan tombol Setujui -- getUserCurrentApproval
-    |                  sekaligus menolak pemohon atas dokumennya sendiri.
+    | Statusnya harus IN PROGRESS, dan penjaganya sama dengan tombol Setujui --
+    | getUserCurrentApproval sekaligus menolak pemohon atas dokumennya sendiri.
     |
-    |  - RECEIVED    : Finance yang berkasnya baru diterima. Penerimaannya
-    |                  ikut ditarik dan tanggal pembayarannya dibatalkan,
-    |                  jadi penjaganya izin claim.unreceive.
+    | PINTU PENERIMAAN SENGAJA DITUTUP.
     |
-    | Yang sudah dibayarkan tidak lewat pintu mana pun: uang penggantinya
-    | sudah di tangan pemohon, dan tidak ada yang bisa direvisi lagi.
+    | Dahulu Finance pun bisa menyuruh revisi dari status RECEIVED lewat izin
+    | unreceive. Itu menaruh dua wewenang berbeda di satu tombol: menarik
+    | penerimaan berkas urusan Finance, sedangkan menilai isi dokumen dan
+    | menyuruh memperbaikinya urusan approver. Pemegang izin unreceive belum
+    | tentu pernah menilai dokumen itu, sementara dokumen yang ia kembalikan
+    | berputar ulang lewat SELURUH rantai approval atas penilaian orang yang
+    | tidak berdiri di dalam rantai itu.
+    |
+    | Jalan mundur Finance tetap utuh lewat "Batalkan Terima": dokumennya
+    | kembali ke APPROVED, jadwal pembayarannya dibatalkan, isinya tidak
+    | disentuh, dan tidak ada yang perlu mengulang approval.
+    |
+    | Yang sudah dibayarkan juga tidak lewat sini: uang penggantinya sudah di
+    | tangan pemohon, dan tidak ada yang bisa direvisi lagi.
     |--------------------------------------------------------------------------
     */
     public function returnForRevision(
@@ -2528,15 +2566,6 @@ class ClaimController extends Controller
                     from: FundRequestRevision::FROM_APPROVAL,
                     stepOrder: (int) $approval->step_order,
                     stepLabel: $approval->label,
-                );
-            } elseif ($status === Claim::STATUS_RECEIVED) {
-                $hasil = $revisionService->kembalikan(
-                    document: $claim,
-                    user: $user,
-                    reason: $validated['reason'],
-                    permission: 'claim.unreceive',
-                    from: FundRequestRevision::FROM_RECEIPT,
-                    approvedStatus: Claim::STATUS_APPROVED,
                 );
             } else {
                 DB::rollBack();

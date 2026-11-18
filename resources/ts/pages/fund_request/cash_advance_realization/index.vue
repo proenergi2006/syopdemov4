@@ -63,6 +63,21 @@ interface RealizationRow {
   | pada dokumen lama, dan diperlakukan sebagai boleh.
   */
   can_pay_today?: boolean
+
+  /*
+  | Pembuka halaman ini adalah pemohon dokumen tersebut. Penentu tombol
+  | "Kembalikan Sisa Dana": izinnya saja tidak cukup, sebab uang sisanya
+  | hanya dipegang satu orang.
+  */
+  is_requester?: boolean
+
+  /*
+  | Boleh membatalkan dokumen INI. Dihitung server dengan penjaga yang sama
+  | dengan endpoint-nya, karena izin batal punya cakupannya sendiri --
+  | OWN_DATA, OWN_CABANG, dan seterusnya. Tanpa ini tombolnya muncul di
+  | setiap dokumen yang boleh dilihat, termasuk milik orang lain.
+  */
+  can_cancel?: boolean
 }
 
 interface RealizationAbilities {
@@ -75,6 +90,9 @@ interface RealizationAbilities {
   can_cancel: boolean
   can_return: boolean
   can_reimburse: boolean
+  can_confirm_return: boolean
+  can_reject_return: boolean
+  can_finalize: boolean
 }
 
 const route = useRoute()
@@ -120,6 +138,9 @@ const defaultAbilities = (): RealizationAbilities => ({
   can_cancel: false,
   can_return: false,
   can_reimburse: false,
+  can_confirm_return: false,
+  can_reject_return: false,
+  can_finalize: false,
 })
 
 /*
@@ -201,6 +222,26 @@ const canUnreceive = computed(() => permissionStore.can('cash_advance_realizatio
 const canVerify = computed(() => permissionStore.can('cash_advance_realization.verify'))
 
 const canReturn = computed(() => permissionStore.can('cash_advance_realization.return'))
+
+/*
+| Mengonfirmasi uang sisa benar-benar masuk.
+|
+| REF YANG SAMA dengan canReceive, bukan computed kedua atas permission yang
+| sama: dua pembacaan terpisah atas satu izin pada akhirnya akan berselisih.
+| Namanya sendiri tetap ada karena yang dijawabnya pertanyaan lain -- meja
+| yang menerima berkasnya pula yang menghitung uangnya masuk, dan kalau
+| kelak langkah itu punya izinnya sendiri, hanya baris ini yang berubah.
+*/
+const canConfirmReturn = computed(() => permissionStore.can('cash_advance_realization.confirm_return'))
+
+const canRejectReturn = computed(() => permissionStore.can('cash_advance_realization.reject_return'))
+
+/*
+| Menutup realisasi yang nilainya PAS. Tidak ada uang yang berpindah di
+| cabang ini, jadi tidak ada izin pembayaran maupun pengembalian yang bisa
+| dipakai -- yang tersisa justru pekerjaan yang paling mudah terlupakan.
+*/
+const canFinalize = computed(() => permissionStore.can('cash_advance_realization.finalize'))
 const canReimburse = computed(() => permissionStore.can('cash_advance_realization.reimburse'))
 
 /*
@@ -414,6 +455,28 @@ const pendingActionItems = computed(() => {
   }
 
   /*
+  | Antrean konfirmasi: sudah dinyatakan pemohon, menunggu Finance
+  | menghitung uangnya masuk. Milik pemegang izin PENERIMAAN.
+  */
+  if (canConfirmReturn.value) {
+    items.push({
+      title: t('cashAdvanceRealization.list.filters.pendingAction.confirmReturn'),
+      value: 'CONFIRM_RETURN',
+    })
+  }
+
+  /*
+  | Antrean approve: nilainya pas, berkasnya sedang diperiksa, menunggu
+  | dinyatakan benar lalu ditutup.
+  */
+  if (canFinalize.value) {
+    items.push({
+      title: t('cashAdvanceRealization.list.filters.pendingAction.finalize'),
+      value: 'FINALIZE',
+    })
+  }
+
+  /*
   | Antrean pemeriksaan: yang berkasnya sudah diterima dan kekurangannya
   | perlu dibayarkan, menunggu diperiksa sebelum berpindah meja.
   */
@@ -453,7 +516,9 @@ const statusItems = computed(() => [
   { title: t('cashAdvanceRealization.status.needRevision'), value: 'NEED REVISION' },
   { title: t('cashAdvanceRealization.status.cancelled'), value: 'CANCELLED' },
   { title: t('cashAdvanceRealization.status.received'), value: 'RECEIVED' },
+  { title: t('cashAdvanceRealization.status.onChecking'), value: 'ON CHECKING' },
   { title: t('cashAdvanceRealization.status.verified'), value: 'VERIFIED' },
+  { title: t('cashAdvanceRealization.status.returnDeclared'), value: 'RETURN DECLARED' },
   { title: t('cashAdvanceRealization.status.settled'), value: 'SETTLED' },
 ])
 
@@ -468,7 +533,9 @@ const formatStatus = (status: string | null | undefined): string => {
     'NEED REVISION': t('cashAdvanceRealization.status.needRevision'),
     'CANCELLED': t('cashAdvanceRealization.status.cancelled'),
     'RECEIVED': t('cashAdvanceRealization.status.received'),
+    'ON CHECKING': t('cashAdvanceRealization.status.onChecking'),
     'VERIFIED': t('cashAdvanceRealization.status.verified'),
+    'RETURN DECLARED': t('cashAdvanceRealization.status.returnDeclared'),
     'SETTLED': t('cashAdvanceRealization.status.settled'),
   }
 
@@ -488,11 +555,25 @@ const getStatusColor = (status: string | null | undefined): string => {
     'RECEIVED': 'primary',
 
     /*
+    | Berkasnya sedang diperiksa pada realisasi yang nilainya pas. Warnanya
+    | dibedakan dari RECEIVED: dua antrean yang dikerjakan lewat tombol
+    | berbeda tidak boleh terbaca sama dalam satu daftar.
+    */
+    'ON CHECKING': 'info',
+
+    /*
     | Sudah diperiksa, menunggu dibayar -- warnanya dibedakan dari RECEIVED
     | supaya dua antrean yang dikerjakan orang berbeda tidak terbaca sama
     | dalam satu daftar.
     */
     'VERIFIED': 'warning',
+
+    /*
+    | Pemohon sudah menyatakan uangnya kembali, Finance belum
+    | mengonfirmasi. Warnanya sendiri, bukan warna SETTLED: yang belum
+    | dihitung siapa pun tidak boleh terbaca seperti yang sudah tutup.
+    */
+    'RETURN DECLARED': 'purple',
 
     'SETTLED': 'info',
   }
@@ -1277,20 +1358,25 @@ const approveRealization = async (): Promise<void> => {
 | pemohonnya.
 */
 /*
-| Boleh mengembalikan: approver yang sedang memegangnya, atau Finance
-| pada dokumen yang berkasnya baru diterima.
+| HANYA APPROVER YANG SEDANG MEMEGANG DOKUMENNYA.
 |
-| Penjaga pertama sama dengan tombol Setujui -- can_approve datang
-| dari server, dihitung dari baris approval, dan sudah menolak pemohon
-| atas dokumennya sendiri. Penjaga kedua izin penarikan penerimaan,
-| karena di pintu itu penerimaan berkasnya ikut ditarik.
+| can_approve datang dari server, dihitung dari baris approval-nya, dan
+| sudah menolak pemohon atas dokumennya sendiri. Satu penjaga itu saja --
+| sama persis dengan tombol Setujui, karena yang berhak menyuruh
+| memperbaiki adalah yang berhak menilai.
 |
-| Yang sudah dicairkan, dibayarkan, atau diselesaikan tidak lewat
-| keduanya; servernya menolak, dan di sini tombolnya pun tidak muncul.
+| Finance TIDAK termasuk, walau ia memegang izin penarikan penerimaan.
+| Menarik penerimaan berkas dan menilai isi dokumen adalah dua wewenang
+| berbeda; yang kedua milik rantai approval, dan Finance tidak berdiri di
+| dalamnya. Jalan mundur Finance tetap ada lewat "Batalkan Terima", yang
+| mengembalikan dokumennya ke APPROVED tanpa memaksa siapa pun mengulang
+| approval.
+|
+| Yang sudah dicairkan, dibayarkan, atau diselesaikan tidak lewat sini;
+| servernya menolak, dan di sini tombolnya pun tidak muncul.
 */
 const canReturnRow = (row: RealizationRow): boolean =>
   Boolean(row.can_approve)
-  || (isStatus(row, 'RECEIVED') && Boolean(canUnreceive.value))
 
 const returnDialog = ref(false)
 const returnTarget = ref<RealizationRow | null>(null)
@@ -1352,6 +1438,88 @@ const returnForRevision = async (): Promise<void> => {
   }
   finally {
     returnLoading.value = false
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Finance menolak pernyataan pengembalian
+|--------------------------------------------------------------------------
+| Pintu keluar bila uangnya ternyata tidak pernah masuk -- salah rekening,
+| bukti keliru, nominalnya kurang. Tanpa ini Finance hanya punya dua pilihan:
+| mengakui yang tidak ia terima, atau membiarkan dokumennya menggantung.
+|
+| Alasannya WAJIB dan diteruskan utuh ke pemohon. Penolakan tanpa alasan
+| memaksa pemohon menebak apa yang salah, lalu menyatakan ulang hal yang sama.
+|--------------------------------------------------------------------------
+*/
+const rejectReturnDialog = ref(false)
+const rejectReturnTarget = ref<RealizationRow | null>(null)
+const rejectReturnReason = ref('')
+const rejectReturnError = ref('')
+const rejectReturnLoading = ref(false)
+
+const openRejectReturn = (row: RealizationRow): void => {
+  rejectReturnTarget.value = row
+  rejectReturnReason.value = ''
+  rejectReturnError.value = ''
+  rejectReturnDialog.value = true
+}
+
+const submitRejectReturn = async (): Promise<void> => {
+  if (!rejectReturnTarget.value?.public_id || rejectReturnLoading.value)
+    return
+
+  /* Sama dengan penjaga di server: tiga huruf. */
+  if (rejectReturnReason.value.trim().length < 3) {
+    rejectReturnError.value = t('common.revision.reasonRequired')
+
+    return
+  }
+
+  rejectReturnLoading.value = true
+
+  try {
+    showLoadingAlert(
+      t('common.alert.processing'),
+      t('common.alert.pleaseWait'),
+    )
+
+    const response = await axios.patch(
+      `/fund-request/cash-advance-realization/${encodeURIComponent(rejectReturnTarget.value.public_id)}/reject-return-declaration`,
+      { reason: rejectReturnReason.value.trim() },
+      { headers: { Accept: 'application/json' } },
+    )
+
+    closeAlert()
+
+    rejectReturnDialog.value = false
+    detailDialog.value = false
+
+    showSuccessToast({
+      title: t('common.alert.success'),
+      text: response.data?.message
+        || t('cashAdvanceRealization.list.rejectReturn.successFallback'),
+    })
+
+    await fetchRealizations()
+
+    /* Angka di sidebar ikut berubah -- angka basi merusak kepercayaan pada semuanya. */
+    await navigationStore.refreshBadges()
+  }
+  catch (error: unknown) {
+    closeAlert()
+
+    showErrorToast({
+      title: t('common.alert.error'),
+      text: getApiErrorMessage(
+        error,
+        t('cashAdvanceRealization.list.rejectReturn.failedFallback'),
+      ),
+    })
+  }
+  finally {
+    rejectReturnLoading.value = false
   }
 }
 
@@ -1513,8 +1681,10 @@ const needsVerification = (row: RealizationRow): boolean =>
   isStatus(row, 'RECEIVED')
     && String(row.difference_type || '').trim().toUpperCase() === 'REIMBURSE'
 
+type DifferenceMode = 'RETURN' | 'CONFIRM_RETURN' | 'REIMBURSE' | 'FINALIZE'
+
 const differenceActionState = (row: RealizationRow): {
-  mode: 'RETURN' | 'REIMBURSE'
+  mode: DifferenceMode
   color: string
   icon: string
   label: string
@@ -1522,11 +1692,11 @@ const differenceActionState = (row: RealizationRow): {
   const type = String(row.difference_type || '').trim().toUpperCase()
 
   /*
-  | Dua arah, dua syarat -- cerminan persis dari penjaga di server.
+  | Tiga meja, tiga syarat -- cerminan persis dari penjaga di server.
   |
-  | Uang masuk dicatat orang yang menerima dokumennya, jadi RECEIVED sudah
-  | cukup. Uang keluar menunggu pemeriksaan lebih dulu, jadi ia baru
-  | ditawarkan setelah VERIFIED.
+  | Uang yang kembali dinyatakan PEMOHON setelah berkasnya diterima, lalu
+  | dikonfirmasi Finance. Uang yang keluar menunggu pemeriksaan lebih dulu,
+  | jadi ia baru ditawarkan setelah VERIFIED.
   |
   | Kalau layarnya tidak ikut, tombolnya muncul lalu ditolak -- dan
   | penolakan yang datang sesudah diklik lebih buruk daripada tombol yang
@@ -1538,6 +1708,28 @@ const differenceActionState = (row: RealizationRow): {
       color: 'success',
       icon: 'tabler-arrow-back-up',
       label: t('cashAdvanceRealization.list.pending.return'),
+    }
+  }
+
+  if (type === 'RETURN' && isStatus(row, 'RETURN DECLARED')) {
+    return {
+      mode: 'CONFIRM_RETURN',
+      color: 'purple',
+      icon: 'tabler-checks',
+      label: t('cashAdvanceRealization.list.pending.confirmReturn'),
+    }
+  }
+
+  /*
+  | Nilainya PAS. Tidak ada uang yang berpindah, jadi yang ditawarkan bukan
+  | penyelesaian selisih melainkan persetujuan atas angkanya.
+  */
+  if (type === 'NONE' && isStatus(row, 'ON CHECKING')) {
+    return {
+      mode: 'FINALIZE',
+      color: 'info',
+      icon: 'tabler-circle-check',
+      label: t('cashAdvanceRealization.list.pending.finalize'),
     }
   }
 
@@ -1553,15 +1745,27 @@ const differenceActionState = (row: RealizationRow): {
   return null
 }
 
-/** Menu aksinya baru ditawarkan bila user memang berwenang menjalankannya. */
-const pendingDifferenceMode = (row: RealizationRow): 'RETURN' | 'REIMBURSE' | null => {
+/*
+| Menu aksinya baru ditawarkan bila user memang berwenang menjalankannya.
+|
+| Pengembalian menuntut DUA hal, bukan satu: izinnya, DAN dokumen itu
+| memang miliknya. Uang sisanya dipegang satu orang saja, jadi izin tanpa
+| kepemilikan akan menawarkan tombol untuk menyerahkan uang orang lain.
+*/
+const pendingDifferenceMode = (row: RealizationRow): DifferenceMode | null => {
   const state = differenceActionState(row)
 
   if (!state)
     return null
 
-  if (state.mode === 'RETURN' && abilities.value.can_return)
+  if (state.mode === 'RETURN' && abilities.value.can_return && row.is_requester)
     return 'RETURN'
+
+  if (state.mode === 'CONFIRM_RETURN' && abilities.value.can_confirm_return)
+    return 'CONFIRM_RETURN'
+
+  if (state.mode === 'FINALIZE' && abilities.value.can_finalize)
+    return 'FINALIZE'
 
   if (state.mode === 'REIMBURSE' && abilities.value.can_reimburse)
     return 'REIMBURSE'
@@ -1584,7 +1788,7 @@ const pendingDifferenceMode = (row: RealizationRow): 'RETURN' | 'REIMBURSE' | nu
 */
 /** Kolom centang tidak perlu ada bila tidak ada satu pun yang bisa diproses. */
 const canBulkSelect = computed<boolean>(() =>
-  canReceive.value || abilities.value.can_return || abilities.value.can_reimburse)
+  canReceive.value || abilities.value.can_reimburse)
 
 /**
  * Tindakan massal yang dibutuhkan satu baris, bila ada.
@@ -2121,7 +2325,7 @@ const openVerify = async (row: RealizationRow): Promise<void> => {
 | dicairkan padahal tidak ada satu pun.
 */
 const blockedByPaymentDay = computed<boolean>(() =>
-  (canReturn.value || canReimburse.value)
+  (canConfirmReturn.value || canReimburse.value)
   && rows.value.some(row =>
     row.can_pay_today === false && differenceActionState(row) !== null))
 
@@ -2153,6 +2357,27 @@ const offScheduleDialog = ref<{ open: (isi: Record<string, unknown>) => Promise<
  * lewat dialog tersendiri, karena di situ ada keadaan yang perlu ditonjolkan
  * dan satu isian catatan.
  */
+/**
+ * Penegasan biasa, tanpa kalender kasir.
+ *
+ * Bentuk kembaliannya sengaja sama persis dengan askPaymentConfirmation,
+ * supaya pemanggilnya bisa memilih salah satu tanpa mengurus perbedaan.
+ */
+const askPlainConfirmation = async (
+  judul: string,
+  pesan: string,
+  tombol: string,
+): Promise<{ lanjut: boolean; catatan: string }> => {
+  const konfirmasi = await showConfirmAlert({
+    title: judul,
+    text: pesan,
+    confirmButtonText: tombol,
+    cancelButtonText: t('common.actions.cancel'),
+  })
+
+  return { lanjut: konfirmasi.isConfirmed === true, catatan: '' }
+}
+
 const askPaymentConfirmation = async (
   row: RealizationRow,
   judul: string,
@@ -2184,34 +2409,71 @@ const askPaymentConfirmation = async (
   return { lanjut: hasil?.confirmed === true, catatan: hasil?.notes ?? '' }
 }
 
+/*
+| Tiga meja, tiga alamat, tiga kalimat. Ditulis sebagai peta, bukan rangkaian
+| if di dalam openSettle: yang bercabang di tengah fungsi panjang pada
+| akhirnya akan kehilangan satu cabang tanpa ada yang menyadarinya.
+*/
+/*
+| Sifat tiap mode, ditulis sebagai daftar dan bukan sebagai rangkaian
+| perbandingan di dalam openSettle.
+|
+| Bukan sekadar soal kerapian: tiap mode baru yang ditambahkan ke
+| rangkaian || menambah satu cabang pada fungsi yang sudah panjang, dan
+| cabang yang terlewat di satu tempat tidak akan terlihat sampai ada
+| yang menekan tombolnya.
+*/
+
+/** Wajib melampirkan bukti transfer sebelum apa pun ditanyakan. */
+const MODE_WAJIB_BUKTI: DifferenceMode[] = ['RETURN']
+
+/*
+| Tidak terikat hari kerja kasir. Pernyataan pemohon menyusul transfer
+| yang sudah terjadi, dan approve tanpa selisih tidak memindahkan
+| sepeser pun -- keduanya tidak ada urusan dengan kalender kasir.
+*/
+const MODE_TANPA_KALENDER_KASIR: DifferenceMode[] = ['RETURN', 'FINALIZE']
+
+/** Mengirim nominal; yang lain hanya menyetujui angka yang sudah ada. */
+const MODE_KIRIM_NOMINAL: DifferenceMode[] = ['RETURN', 'REIMBURSE']
+
+const SETTLE_ROUTES: Record<DifferenceMode, { ns: string; endpoint: string }> = {
+  RETURN: {
+    ns: 'cashAdvanceRealization.list.returnDifference',
+    endpoint: 'return-difference',
+  },
+  CONFIRM_RETURN: {
+    ns: 'cashAdvanceRealization.list.confirmReturn',
+    endpoint: 'confirm-return-difference',
+  },
+  REIMBURSE: {
+    ns: 'cashAdvanceRealization.list.reimburseDifference',
+    endpoint: 'reimburse-difference',
+  },
+  FINALIZE: {
+    ns: 'cashAdvanceRealization.list.finalize',
+    endpoint: 'finalize-no-difference',
+  },
+}
+
 const openSettle = async (
   row: RealizationRow,
-  mode: 'RETURN' | 'REIMBURSE',
+  mode: DifferenceMode,
 ): Promise<void> => {
   if (!row?.public_id || settleLoading.value)
     return
 
-  /*
-  | Dua tindakan yang berbeda: pemohon mengembalikan sisa, atau perusahaan
-  | membayar kekurangan. Endpoint dan teksnya mengikuti mode yang dipilih.
-  */
-  const ns = mode === 'RETURN'
-    ? 'cashAdvanceRealization.list.returnDifference'
-    : 'cashAdvanceRealization.list.reimburseDifference'
-
-  const endpoint = mode === 'RETURN'
-    ? 'return-difference'
-    : 'reimburse-difference'
+  const { ns, endpoint } = SETTLE_ROUTES[mode]
 
   /*
   | Bukti transfer diminta LEBIH DULU, sebelum penegasan apa pun: yang
   | tidak memegang buktinya berhenti di sini, tanpa harus menjawab
-  | pertanyaan lain. Hanya untuk pengembalian -- pembayaran kekurangan
-  | dicatat Finance sendiri dan buktinya tidak diwajibkan.
+  | pertanyaan lain. Hanya untuk pengembalian -- konfirmasi Finance dan
+  | pembayaran kekurangan tidak mewajibkan berkas.
   */
   let bukti: File[] = []
 
-  if (mode === 'RETURN') {
+  if (MODE_WAJIB_BUKTI.includes(mode)) {
     const dipilih = await askTransferProof()
 
     if (!dipilih)
@@ -2220,15 +2482,32 @@ const openSettle = async (
     bukti = dipilih
   }
 
-  const { lanjut, catatan } = await askPaymentConfirmation(
-    row,
-    t(`${ns}.confirmTitle`),
-    t(`${ns}.confirmText`, {
-      nomor: row.realization_number || '-',
-      nominal: `Rp ${formatNumberWithoutRp(Math.abs(Number(row.difference_amount || 0)))}`,
-    }),
-    t(`${ns}.confirmButton`),
-  )
+  const judul = t(`${ns}.confirmTitle`)
+
+  const pesan = t(`${ns}.confirmText`, {
+    nomor: row.realization_number || '-',
+    nominal: `Rp ${formatNumberWithoutRp(Math.abs(Number(row.difference_amount || 0)))}`,
+  })
+
+  const tombol = t(`${ns}.confirmButton`)
+
+  /*
+  | Jadwal kasir hanya mengikat meja Finance.
+  |
+  | Pemohon menyatakan transfer yang SUDAH ia lakukan; tanggalnya sudah lewat
+  | sebelum layar ini dibuka, jadi menahannya dengan kalender kasir berarti
+  | menolak kenyataan yang sudah terjadi. Servernya pun tidak memeriksanya di
+  | langkah itu -- dan layar yang menahan lebih ketat daripada servernya
+  | adalah larangan yang tidak tertulis di mana pun.
+  */
+  /*
+  | Kalender kasir hanya mengikat langkah yang benar-benar memindahkan uang
+  | lewat meja Finance. Pernyataan pemohon menyusul transfer yang sudah
+  | terjadi, dan approve tanpa selisih tidak memindahkan sepeser pun.
+  */
+  const { lanjut, catatan } = MODE_TANPA_KALENDER_KASIR.includes(mode)
+    ? await askPlainConfirmation(judul, pesan, tombol)
+    : await askPaymentConfirmation(row, judul, pesan, tombol)
 
   if (!lanjut)
     return
@@ -2252,10 +2531,19 @@ const openSettle = async (
     const formData = new FormData()
 
     formData.append('_method', 'PATCH')
-    formData.append(
-      'settlement_amount',
-      String(Math.round(Math.abs(Number(row.difference_amount || 0)) * 100) / 100),
-    )
+
+    /*
+    | Nominalnya dikirim oleh yang MENYATAKAN, bukan yang mengonfirmasi.
+    | Angka itu sudah terekam saat pernyataannya; mengirimkannya lagi di
+    | langkah kedua berarti memberi kesempatan kedua untuk mengubahnya.
+    */
+    if (MODE_KIRIM_NOMINAL.includes(mode)) {
+      formData.append(
+        'settlement_amount',
+        String(Math.round(Math.abs(Number(row.difference_amount || 0)) * 100) / 100),
+      )
+    }
+
     formData.append('notes', catatan ?? '')
 
     bukti.forEach(berkas => {
@@ -2294,6 +2582,49 @@ const openSettle = async (
     settleLoading.value = false
   }
 }
+
+/*
+| Warna, ikon, dan sebutan tiap percobaan pengembalian.
+|
+| Dipisah dari templatnya supaya tiga keadaan itu punya SATU definisi: yang
+| ditulis berulang di beberapa tempat pada akhirnya akan berbeda warna di
+| daftar dan di riwayatnya.
+*/
+const normalkanStatusPercobaan = (status: string | null | undefined): string =>
+  String(status || '').trim().toUpperCase()
+
+const returnAttemptColor = (status: string | null | undefined): string => {
+  const normalized = normalkanStatusPercobaan(status)
+
+  if (normalized === 'CONFIRMED')
+    return 'success'
+
+  return normalized === 'REJECTED' ? 'error' : 'warning'
+}
+
+const returnAttemptIcon = (status: string | null | undefined): string => {
+  const normalized = normalkanStatusPercobaan(status)
+
+  if (normalized === 'CONFIRMED')
+    return 'tabler-check'
+
+  return normalized === 'REJECTED' ? 'tabler-x' : 'tabler-clock'
+}
+
+const returnAttemptLabel = (status: string | null | undefined): string => {
+  const normalized = normalkanStatusPercobaan(status)
+
+  if (normalized === 'CONFIRMED')
+    return t('cashAdvanceRealization.detail.returnStatus.confirmed')
+
+  return normalized === 'REJECTED'
+    ? t('cashAdvanceRealization.detail.returnStatus.rejected')
+    : t('cashAdvanceRealization.detail.returnStatus.pending')
+}
+
+/** Nominal bergaya Rp, sama dengan yang dipakai kartu ringkasan. */
+const formatRupiah = (value: unknown): string =>
+  `Rp ${formatNumberWithoutRp(Number(value || 0))}`
 
 const openDelete = async (row: RealizationRow): Promise<void> => {
   const confirm = await showConfirmAlert({
@@ -2626,7 +2957,7 @@ const detailPaymentSchedule = computed<{
   | terlambat tetap terlihat semua orang -- justru itu yang perlu
   | diketahui pemohonnya.
   */
-  if (source.payment_timing === 'EARLY' && !(abilities.value.can_reimburse || abilities.value.can_return))
+  if (source.payment_timing === 'EARLY' && !(abilities.value.can_reimburse || abilities.value.can_confirm_return))
     return null
 
   /* Belum dibayar dan tanggalnya sudah lewat adalah satu-satunya yang mendesak. */
@@ -3440,7 +3771,7 @@ onMounted(async () => {
                     berwenang menariknya kembali.
                   -->
                   <VListItem
-                    v-if="isStatus(row, 'RECEIVED') && canUnreceive"
+                    v-if="(isStatus(row, 'RECEIVED') || isStatus(row, 'ON CHECKING')) && canUnreceive"
                     href="javascript:void(0)"
                     @click="openUnreceive(row)"
                   >
@@ -3461,9 +3792,13 @@ onMounted(async () => {
                     Aksi penyelesaian selisih hanya muncul bila memang ada uang
                     yang harus berpindah, dan labelnya mengikuti arahnya.
                   -->
+
+                  <!--
+                    Milik PEMOHON, bukan Finance. Tidak terikat hari kasir:
+                    transfernya sudah terjadi sebelum layar ini dibuka.
+                  -->
                   <VListItem
                     v-if="pendingDifferenceMode(row) === 'RETURN'"
-                    :disabled="!canPayTodayRow(row)"
                     href="javascript:void(0)"
                     @click="openSettle(row, 'RETURN')"
                   >
@@ -3477,6 +3812,72 @@ onMounted(async () => {
 
                     <VListItemTitle class="text-success">
                       {{ t('cashAdvanceRealization.list.menu.returnDifference') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <!-- Milik Finance: menyatakan uangnya benar-benar masuk. -->
+                  <VListItem
+                    v-if="pendingDifferenceMode(row) === 'CONFIRM_RETURN'"
+                    :disabled="!canPayTodayRow(row)"
+                    href="javascript:void(0)"
+                    @click="openSettle(row, 'CONFIRM_RETURN')"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-checks"
+                        :size="20"
+                        class="me-3 text-primary"
+                      />
+                    </template>
+
+                    <VListItemTitle class="text-primary">
+                      {{ t('cashAdvanceRealization.list.menu.confirmReturn') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <!--
+                    Pasangan tombol di atas. Tanpa pintu ini Finance hanya
+                    punya dua pilihan ketika uangnya tidak pernah masuk:
+                    mengakuinya, atau membiarkannya menggantung.
+                  -->
+                  <VListItem
+                    v-if="differenceActionState(row)?.mode === 'CONFIRM_RETURN' && canRejectReturn"
+                    href="javascript:void(0)"
+                    @click="openRejectReturn(row)"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-receipt-off"
+                        :size="20"
+                        class="me-3 text-error"
+                      />
+                    </template>
+
+                    <VListItemTitle class="text-error">
+                      {{ t('cashAdvanceRealization.list.menu.rejectReturn') }}
+                    </VListItemTitle>
+                  </VListItem>
+
+                  <!--
+                    Nilainya pas: tidak ada uang yang berpindah, yang
+                    dilakukan hanya menyatakan angkanya memang sudah benar.
+                    Sesudah ini dokumennya tidak bisa ditarik lagi.
+                  -->
+                  <VListItem
+                    v-if="pendingDifferenceMode(row) === 'FINALIZE'"
+                    href="javascript:void(0)"
+                    @click="openSettle(row, 'FINALIZE')"
+                  >
+                    <template #prepend>
+                      <VIcon
+                        icon="tabler-circle-check"
+                        :size="20"
+                        class="me-3 text-info"
+                      />
+                    </template>
+
+                    <VListItemTitle class="text-info">
+                      {{ t('cashAdvanceRealization.list.menu.finalize') }}
                     </VListItemTitle>
                   </VListItem>
 
@@ -3518,7 +3919,7 @@ onMounted(async () => {
                   </VListItem>
 
                   <VListItem
-                    v-if="isStatus(row, 'APPROVED') && canCancel"
+                    v-if="isStatus(row, 'APPROVED') && canCancel && row.can_cancel"
                     href="javascript:void(0)"
                     @click="openCancel(row)"
                   >
@@ -4771,6 +5172,179 @@ onMounted(async () => {
               </div>
             </template>
 
+            <!--
+              Serah-terima dari pemeriksa ke pembayar, pada cabang kekurangan.
+
+              Langkah inilah yang memindahkan dokumen antar meja, dan selama
+              ini justru ia yang tidak terlihat: pembaca detail hanya melihat
+              "diterima" lalu "dibayar", seolah tidak ada pemeriksaan di
+              antaranya.
+            -->
+            <VAlert
+              v-if="detail.verified_at"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-5"
+            >
+              <div class="font-weight-medium">
+                {{ t('cashAdvanceRealization.detail.verifiedTitle') }}
+              </div>
+
+              <div class="car-detail__meta mt-1">
+                {{ t('cashAdvanceRealization.detail.verifiedBy', {
+                  name: detail.verified_by_name || '-',
+                  time: formatAuditDateTime(detail.verified_at),
+                }) }}
+              </div>
+
+              <div
+                v-if="detail.verification_notes"
+                class="text-body-2 mt-1"
+              >
+                {{ detail.verification_notes }}
+              </div>
+            </VAlert>
+
+            <!--
+              Riwayat pengembalian sisa dana.
+
+              Pengembalian bisa GAGAL, dan karena itu bisa berulang. Tanpa
+              daftar ini pemohon yang ditolak hanya tahu dokumennya kembali,
+              tidak tahu APA yang salah -- lalu menyatakan ulang hal yang sama.
+
+              Percobaan yang ditolak sengaja tetap ditampilkan beserta
+              buktinya: justru itu yang perlu dibaca berdampingan dengan
+              alasan penolakannya.
+            -->
+            <template v-if="(detail.return_declarations || []).length">
+              <div class="car-detail__section-title">
+                <VIcon
+                  icon="tabler-history"
+                  size="18"
+                />
+                {{ t('cashAdvanceRealization.detail.returnHistoryTitle') }}
+              </div>
+
+              <VTimeline
+                side="end"
+                align="start"
+                truncate-line="both"
+                density="compact"
+                class="car-return-history"
+              >
+                <VTimelineItem
+                  v-for="percobaan in detail.return_declarations"
+                  :key="`return-attempt-${percobaan.id}`"
+                  :dot-color="returnAttemptColor(percobaan.status)"
+                  :icon="returnAttemptIcon(percobaan.status)"
+                  size="x-small"
+                >
+                  <div class="d-flex flex-wrap align-center gap-2 mb-1">
+                    <span class="font-weight-medium">
+                      {{ t('cashAdvanceRealization.detail.returnAttempt', { n: percobaan.attempt }) }}
+                    </span>
+
+                    <VChip
+                      :color="returnAttemptColor(percobaan.status)"
+                      size="x-small"
+                      label
+                    >
+                      {{ returnAttemptLabel(percobaan.status) }}
+                    </VChip>
+                  </div>
+
+                  <div class="text-body-2">
+                    {{ t('cashAdvanceRealization.detail.returnDeclaredBy', {
+                      name: percobaan.declared_by_name || '-',
+                      amount: formatRupiah(percobaan.declared_amount),
+                    }) }}
+                  </div>
+
+                  <div class="car-detail__meta">
+                    {{ formatAuditDateTime(percobaan.declared_at) }}
+                  </div>
+
+                  <div
+                    v-if="percobaan.declaration_notes"
+                    class="text-body-2 mt-1"
+                  >
+                    {{ percobaan.declaration_notes }}
+                  </div>
+
+                  <!--
+                    Alasan penolakan ditonjolkan, bukan diselipkan sebagai
+                    catatan biasa: inilah satu-satunya kalimat yang memberi
+                    tahu pemohon apa yang harus ia perbaiki.
+                  -->
+                  <VAlert
+                    v-if="percobaan.status === 'REJECTED' && percobaan.review_notes"
+                    type="error"
+                    variant="tonal"
+                    density="compact"
+                    class="mt-2"
+                  >
+                    <div class="text-body-2">
+                      {{ percobaan.review_notes }}
+                    </div>
+
+                    <div class="car-detail__meta mt-1">
+                      {{ t('cashAdvanceRealization.detail.returnReviewedBy', {
+                        name: percobaan.reviewed_by_name || '-',
+                        time: formatAuditDateTime(percobaan.reviewed_at),
+                      }) }}
+                    </div>
+                  </VAlert>
+
+                  <div
+                    v-else-if="percobaan.reviewed_at"
+                    class="car-detail__meta mt-1"
+                  >
+                    {{ t('cashAdvanceRealization.detail.returnReviewedBy', {
+                      name: percobaan.reviewed_by_name || '-',
+                      time: formatAuditDateTime(percobaan.reviewed_at),
+                    }) }}
+                  </div>
+
+                  <div
+                    v-if="(percobaan.attachments || []).length"
+                    class="car-detail__files mt-2"
+                  >
+                    <a
+                      v-for="berkas in percobaan.attachments"
+                      :key="`return-attempt-file-${berkas.id}`"
+                      class="car-detail__file"
+                      :href="berkas.url || undefined"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <VIcon
+                        :icon="getAttachmentIcon(berkas.mime_type)"
+                        size="22"
+                        color="info"
+                      />
+
+                      <div class="car-detail__file-body">
+                        <div class="car-detail__file-name">
+                          {{ berkas.original_filename || berkas.filename }}
+                        </div>
+
+                        <div class="car-detail__meta">
+                          {{ formatAttachmentSize(berkas.file_size) }}
+                        </div>
+                      </div>
+
+                      <VIcon
+                        icon="tabler-external-link"
+                        size="16"
+                        class="text-medium-emphasis"
+                      />
+                    </a>
+                  </div>
+                </VTimelineItem>
+              </VTimeline>
+            </template>
+
             <!-- Jadwal pembayaran: janji yang sudah dikirimkan ke pemohon -->
             <VAlert
               v-if="detailPaymentSchedule"
@@ -4996,6 +5570,63 @@ onMounted(async () => {
             @click="returnForRevision"
           >
             {{ t('common.revision.confirmButton') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!--
+      Menolak pernyataan pengembalian.
+
+      Warnanya merah: ini menyatakan uangnya TIDAK diterima, dan dokumennya
+      mundur ke meja pemohon. Berbeda dari "Kembalikan untuk revisi", yang
+      meminta perbaikan isi dokumen, bukan uangnya.
+    -->
+    <VDialog
+      v-model="rejectReturnDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle class="text-h6 font-weight-bold">
+          {{ t('cashAdvanceRealization.list.rejectReturn.dialogTitle', {
+            number: rejectReturnTarget?.realization_number || '-',
+          }) }}
+        </VCardTitle>
+
+        <VCardText>
+          <div class="text-body-2 text-medium-emphasis mb-4">
+            {{ t('cashAdvanceRealization.list.rejectReturn.dialogSubtitle') }}
+          </div>
+
+          <VTextarea
+            v-model="rejectReturnReason"
+            :label="t('cashAdvanceRealization.list.rejectReturn.reasonLabel')"
+            :placeholder="t('cashAdvanceRealization.list.rejectReturn.reasonPlaceholder')"
+            rows="3"
+            auto-grow
+            :error="!!rejectReturnError"
+            :error-messages="rejectReturnError ? [rejectReturnError] : []"
+          />
+        </VCardText>
+
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            :disabled="rejectReturnLoading"
+            @click="rejectReturnDialog = false"
+          >
+            {{ t('common.actions.cancel') }}
+          </VBtn>
+
+          <VBtn
+            color="error"
+            class="text-none"
+            :loading="rejectReturnLoading"
+            @click="submitRejectReturn"
+          >
+            {{ t('cashAdvanceRealization.list.rejectReturn.confirmButton') }}
           </VBtn>
         </VCardActions>
       </VCard>

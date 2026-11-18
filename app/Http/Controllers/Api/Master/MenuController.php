@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Menu;
+use App\Models\MenuSection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,7 @@ class MenuController extends Controller
             ->select(
                 'm.id',
                 'm.parent_id',
+                'm.menu_section_id',
                 'm.name',
                 'm.path',
                 'm.route_name',
@@ -100,6 +102,9 @@ class MenuController extends Controller
                 'parent_id' => $row->parent_id !== null
                     ? (int) $row->parent_id
                     : null,
+                'menu_section_id' => $row->menu_section_id !== null
+                    ? (int) $row->menu_section_id
+                    : null,
                 'title' => $row->name,
                 'icon' => !empty($row->icon)
                     ? ['icon' => $row->icon]
@@ -126,6 +131,16 @@ class MenuController extends Controller
         }
 
         unset($node);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Sisipkan judul section
+        |--------------------------------------------------------------------------
+        | Dikerjakan SEBELUM cleanMaterioMenu, selagi menu_section_id masih
+        | melekat pada tiap simpul -- pembersih itulah yang membuangnya.
+        |--------------------------------------------------------------------------
+        */
+        $tree = $this->applyMenuSections($tree);
 
         $result = $this->cleanMaterioMenu($tree);
 
@@ -164,6 +179,7 @@ class MenuController extends Controller
             ->get([
                 'id',
                 'parent_id',
+                'menu_section_id',
                 'name',
                 'path',
                 'route_name',
@@ -211,6 +227,9 @@ class MenuController extends Controller
         $menu = DB::transaction(function () use ($validated) {
             $menu = Menu::create([
                 'parent_id' => $validated['parent_id'] ?? null,
+                'menu_section_id' => ($validated['parent_id'] ?? null) === null
+                    ? ($validated['menu_section_id'] ?? null)
+                    : null,
                 'name' => $validated['name'],
                 'path' => $validated['path'] ?? null,
                 'route_name' => $validated['route_name'] ?? null,
@@ -296,6 +315,9 @@ class MenuController extends Controller
 
         $menu->update([
             'parent_id' => $validated['parent_id'] ?? null,
+            'menu_section_id' => ($validated['parent_id'] ?? null) === null
+                ? ($validated['menu_section_id'] ?? null)
+                : null,
             'name' => $validated['name'],
             'path' => $validated['path'] ?? null,
             'route_name' => $validated['route_name'] ?? null,
@@ -422,6 +444,19 @@ class MenuController extends Controller
                 'nullable',
                 'integer',
                 'exists:menus,id',
+            ],
+
+            /*
+            | Section hanya berlaku bagi menu induk; submenu mengikuti
+            | induknya. Nilainya tetap diterima apa adanya di sini dan
+            | dikosongkan belakangan bila menunya ternyata punya induk --
+            | menolaknya mentah-mentah akan menggagalkan penyimpanan hanya
+            | karena layar mengirim medan yang tidak relevan.
+            */
+            'menu_section_id' => [
+                'nullable',
+                'integer',
+                'exists:menu_sections,id',
             ],
 
             'name' => [
@@ -646,10 +681,99 @@ class MenuController extends Controller
             ->values();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Menyisipkan judul section di antara menu teratas
+    |--------------------------------------------------------------------------
+    | Tema menggambar sebuah item sebagai judul kelompok begitu ia punya
+    | properti 'heading' -- lihat VerticalNav.vue. Jadi yang dikerjakan di sini
+    | hanya menyusun ulang deretnya:
+    |
+    |   [menu tanpa section]       <- Dashboard dan sejenisnya, di paling atas
+    |   { heading: 'FINANCE' }
+    |   [menu-menu Finance]
+    |   { heading: 'PROCUREMENT' }
+    |   [menu-menu Procurement]
+    |
+    | TIGA ATURAN, DAN KETIGANYA PENTING:
+    |
+    | 1. Menu tanpa section digambar LEBIH DULU, sebelum heading mana pun.
+    |    Dashboard memang pantas berdiri sendiri di puncak, dan menu yang
+    |    sectionnya belum diisi tidak boleh lenyap hanya karena itu.
+    |
+    | 2. Section yang KOSONG tidak digambar. Sidebar disaring per role, jadi
+    |    sebuah section bisa saja tidak menyisakan satu pun menu bagi
+    |    seseorang -- dan judul yang menggantung tanpa isi terbaca seperti
+    |    menu yang rusak atau hak akses yang hilang.
+    |
+    | 3. Section NONAKTIF atau TERHAPUS diperlakukan seperti tanpa section.
+    |    Menunya naik ke bagian teratas, bukan ikut hilang: yang dinonaktifkan
+    |    pengelompokannya, bukan menunya.
+    |--------------------------------------------------------------------------
+    */
+    private function applyMenuSections(array $roots): array
+    {
+        $sections = MenuSection::query()
+            ->where('is_active', true)
+            ->orderBy('order_no')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        if ($sections->isEmpty()) {
+            return $roots;
+        }
+
+        $dikenal = $sections->keyBy('id');
+
+        $tanpaSection = [];
+        $perSection = [];
+
+        foreach ($roots as $root) {
+            $sectionId = $root['menu_section_id'] ?? null;
+
+            if ($sectionId === null || !$dikenal->has($sectionId)) {
+                $tanpaSection[] = $root;
+
+                continue;
+            }
+
+            $perSection[$sectionId][] = $root;
+        }
+
+        $hasil = $tanpaSection;
+
+        foreach ($sections as $section) {
+            $isi = $perSection[$section->id] ?? [];
+
+            if ($isi === []) {
+                continue;
+            }
+
+            $hasil[] = ['heading' => $section->name];
+
+            foreach ($isi as $menu) {
+                $hasil[] = $menu;
+            }
+        }
+
+        return $hasil;
+    }
+
     private function cleanMaterioMenu(array $items): array
     {
         return array_values(array_map(function (array $item): array {
-            unset($item['id'], $item['parent_id'], $item['order_no']);
+            /*
+            | Judul section dibiarkan apa adanya.
+            |
+            | Ia bukan menu: tidak punya tujuan, tidak punya anak, dan tidak
+            | boleh diberi 'to' => '#' seperti perlakuan simpul tanpa anak di
+            | bawah -- itu akan membuatnya tergambar sebagai tautan mati.
+            */
+            if (array_key_exists('heading', $item)) {
+                return ['heading' => $item['heading']];
+            }
+
+            unset($item['id'], $item['parent_id'], $item['menu_section_id'], $item['order_no']);
 
             if (empty($item['icon'])) {
                 unset($item['icon']);
@@ -690,6 +814,7 @@ class MenuController extends Controller
                 return [
                     'id' => $menu->id,
                     'parent_id' => $menu->parent_id,
+                    'menu_section_id' => $menu->menu_section_id,
                     'name' => $menu->name,
                     'path' => $menu->path,
                     'route_name' => $menu->route_name,
@@ -1272,10 +1397,40 @@ class MenuController extends Controller
                         'status' => 'RECEIVED',
                         'difference_type' => 'REIMBURSE',
                     ],
+                    /*
+                    | Menunggu DIKEMBALIKAN PEMOHON, bukan menunggu Finance.
+                    |
+                    | own_only bukan hiasan. Uang sisanya dipegang satu orang,
+                    | dan hanya orang itu yang bisa mengembalikannya; tanpa
+                    | saringan ini, siapa pun yang cakupan lihatnya seluruh
+                    | cabang akan melihat angka berisi tagihan orang lain --
+                    | lalu membuka daftarnya dan tidak menemukan satu pun yang
+                    | bisa ia kerjakan.
+                    */
                     [
                         'permission' => 'cash_advance_realization.return',
                         'status' => 'RECEIVED',
                         'difference_type' => 'RETURN',
+                        'own_only' => true,
+                    ],
+
+                    /* Sudah dinyatakan pemohon, menunggu Finance mengonfirmasi. */
+                    [
+                        'permission' => 'cash_advance_realization.confirm_return',
+                        'status' => 'RETURN DECLARED',
+                        'difference_type' => 'RETURN',
+                    ],
+
+                    /*
+                    | Nilainya pas, berkasnya sedang diperiksa. Tidak ada uang
+                    | yang berpindah di cabang ini -- yang menunggu justru
+                    | pekerjaan yang paling mudah terlupakan kalau tidak ada
+                    | angka yang mengingatkannya.
+                    */
+                    [
+                        'permission' => 'cash_advance_realization.finalize',
+                        'status' => 'ON CHECKING',
+                        'difference_type' => 'NONE',
                     ],
                     [
                         'permission' => 'cash_advance_realization.reimburse',
@@ -1352,6 +1507,31 @@ class MenuController extends Controller
                 "UPPER(TRIM({$tabel}.difference_type)) = ?",
                 [strtoupper(trim((string) $antrean['difference_type']))],
             );
+        }
+
+        /*
+        | Antrean yang hanya bisa dikerjakan pemohonnya sendiri disaring di
+        | sini, SEBELUM cakupan lihat. Keduanya tidak saling menggantikan:
+        | cakupan lihat menjawab "boleh melihat apa", antrean ini menjawab
+        | "siapa yang bisa mengerjakannya", dan yang kedua jauh lebih sempit.
+        */
+        if (!empty($antrean['own_only']) && Schema::hasColumn($tabel, 'submitted_by')) {
+            $query->where(function ($q) use ($tabel, $user): void {
+                $q->where("{$tabel}.submitted_by", $user->id);
+
+                /*
+                | created_by hanya dipakai bila dokumennya tidak punya
+                | submitted_by -- sama seperti definisi pemohon di modulnya.
+                | Tanpa whereNull, dokumen yang disiapkan admin lalu diajukan
+                | orang lain akan terhitung pada keduanya.
+                */
+                if (Schema::hasColumn($tabel, 'created_by')) {
+                    $q->orWhere(function ($sub) use ($tabel, $user): void {
+                        $sub->whereNull("{$tabel}.submitted_by")
+                            ->where("{$tabel}.created_by", $user->id);
+                    });
+                }
+            });
         }
 
         $this->applyBadgeVisibilityScope($query, $user, $config);

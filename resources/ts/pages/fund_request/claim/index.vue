@@ -37,6 +37,13 @@ import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
 interface ClaimRow {
 
   /*
+  | Boleh membatalkan dokumen INI. Dihitung server dengan penjaga yang sama
+  | dengan endpoint-nya, karena izin batal punya cakupannya sendiri --
+  | OWN_DATA, OWN_CABANG, dan seterusnya.
+  */
+  can_cancel?: boolean
+
+  /*
   | Jumlah lampiran. Dipakai satu hal saja: menentukan perlu tidaknya
   | layar bertanya "gabungkan lampiran ke dalam cetakan?".
   */
@@ -480,8 +487,14 @@ const canPayNowRow = (row: ClaimRow): boolean =>
 | ditarik dulu penerimaannya, baru dibatalkan -- aturannya sama dengan FPU,
 | dan dijaga juga di ClaimController::cancel().
 */
+/*
+| row.can_cancel datang dari server, dihitung dengan penjaga yang sama
+| dengan endpoint-nya. Tanpa itu, izin bercakupan OWN_DATA tetap
+| memunculkan tombol Batalkan pada dokumen orang lain -- lalu servernya
+| menjawab "tidak ditemukan" sesudah alasan pembatalan diketik.
+*/
 const canCancelRow = (row: ClaimRow): boolean =>
-  canCancel.value && isStatus(row, 'APPROVED')
+  canCancel.value && row.can_cancel !== false && isStatus(row, 'APPROVED')
 
 /*
  * Penanda tindakan Finance yang masih ditunggu. Approved saja belum berarti
@@ -1207,20 +1220,25 @@ const saveSignatureAndContinue = async (): Promise<void> => {
 | pemohonnya.
 */
 /*
-| Boleh mengembalikan: approver yang sedang memegangnya, atau Finance
-| pada dokumen yang berkasnya baru diterima.
+| HANYA APPROVER YANG SEDANG MEMEGANG DOKUMENNYA.
 |
-| Penjaga pertama sama dengan tombol Setujui -- can_approve datang
-| dari server, dihitung dari baris approval, dan sudah menolak pemohon
-| atas dokumennya sendiri. Penjaga kedua izin penarikan penerimaan,
-| karena di pintu itu penerimaan berkasnya ikut ditarik.
+| can_approve datang dari server, dihitung dari baris approval-nya, dan
+| sudah menolak pemohon atas dokumennya sendiri. Satu penjaga itu saja --
+| sama persis dengan tombol Setujui, karena yang berhak menyuruh
+| memperbaiki adalah yang berhak menilai.
 |
-| Yang sudah dicairkan, dibayarkan, atau diselesaikan tidak lewat
-| keduanya; servernya menolak, dan di sini tombolnya pun tidak muncul.
+| Finance TIDAK termasuk, walau ia memegang izin penarikan penerimaan.
+| Menarik penerimaan berkas dan menilai isi dokumen adalah dua wewenang
+| berbeda; yang kedua milik rantai approval, dan Finance tidak berdiri di
+| dalamnya. Jalan mundur Finance tetap ada lewat "Batalkan Terima", yang
+| mengembalikan dokumennya ke APPROVED tanpa memaksa siapa pun mengulang
+| approval.
+|
+| Yang sudah dicairkan, dibayarkan, atau diselesaikan tidak lewat sini;
+| servernya menolak, dan di sini tombolnya pun tidak muncul.
 */
 const canReturnRow = (row: ClaimRow): boolean =>
   Boolean(row.can_approve)
-  || (isStatus(row, 'RECEIVED') && Boolean(canUnreceive.value))
 
 const returnDialog = ref(false)
 const returnTarget = ref<ClaimRow | null>(null)
