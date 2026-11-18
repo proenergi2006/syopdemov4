@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import axios from '@axios'
 import {
   computed,
   nextTick,
@@ -10,6 +9,8 @@ import {
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import axios from '@axios'
+import PettyCashBalancePanel from '@/components/petty-cash/PettyCashBalancePanel.vue'
 
 type DisplayMode = 4 | 8 | 12 | 'all'
 
@@ -189,9 +190,8 @@ async function fetchDashboardModules(
       isLoadingMore.value
       || !hasMoreModules.value
       || displayMode.value !== 'all'
-    ) {
+    )
       return
-    }
 
     isLoadingMore.value = true
   }
@@ -311,9 +311,8 @@ async function loadMoreModules(): Promise<void> {
     displayMode.value !== 'all'
     || isLoadingMore.value
     || !hasMoreModules.value
-  ) {
+  )
     return
-  }
 
   currentPage.value += 1
 
@@ -326,9 +325,8 @@ async function openDashboardModule(
   if (
     !dashboardModule.is_available
     || !dashboardModule.route_path
-  ) {
+  )
     return
-  }
 
   try {
     await router.push(dashboardModule.route_path)
@@ -351,9 +349,8 @@ function createScrollObserver(): void {
         && displayMode.value === 'all'
         && hasMoreModules.value
         && !isLoadingMore.value
-      ) {
+      )
         loadMoreModules()
-      }
     },
     {
       root: null,
@@ -372,9 +369,8 @@ function observeLoadMoreTrigger(): void {
   if (
     loadMoreTrigger.value
     && displayMode.value === 'all'
-  ) {
+  )
     scrollObserver.observe(loadMoreTrigger.value)
-  }
 }
 
 watch(
@@ -409,6 +405,19 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="dashboard-module-page">
+    <!--
+      Peringatan saldo kas kecil, di atas segalanya.
+
+      warningsOnly: hanya kartu yang saldonya di bawah ambang yang muncul.
+      Bagi yang bukan pemegang kas kecil, dan bagi pemegang yang saldonya
+      masih sehat, tidak ada apa pun yang ditampilkan di sini -- jadi
+      halaman ini tidak berubah bagi siapa pun kecuali yang perlu bertindak.
+    -->
+    <PettyCashBalancePanel
+      warnings-only
+      class="mb-6"
+    />
+
     <!-- Welcome header -->
     <VCard class="dashboard-welcome-card mb-6">
       <VCardText class="pa-6 pa-md-8">

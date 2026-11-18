@@ -1,42 +1,41 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import axios from '@axios'
+import { onMounted, reactive, ref } from 'vue'
 import { debounce } from 'lodash-es'
+
+import { VForm } from 'vuetify/components/VForm'
+import { useRoute } from 'vue-router'
 import {
   onlyNumberKeypress,
 } from '@/utils/textFormatter'
-import { reactive } from 'vue'
-import { VForm } from 'vuetify/components/VForm'
-import { useRoute } from 'vue-router'
+import axios from '@axios'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import {
+  closeAlert,
   showConfirmAlert,
   showErrorAlert,
   showErrorToast,
   showLoadingAlert,
   showSuccessAlert,
   showWarningAlert,
-  closeAlert,
 } from '@/utils/alert'
-
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 const dialogSubmit = ref(false)
 const route = useRoute()
 const router = useRouter()
 
-
 const id = computed(() => route.query.id)
 const mode = computed(() => route.query.id ? 'edit' : 'add')
+
 // console.log( route.query.id)
 // const mode = computed(() => {
 //   return route.params.id_master ? 'edit' : 'add'
 // })
 
-
 const step = ref('form') // form | review
 
 const form = reactive({
- 
+
   nomor_po: null,
   id_accurate: 0,
   vendor: null,
@@ -46,52 +45,52 @@ const form = reactive({
   terms_day: 0,
   kd_tax: '',
   volume_po: 0,
-  tanggal_inven:'',
+  tanggal_inven: '',
   jenis_harga: 0,
   jenis_kirim: 0,
 
-  nilai_pbbkb:0,
+  nilai_pbbkb: 0,
   harga_tebus: 0,
   kategori_oa: 1,
   jenis_oa: 0,
 
-  //item OA
+  // item OA
   kode_item_oa: null,
   keterangan_item_oa: '',
   alokasi_item_oa: false,
 
-  //kode Item
+  // kode Item
   kode_item: null,
-  keterangan_item :'',
+  keterangan_item: '',
 
   ongkos_angkut: 0,
   kategori_plat: '',
 
-  //biaya oa
+  // biaya oa
   biaya_oa: null,
   keterangan_biaya_oa: '',
   alokasi_biaya_oa: false,
   total_biaya_oa: 0,
 
-  //biaya lain
+  // biaya lain
   biaya_lain_oa: null,
   ket_biaya_lain_oa: '',
   alokasi_biaya_oa_lain: false,
   jumlah_biaya: 0,
 
-  //biaya pph
+  // biaya pph
   pph22: null,
   biaya_pph22: null,
   keterangan_pph22: '',
   alokasi_pph22: false,
 
-  //biaya pbbkb
+  // biaya pbbkb
   pbbkb: 0,
   biaya_pbbkb: null,
   keterangan_pbbkb: '',
   alokasi_pbbkb: false,
 
-  //biaya migas
+  // biaya migas
   iuran_migas: false,
   nominal_iuran: 0,
   biaya_migas: null,
@@ -103,89 +102,101 @@ const form = reactive({
   total_order: 0,
   catatan_po: '',
   internal_notes: '',
-  catatan_resubmit:'',
+  catatan_resubmit: '',
 
   // approval
-  disposisi_po : 0,
-  ceo_result:0,
-  revert_cfo:0,
-  revert_ceo:0,
-  revert_cfo_summary:'',
-  revert_ceo_summary:'',
+  disposisi_po: 0,
+  ceo_result: 0,
+  revert_cfo: 0,
+  revert_ceo: 0,
+  revert_cfo_summary: '',
+  revert_ceo_summary: '',
 })
+
 const produkAccList = ref<any[]>([])
 const akunAccList = ref<any[]>([])
 const pbbkbList = ref<any[]>([])
 const produkList = ref<any[]>([])
 const vendorList = ref<any[]>([])
 const terminalList = ref<any[]>([])
-let controller: AbortController | null = null
-const safe =  (val: any) => Number(val) || 0
+const controller: AbortController | null = null
+const safe = (val: any) => Number(val) || 0
 const val = ''
 
 // const showBiayaOA = ref(false)
 // const showKodeItemOA = ref(false)
 // const showKodeAkunOA = ref(false)
 const showpph = computed(() => form.kd_tax === 'EC')
+
 const showpbbkb = computed(() => {
   const selected = pbbkbList.value.find(
-    (p: any) => p.id === form.pbbkb
+    (p: any) => p.id === form.pbbkb,
   )
 
   const nilaiPbbkb = selected?.nilai ?? 0
-  return nilaiPbbkb > 0
 
+  return nilaiPbbkb > 0
 })
+
 const showNetInput = ref(false)
 const showMigas = computed(() => form.iuran_migas)
 const totalHD = computed(() => safe(form.harga_tebus) * safe(form.volume_po))
+
 const nominalMigas = computed(() => {
-  if (!showMigas.value) return 0
+  if (!showMigas.value)
+    return 0
 
-  return  Math.round(((form.harga_tebus * 0.25) / 100) * form.volume_po)
+  return Math.round(((form.harga_tebus * 0.25) / 100) * form.volume_po)
 })
+
 const oaValue = computed(() => {
-  if (!form.ongkos_angkut) return 0
+  if (!form.ongkos_angkut)
+    return 0
 
-  return (form.ongkos_angkut)* form.volume_po
+  return (form.ongkos_angkut) * form.volume_po
 })
+
 const subtotal = computed(() => {
-  return totalHD.value +
-    (form.kategori_oa === 2 ? oaValue.value : 0) +
-    (nominalMigas.value ? nominalMigas.value : 0)
+  return totalHD.value
+    + (form.kategori_oa === 2 ? oaValue.value : 0)
+    + (nominalMigas.value ? nominalMigas.value : 0)
 })
+
 const subtotalPPN = computed(() => {
-  return totalHD.value +
-    (form.kategori_plat === 'Hitam'
+  return totalHD.value
+    + (form.kategori_plat === 'Hitam'
       ? (form.kategori_oa === 2 ? oaValue.value : 0)
       : 0
-    ) 
+    )
 })
+
 const dpp = computed(() => {
-  return safe(subtotalPPN.value)* (11/12)
+  return safe(subtotalPPN.value) * (11 / 12)
 })
 
 const ppn = computed(() => {
-  return safe(dpp.value)* (12/100)
+  return safe(dpp.value) * (12 / 100)
 })
 
 const pph22 = computed(() => {
-  if (form.kd_tax !== 'EC') return 0
+  if (form.kd_tax !== 'EC')
+    return 0
 
   return totalHD.value * (0.3 / 100)
 })
 
 const pbbkbval = computed(() => {
   const selected = pbbkbList.value.find(
-    (p: any) => p.id === form.pbbkb
+    (p: any) => p.id === form.pbbkb,
   )
 
   const nilaiPbbkb = selected?.nilai ?? 0
 
   return totalHD.value * (nilaiPbbkb / 100)
 })
+
 const totalPO = computed(() => {
-  return safe(subtotal.value)+safe(ppn.value)+safe(pph22.value)+safe(pbbkbval.value)
+  return safe(subtotal.value) + safe(ppn.value) + safe(pph22.value) + safe(pbbkbval.value)
 })
 
 watch(
@@ -195,8 +206,10 @@ watch(
   },
   { immediate: true },
 )
+
 const isSaving = ref(false)
-//API AOL Produk
+
+// API AOL Produk
 const page = ref(1)
 const loading = ref(false)
 const pageLoading = ref(false)
@@ -218,25 +231,27 @@ const getAccProduk = async (
     })
 
     const items = res.data.data || []
+
     // console.log(res)
-    if (reset) {
+    if (reset)
       produkAccList.value = items
-    } else {
+    else
       produkAccList.value.push(...items)
-    }
 
     page.value++
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
-//API AOL AKUN
+// API AOL AKUN
 
 const pageAkun = ref(1)
 const loadingAkun = ref(false)
 const hasMoreAkun = ref(true)
 const searchAkun = ref('')
+
 const getAccAkun = async (
   keyword = '',
   reset = false,
@@ -244,29 +259,27 @@ const getAccAkun = async (
   loadingAkun.value = true
 
   try {
-    
-      const res = await axios.get('/accurate/accounts', {
-        params: {
-          q: keyword,
-          page: pageAkun.value,
-        },
-      })
+    const res = await axios.get('/accurate/accounts', {
+      params: {
+        q: keyword,
+        page: pageAkun.value,
+      },
+    })
 
-      const items = res.data.data || []
+    const items = res.data.data || []
 
-      if (items.length === 0) {
-        hasMoreAkun.value = false
-      }
+    if (items.length === 0)
+      hasMoreAkun.value = false
 
-      if (reset) {
-        akunAccList.value = items
-      } else {
-        akunAccList.value.push(...items)
-      }
+    if (reset)
+      akunAccList.value = items
+    else
+      akunAccList.value.push(...items)
 
-      pageAkun.value++
-  } finally {
-   loadingAkun.value = false
+    pageAkun.value++
+  }
+  finally {
+    loadingAkun.value = false
   }
 }
 
@@ -281,14 +294,17 @@ const onSearchAkun = debounce((val: string) => {
 
 const getPbbkb = async () => {
   const res = await axios.get('/pbbkb')
+
   pbbkbList.value = res.data.map((p: any) => ({
     id: p.id,
     label: `${p.nilai_pbbkb}%`,
     nilai: p.nilai_pbbkb,
   }))
 }
+
 const getProduk = async () => {
   const res = await axios.get('/produk')
+
   produkList.value = res.data.map((p: any) => ({
     id: p.id,
     label: `${p.merk_dagang} - ${p.jenis_produk}`,
@@ -297,15 +313,18 @@ const getProduk = async () => {
 
 const getTerminal = async () => {
   const res = await axios.get('/terminal')
+
   terminalList.value = res.data.map((p: any) => ({
     id: p.id,
     nama_terminal: p.nama_terminal,
     lokasi_terminal: p.lokasi_terminal,
   }))
 }
+
 const getVendor = async () => {
   const res = await axios.get('/master/vendor/dropdown-select')
-   vendorList.value = res.data.data
+
+  vendorList.value = res.data.data
     .filter((p: any) => p.kategori_vendor === 'TRADING')
     .map((p: any) => ({
       id: p.id,
@@ -315,7 +334,7 @@ const getVendor = async () => {
 
 const setNilaiPbbkb = (id: any) => {
   const selected = pbbkbList.value.find(
-    (p: any) => p.id === id
+    (p: any) => p.id === id,
   )
 
   form.nilai_pbbkb = selected?.nilai ?? 0
@@ -325,12 +344,10 @@ const onScroll = (e: any) => {
   const el = e.target
 
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) {
-    if (hasMore.value) {
+    if (hasMore.value)
       getAccProduk()
-    }
   }
 }
-
 
 // setTimeout(() => {
 //   const el = document.querySelector('.v-overlay__content')
@@ -346,7 +363,6 @@ const onScroll = (e: any) => {
 //   })
 // }, 300)
 
-
 // data lama sebelum diubah
 const oldPo = reactive({
   harga_tebus: 0,
@@ -354,18 +370,17 @@ const oldPo = reactive({
   total: 0,
 })
 
-  // EDIT
-  const fetchPO = async (id: any) => {
+// EDIT
+const fetchPO = async (id: any) => {
   try {
     const res = await axios.get(`/inventory/purchase-order/${id.value}`)
 
     const data = res.data
 
     const selected = pbbkbList.value.find(
-      (p: any) => p.nilai === res.data.nilai_pbbkb
+      (p: any) => p.nilai === res.data.nilai_pbbkb,
     )
 
-   
     Object.assign(form, {
       id_accurate: data.id_accurate,
       tanggal_inven: data.tanggal_inven,
@@ -380,17 +395,17 @@ const oldPo = reactive({
       kd_tax: data.kd_tax,
       terms: data.terms,
       terms_day: data.terms_day,
-      volume_po: data.volume_po, 
-      kategori_oa: Number(data.kategori_oa), 
-      jenis_oa: Number(data.is_biaya), 
+      volume_po: data.volume_po,
+      kategori_oa: Number(data.kategori_oa),
+      jenis_oa: Number(data.is_biaya),
       harga_tebus: data.harga_tebus,
       ongkos_angkut: data.ongkos_angkut,
       iuran_migas: data.iuran_migas,
       nominal_migas: data.nominal_migas,
       catatan_po: data.keterangan,
       internal_notes: data.internal_notes,
-      pbbkb : selected?.id ?? null,
-      nilai_pbbkb : data.nilai_pbbkb,
+      pbbkb: selected?.id ?? null,
+      nilai_pbbkb: data.nilai_pbbkb,
       disposisi_po: Number(data.disposisi_po),
       ceo_result: data.ceo_result,
       revert_cfo: data.revert_cfo,
@@ -401,32 +416,31 @@ const oldPo = reactive({
       total_bl: data.total_bl,
     })
 
-     Object.assign(oldPo, {
+    Object.assign(oldPo, {
       harga_tebus: data.harga_tebus,
       ongkos_angkut: data.ongkos_angkut,
       total: data.total_order,
-     })
-       // DETAIL ACCURATE
-      if (data.id_accurate) {
+    })
 
-        const acc = await axios.get('/accurate/detail-po', {
-          params: {
-            id_accurate: data.id_accurate,
-          },
-        })
-      
+    // DETAIL ACCURATE
+    if (data.id_accurate) {
+      const acc = await axios.get('/accurate/detail-po', {
+        params: {
+          id_accurate: data.id_accurate,
+        },
+      })
 
-        Object.assign(form, acc.data.data)
-        console.log(form)
-      }
-
-  } catch (err) {
+      Object.assign(form, acc.data.data)
+      console.log(form)
+    }
+  }
+  catch (err) {
     console.error(err)
   }
-  }
+}
 
 // onMounted(() => {
-//   getAccProduk(val, true) 
+//   getAccProduk(val, true)
 //   getAccAkun(val, true)
 //   getProduk()
 //   getTerminal()
@@ -442,7 +456,7 @@ onMounted(async () => {
       getProduk(),
       getTerminal(),
       getVendor(),
-      getPbbkb()
+      getPbbkb(),
     ])
 
     // minimal loading 700ms
@@ -453,10 +467,10 @@ onMounted(async () => {
       getAccAkun('', true),
     ])
 
-    if (id.value) {
+    if (id.value)
       await fetchPO(id)
-    }
-  } finally {
+  }
+  finally {
     pageLoading.value = false
   }
 })
@@ -472,8 +486,10 @@ const onSearch = debounce((val: string) => {
 }, 300)
 
 const formatMoney = (value: number | null): string => {
-   if (value === null || value === undefined) return '0'
-  return new Intl.NumberFormat('id-ID').format(value)
+  if (value === null || value === undefined)
+    return '0'
+
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(value)
 }
 
 const onlyNumber = (e: KeyboardEvent): void => {
@@ -481,22 +497,22 @@ const onlyNumber = (e: KeyboardEvent): void => {
 }
 
 const parse = (val: string) =>
-  Number(val.replace(/[^\d]/g, ""))
+  Number(val.replace(/[^\d]/g, ''))
 
 const required = (label: string) => {
   return (v: any) =>
-    v !== null &&
-    v !== undefined &&
-    v !== ''
+    v !== null
+    && v !== undefined
+    && v !== ''
       || `${label} wajib diisi`
 }
 
-const requiredNotZero = (label: string)=> {
+const requiredNotZero = (label: string) => {
   return (v: any) =>
-    v !== null &&
-    v !== undefined &&
-    v !== '' && v !== '0' &&
-    v !== 0
+    v !== null
+    && v !== undefined
+    && v !== '' && v !== '0'
+    && v !== 0
       || `${label} wajib diisi dan tidak boleh 0`
 }
 
@@ -514,16 +530,16 @@ const showKodeAkunOA = computed(() => {
 
 const isHargaReadonly = computed(() => {
   // Jenis Harga Sementara
-  if (form.jenis_harga == 2) {
+  if (form.jenis_harga == 2)
     return false
-  }
 
   // Jenis Harga Final
   return (
-    Number(form.ceo_result) == 1 &&
-    Number(form.revert_ceo) == 0 || Number(form.total_ri)>0
+    Number(form.ceo_result) == 1
+    && Number(form.revert_ceo) == 0 || Number(form.total_ri) > 0
   )
 })
+
 // watch(
 //   () => form.kategori_oa,
 //   (val) => {
@@ -552,7 +568,7 @@ watch(
   { immediate: true },
 )
 
-watch(() => form.iuran_migas, (val) => {
+watch(() => form.iuran_migas, val => {
   if (!val) {
     form.nominal_iuran = 0
     form.biaya_migas = null
@@ -560,6 +576,7 @@ watch(() => form.iuran_migas, (val) => {
     form.keterangan_migas = ''
   }
 })
+
 // watch(
 //   () => [
 //     form.iuran_migas,
@@ -578,7 +595,7 @@ watch(() => form.iuran_migas, (val) => {
 // )
 watch(
   () => form.kategori_oa,
-  (val) => {
+  val => {
     if (Number(val) !== 2) {
       form.jenis_oa = 0
       form.kode_item_oa = null
@@ -597,7 +614,7 @@ watch(
       form.ongkos_angkut = 0
       form.kategori_plat = ''
     }
-  }
+  },
 )
 
 const selectedAccText = reactive({
@@ -610,6 +627,7 @@ const selectedAccText = reactive({
   biaya_pbbkb: '',
   biaya_migas: '',
 })
+
 const setSelectedAccText = (
   list: any[],
   selectedId: any,
@@ -618,6 +636,7 @@ const setSelectedAccText = (
 ) => {
   if (!selectedId) {
     selectedAccText[targetKey] = ''
+
     return
   }
 
@@ -625,24 +644,24 @@ const setSelectedAccText = (
 
   selectedAccText[targetKey] = item?.[labelKey] || ''
 }
+
 const showAkun = computed(() => {
   return (
-    showpph.value ||
-    showpbbkb.value ||
-    showMigas.value
+    showpph.value
+    || showpbbkb.value
+    || showMigas.value
   )
 })
-
 
 const resolveLabelById = (
   list: any[],
   id: any,
-  labelKey: string = 'label',
+  labelKey = 'label',
 ) => {
   const item = list.find(i => i.id === id)
+
   return item ? item[labelKey] : '-'
 }
-
 
 const changePrice = async () => {
   const confirm = await showConfirmAlert({
@@ -653,7 +672,8 @@ const changePrice = async () => {
     cancelButtonText: 'Batal',
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   isSaving.value = true
 
@@ -663,8 +683,8 @@ const changePrice = async () => {
     await axios.post(`/inventory/purchase-order/${id.value}/changePrice`)
     await fetchPO(id)
     closeAlert()
-  }catch (err: any) {
-
+  }
+  catch (err: any) {
     console.error(err)
     isSaving.value = false
 
@@ -672,20 +692,21 @@ const changePrice = async () => {
       title: 'Error',
       text: getApiErrorMessage(err, 'gagal menyimpan data'),
     })
-
-  } finally {
-
+  }
+  finally {
     isSaving.value = false
   }
 }
+
 const goToReview = async () => {
   const { valid } = await formRef.value.validate()
 
-  if (!valid){
-      showErrorToast({
+  if (!valid) {
+    showErrorToast({
       title: 'Form belum lengkap',
       text: 'Lengkapi data yang diwajibkan',
     })
+
     return
   }
 
@@ -712,11 +733,9 @@ const notify = (
 const formRef = ref()
 
 const submit = async () => {
-
   isSaving.value = true
 
   try {
-
     dialogSubmit.value = false
 
     const payload = {
@@ -735,15 +754,14 @@ const submit = async () => {
 
     // EDIT
     if (mode.value === 'edit') {
-
       response = await axios.put(
         `/inventory/purchase-order/${route.query.id}`,
         payload,
       )
 
     // CREATE
-    } else {
-
+    }
+    else {
       response = await axios.post(
         '/inventory/purchase-order',
         payload,
@@ -756,9 +774,8 @@ const submit = async () => {
     )
 
     router.push('/purchaseSupplier/po-supplier')
-
-  } catch (err: any) {
-
+  }
+  catch (err: any) {
     console.error(err)
     isSaving.value = false
 
@@ -766,152 +783,159 @@ const submit = async () => {
       title: 'Error',
       text: getApiErrorMessage(err, 'gagal menyimpan data'),
     })
-
-  } finally {
-
+  }
+  finally {
     isSaving.value = false
   }
 }
 
 const canResubmitPrice = computed(() => {
   return (
-    form.disposisi_po === 4 &&
-    form.ceo_result === 1 &&
-    form.jenis_harga === 2 // Sementara
+    form.disposisi_po === 4
+    && form.ceo_result === 1
+    && form.jenis_harga === 2 // Sementara
   )
 })
 
 const canChangePrice = computed(() => {
-    return Number(form.jenis_harga) === 2 // Sementara
+  return Number(form.jenis_harga) === 2 // Sementara
 })
 
 const canChange = computed(() => {
-    return Number(form.total_ri)==0 
+  return Number(form.total_ri) == 0
 })
 
 const isPriceChanged = computed(() => {
-    return form.harga_tebus != oldPo.harga_tebus && form.disposisi_po === 4 &&
-    form.ceo_result === 1
+  return form.harga_tebus != oldPo.harga_tebus && form.disposisi_po === 4
+    && form.ceo_result === 1
 })
-
 </script>
+
 <template>
-  <VContainer fluid class="pa-3 bg-grey-lighten-4">
+  <VContainer
+    fluid
+    class="pa-3 bg-grey-lighten-4"
+  >
     <div v-if="step === 'form'">
-        <!-- <div v-if="mode === 'add'"> -->
-          <VCard
-            v-if="pageLoading"
-            class="mb-6"
-            variant="tonal"
+      <!-- <div v-if="mode === 'add'"> -->
+      <VCard
+        v-if="pageLoading"
+        class="mb-6"
+        variant="tonal"
+        color="primary"
+      >
+        <VCardText class="d-flex align-center py-4">
+          <VProgressCircular
+            indeterminate
+            size="30"
+            width="3"
             color="primary"
-          >
-            <VCardText class="d-flex align-center py-4">
+            class="me-4"
+          />
 
-              <VProgressCircular
-                indeterminate
-                size="30"
-                width="3"
-                color="primary"
-                class="me-4"
-              />
+          <div>
+            <div class="text-h6 font-weight-medium">
+              {{ mode === 'add' ? 'Mohon menunggu' : ' Memuat data Purchase Order' }}
+            </div>
 
-              <div>
-                <div class="text-h6 font-weight-medium">
-                    {{ mode === 'add' ? 'Mohon menunggu' : ' Memuat data Purchase Order' }}
+            <div
+              v-if="mode === 'edit'"
+              class="text-body-2 text-medium-emphasis"
+            >
+              Mohon menunggu
+            </div>
+          </div>
+        </VCardText>
+      </VCard>
+      <VForm
+        v-if="!pageLoading"
+        ref="formRef"
+      >
+        <!-- ===================================================== -->
+        <!-- HEADER -->
+        <!-- ===================================================== -->
+        <section class="mb-6">
+          <VCard>
+            <VCardText class="pa-6">
+              <div class="d-flex justify-space-between align-center flex-wrap ga-4">
+                <div>
+                  <div class="d-flex align-center ga-3 mb-2">
+                    <VAvatar
+                      color="primary"
+                      rounded
+                      class="me-3"
+                      variant="tonal"
+                    >
+                      <VIcon icon="tabler-file-invoice" />
+                    </VAvatar>
+
+                    <div>
+                      <div class="text-h6 text-weight-bold">
+                        {{ mode === 'add' ? 'Tambah PO Supplier' : 'Edit PO Supplier' }}
+                      </div>
+
+                      <div class="text-medium-emphasis text-body-2">
+                        Silakan isi form dibawah ini
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div v-if="mode === 'edit'" class="text-body-2 text-medium-emphasis">
-                  Mohon menunggu
-                </div>
+                <VChip
+                  v-if="form.jenis_harga"
+                  :color="form.jenis_harga == 1 ? 'primary' : 'warning'"
+                  variant="tonal"
+                  size="large"
+                  :prepend-icon="form.jenis_harga == 1 ? 'tabler-circle-check' : 'tabler-alert-circle'"
+                >
+                  {{ form.jenis_harga == 1 ? 'Harga Final' : 'Harga Sementara' }}
+                </VChip>
               </div>
-
             </VCardText>
           </VCard>
-          <VForm  v-if="!pageLoading" ref="formRef">
-    
-            <!-- ===================================================== -->
-            <!-- HEADER -->
-            <!-- ===================================================== -->
-              <section class="mb-6">
-                <VCard>
-                  <VCardText class="pa-6">
-    
-                    <div class="d-flex justify-space-between align-center flex-wrap ga-4">
-                      <div>
-                        <div class="d-flex align-center ga-3 mb-2">
-                          
-                          <VAvatar
-                            color="primary"
-                              rounded
-                              class="me-3"
-                              variant="tonal"
-                              >
-                            <VIcon icon="tabler-file-invoice" />
-                          </VAvatar>
-    
-                          <div>
-                                <div class="text-h6 text-weight-bold">
-                                  {{ mode === 'add' ? 'Tambah PO Supplier' : 'Edit PO Supplier' }}
-                                </div>
-    
-                            <div class="text-medium-emphasis text-body-2">
-                              Silakan isi form dibawah ini
-                            </div>
-                          </div>
-    
-                        </div>
-                      </div>
-    
-                      <VChip v-if="form.jenis_harga"
-                        :color="form.jenis_harga == 1 ? 'primary' : 'warning'"
-                        variant="tonal"
-                        size="large"
-                        :prepend-icon="form.jenis_harga == 1 ? 'tabler-circle-check' : 'tabler-alert-circle'"
-                      >
-                        {{ form.jenis_harga == 1 ? 'Harga Final' : 'Harga Sementara' }}
-                      </VChip>
-    
-                    </div>
-    
-                  </VCardText>
-                </VCard>
-              </section>
-    
-            <!-- ===================================================== -->
-            <!-- ALERT -->
-            <!-- ===================================================== -->
-          <section class="mb-6" v-if="canResubmitPrice">
-            <VAlert
-              type="warning"
-              variant="tonal"
-              border="start"
-              prominent
-            >
-              <div class="d-flex justify-space-between align-center w-100">
-                
-                <div>
-                   <div class="font-weight-bold">
-                      Pengajuan Ulang Perubahan Harga
-                    </div>
+        </section>
 
-                    PO ini sudah disetujui CEO.
-                    Karena menggunakan <b>Jenis Harga Sementara</b>,
-                    perubahan harga akan mengulang proses approval.
+        <!-- ===================================================== -->
+        <!-- ALERT -->
+        <!-- ===================================================== -->
+        <section
+          v-if="canResubmitPrice"
+          class="mb-6"
+        >
+          <VAlert
+            type="warning"
+            variant="tonal"
+            border="start"
+            prominent
+          >
+            <div class="d-flex justify-space-between align-center w-100">
+              <div>
+                <div class="font-weight-bold">
+                  Pengajuan Ulang Perubahan Harga
                 </div>
-    
-                <!-- <VBtn
-                  color="warning"
-                  variant="flat"
-                  class="ml-4"
-                >
-                  Ubah Harga
-                </VBtn> -->
-    
-              </div>
-            </VAlert>
-          </section>
 
-          <section class="mb-6" v-if="form.revert_cfo==1 || form.revert_ceo==1">
+                PO ini sudah disetujui CEO.
+                Karena menggunakan <b>Jenis Harga Sementara</b>,
+                perubahan harga akan mengulang proses approval.
+              </div>
+
+              <!--
+                <VBtn
+                color="warning"
+                variant="flat"
+                class="ml-4"
+                >
+                Ubah Harga
+                </VBtn>
+              -->
+            </div>
+          </VAlert>
+        </section>
+
+        <section
+          v-if="form.revert_cfo == 1 || form.revert_ceo == 1"
+          class="mb-6"
+        >
           <VAlert
             v-if="form.revert_cfo == 1 || form.revert_ceo == 1"
             color="error"
@@ -925,7 +949,9 @@ const isPriceChanged = computed(() => {
                 size="32"
                 class="me-3"
               >
-                <VIcon size="18">mdi-close</VIcon>
+                <VIcon size="18">
+                  mdi-close
+                </VIcon>
               </VAvatar>
 
               <div>
@@ -952,1136 +978,1286 @@ const isPriceChanged = computed(() => {
               </div>
             </VSheet>
           </VAlert>
-          </section>
-    
-            <!-- ===================================================== -->
-            <!-- INFORMASI PO -->
-            <!-- ===================================================== -->
-            <section class="mb-6">
-              <VCard>
-    
-                <VCardTitle class="px-6 pt-5 pb-2">
-                  <div>
-                    <div class="text-h6 font-weight-bold">
-                      Informasi Purchase Order
-                    </div>
-    
-                    <div class="text-caption text-medium-emphasis">
-                      Data utama Purchase Order Vendor
-                    </div>
-                  </div>
-                </VCardTitle>
-    
-                <VDivider />
-    
-                <VCardText class="pa-6">
-    
-                  <VRow>
-    
-                    <VCol cols="12" md="6">
-                      <VTextField
-                        label="Nomor PO"
-                        v-model="form.nomor_po"
-                        disabled
-                        variant="outlined"
-                      />
-                    </VCol>
-    
-                  </VRow>
-                  <VRow>
-                    <VCol cols="12" md="6">
-                      <VTextField
-                        v-model="form.tanggal_inven"
-                        label="Tanggal PO *"
-                        type="date"
-                        variant="outlined"
-                        :rules="[required('Tanggal PO')]"
-                      />
-                    </VCol>
-                    <VCol cols="12" md="6">
-                      <VSelect
-                        v-model="form.produk"
-                        :items="produkList"
-                        item-title="label"
-                        item-value="id"
-                        label="Produk *"
-                        clearable
-                        variant="outlined"
-                        :rules="[required('Produk')]"
-                      />
-                    </VCol>
-                    
-                  </VRow>
-                  <VRow>
-                    <VCol cols="12">
-                      <div class="border rounded pa-4 mb-2 border-primary border-opacity-100">
-                        <div class="font-weight-bold mb-2">
-                          kode Item Accurate *
-                        </div>
-                        <VRow>
-                          <VCol cols="12" md="6" >
-    
-                            <VAutocomplete
-                              v-model="form.kode_item"
-                              label="Kode Item Accurate *"
-                              :items="produkAccList"
-                              item-title="text"
-                              item-value="id"
-                              clearable
-                              no-filter
-                              density="comfortable"
-                              :loading="loading"
-                              :menu-props="{  maxHeight: 300,
-                              attach: 'body' }"
-                              placeholder="Pilih Kode Item Accurate"
-                              @update:search="onSearch"
-                              @update:model-value="val => setSelectedAccText(produkAccList, val, 'kode_item')"
-                              :rules="[required('Kode Item Accurate')]"
-                            >
-                             <template #prepend-item>
-                              <div v-if="loading" class="pa-2">
-                                <VProgressLinear
-                                  indeterminate
-                                  color="primary"
-                                />
-                                <div class="text-caption mt-1 text-center">
-                                  Loading...
-                                </div>
-                              </div>
-                            </template>
+        </section>
 
-                            <template #no-data>
-                              <div class="pa-3 text-center">
-                                <span v-if="loading">Sedang mengambil data...</span>
-                                <span v-else>Tidak ada data</span>
-                              </div>
-                            </template>
-                            
-                              <template #item="{ props, item }">
-                                <VListItem
-                                  v-bind="props"
-                                >
-                                  <div class="text-caption text-medium-emphasis">
-                                    {{ item.raw?.id || '-' }}
-                                  </div>
-                                </VListItem>
-                              </template>
-                            </VAutocomplete>
-                          </VCol>
-    
-                          <VCol cols="12" md="4">
-                            <VTextField
-                              label="Keterangan Item"
-                              variant="outlined"
-                            />
-                          </VCol>
-                        </VRow>
-    
-                      </div>
-                    </VCol>
-                  </VRow>
-                  <VRow>
-                    <VCol cols="12" md="6">
-                       <VAutocomplete
-                          v-model="form.terminal"
-                          label="Terminal *"
-                          :items="terminalList"
-                          item-title="nama_terminal"
+        <!-- ===================================================== -->
+        <!-- INFORMASI PO -->
+        <!-- ===================================================== -->
+        <section class="mb-6">
+          <VCard>
+            <VCardTitle class="px-6 pt-5 pb-2">
+              <div>
+                <div class="text-h6 font-weight-bold">
+                  Informasi Purchase Order
+                </div>
+
+                <div class="text-caption text-medium-emphasis">
+                  Data utama Purchase Order Vendor
+                </div>
+              </div>
+            </VCardTitle>
+
+            <VDivider />
+
+            <VCardText class="pa-6">
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VTextField
+                    v-model="form.nomor_po"
+                    label="Nomor PO"
+                    disabled
+                    variant="outlined"
+                  />
+                </VCol>
+              </VRow>
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VTextField
+                    v-model="form.tanggal_inven"
+                    label="Tanggal PO *"
+                    type="date"
+                    variant="outlined"
+                    :rules="[required('Tanggal PO')]"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VSelect
+                    v-model="form.produk"
+                    :items="produkList"
+                    item-title="label"
+                    item-value="id"
+                    label="Produk *"
+                    clearable
+                    variant="outlined"
+                    :rules="[required('Produk')]"
+                  />
+                </VCol>
+              </VRow>
+              <VRow>
+                <VCol cols="12">
+                  <div class="border rounded pa-4 mb-2 border-primary border-opacity-100">
+                    <div class="font-weight-bold mb-2">
+                      kode Item Accurate *
+                    </div>
+                    <VRow>
+                      <VCol
+                        cols="12"
+                        md="6"
+                      >
+                        <VAutocomplete
+                          v-model="form.kode_item"
+                          label="Kode Item Accurate *"
+                          :items="produkAccList"
+                          item-title="text"
                           item-value="id"
                           clearable
                           no-filter
                           density="comfortable"
-                          :menu-props="{  maxHeight: 300,
-                          attach: 'body' }"
-                          action-refresh
-                          @refresh="getTerminal"
-                          placeholder="Pilih Terminal"
-                          :rules="[required('Terminal')]"
+                          :loading="loading"
+                          :menu-props="{
+                            maxHeight: 300,
+                            attach: 'body',
+                          }"
+                          placeholder="Pilih Kode Item Accurate"
+                          :rules="[required('Kode Item Accurate')]"
+                          @update:search="onSearch"
+                          @update:model-value="val => setSelectedAccText(produkAccList, val, 'kode_item')"
                         >
-                        
+                          <template #prepend-item>
+                            <div
+                              v-if="loading"
+                              class="pa-2"
+                            >
+                              <VProgressLinear
+                                indeterminate
+                                color="primary"
+                              />
+                              <div class="text-caption mt-1 text-center">
+                                Loading...
+                              </div>
+                            </div>
+                          </template>
+
+                          <template #no-data>
+                            <div class="pa-3 text-center">
+                              <span v-if="loading">Sedang mengambil data...</span>
+                              <span v-else>Tidak ada data</span>
+                            </div>
+                          </template>
+
                           <template #item="{ props, item }">
                             <VListItem
                               v-bind="props"
                             >
                               <div class="text-caption text-medium-emphasis">
-                                {{ item.raw?.lokasi_terminal || '-' }}
+                                {{ item.raw?.id || '-' }}
                               </div>
                             </VListItem>
                           </template>
                         </VAutocomplete>
-                    </VCol>
-          
-                    <VCol cols="12" md="6">
-                        <VAutocomplete
-                          v-model="form.vendor"
-                          :items="vendorList"
-                          item-title="nama_vendor"
-                          item-value="id"
-                          label="Vendor *"
-                          density="comfortable"
-                          :menu-props="{  maxHeight: 300,
-                          attach: 'body' }"
-                          action-refresh
-                          @refresh="getVendor"
-                          placeholder="Pilih Vendor"
-                          clearable
-                          variant="outlined"
-                          :rules="[required('Vendor')]"
-                        />
-                    </VCol>
-                  </VRow>
-                  <VRow>
-                    <VCol cols="12" md="2">
-                      <label class="text-subtitle-2 font-weight-medium mb-1 d-block">
-                        Jenis Kirim
-                      </label>
-    
-                      <VRadioGroup 
-                      inline
-                      v-model="form.jenis_kirim"
-                      :rules="[required('Jenis Kirim')]"
+                      </VCol>
+
+                      <VCol
+                        cols="12"
+                        md="4"
                       >
-                        <VRadio label="Truck" :value="1" />
-                        <VRadio label="Ship" :value="2" />
+                        <VTextField
+                          label="Keterangan Item"
+                          variant="outlined"
+                        />
+                      </VCol>
+                    </VRow>
+                  </div>
+                </VCol>
+              </VRow>
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VAutocomplete
+                    v-model="form.terminal"
+                    label="Terminal *"
+                    :items="terminalList"
+                    item-title="nama_terminal"
+                    item-value="id"
+                    clearable
+                    no-filter
+                    density="comfortable"
+                    :menu-props="{
+                      maxHeight: 300,
+                      attach: 'body',
+                    }"
+                    action-refresh
+                    placeholder="Pilih Terminal"
+                    :rules="[required('Terminal')]"
+                    @refresh="getTerminal"
+                  >
+                    <template #item="{ props, item }">
+                      <VListItem
+                        v-bind="props"
+                      >
+                        <div class="text-caption text-medium-emphasis">
+                          {{ item.raw?.lokasi_terminal || '-' }}
+                        </div>
+                      </VListItem>
+                    </template>
+                  </VAutocomplete>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VAutocomplete
+                    v-model="form.vendor"
+                    :items="vendorList"
+                    item-title="nama_vendor"
+                    item-value="id"
+                    label="Vendor *"
+                    density="comfortable"
+                    :menu-props="{
+                      maxHeight: 300,
+                      attach: 'body',
+                    }"
+                    action-refresh
+                    placeholder="Pilih Vendor"
+                    clearable
+                    variant="outlined"
+                    :rules="[required('Vendor')]"
+                    @refresh="getVendor"
+                  />
+                </VCol>
+              </VRow>
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="2"
+                >
+                  <label class="text-subtitle-2 font-weight-medium mb-1 d-block">
+                    Jenis Kirim
+                  </label>
+
+                  <VRadioGroup
+                    v-model="form.jenis_kirim"
+                    inline
+                    :rules="[required('Jenis Kirim')]"
+                  >
+                    <VRadio
+                      label="Truck"
+                      :value="1"
+                    />
+                    <VRadio
+                      label="Ship"
+                      :value="2"
+                    />
+                  </VRadioGroup>
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
+        </section>
+
+        <!-- ===================================================== -->
+        <!-- HARGA -->
+        <!-- ===================================================== -->
+        <section class="mb-6">
+          <VRow>
+            <!-- LEFT -->
+            <VCol
+              cols="12"
+              md="7"
+            >
+              <VCard class="h-100">
+                <VCardTitle class="px-6 pt-5 pb-2">
+                  <div>
+                    <div class="text-h6 font-weight-bold">
+                      Informasi Harga
+                    </div>
+
+                    <div class="text-caption text-medium-emphasis">
+                      Detail Harga Pembelian
+                    </div>
+                  </div>
+                </VCardTitle>
+
+                <VDivider />
+
+                <VCardText class="pa-6">
+                  <VRow>
+                    <VCol
+                      cols="12"
+                      md="4"
+                    >
+                      <label class="text-subtitle-2 font-weight-medium d-block">
+                        Jenis Harga PO
+                      </label>
+
+                      <VRadioGroup
+                        v-model="form.jenis_harga"
+                        inline
+                        :rules="[requiredNotZero('Jenis Harga PO')]"
+                      >
+                        <VRadio
+                          label="Final"
+                          :value="1"
+                        />
+                        <VRadio
+                          label="Sementara"
+                          :value="2"
+                        />
                       </VRadioGroup>
                     </VCol>
                   </VRow>
-    
-                </VCardText>
-              </VCard>
-            </section>
-    
-            <!-- ===================================================== -->
-            <!-- HARGA -->
-            <!-- ===================================================== -->
-            <section class="mb-6">
-              <VRow>
-                <!-- LEFT -->
-                <VCol cols="12" md="7">
-    
-                  <VCard class="h-100">
-    
-                    <VCardTitle class="px-6 pt-5 pb-2">
-                      <div>
-                        <div class="text-h6 font-weight-bold">
-                          Informasi Harga
-                        </div>
-    
-                        <div class="text-caption text-medium-emphasis">
-                          Detail Harga Pembelian 
-                        </div>
-                      </div>
-                    </VCardTitle>
-    
-                    <VDivider />
-    
-                    <VCardText class="pa-6">
-    
-                      <VRow>
-                        <VCol cols="12" md="4">
-                          <label class="text-subtitle-2 font-weight-medium d-block">
-                            Jenis Harga PO
-                          </label>
-    
-                          <VRadioGroup
-                            v-model="form.jenis_harga"
-                            inline
-                            :rules="[requiredNotZero('Jenis Harga PO')]"
-                          >
-                            <VRadio label="Final" :value="1" />
-                            <VRadio label="Sementara" :value="2" />
-                          </VRadioGroup>
-                          </VCol>
-                          
-                      </VRow>
-                      <VRow>
-                        <VCol cols="12" md="3">
-                          <VSelect
-                            label="Kode Tax *"
-                            v-model="form.kd_tax"
-                            :items="['E', 'EC']"
-                            variant="outlined"
-                            placeholder="Pilih Kode Tax"
-                            :rules="[required('Kode Tax')]"
-                          />
-                        </VCol>
-                        <VCol cols="12" md="3">
-                          <VSelect
-                            v-model="form.terms"
-                            label="Terms *"
-                            :items="[
-                              { title: 'COD', value: 'COD' },
-                              { title: 'NET', value: 'NET' },
-                              { title: 'CBD', value: 'CBD' },
-                            ]"
-                            item-title="title"
-                            item-value="value"
-                            variant="outlined"
-                            :rules="[required('Terms')]"
-                          />
-                          </VCol>
-    
-                          <VCol v-if="showNetInput" cols="12" md="3">
-                            <VTextField
-                              v-model="form.terms_day"
-                              suffix="Hari"
-                              label="Terms Day"
-                              variant="outlined"
-                              :rules="[requiredNotZero('Terms Days')]"
-                            />
-                          </VCol>
-                      </VRow>
-                      <VRow>
-                        <VCol cols="12" md="3">
-                          <VTextField
-                            label="Volume PO"
-                            @keypress="onlyNumber"
-                            inputmode="numeric"
-                            class="text-end"
-                            :model-value="formatMoney(form.volume_po)"
-                            @update:modelValue="(val: string) => form.volume_po = parse(val) || 0"
-                            suffix="Liter"
-                            :rules="[requiredNotZero('Volume PO')]"
-                          />
-                        </VCol>
-                        <VCol cols="12" md="3">
-                          <VTextField
-                            label="Harga Dasar"
-                            inputmode="numeric"
-                            :input-style="{ textAlign: 'right' }"
-                            @keypress="onlyNumber"
-                            :model-value="formatMoney(form.harga_tebus)"
-                            @update:modelValue="(val) => form.harga_tebus = parse(val) || 0"
-                            prefix="Rp"
-                            :readonly="isHargaReadonly"
-                            :rules="[requiredNotZero('Harga Dasar')]"
-                          />
-                        </VCol>
-    
-                        <VCol cols="12" md="4">
-                          <VSelect
-                            label="Kategori OA"
-                            v-model="form.kategori_oa"
-                            :items="[
-                              { title: 'Tanpa OA', value: 1 },
-                              { title: 'Dengan OA', value: 2 }
-                            ]"
-                            variant="outlined"
-                            :rules="[required('Kategori OA')]"
-                          />
-                        </VCol>
-                      </VRow>
-                      <VRow>
-                        <VCol cols="12" md="3">
-                            <VSelect
-                              v-model="form.pbbkb"
-                              :items="pbbkbList"
-                              item-title="label"
-                              item-value="id"
-                              label="PBBKB *"
-                              clearable
-                              :rules="[required('PBBKB')]"
-                               @update:modelValue="setNilaiPbbkb"
-                            />
-                          </VCol>
-                          <VCol cols="12" md="3">
-                              <VCheckbox
-                                v-model="form.iuran_migas"
-                                label="Iuran Migas"
-                              />
-                            </VCol>
-    
-                            <VCol cols="12" md="4" v-if="showMigas" >
-                              <VTextField
-                                label="Nominal Migas"
-                                @keypress="onlyNumber"
-                                :model-value="formatMoney(nominalMigas)"
-                                @update:modelValue="(val) => form.nominal_iuran = parse(val)"
-                                prefix="Rp"
-                                :rules="[requiredNotZero('Nominal Migas')]"
-                              />
-                            </VCol>
-                      </VRow>
-    
-                    </VCardText>
-    
-                  </VCard>
-    
-                </VCol>
-    
-                <!-- RIGHT SUMMARY -->
-                <VCol cols="12" md="5">
-    
-                  <VCard color="primary" theme="dark">
-    
-                    <VCardText class="pa-6">
-    
-                      <!-- HEADER -->
-                      <div class="d-flex align-center mb-5">
-                        <VAvatar
-                          color="white"
-                          rounded
-                          size="42"
-                          class="me-3"
-                          variant="tonal"
-                        >
-                          <VIcon icon="mdi-receipt-text" />
-                        </VAvatar>
-    
-                        <div>
-                          <div class="text-h6 font-weight-bold text-white">
-                            Rincian Perhitungan
-                          </div>
-    
-                          <div class="text-caption text-white">
-                            Detail Harga pembelian
-                          </div>
-                        </div>
-                      </div>
-    
-                      <!-- DETAIL TRANSAKSI -->
-                      <!-- <div class="text-subtitle-2 font-weight-bold mb-3 text-white">
-                        Informasi Dasar
-                      </div> -->
-    
-                      <div class="d-flex justify-space-between mb-3">
-                        <span>Harga Dasar</span>
-                        <strong>Rp {{ formatMoney(form.harga_tebus) }}</strong>
-                      </div>
-    
-                      <div class="d-flex justify-space-between mb-4">
-                        <span>Volume PO</span>
-                        <strong>{{ formatMoney(form.volume_po) }} Liter</strong>
-                      </div>
-                      <div
-                        v-if="showBiayaOA"
-                        class="d-flex justify-space-between mb-3"
-                      >
-                        <span>Ongkos Angkut</span>
-                        <strong>Rp {{ formatMoney(form.ongkos_angkut) }}</strong>
-                      </div>
-    
-    
-                      <VDivider class="mb-4 border-opacity-50" />
-    
-                      <!-- PERHITUNGAN -->
-                      <!-- <div class="text-subtitle-2 font-weight-bold mb-3 text-white">
-                        Komponen Biaya
-                      </div> -->
-    
-                      <div class="d-flex justify-space-between mb-3">
-                        <span>Subtotal</span>
-                        <strong>Rp {{ formatMoney(subtotal) }}</strong>
-                      </div>
-    
-                      <div class="d-flex justify-space-between mb-3">
-                        <span>DPP 11/12</span>
-                        <strong>Rp {{ formatMoney(dpp) }}</strong>
-                      </div>
-    
-                      <div class="d-flex justify-space-between mb-3">
-                        <span>PPN 12%</span>
-                        <strong>Rp {{ formatMoney(ppn) }}</strong>
-                      </div>
-    
-                      <div class="d-flex justify-space-between mb-3" v-if="showpph">
-                        <span>PPH 22</span>
-                        <strong>Rp {{ formatMoney(pph22) }}</strong>
-                      </div>
-    
-                      <div
-                        v-if="showpbbkb"
-                        class="d-flex justify-space-between mb-3"
-                      >
-                        <span>PBBKB</span>
-                        <strong>Rp {{ formatMoney(pbbkbval) }}</strong>
-                      </div>
-    
-                      <div
-                        v-if="showMigas"
-                        class="d-flex justify-space-between mb-3"
-                      >
-                        <span>Iuran Migas</span>
-                        <strong>Rp {{ formatMoney(nominalMigas) }}</strong>
-                      </div>
-    
-    
-                      <VDivider class="my-4 border-opacity-50" />
-    
-                      <!-- TOTAL -->
-                      <div class="d-flex justify-space-between align-center">
-                        <span class="text-h6 font-weight-bold text-white">
-                          Total Order
-                        </span>
-    
-                        <span class="text-h5 font-weight-bold text-white">
-                          Rp {{ formatMoney(totalPO) }}
-                        </span>
-                      </div>
-    
-                    </VCardText>
-    
-                  </VCard>
-    
-                </VCol>
-    
-              </VRow>
-    
-            </section>
-    
-            <!-- OA SECTION -->
-            <section v-if="showBiayaOA" class="mb-3">
-    
-              <VCard>
-                <VCardTitle class="px-6 pt-5">
-                  Biaya Ongkos Angkut
-                </VCardTitle>
-    
-                <VDivider />
-    
-                <VCardText class="pa-6">
-    
                   <VRow>
-    
-                    <VCol cols="12" md="3">
-                        <VSelect
-                          label="Jenis OA"
-                          v-model="form.jenis_oa"
-                          :items="[
-                            { title: 'Sebagai Biaya', value: 1 },
-                            { title: 'Sebagai Kode Item', value: 0 }
-                          ]"
-                          variant="outlined"
-                          placeholder="Pilih Jenis OA"
-                          :rules="[required('Jenis OA')]"
-                        />
-                      </VCol>
-                  </VRow>
-    
-                  <!-- sebagai kode item -->
-                  <VSheet v-if="showKodeItemOA" class="mt-3 pa-4 mb-4"
-                  border rounded="lg" color="pink-lighten-5">
-    
-                    <div class="text-subtitle-2 font-weight-bold mb-3">
-                      Akun OA Accurate *
-                    </div>
-                    <VRow>
-          
-                      <VCol cols="12" md="6">
-                        <VAutocomplete
-                              v-model="form.kode_item_oa"
-                              label="Kode Item Accurate *"
-                              :items="produkAccList"
-                              item-title="text"
-                              item-value="id"
-                              clearable
-                              no-filter
-                              density="comfortable"
-                              :loading="loading"
-                              :menu-props="{  maxHeight: 300,
-                              attach: 'body' }"
-                              placeholder="Pilih Kode Item Accurate"
-                              @update:search="onSearch"
-                              :rules="[required('Kode Item Accurate')]"
-                            >
-                             <template #prepend-item>
-                              <div v-if="loading" class="pa-2">
-                                <VProgressLinear
-                                  indeterminate
-                                  color="primary"
-                                />
-                                <div class="text-caption mt-1 text-center">
-                                  Loading...
-                                </div>
-                              </div>
-                            </template>
+                    <VCol
+                      cols="12"
+                      md="3"
+                    >
+                      <VSelect
+                        v-model="form.kd_tax"
+                        label="Kode Tax *"
+                        :items="['E', 'EC']"
+                        variant="outlined"
+                        placeholder="Pilih Kode Tax"
+                        :rules="[required('Kode Tax')]"
+                      />
+                    </VCol>
+                    <VCol
+                      cols="12"
+                      md="3"
+                    >
+                      <VSelect
+                        v-model="form.terms"
+                        label="Terms *"
+                        :items="[
+                          { title: 'COD', value: 'COD' },
+                          { title: 'NET', value: 'NET' },
+                          { title: 'CBD', value: 'CBD' },
+                        ]"
+                        item-title="title"
+                        item-value="value"
+                        variant="outlined"
+                        :rules="[required('Terms')]"
+                      />
+                    </VCol>
 
-                            <template #no-data>
-                              <div class="pa-3 text-center">
-                                <span v-if="loading">Sedang mengambil data...</span>
-                                <span v-else>Tidak ada data</span>
-                              </div>
-                            </template>
-                            
-                              <template #item="{ props, item }">
-                                <VListItem
-                                  v-bind="props"
-                                >
-                                  <div class="text-caption text-medium-emphasis">
-                                    {{ item.raw?.id || '-' }}
-                                  </div>
-                                </VListItem>
-                              </template>
-                            </VAutocomplete>
-                      </VCol>
-          
-                      <VCol cols="12" md="4">
-                        <VTextField
-                          v-model="form.keterangan_item_oa"
-                          label="Keterangan"
-                          variant="outlined"
-                        />
-                      </VCol>
-          
-                      <VCol cols="12" md="2">
-                        <VCheckbox
-                          v-model="form.alokasi_item_oa"
-                          label="Alokasi ke Barang"
-                        />
-                      </VCol>
-          
-                    </VRow>
-                  </VSheet>
-    
-                  <VRow class="mb-3">
-    
-                    <VCol cols="12" md="3">
+                    <VCol
+                      v-if="showNetInput"
+                      cols="12"
+                      md="3"
+                    >
                       <VTextField
-                        label="Ongkos Angkut"
+                        v-model="form.terms_day"
+                        suffix="Hari"
+                        label="Terms Day"
+                        variant="outlined"
+                        :rules="[requiredNotZero('Terms Days')]"
+                      />
+                    </VCol>
+                  </VRow>
+                  <VRow>
+                    <VCol
+                      cols="12"
+                      md="3"
+                    >
+                      <VTextField
+                        label="Volume PO"
+                        inputmode="numeric"
                         class="text-end"
+                        :model-value="formatMoney(form.volume_po)"
+                        suffix="Liter"
+                        :rules="[requiredNotZero('Volume PO')]"
                         @keypress="onlyNumber"
-                        :model-value="formatMoney(form.ongkos_angkut)"
-                        @update:modelValue="(val) => form.ongkos_angkut = parse(val)"
-                        prefix="Rp"
+                        @update:modelValue="(val: string) => form.volume_po = parse(val) || 0"
                       />
-                      </VCol>
-                    <VCol cols="12" md="3">
-                      <VAutocomplete
-                            label="Kategori Plat *"
-                            v-model="form.kategori_plat"
-                            :items="[
-                              { title: 'Hitam', value: 'Hitam' },
-                              { title: 'Kuning', value: 'Kuning' }
-                            ]"
-                            variant="outlined"
-                            item-title="title"
-                            item-value="value"
-                            clearable
-                            density="comfortable"
-                            :menu-props="{ maxHeight: 300 }"
-                            placeholder="Pilih Kategori Plat"
-                          />
-                      </VCol>
-                  </VRow>
-    
-                  <!-- sebagai biaya -->
-                <VSheet
-                  v-if="showKodeAkunOA"
-                  class="pa-4 mb-4"
-                  border rounded="lg"
-                  color="pink-lighten-5"
-                >
-                  
-                  <!-- AKUN OA ACCURATE-->
-                  <div class="font-weight-bold mb-3">
-                    Akun OA Accurate
-                  </div>
-    
-                  <VRow class="mb-3">
-                    <VCol cols="12" md="4">
-                        <VAutocomplete
-                          v-model="form.biaya_oa"
-                          v-model:search="search"
-                          label="Akun OA Accurate *"
-                          :items="akunAccList"
-                          item-title="text"
-                          item-value="id"
-                          clearable
-                          density="comfortable"
-                          :menu-props="{  maxHeight: 300,
-                          attach: 'body' }"
-                          placeholder="Pilih akun OA Accurate"
-                          @update:search="onSearchAkun"
-                          :rules="[required('akun OA Accurate')]"
-                        >
-                          <template #prepend-item>
-                              <div v-if="loadingAkun" class="pa-2">
-                                <VProgressLinear
-                                  indeterminate
-                                  color="primary"
-                                />
-                                <div class="text-caption mt-1 text-center">
-                                  Loading...
-                                </div>
-                              </div>
-                            </template>
-
-                            <template #no-data>
-                              <div class="pa-3 text-center">
-                                <span v-if="loadingAkun">Sedang mengambil data...</span>
-                                <span v-else>Tidak ada data</span>
-                              </div>
-                            </template>
-                            
-                         <template #item="{ props, item }">
-                          <VListItem v-bind="props">
-                            <VListItemTitle>
-                              {{ item.raw?.noWithIndent }}
-                            </VListItemTitle>
-
-                          </VListItem>
-                        </template>
-                        </VAutocomplete>
                     </VCol>
-    
-                    <VCol cols="12" md="4">
+                    <VCol
+                      cols="12"
+                      md="3"
+                    >
                       <VTextField
-                        v-model="form.keterangan_biaya_oa"
-                        label="Keterangan"
-                        variant="outlined"
-                        density="comfortable"
-                      />
-                    </VCol>
-    
-                    <VCol cols="12" md="4">
-                      <div class="d-flex align-center h-100">
-                        <VCheckbox
-                          v-model="form.alokasi_biaya_oa"
-                          label="Alokasi ke Barang"
-                          hide-details
-                        />
-                      </div>
-                    </VCol>
-                  </VRow>
-    
-                  <!-- AKUN BIAYA LAIN AOL-->
-                  <div class="font-weight-bold mb-3">
-                    Akun Biaya Lain
-                  </div>
-    
-                  <VRow>
-                    <VCol cols="12" md="4">
-                        <VAutocomplete
-                          v-model="form.biaya_lain_oa"
-                          v-model:search="search"
-                          label="Akun Biaya Lain Accurate *"
-                          :items="akunAccList"
-                          item-title="text"
-                          item-value="id"
-                          clearable
-                          density="comfortable"
-                          :menu-props="{  maxHeight: 300,
-                          attach: 'body' }"
-                          placeholder="Pilih akun biaya lain Accurate"
-                          @update:search="onSearchAkun"
-                          @update:model-value="val => setSelectedAccText(akunAccList, val, 'biaya_lain_oa')"
-                          :rules="[required('akun biaya lain Accurate')]"
-                        >
-                          <template #prepend-item>
-                            <div v-if="loadingAkun" class="pa-2">
-                              <VProgressLinear
-                                indeterminate
-                                color="primary"
-                              />
-                              <div class="text-caption mt-1 text-center">
-                                Loading...
-                              </div>
-                            </div>
-                          </template>
-
-                          <template #no-data>
-                            <div class="pa-3 text-center">
-                              <span v-if="loadingAkun">Sedang mengambil data...</span>
-                              <span v-else>Tidak ada data</span>
-                            </div>
-                          </template>
-                         <template #item="{ props, item }">
-                          <VListItem v-bind="props">
-                            <VListItemTitle>
-                              {{ item.raw?.noWithIndent }}
-                            </VListItemTitle>
-
-                          </VListItem>
-                        </template>
-                        </VAutocomplete>
-                    </VCol>
-    
-                    <VCol cols="12" md="4">
-                      <VTextField
-                        label="Keterangan"
-                        variant="outlined"
-                        density="comfortable"
-                      />
-                    </VCol>
-                    <VCol cols="12" md="2">
-                    <VTextField
-                        label="Jumlah"
+                        label="Harga Dasar"
                         inputmode="numeric"
                         :input-style="{ textAlign: 'right' }"
-                        @keypress="onlyNumber"
-                        :model-value="formatMoney(form.jumlah_biaya)"
-                        @update:modelValue="(val) => form.jumlah_biaya = parse(val)"
+                        :model-value="formatMoney(form.harga_tebus)"
                         prefix="Rp"
+                        :readonly="isHargaReadonly"
+                        :rules="[requiredNotZero('Harga Dasar')]"
+                        @keypress="onlyNumber"
+                        @update:modelValue="(val) => form.harga_tebus = parse(val) || 0"
                       />
                     </VCol>
-    
-                    <VCol cols="12" md="2">
-                      <div class="d-flex align-center h-100">
-                        <VCheckbox
-                         v-model="form.alokasi_biaya_oa_lain"
-                          label="Alokasi ke Barang"
-                          hide-details
-                        />
-                      </div>
+
+                    <VCol
+                      cols="12"
+                      md="4"
+                    >
+                      <VSelect
+                        v-model="form.kategori_oa"
+                        label="Kategori OA"
+                        :items="[
+                          { title: 'Tanpa OA', value: 1 },
+                          { title: 'Dengan OA', value: 2 },
+                        ]"
+                        variant="outlined"
+                        :rules="[required('Kategori OA')]"
+                      />
                     </VCol>
                   </VRow>
-    
-                </VSheet>
-    
+                  <VRow>
+                    <VCol
+                      cols="12"
+                      md="3"
+                    >
+                      <VSelect
+                        v-model="form.pbbkb"
+                        :items="pbbkbList"
+                        item-title="label"
+                        item-value="id"
+                        label="PBBKB *"
+                        clearable
+                        :rules="[required('PBBKB')]"
+                        @update:modelValue="setNilaiPbbkb"
+                      />
+                    </VCol>
+                    <VCol
+                      cols="12"
+                      md="3"
+                    >
+                      <VCheckbox
+                        v-model="form.iuran_migas"
+                        label="Iuran Migas"
+                      />
+                    </VCol>
+
+                    <VCol
+                      v-if="showMigas"
+                      cols="12"
+                      md="4"
+                    >
+                      <VTextField
+                        label="Nominal Migas"
+                        :model-value="formatMoney(nominalMigas)"
+                        prefix="Rp"
+                        :rules="[requiredNotZero('Nominal Migas')]"
+                        @keypress="onlyNumber"
+                        @update:modelValue="(val) => form.nominal_iuran = parse(val)"
+                      />
+                    </VCol>
+                  </VRow>
                 </VCardText>
-    
               </VCard>
-    
-            </section>
-    
-            <section v-if="showAkun" class="mb-3">
-    
-              <VCard>
-                <VCardTitle class="px-5">
-                  Kode Akun Accurate
-                </VCardTitle>
-    
-                <VDivider />
-    
-                <VCardText class="pa-5">
-    
-    
-                  <!-- sebagai pph22 -->
-                <VSheet v-if="showpph" class="mb-3">
-    
-                    <div class="font-weight-bold mb-3">
-                    Akun PPH 22 Accurate *
+            </VCol>
+
+            <!-- RIGHT SUMMARY -->
+            <VCol
+              cols="12"
+              md="5"
+            >
+              <VCard
+                color="primary"
+                theme="dark"
+              >
+                <VCardText class="pa-6">
+                  <!-- HEADER -->
+                  <div class="d-flex align-center mb-5">
+                    <VAvatar
+                      color="white"
+                      rounded
+                      size="42"
+                      class="me-3"
+                      variant="tonal"
+                    >
+                      <VIcon icon="mdi-receipt-text" />
+                    </VAvatar>
+
+                    <div>
+                      <div class="text-h6 font-weight-bold text-white">
+                        Rincian Perhitungan
+                      </div>
+
+                      <div class="text-caption text-white">
+                        Detail Harga pembelian
+                      </div>
                     </div>
-                    <VRow class="mb-2">
-          
-                      <VCol cols="12" md="6">
-                          <VAutocomplete
-                            v-model="form.biaya_pph22"
-                            v-model:search="search"
-                            label="Akun PPH 22 Accurate *"
-                            :items="akunAccList"
-                            item-title="text"
-                            item-value="id"
-                            clearable
-                            density="comfortable"
-                            :menu-props="{  maxHeight: 300,
-                            attach: 'body' }"
-                            placeholder="Pilih akun pph 22 Accurate"
-                            @update:search="onSearchAkun"
-                            @update:model-value="val => setSelectedAccText(akunAccList, val, 'biaya_pph22')"
-                            :rules="[required('akun pph 22 Accurate')]"
-                          >
-                          <template #prepend-item>
-                            <div v-if="loadingAkun" class="pa-2">
-                              <VProgressLinear
-                                indeterminate
-                                color="primary"
-                              />
-                              <div class="text-caption mt-1 text-center">
-                                Loading...
-                              </div>
-                            </div>
-                          </template>
-
-                          <template #no-data>
-                            <div class="pa-3 text-center">
-                              <span v-if="loadingAkun">Sedang mengambil data...</span>
-                              <span v-else>Tidak ada data</span>
-                            </div>
-                          </template>
-                          <template #item="{ props, item }">
-                            <VListItem v-bind="props">
-                              <VListItemTitle>
-                                {{ item.raw?.noWithIndent }}
-                              </VListItemTitle>
-
-                            </VListItem>
-                          </template>
-                          </VAutocomplete>
-                      </VCol>
-          
-                      <VCol cols="12" md="4">
-                        <VTextField
-                          v-model="form.keterangan_pph22"
-                          label="Keterangan"
-                          variant="outlined"
-                        />
-                      </VCol>
-          
-                      <VCol cols="12" md="2">
-                        <VCheckbox
-                          v-model="form.alokasi_pph22"
-                          label="Alokasi ke Barang"
-                        />
-                      </VCol>
-          
-                    </VRow>
-                  <VDivider />
-                </VSheet>
-    
-                <VSheet v-if="showpbbkb" class="mb-2"
-                  >
-                  
-                    <div class="font-weight-bold mb-3 mt-2">
-                    Akun PBBKB Accurate *
-                    </div>
-                    <VRow  class="mb-2">
-          
-                      <VCol cols="12" md="6">
-                         <VAutocomplete
-                          v-model="form.biaya_pbbkb"
-                          v-model:search="search"
-                          label="Akun PBBKB Accurate *"
-                          :items="akunAccList"
-                          item-title="text"
-                          item-value="id"
-                          clearable
-                          density="comfortable"
-                          :menu-props="{  maxHeight: 300,
-                          attach: 'body' }"
-                          placeholder="Pilih akun PBBKB Accurate"
-                          @update:search="onSearchAkun"
-                          :rules="[required('akun PBBKB Accurate')]"
-                        >
-                        <template #prepend-item>
-                            <div v-if="loadingAkun" class="pa-2">
-                              <VProgressLinear
-                                indeterminate
-                                color="primary"
-                              />
-                              <div class="text-caption mt-1 text-center">
-                                Loading...
-                              </div>
-                            </div>
-                          </template>
-
-                          <template #no-data>
-                            <div class="pa-3 text-center">
-                              <span v-if="loadingAkun">Sedang mengambil data...</span>
-                              <span v-else>Tidak ada data</span>
-                            </div>
-                          </template>
-                         <template #item="{ props, item }">
-                          <VListItem v-bind="props">
-                            <VListItemTitle>
-                              {{ item.raw?.noWithIndent }}
-                            </VListItemTitle>
-
-                          </VListItem>
-                          </template>
-                        </VAutocomplete>
-                      </VCol>
-          
-                      <VCol cols="12" md="4">
-                        <VTextField
-                          v-model="form.keterangan_pbbkb"
-                          label="Keterangan"
-                          variant="outlined"
-                        />
-                      </VCol>
-          
-                      <VCol cols="12" md="2">
-                        <VCheckbox
-                          v-model="form.alokasi_pbbkb"
-                          label="Alokasi ke Barang"
-                        />
-                      </VCol>
-          
-                    </VRow>
-                    <VDivider />
-                </VSheet>
-                <VSheet v-if="showMigas" class="mb-2">
-                  <div class="font-weight-bold mb-3">
-                    Akun Iuran Migas Accurate *
                   </div>
-                    <VRow>
-                      <VCol cols="12" md="6">
-                  
-                        <VAutocomplete
-                          v-model="form.biaya_migas"
-                          v-model:search="search"
-                          label="Akun Iuran Migas Accurate *"
-                          :items="akunAccList"
-                          item-title="text"
-                          item-value="id"
-                          clearable
-                          density="comfortable"
-                          :menu-props="{  maxHeight: 300,
-                          attach: 'body' }"
-                          placeholder="Pilih akun Iuran Migas Accurate"
-                          @update:search="onSearchAkun"
-                          @update:model-value="val => setSelectedAccText(akunAccList, val, 'biaya_migas')"
-                          :rules="[required('akun Iuran Migas Accurate')]"
-                        >
-                        <template #prepend-item>
-                            <div v-if="loadingAkun" class="pa-2">
-                              <VProgressLinear
-                                indeterminate
-                                color="primary"
-                              />
-                              <div class="text-caption mt-1 text-center">
-                                Loading...
-                              </div>
-                            </div>
-                          </template>
 
-                          <template #no-data>
-                            <div class="pa-3 text-center">
-                              <span v-if="loadingAkun">Sedang mengambil data...</span>
-                              <span v-else>Tidak ada data</span>
-                            </div>
-                          </template>
-                        <template #item="{ props, item }">
+                  <!-- DETAIL TRANSAKSI -->
+                  <!--
+                    <div class="text-subtitle-2 font-weight-bold mb-3 text-white">
+                    Informasi Dasar
+                    </div>
+                  -->
+
+                  <div class="d-flex justify-space-between mb-3">
+                    <span>Harga Dasar</span>
+                    <strong>Rp {{ formatMoney(form.harga_tebus) }}</strong>
+                  </div>
+
+                  <div class="d-flex justify-space-between mb-4">
+                    <span>Volume PO</span>
+                    <strong>{{ formatMoney(form.volume_po) }} Liter</strong>
+                  </div>
+                  <div
+                    v-if="showBiayaOA"
+                    class="d-flex justify-space-between mb-3"
+                  >
+                    <span>Ongkos Angkut</span>
+                    <strong>Rp {{ formatMoney(form.ongkos_angkut) }}</strong>
+                  </div>
+
+                  <VDivider class="mb-4 border-opacity-50" />
+
+                  <!-- PERHITUNGAN -->
+                  <!--
+                    <div class="text-subtitle-2 font-weight-bold mb-3 text-white">
+                    Komponen Biaya
+                    </div>
+                  -->
+
+                  <div class="d-flex justify-space-between mb-3">
+                    <span>Subtotal</span>
+                    <strong>Rp {{ formatMoney(subtotal) }}</strong>
+                  </div>
+
+                  <div class="d-flex justify-space-between mb-3">
+                    <span>DPP 11/12</span>
+                    <strong>Rp {{ formatMoney(dpp) }}</strong>
+                  </div>
+
+                  <div class="d-flex justify-space-between mb-3">
+                    <span>PPN 12%</span>
+                    <strong>Rp {{ formatMoney(ppn) }}</strong>
+                  </div>
+
+                  <div
+                    v-if="showpph"
+                    class="d-flex justify-space-between mb-3"
+                  >
+                    <span>PPH 22</span>
+                    <strong>Rp {{ formatMoney(pph22) }}</strong>
+                  </div>
+
+                  <div
+                    v-if="showpbbkb"
+                    class="d-flex justify-space-between mb-3"
+                  >
+                    <span>PBBKB</span>
+                    <strong>Rp {{ formatMoney(pbbkbval) }}</strong>
+                  </div>
+
+                  <div
+                    v-if="showMigas"
+                    class="d-flex justify-space-between mb-3"
+                  >
+                    <span>Iuran Migas</span>
+                    <strong>Rp {{ formatMoney(nominalMigas) }}</strong>
+                  </div>
+
+                  <VDivider class="my-4 border-opacity-50" />
+
+                  <!-- TOTAL -->
+                  <div class="d-flex justify-space-between align-center">
+                    <span class="text-h6 font-weight-bold text-white">
+                      Total Order
+                    </span>
+
+                    <span class="text-h5 font-weight-bold text-white">
+                      Rp {{ formatMoney(totalPO) }}
+                    </span>
+                  </div>
+                </VCardText>
+              </VCard>
+            </VCol>
+          </VRow>
+        </section>
+
+        <!-- OA SECTION -->
+        <section
+          v-if="showBiayaOA"
+          class="mb-3"
+        >
+          <VCard>
+            <VCardTitle class="px-6 pt-5">
+              Biaya Ongkos Angkut
+            </VCardTitle>
+
+            <VDivider />
+
+            <VCardText class="pa-6">
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="3"
+                >
+                  <VSelect
+                    v-model="form.jenis_oa"
+                    label="Jenis OA"
+                    :items="[
+                      { title: 'Sebagai Biaya', value: 1 },
+                      { title: 'Sebagai Kode Item', value: 0 },
+                    ]"
+                    variant="outlined"
+                    placeholder="Pilih Jenis OA"
+                    :rules="[required('Jenis OA')]"
+                  />
+                </VCol>
+              </VRow>
+
+              <!-- sebagai kode item -->
+              <VSheet
+                v-if="showKodeItemOA"
+                class="mt-3 pa-4 mb-4"
+                border
+                rounded="lg"
+                color="pink-lighten-5"
+              >
+                <div class="text-subtitle-2 font-weight-bold mb-3">
+                  Akun OA Accurate *
+                </div>
+                <VRow>
+                  <VCol
+                    cols="12"
+                    md="6"
+                  >
+                    <VAutocomplete
+                      v-model="form.kode_item_oa"
+                      label="Kode Item Accurate *"
+                      :items="produkAccList"
+                      item-title="text"
+                      item-value="id"
+                      clearable
+                      no-filter
+                      density="comfortable"
+                      :loading="loading"
+                      :menu-props="{
+                        maxHeight: 300,
+                        attach: 'body',
+                      }"
+                      placeholder="Pilih Kode Item Accurate"
+                      :rules="[required('Kode Item Accurate')]"
+                      @update:search="onSearch"
+                    >
+                      <template #prepend-item>
+                        <div
+                          v-if="loading"
+                          class="pa-2"
+                        >
+                          <VProgressLinear
+                            indeterminate
+                            color="primary"
+                          />
+                          <div class="text-caption mt-1 text-center">
+                            Loading...
+                          </div>
+                        </div>
+                      </template>
+
+                      <template #no-data>
+                        <div class="pa-3 text-center">
+                          <span v-if="loading">Sedang mengambil data...</span>
+                          <span v-else>Tidak ada data</span>
+                        </div>
+                      </template>
+
+                      <template #item="{ props, item }">
+                        <VListItem
+                          v-bind="props"
+                        >
+                          <div class="text-caption text-medium-emphasis">
+                            {{ item.raw?.id || '-' }}
+                          </div>
+                        </VListItem>
+                      </template>
+                    </VAutocomplete>
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VTextField
+                      v-model="form.keterangan_item_oa"
+                      label="Keterangan"
+                      variant="outlined"
+                    />
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="2"
+                  >
+                    <VCheckbox
+                      v-model="form.alokasi_item_oa"
+                      label="Alokasi ke Barang"
+                    />
+                  </VCol>
+                </VRow>
+              </VSheet>
+
+              <VRow class="mb-3">
+                <VCol
+                  cols="12"
+                  md="3"
+                >
+                  <VTextField
+                    label="Ongkos Angkut"
+                    class="text-end"
+                    :model-value="formatMoney(form.ongkos_angkut)"
+                    prefix="Rp"
+                    @keypress="onlyNumber"
+                    @update:modelValue="(val) => form.ongkos_angkut = parse(val)"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="3"
+                >
+                  <VAutocomplete
+                    v-model="form.kategori_plat"
+                    label="Kategori Plat *"
+                    :items="[
+                      { title: 'Hitam', value: 'Hitam' },
+                      { title: 'Kuning', value: 'Kuning' },
+                    ]"
+                    variant="outlined"
+                    item-title="title"
+                    item-value="value"
+                    clearable
+                    density="comfortable"
+                    :menu-props="{ maxHeight: 300 }"
+                    placeholder="Pilih Kategori Plat"
+                  />
+                </VCol>
+              </VRow>
+
+              <!-- sebagai biaya -->
+              <VSheet
+                v-if="showKodeAkunOA"
+                class="pa-4 mb-4"
+                border
+                rounded="lg"
+                color="pink-lighten-5"
+              >
+                <!-- AKUN OA ACCURATE -->
+                <div class="font-weight-bold mb-3">
+                  Akun OA Accurate
+                </div>
+
+                <VRow class="mb-3">
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VAutocomplete
+                      v-model="form.biaya_oa"
+                      v-model:search="search"
+                      label="Akun OA Accurate *"
+                      :items="akunAccList"
+                      item-title="text"
+                      item-value="id"
+                      clearable
+                      density="comfortable"
+                      :menu-props="{
+                        maxHeight: 300,
+                        attach: 'body',
+                      }"
+                      placeholder="Pilih akun OA Accurate"
+                      :rules="[required('akun OA Accurate')]"
+                      @update:search="onSearchAkun"
+                    >
+                      <template #prepend-item>
+                        <div
+                          v-if="loadingAkun"
+                          class="pa-2"
+                        >
+                          <VProgressLinear
+                            indeterminate
+                            color="primary"
+                          />
+                          <div class="text-caption mt-1 text-center">
+                            Loading...
+                          </div>
+                        </div>
+                      </template>
+
+                      <template #no-data>
+                        <div class="pa-3 text-center">
+                          <span v-if="loadingAkun">Sedang mengambil data...</span>
+                          <span v-else>Tidak ada data</span>
+                        </div>
+                      </template>
+
+                      <template #item="{ props, item }">
+                        <VListItem v-bind="props">
+                          <VListItemTitle>
+                            {{ item.raw?.noWithIndent }}
+                          </VListItemTitle>
+                        </VListItem>
+                      </template>
+                    </VAutocomplete>
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VTextField
+                      v-model="form.keterangan_biaya_oa"
+                      label="Keterangan"
+                      variant="outlined"
+                      density="comfortable"
+                    />
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <div class="d-flex align-center h-100">
+                      <VCheckbox
+                        v-model="form.alokasi_biaya_oa"
+                        label="Alokasi ke Barang"
+                        hide-details
+                      />
+                    </div>
+                  </VCol>
+                </VRow>
+
+                <!-- AKUN BIAYA LAIN AOL -->
+                <div class="font-weight-bold mb-3">
+                  Akun Biaya Lain
+                </div>
+
+                <VRow>
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VAutocomplete
+                      v-model="form.biaya_lain_oa"
+                      v-model:search="search"
+                      label="Akun Biaya Lain Accurate *"
+                      :items="akunAccList"
+                      item-title="text"
+                      item-value="id"
+                      clearable
+                      density="comfortable"
+                      :menu-props="{
+                        maxHeight: 300,
+                        attach: 'body',
+                      }"
+                      placeholder="Pilih akun biaya lain Accurate"
+                      :rules="[required('akun biaya lain Accurate')]"
+                      @update:search="onSearchAkun"
+                      @update:model-value="val => setSelectedAccText(akunAccList, val, 'biaya_lain_oa')"
+                    >
+                      <template #prepend-item>
+                        <div
+                          v-if="loadingAkun"
+                          class="pa-2"
+                        >
+                          <VProgressLinear
+                            indeterminate
+                            color="primary"
+                          />
+                          <div class="text-caption mt-1 text-center">
+                            Loading...
+                          </div>
+                        </div>
+                      </template>
+
+                      <template #no-data>
+                        <div class="pa-3 text-center">
+                          <span v-if="loadingAkun">Sedang mengambil data...</span>
+                          <span v-else>Tidak ada data</span>
+                        </div>
+                      </template>
+                      <template #item="{ props, item }">
+                        <VListItem v-bind="props">
+                          <VListItemTitle>
+                            {{ item.raw?.noWithIndent }}
+                          </VListItemTitle>
+                        </VListItem>
+                      </template>
+                    </VAutocomplete>
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VTextField
+                      label="Keterangan"
+                      variant="outlined"
+                      density="comfortable"
+                    />
+                  </VCol>
+                  <VCol
+                    cols="12"
+                    md="2"
+                  >
+                    <VTextField
+                      label="Jumlah"
+                      inputmode="numeric"
+                      :input-style="{ textAlign: 'right' }"
+                      :model-value="formatMoney(form.jumlah_biaya)"
+                      prefix="Rp"
+                      @keypress="onlyNumber"
+                      @update:modelValue="(val) => form.jumlah_biaya = parse(val)"
+                    />
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="2"
+                  >
+                    <div class="d-flex align-center h-100">
+                      <VCheckbox
+                        v-model="form.alokasi_biaya_oa_lain"
+                        label="Alokasi ke Barang"
+                        hide-details
+                      />
+                    </div>
+                  </VCol>
+                </VRow>
+              </VSheet>
+            </VCardText>
+          </VCard>
+        </section>
+
+        <section
+          v-if="showAkun"
+          class="mb-3"
+        >
+          <VCard>
+            <VCardTitle class="px-5">
+              Kode Akun Accurate
+            </VCardTitle>
+
+            <VDivider />
+
+            <VCardText class="pa-5">
+              <!-- sebagai pph22 -->
+              <VSheet
+                v-if="showpph"
+                class="mb-3"
+              >
+                <div class="font-weight-bold mb-3">
+                  Akun PPH 22 Accurate *
+                </div>
+                <VRow class="mb-2">
+                  <VCol
+                    cols="12"
+                    md="6"
+                  >
+                    <VAutocomplete
+                      v-model="form.biaya_pph22"
+                      v-model:search="search"
+                      label="Akun PPH 22 Accurate *"
+                      :items="akunAccList"
+                      item-title="text"
+                      item-value="id"
+                      clearable
+                      density="comfortable"
+                      :menu-props="{
+                        maxHeight: 300,
+                        attach: 'body',
+                      }"
+                      placeholder="Pilih akun pph 22 Accurate"
+                      :rules="[required('akun pph 22 Accurate')]"
+                      @update:search="onSearchAkun"
+                      @update:model-value="val => setSelectedAccText(akunAccList, val, 'biaya_pph22')"
+                    >
+                      <template #prepend-item>
+                        <div
+                          v-if="loadingAkun"
+                          class="pa-2"
+                        >
+                          <VProgressLinear
+                            indeterminate
+                            color="primary"
+                          />
+                          <div class="text-caption mt-1 text-center">
+                            Loading...
+                          </div>
+                        </div>
+                      </template>
+
+                      <template #no-data>
+                        <div class="pa-3 text-center">
+                          <span v-if="loadingAkun">Sedang mengambil data...</span>
+                          <span v-else>Tidak ada data</span>
+                        </div>
+                      </template>
+                      <template #item="{ props, item }">
+                        <VListItem v-bind="props">
+                          <VListItemTitle>
+                            {{ item.raw?.noWithIndent }}
+                          </VListItemTitle>
+                        </VListItem>
+                      </template>
+                    </VAutocomplete>
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VTextField
+                      v-model="form.keterangan_pph22"
+                      label="Keterangan"
+                      variant="outlined"
+                    />
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="2"
+                  >
+                    <VCheckbox
+                      v-model="form.alokasi_pph22"
+                      label="Alokasi ke Barang"
+                    />
+                  </VCol>
+                </VRow>
+                <VDivider />
+              </VSheet>
+
+              <VSheet
+                v-if="showpbbkb"
+                class="mb-2"
+              >
+                <div class="font-weight-bold mb-3 mt-2">
+                  Akun PBBKB Accurate *
+                </div>
+                <VRow class="mb-2">
+                  <VCol
+                    cols="12"
+                    md="6"
+                  >
+                    <VAutocomplete
+                      v-model="form.biaya_pbbkb"
+                      v-model:search="search"
+                      label="Akun PBBKB Accurate *"
+                      :items="akunAccList"
+                      item-title="text"
+                      item-value="id"
+                      clearable
+                      density="comfortable"
+                      :menu-props="{
+                        maxHeight: 300,
+                        attach: 'body',
+                      }"
+                      placeholder="Pilih akun PBBKB Accurate"
+                      :rules="[required('akun PBBKB Accurate')]"
+                      @update:search="onSearchAkun"
+                    >
+                      <template #prepend-item>
+                        <div
+                          v-if="loadingAkun"
+                          class="pa-2"
+                        >
+                          <VProgressLinear
+                            indeterminate
+                            color="primary"
+                          />
+                          <div class="text-caption mt-1 text-center">
+                            Loading...
+                          </div>
+                        </div>
+                      </template>
+
+                      <template #no-data>
+                        <div class="pa-3 text-center">
+                          <span v-if="loadingAkun">Sedang mengambil data...</span>
+                          <span v-else>Tidak ada data</span>
+                        </div>
+                      </template>
+                      <template #item="{ props, item }">
+                        <VListItem v-bind="props">
+                          <VListItemTitle>
+                            {{ item.raw?.noWithIndent }}
+                          </VListItemTitle>
+                        </VListItem>
+                      </template>
+                    </VAutocomplete>
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VTextField
+                      v-model="form.keterangan_pbbkb"
+                      label="Keterangan"
+                      variant="outlined"
+                    />
+                  </VCol>
+
+                  <VCol
+                    cols="12"
+                    md="2"
+                  >
+                    <VCheckbox
+                      v-model="form.alokasi_pbbkb"
+                      label="Alokasi ke Barang"
+                    />
+                  </VCol>
+                </VRow>
+                <VDivider />
+              </VSheet>
+              <VSheet
+                v-if="showMigas"
+                class="mb-2"
+              >
+                <div class="font-weight-bold mb-3">
+                  Akun Iuran Migas Accurate *
+                </div>
+                <VRow>
+                  <VCol
+                    cols="12"
+                    md="6"
+                  >
+                    <VAutocomplete
+                      v-model="form.biaya_migas"
+                      v-model:search="search"
+                      label="Akun Iuran Migas Accurate *"
+                      :items="akunAccList"
+                      item-title="text"
+                      item-value="id"
+                      clearable
+                      density="comfortable"
+                      :menu-props="{
+                        maxHeight: 300,
+                        attach: 'body',
+                      }"
+                      placeholder="Pilih akun Iuran Migas Accurate"
+                      :rules="[required('akun Iuran Migas Accurate')]"
+                      @update:search="onSearchAkun"
+                      @update:model-value="val => setSelectedAccText(akunAccList, val, 'biaya_migas')"
+                    >
+                      <template #prepend-item>
+                        <div
+                          v-if="loadingAkun"
+                          class="pa-2"
+                        >
+                          <VProgressLinear
+                            indeterminate
+                            color="primary"
+                          />
+                          <div class="text-caption mt-1 text-center">
+                            Loading...
+                          </div>
+                        </div>
+                      </template>
+
+                      <template #no-data>
+                        <div class="pa-3 text-center">
+                          <span v-if="loadingAkun">Sedang mengambil data...</span>
+                          <span v-else>Tidak ada data</span>
+                        </div>
+                      </template>
+                      <template #item="{ props, item }">
                         <VListItem v-bind="props">
                           <VListItemTitle>
                             {{ item.raw?.noWithIndent }} - {{ item.raw?.name || item.raw?.text }}
                           </VListItemTitle>
                         </VListItem>
                       </template>
-                          
-                        </VAutocomplete>
-                
-                      
-                      </VCol>
-                
-                      <VCol cols="12" md="4">
-                        <VTextField 
-                        v-model="form.keterangan_migas"
-                        label="Keterangan Item" 
-                        />
-                      </VCol>
-                      <VCol cols="12" md="2">
-                        <div class="d-flex align-center h-100">
-                            <VCheckbox
-                            v-model="form.alokasi_migas"
-                            label="Alokasi ke Barang "
-                            color="primary"
-                            hide-details
-                            />
-                        </div>
-                      </VCol>
-                    </VRow>
-                </VSheet>
-    
-                </VCardText>
-    
-              </VCard>
-    
-            </section>
-    
-            <section class="mb-6">
-    
-              <VCard>
-    
-                <VCardTitle class="px-6 pt-3">
-                  Catatan & Informasi Tambahan
-                </VCardTitle>
-    
-                <VDivider />
-    
-                <VCardText class="pa-6">
-    
-                  <VTextarea
-                    v-model="form.catatan_po"
-                    label="Catatan PO"
-                    rows="3"
-                    variant="outlined"
-                    class="mb-4"
-                  />
-    
-                  <VTextarea
-                    v-model="form.internal_notes"
-                    label="Internal Notes"
-                    rows="4"
-                    variant="outlined"
-                    class="mb-4"
-                  />
+                    </VAutocomplete>
+                  </VCol>
 
-                  <VTextarea
-                    v-if="Number(form.disposisi_po)==4"
-                    v-model="form.catatan_resubmit"
-                    label="Catatan Pengajuan Ulang *"
-                    rows="4"
-                    variant="outlined"
-                    :rules="[required('Catatan Pengajuan Ulang')]"
-                  />
-    
-                </VCardText>
-    
-              </VCard>
-    
-            </section>
-    
-            <!-- ACTION -->
-            <section>
-    
-              <div class="d-flex justify-end flex-wrap gap-3">
-    
-                <VBtn color="warning" size="large" @click="changePrice" v-if="!canChangePrice && !canChange">
-                  Perubahan Harga
-                </VBtn>
-                <!-- <VBtn color="primary" size="large" @click="step = 'review'"> -->
-                <VBtn color="primary" size="large" @click="goToReview" v-if="canChange || (canChangePrice && !canChange)">
-                  Review
-                </VBtn>
-    
-                <VBtn
-                  variant="outlined"
-                  size="large"  @click="router.back()"
-                >
-                  Kembali
-                </VBtn>
-    
-              </div>
-    
-            </section>
-          </VForm>
-        <!-- </div> -->
-        <!-- <div v-else>
-     
-        </div> -->
-       
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VTextField
+                      v-model="form.keterangan_migas"
+                      label="Keterangan Item"
+                    />
+                  </VCol>
+                  <VCol
+                    cols="12"
+                    md="2"
+                  >
+                    <div class="d-flex align-center h-100">
+                      <VCheckbox
+                        v-model="form.alokasi_migas"
+                        label="Alokasi ke Barang "
+                        color="primary"
+                        hide-details
+                      />
+                    </div>
+                  </VCol>
+                </VRow>
+              </VSheet>
+            </VCardText>
+          </VCard>
+        </section>
+
+        <section class="mb-6">
+          <VCard>
+            <VCardTitle class="px-6 pt-3">
+              Catatan & Informasi Tambahan
+            </VCardTitle>
+
+            <VDivider />
+
+            <VCardText class="pa-6">
+              <VTextarea
+                v-model="form.catatan_po"
+                label="Catatan PO"
+                rows="3"
+                variant="outlined"
+                class="mb-4"
+              />
+
+              <VTextarea
+                v-model="form.internal_notes"
+                label="Internal Notes"
+                rows="4"
+                variant="outlined"
+                class="mb-4"
+              />
+
+              <VTextarea
+                v-if="Number(form.disposisi_po) == 4"
+                v-model="form.catatan_resubmit"
+                label="Catatan Pengajuan Ulang *"
+                rows="4"
+                variant="outlined"
+                :rules="[required('Catatan Pengajuan Ulang')]"
+              />
+            </VCardText>
+          </VCard>
+        </section>
+
+        <!-- ACTION -->
+        <section>
+          <div class="d-flex justify-end flex-wrap gap-3">
+            <VBtn
+              v-if="!canChangePrice && !canChange"
+              color="warning"
+              size="large"
+              @click="changePrice"
+            >
+              Perubahan Harga
+            </VBtn>
+            <!-- <VBtn color="primary" size="large" @click="step = 'review'"> -->
+            <VBtn
+              v-if="canChange || (canChangePrice && !canChange)"
+              color="primary"
+              size="large"
+              @click="goToReview"
+            >
+              Review
+            </VBtn>
+
+            <VBtn
+              variant="outlined"
+              size="large"
+              @click="router.back()"
+            >
+              Kembali
+            </VBtn>
+          </div>
+        </section>
+      </VForm>
+      <!-- </div> -->
+      <!--
+        <div v-else>
+
+        </div>
+      -->
     </div>
     <div v-else>
-      
-    <VCard rounded="lg">
-
-      <!-- HEADER -->
-      <VCardTitle class="d-flex justify-space-between align-center">
-        <div>
-          <div class="text-h6 font-weight-bold">
-            Review Purchase Order
+      <VCard rounded="lg">
+        <!-- HEADER -->
+        <VCardTitle class="d-flex justify-space-between align-center">
+          <div>
+            <div class="text-h6 font-weight-bold">
+              Review Purchase Order
+            </div>
+            <div class="text-caption text-medium-emphasis">
+              Cek ulang sebelum submit
+            </div>
           </div>
-          <div class="text-caption text-medium-emphasis">
-            Cek ulang sebelum submit
-          </div>
-        </div>
 
-        <VChip
-          :color="mode === 'add' ? 'primary' : 'warning'"
-          variant="flat"
-        >
-          {{ mode === 'add' ? 'New PO' : 'Edit PO' }}
-        </VChip>
-      </VCardTitle>
+          <VChip
+            :color="mode === 'add' ? 'primary' : 'warning'"
+            variant="flat"
+          >
+            {{ mode === 'add' ? 'New PO' : 'Edit PO' }}
+          </VChip>
+        </VCardTitle>
 
-      <VDivider />
+        <VDivider />
 
-      <VCardText class="pa-6">
+        <VCardText class="pa-6">
+          <!-- ALERT -->
+          <VAlert
+            type="info"
+            variant="tonal"
+            class="mb-6"
+          >
+            <div class="font-weight-bold mb-1">
+              Silakan cek kembali data PO sebelum submit
+            </div>
+            Pastikan semua informasi sudah sesuai.
+          </VAlert>
 
-        <!-- ALERT -->
-        <VAlert
-          type="info"
-          variant="tonal"
-          class="mb-6"
-        >
-          <div class="font-weight-bold mb-1">
-            Silakan cek kembali data PO sebelum submit
-          </div>
-          Pastikan semua informasi sudah sesuai.
-        </VAlert>
-
-        <VCard
+          <VCard
             v-if="isPriceChanged"
             class="mb-6"
             color="warning"
@@ -2090,7 +2266,6 @@ const isPriceChanged = computed(() => {
             <VCardTitle>Perubahan Harga</VCardTitle>
 
             <VCardText>
-
               <div class="d-flex justify-space-between mb-2">
                 <span>Harga Dasar</span>
 
@@ -2101,7 +2276,10 @@ const isPriceChanged = computed(() => {
                 </strong>
               </div>
 
-              <div class="d-flex justify-space-between mb-2" v-if="showBiayaOA">
+              <div
+                v-if="showBiayaOA"
+                class="d-flex justify-space-between mb-2"
+              >
                 <span>Ongkos Angkut</span>
 
                 <strong>
@@ -2111,7 +2289,7 @@ const isPriceChanged = computed(() => {
                 </strong>
               </div>
 
-              <VDivider class="my-2"/>
+              <VDivider class="my-2" />
 
               <div class="d-flex justify-space-between font-weight-bold">
                 <span>Total</span>
@@ -2122,77 +2300,105 @@ const isPriceChanged = computed(() => {
                   Rp {{ formatMoney(totalPO) }}
                 </span>
               </div>
-
             </VCardText>
-        </VCard>
+          </VCard>
 
-        <!-- ================= INFORMASI DASAR ================= -->
-      <div class="text-h6 font-weight-bold">
-        Informasi Dasar
-      </div>
-      <div class="bg-var-theme-background rounded pa-5 mt-2">
-        <VRow>
-            <VCol cols="12" md="6">
-
-              <div class="mb-4">
-                <div class="text-caption text-black">Tanggal PO</div>
-                <div class="text-sm font-weight-semibold">
-                  {{ form.tanggal_inven || '-' }}
-                </div>
-              </div>
-    
-              <div class="mb-4">
-                <div class="text-caption text-black">Produk</div>
-                <div class="text-black font-weight-semibold">
-                  {{ resolveLabelById(produkList, form.produk, 'label')}}
-                </div>
-              </div>
-    
-              <div class="mb-4">
-                <div class="text-caption text-black">Terminal</div>
-                <div class="text-black font-weight-semibold">
-                  {{ resolveLabelById(terminalList, form.terminal, 'nama_terminal') }} -
-                  {{ resolveLabelById(terminalList, form.terminal, 'lokasi_terminal') }}
-                </div>
-              </div>
-              <div class="mb-4">
-                <div class="text-caption text-black">Vendor</div>
-                <div class="text-black font-weight-semibold">
-                  {{ resolveLabelById(vendorList, form.vendor, 'nama_vendor') }}
-                </div>
-              </div>
-               <div class="mb-4">
-                  <div class="text-caption text-black">Jenis Kirim</div>
-                  <div class="text-black font-weight-semibold">
-                    {{  form.jenis_kirim === 1 ? 'Truck'
-                        : form.jenis_kirim === 2
-                          ? 'Ship'
-                          : '-' }}
+          <!-- ================= INFORMASI DASAR ================= -->
+          <div class="text-h6 font-weight-bold">
+            Informasi Dasar
+          </div>
+          <div class="bg-var-theme-background rounded pa-5 mt-2">
+            <VRow>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <div class="mb-4">
+                  <div class="text-caption text-black">
+                    Tanggal PO
+                  </div>
+                  <div class="text-sm font-weight-semibold">
+                    {{ form.tanggal_inven || '-' }}
                   </div>
                 </div>
-            </VCol>
-            <VCol cols="12" md="6">
+
                 <div class="mb-4">
-                  <div class="text-caption text-black">Terms</div>
+                  <div class="text-caption text-black">
+                    Produk
+                  </div>
+                  <div class="text-black font-weight-semibold">
+                    {{ resolveLabelById(produkList, form.produk, 'label') }}
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <div class="text-caption text-black">
+                    Terminal
+                  </div>
+                  <div class="text-black font-weight-semibold">
+                    {{ resolveLabelById(terminalList, form.terminal, 'nama_terminal') }} -
+                    {{ resolveLabelById(terminalList, form.terminal, 'lokasi_terminal') }}
+                  </div>
+                </div>
+                <div class="mb-4">
+                  <div class="text-caption text-black">
+                    Vendor
+                  </div>
+                  <div class="text-black font-weight-semibold">
+                    {{ resolveLabelById(vendorList, form.vendor, 'nama_vendor') }}
+                  </div>
+                </div>
+                <div class="mb-4">
+                  <div class="text-caption text-black">
+                    Jenis Kirim
+                  </div>
+                  <div class="text-black font-weight-semibold">
+                    {{ form.jenis_kirim === 1 ? 'Truck'
+                      : form.jenis_kirim === 2
+                        ? 'Ship'
+                        : '-' }}
+                  </div>
+                </div>
+              </VCol>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <div class="mb-4">
+                  <div class="text-caption text-black">
+                    Terms
+                  </div>
                   <div class="text-black font-weight-semibold">
                     {{ form.terms || '-' }}
                   </div>
                 </div>
 
-                <div v-if="form.terms === 'NET'" class="mb-4">
-                  <div class="text-caption text-black">Terms Day</div>
+                <div
+                  v-if="form.terms === 'NET'"
+                  class="mb-4"
+                >
+                  <div class="text-caption text-black">
+                    Terms Day
+                  </div>
                   <div class="text-black font-weight-semibold">
                     {{ form.terms_day || '-' }} Hari
                   </div>
                 </div>
                 <div class="mb-4">
-                  <div class="text-caption text-black">Tax</div>
+                  <div class="text-caption text-black">
+                    Tax
+                  </div>
                   <div class="text-black font-weight-semibold">
-                    {{ form.kd_tax || '-' }} 
+                    {{ form.kd_tax || '-' }}
                   </div>
                 </div>
-                <div class="mb-4" v-if="form.iuran_migas">
-                  <div class="text-caption text-black">Iuran Migas</div>
+                <div
+                  v-if="form.iuran_migas"
+                  class="mb-4"
+                >
+                  <div class="text-caption text-black">
+                    Iuran Migas
+                  </div>
                   <VChip
                     :color="form.iuran_migas ? 'success' : 'error'"
                     size="small"
@@ -2202,7 +2408,9 @@ const isPriceChanged = computed(() => {
                 </div>
 
                 <div class="mb-0">
-                  <div class="text-caption text-black">Jenis Harga</div>
+                  <div class="text-caption text-black">
+                    Jenis Harga
+                  </div>
                   <div class="text-black font-weight-semibold">
                     {{
                       form.jenis_harga === 1
@@ -2213,313 +2421,501 @@ const isPriceChanged = computed(() => {
                     }}
                   </div>
                 </div>
-            </VCol>
-        </VRow>
-         
-
-       
-
-        </div>
-
-        <VCard class="pa-4 mb-3 mt-2"  variant="outlined">
-
-        <VRow dense>
-          <VCol cols="12" md="4">
-            <div class="text-caption text-medium-emphasis">Kode Item Accurate</div>
-            <div class="text-body-2 font-weight-medium">
-              {{ form.kode_item +' -'+selectedAccText.kode_item|| '-' }}
-            </div>
-          </VCol>
-
-          <VCol cols="12" md="4">
-            <div class="text-caption text-medium-emphasis">Keterangan</div>
-            <div class="text-body-2">
-              {{ form.keterangan_item || '-' }}
-            </div>
-          </VCol>
-
-        </VRow>
-        <VDivider class="mt-2" />
-         <!-- OA -->
-        <div v-if="showKodeItemOA" class="mt-2">
-          <VRow dense>
-            <VCol cols="12" md="4">
-              <div class="text-caption">Kode Item OA Accurate</div>
-              <div class="text-body-2">{{ form.kode_item_oa +' -'+selectedAccText.kode_item_oa || '-' }}</div>
-            </VCol>
-
-            <VCol cols="12" md="4">
-              <div class="text-caption">Keterangan</div>
-              <div class="text-body-2">{{ form.keterangan_item_oa || '-' }}</div>
-            </VCol>
-
-            <VCol cols="12" md="2">
-              <div class="text-caption">Alokasi</div>
-              <VChip size="small" :color="form.alokasi_item_oa ? 'success' : 'error'">
-                {{ form.alokasi_item_oa ? 'Yes' : 'No' }}
-              </VChip>
-            </VCol>
-          </VRow>
+              </VCol>
+            </VRow>
           </div>
-        <div v-if="showKodeAkunOA" class="mt-2">
-          <VRow dense>
-            <VCol cols="12" md="4">
-              <div class="text-caption">Akun biaya OA Accurate</div>
-              <div class="text-body-2">{{ form.biaya_oa || '-' }}</div>
-            </VCol>
 
-            <VCol cols="12" md="4">
-              <div class="text-caption">Keterangan</div>
-              <div class="text-body-2">{{ form.keterangan_biaya_oa || '-' }}</div>
-            </VCol>
+          <VCard
+            class="pa-4 mb-3 mt-2"
+            variant="outlined"
+          >
+            <VRow dense>
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <div class="text-caption text-medium-emphasis">
+                  Kode Item Accurate
+                </div>
+                <div class="text-body-2 font-weight-medium">
+                  {{ `${form.kode_item} -${selectedAccText.kode_item}` || '-' }}
+                </div>
+              </VCol>
 
-            <VCol cols="12" md="2">
-              <div class="text-caption">Alokasi</div>
-              <VChip size="small" :color="form.alokasi_biaya_oa ? 'success' : 'error'">
-                {{ form.alokasi_biaya_oa ? 'Yes' : 'No' }}
-              </VChip>
-            </VCol>
-          </VRow>
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <div class="text-caption text-medium-emphasis">
+                  Keterangan
+                </div>
+                <div class="text-body-2">
+                  {{ form.keterangan_item || '-' }}
+                </div>
+              </VCol>
+            </VRow>
+            <VDivider class="mt-2" />
+            <!-- OA -->
+            <div
+              v-if="showKodeItemOA"
+              class="mt-2"
+            >
+              <VRow dense>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Kode Item OA Accurate
+                  </div>
+                  <div class="text-body-2">
+                    {{ `${form.kode_item_oa} -${selectedAccText.kode_item_oa}` || '-' }}
+                  </div>
+                </VCol>
 
-          <VDivider class="mt-2" />
-          <VRow dense>
-            <VCol cols="12" md="4">
-              <div class="text-caption">Akun biaya lain Accurate</div>
-              <div class="text-body-2">
-                {{  form.biaya_lain_oa +' -'+selectedAccText.biaya_lain_oa ||'-' }}
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Keterangan
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.keterangan_item_oa || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="2"
+                >
+                  <div class="text-caption">
+                    Alokasi
+                  </div>
+                  <VChip
+                    size="small"
+                    :color="form.alokasi_item_oa ? 'success' : 'error'"
+                  >
+                    {{ form.alokasi_item_oa ? 'Yes' : 'No' }}
+                  </VChip>
+                </VCol>
+              </VRow>
+            </div>
+            <div
+              v-if="showKodeAkunOA"
+              class="mt-2"
+            >
+              <VRow dense>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Akun biaya OA Accurate
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.biaya_oa || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Keterangan
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.keterangan_biaya_oa || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="2"
+                >
+                  <div class="text-caption">
+                    Alokasi
+                  </div>
+                  <VChip
+                    size="small"
+                    :color="form.alokasi_biaya_oa ? 'success' : 'error'"
+                  >
+                    {{ form.alokasi_biaya_oa ? 'Yes' : 'No' }}
+                  </VChip>
+                </VCol>
+              </VRow>
+
+              <VDivider class="mt-2" />
+              <VRow dense>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Akun biaya lain Accurate
+                  </div>
+                  <div class="text-body-2">
+                    {{ `${form.biaya_lain_oa} -${selectedAccText.biaya_lain_oa}` || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Keterangan
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.ket_biaya_lain_oa || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="2"
+                >
+                  <div class="text-caption">
+                    Alokasi
+                  </div>
+                  <VChip
+                    size="small"
+                    :color="form.alokasi_biaya_oa_lain ? 'success' : 'error'"
+                  >
+                    {{ form.alokasi_biaya_oa_lain ? 'Yes' : 'No' }}
+                  </VChip>
+                </VCol>
+              </VRow>
+
+              <VDivider class="mt-2" />
+            </div>
+            <div
+              v-if="showpph"
+              class="mt-2"
+            >
+              <VRow dense>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Kode PPH 22 Accurate
+                  </div>
+                  <div class="text-body-2">
+                    {{ `${form.biaya_pph22} -${selectedAccText.biaya_pph22}` || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Keterangan
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.keterangan_pph22 || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="2"
+                >
+                  <div class="text-caption">
+                    Alokasi
+                  </div>
+                  <VChip
+                    size="small"
+                    :color="form.alokasi_pph22 ? 'success' : 'error'"
+                  >
+                    {{ form.alokasi_pph22 ? 'Yes' : 'No' }}
+                  </VChip>
+                </VCol>
+              </VRow>
+
+              <VDivider class="mt-2" />
+            </div>
+            <div
+              v-if="showpbbkb"
+              class="mt-2"
+            >
+              <VRow dense>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Kode PBBKB Accurate
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.biaya_pbbkb || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Keterangan
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.keterangan_pbbkb || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="2"
+                >
+                  <div class="text-caption">
+                    Alokasi
+                  </div>
+                  <VChip
+                    size="small"
+                    :color="form.alokasi_pbbkb ? 'success' : 'error'"
+                  >
+                    {{ form.alokasi_pbbkb ? 'Yes' : 'No' }}
+                  </VChip>
+                </VCol>
+              </VRow>
+
+              <VDivider class="mt-2" />
+            </div>
+            <div
+              v-if="showMigas"
+              class="mt-2"
+            >
+              <VRow dense>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Kode Iuran Migas Accurate
+                  </div>
+                  <div class="text-body-2">
+                    {{ `${form.biaya_migas} -${selectedAccText.biaya_migas}` || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <div class="text-caption">
+                    Keterangan
+                  </div>
+                  <div class="text-body-2">
+                    {{ form.keterangan_migas || '-' }}
+                  </div>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="2"
+                >
+                  <div class="text-caption">
+                    Alokasi
+                  </div>
+                  <VChip
+                    size="small"
+                    :color="form.alokasi_migas ? 'success' : 'error'"
+                  >
+                    {{ form.alokasi_migas ? 'Yes' : 'No' }}
+                  </VChip>
+                </VCol>
+              </VRow>
+
+              <VDivider class="mt-2" />
+            </div>
+          </VCard>
+
+          <!-- ================= HARGA ================= -->
+          <div class="text-subtitle-1 font-weight-bold mb-2">
+            Ringkasan Harga
+          </div>
+
+          <VCard class="pa-5 mb-6">
+            <div class="mb-4">
+              <div class="text-caption text-black">
+                Volume PO
               </div>
-            </VCol>
+              <div class="text-black font-weight-semibold">
+                {{ formatMoney(form.volume_po) || 0 }} Liter
+              </div>
+            </div>
 
-            <VCol cols="12" md="4">
-              <div class="text-caption">Keterangan</div>
-              <div class="text-body-2">{{ form.ket_biaya_lain_oa || '-' }}</div>
-            </VCol>
+            <div class="mb-4">
+              <div class="text-caption text-black">
+                Harga Dasar
+              </div>
+              <div class="text-black font-weight-semibold">
+                Rp {{ formatMoney(form.harga_tebus) || 0 }}
+              </div>
+            </div>
 
-            <VCol cols="12" md="2">
-              <div class="text-caption">Alokasi</div>
-              <VChip size="small" :color="form.alokasi_biaya_oa_lain ? 'success' : 'error'">
-                {{ form.alokasi_biaya_oa_lain ? 'Yes' : 'No' }}
-              </VChip>
-            </VCol>
-          </VRow>
+            <div
+              v-if="showBiayaOA"
+              class="mb-0"
+            >
+              <div class="text-caption text-black">
+                Ongkos Angkut
+              </div>
+              <div class="text-black font-weight-semibold">
+                Rp {{ formatMoney(form.ongkos_angkut) || 0 }}
+              </div>
+            </div>
+          </VCard>
 
-          <VDivider class="mt-2" />
+          <!-- ================= PAJAK ================= -->
+          <div class="text-subtitle-1 font-weight-bold mb-3">
+            Pajak & Biaya
           </div>
-          <div v-if="showpph" class="mt-2">
-            <VRow dense>
-              <VCol cols="12" md="4">
-                <div class="text-caption">Kode PPH 22 Accurate</div>
-                <div class="text-body-2">{{ form.biaya_pph22+' -'+selectedAccText.biaya_pph22 || '-' }}</div>
+
+          <VCard class="pa-5 mb-2">
+            <div class="mb-3 d-flex justify-space-between">
+              <span class="text-black">Subtotal</span>
+              <strong class="text-success">Rp {{ formatMoney(subtotal) }}</strong>
+            </div>
+            <div class="mb-3 d-flex justify-space-between">
+              <span class="text-black">PPN</span>
+              <strong>Rp {{ formatMoney(ppn) }}</strong>
+            </div>
+
+            <div class="mb-3 d-flex justify-space-between">
+              <span class="text-black">DPP 11/12</span>
+              <strong>Rp {{ formatMoney(dpp) }}</strong>
+            </div>
+
+            <div
+              v-if="showpph"
+              class="mb-3 d-flex justify-space-between"
+            >
+              <span class="text-black">PPH 22</span>
+              <strong class="text-red">Rp {{ formatMoney(pph22) }}</strong>
+            </div>
+
+            <div
+              v-if="showpbbkb"
+              class="mb-3 d-flex justify-space-between"
+            >
+              <span class="text-black">PBBKB</span>
+              <strong>Rp {{ formatMoney(pbbkbval) }}</strong>
+            </div>
+
+            <div
+              v-if="showMigas"
+              class="d-flex justify-space-between"
+            >
+              <span class="text-black">Iuran Migas</span>
+              <strong>Rp {{ formatMoney(nominalMigas) }}</strong>
+            </div>
+          </VCard>
+
+          <!-- ================= TOTAL (HIGHLIGHT) ================= -->
+          <VCard
+            class="pa-5"
+            color="primary"
+          >
+            <div class="d-flex justify-space-between align-center">
+              <div class="text-white text-h6 font-weight-bold">
+                Total
+              </div>
+
+              <div class="d-flex align-center">
+                <span class="text-white text-body-2 text-md-h5 font-weight-bold">
+                  Rp {{ formatMoney(totalPO ?? 0) }}
+                </span>
+              </div>
+            </div>
+          </VCard>
+
+          <!-- ================= CATATAN ================= -->
+          <div class="text-subtitle-1 font-weight-bold mt-4 mb-2">
+            Catatan
+          </div>
+          <VCard
+            variant="outlined"
+            class="pa-5"
+          >
+            <VRow>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <div class="text-black">
+                  Catatan PO :
+                </div>
+                <div class="text-black font-weight-semibold">
+                  {{ form.catatan_po || '-' }}
+                </div>
               </VCol>
 
-              <VCol cols="12" md="4">
-                <div class="text-caption">Keterangan</div>
-                <div class="text-body-2">{{ form.keterangan_pph22 || '-' }}</div>
-              </VCol>
+              <VDivider vertical />
 
-              <VCol cols="12" md="2">
-                <div class="text-caption">Alokasi</div>
-                <VChip size="small" :color="form.alokasi_pph22 ? 'success' : 'error'">
-                  {{ form.alokasi_pph22 ? 'Yes' : 'No' }}
-                </VChip>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <div class="text-black">
+                  Internal Notes :
+                </div>
+                <div class="text-black font-weight-semibold">
+                  {{ form.internal_notes || '-' }}
+                </div>
+              </VCol>
+              <VCol
+                v-if="form.disposisi_po == 4"
+                cols="12"
+                md="6"
+              >
+                <div class="text-black">
+                  Catatan Pengajuan Ulang :
+                </div>
+                <div class="text-black font-weight-semibold">
+                  {{ form.catatan_resubmit || '-' }}
+                </div>
               </VCol>
             </VRow>
+          </VCard>
+        </VCardText>
 
-            <VDivider class="mt-2" />
-          </div>
-          <div v-if="showpbbkb" class="mt-2">
-            <VRow dense>
-              <VCol cols="12" md="4">
-                <div class="text-caption">Kode PBBKB Accurate</div>
-                <div class="text-body-2">{{ form.biaya_pbbkb || '-' }}</div>
-              </VCol>
+        <!-- ACTION -->
+        <VDivider />
 
-              <VCol cols="12" md="4">
-                <div class="text-caption">Keterangan</div>
-                <div class="text-body-2">{{ form.keterangan_pbbkb || '-' }}</div>
-              </VCol>
+        <VCardActions class="pa-4 d-flex justify-end">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            @click="step = 'form'"
+          >
+            Revisi PO
+          </VBtn>
 
-              <VCol cols="12" md="2">
-                <div class="text-caption">Alokasi</div>
-                <VChip size="small" :color="form.alokasi_pbbkb ? 'success' : 'error'">
-                  {{ form.alokasi_pbbkb ? 'Yes' : 'No' }}
-                </VChip>
-              </VCol>
-            </VRow>
-
-            <VDivider class="mt-2" />
-          </div>
-          <div v-if="showMigas" class="mt-2">
-            <VRow dense>
-              <VCol cols="12" md="4">
-                <div class="text-caption">Kode Iuran Migas Accurate</div>
-                <div class="text-body-2">{{ form.biaya_migas +' -'+selectedAccText.biaya_migas|| '-' }}</div>
-              </VCol>
-
-              <VCol cols="12" md="4">
-                <div class="text-caption">Keterangan</div>
-                <div class="text-body-2">{{ form.keterangan_migas || '-' }}</div>
-              </VCol>
-
-              <VCol cols="12" md="2">
-                <div class="text-caption">Alokasi</div>
-                <VChip size="small" :color="form.alokasi_migas ? 'success' : 'error'">
-                  {{ form.alokasi_migas ? 'Yes' : 'No' }}
-                </VChip>
-              </VCol>
-            </VRow>
-
-            <VDivider class="mt-2" />
-          </div>
+          <!--
+            <VBtn color="primary" variant="flat" @click="submit">
+            Submit
+            </VBtn>
+          -->
+          <VBtn
+            color="primary"
+            variant="flat"
+            @click="dialogSubmit = true"
+          >
+            Simpan
+          </VBtn>
+        </VCardActions>
       </VCard>
-
-        <!-- ================= HARGA ================= -->
-        <div class="text-subtitle-1 font-weight-bold mb-2">
-          Ringkasan Harga
-        </div>
-
-        <VCard class="pa-5 mb-6">
-
-          <div class="mb-4">
-            <div class="text-caption text-black">Volume PO</div>
-            <div class="text-black font-weight-semibold">
-              {{ formatMoney(form.volume_po) || 0 }} Liter
-            </div>
-          </div>
-
-          <div class="mb-4">
-            <div class="text-caption text-black">Harga Dasar</div>
-            <div class="text-black font-weight-semibold">
-              Rp {{ formatMoney(form.harga_tebus) || 0 }}
-            </div>
-          </div>
-
-          <div v-if="showBiayaOA" class="mb-0">
-            <div class="text-caption text-black">Ongkos Angkut</div>
-            <div class="text-black font-weight-semibold">
-              Rp {{ formatMoney(form.ongkos_angkut) || 0 }}
-            </div>
-          </div>
-
-        </VCard>
-
-        <!-- ================= PAJAK ================= -->
-        <div class="text-subtitle-1 font-weight-bold mb-3">
-          Pajak & Biaya
-        </div>
-
-        <VCard class="pa-5 mb-2">
-
-          <div class="mb-3 d-flex justify-space-between">
-            <span class="text-black">Subtotal</span>
-            <strong class="text-success">Rp {{ formatMoney(subtotal) }}</strong>
-          </div>
-          <div class="mb-3 d-flex justify-space-between">
-            <span class="text-black">PPN</span>
-            <strong>Rp {{ formatMoney(ppn) }}</strong>
-          </div>
-
-          <div class="mb-3 d-flex justify-space-between">
-            <span class="text-black">DPP 11/12</span>
-            <strong>Rp {{ formatMoney(dpp) }}</strong>
-          </div>
-
-          <div v-if="showpph" class="mb-3 d-flex justify-space-between">
-            <span class="text-black">PPH 22</span>
-            <strong class="text-red">Rp {{ formatMoney(pph22) }}</strong>
-          </div>
-
-          <div v-if="showpbbkb" class="mb-3 d-flex justify-space-between">
-            <span class="text-black">PBBKB</span>
-            <strong>Rp {{ formatMoney(pbbkbval) }}</strong>
-          </div>
-
-          <div v-if="showMigas" class="d-flex justify-space-between">
-            <span class="text-black">Iuran Migas</span>
-            <strong>Rp {{ formatMoney(nominalMigas) }}</strong>
-          </div>
-
-        </VCard>
-
-        <!-- ================= TOTAL (HIGHLIGHT) ================= -->
-        <VCard
-          class="pa-5"
-          color="primary"
-        >
-          <div class="d-flex justify-space-between align-center">
-            <div class="text-white text-h6 font-weight-bold">
-              Total 
-            </div>
-
-          <div class="d-flex align-center">
-            <span class="text-white text-body-2 text-md-h5 font-weight-bold">
-              Rp {{ formatMoney(totalPO ?? 0) }}
-            </span>
-          </div>
-          </div>
-        </VCard>
-
-        <!-- ================= CATATAN ================= -->
-        <div class="text-subtitle-1 font-weight-bold mt-4 mb-2">
-          Catatan
-        </div>
-        <VCard variant="outlined" class="pa-5">
-
-          <VRow>
-            <VCol cols="12" md="6">
-             <div class="text-black">Catatan PO :</div>
-            <div class="text-black font-weight-semibold">
-              {{ form.catatan_po || '-' }}
-            </div>
-            </VCol>
-
-            <VDivider vertical />
-
-            <VCol cols="12" md="6">
-              <div class="text-black">Internal Notes :</div>
-            <div class="text-black font-weight-semibold">
-              {{ form.internal_notes || '-' }}
-            </div>
-            </VCol>
-            <VCol cols="12" md="6" v-if="form.disposisi_po==4">
-              <div class="text-black">Catatan Pengajuan Ulang :</div>
-             <div class="text-black font-weight-semibold">
-               {{ form.catatan_resubmit || '-' }}
-             </div>
-             </VCol>
-          </VRow>
-
-        </VCard>
-
-      </VCardText>
-
-      <!-- ACTION -->
-      <VDivider />
-
-      <VCardActions class="pa-4 d-flex justify-end">
-
-        <VBtn variant="tonal" color="secondary" @click="step = 'form'">
-          Revisi PO
-        </VBtn>
-
-        <!-- <VBtn color="primary" variant="flat" @click="submit">
-          Submit
-        </VBtn> -->
-        <VBtn
-          color="primary" variant="flat"
-          @click="dialogSubmit = true"
-        >
-          Simpan
-        </VBtn>
-
-      </VCardActions>
-
-    </VCard>
     </div>
 
-    <VDialog v-model="dialogSubmit" width="400">
+    <VDialog
+      v-model="dialogSubmit"
+      width="400"
+    >
       <VCard>
-        
         <VCardTitle>
           Konfirmasi
         </VCardTitle>
@@ -2545,31 +2941,28 @@ const isPriceChanged = computed(() => {
           >
             Ya, Simpan
           </VBtn>
-
         </VCardActions>
-
       </VCard>
     </VDialog>
     <VDialog
-        v-model="isSaving"
-        width="300"
-      >
-    <VCard
-      color="primary"
+      v-model="isSaving"
       width="300"
     >
-      <VCardText class="pt-3 text-white">
-        Menyimpan Data
-        <VProgressLinear
-          indeterminate
-          class="mt-4"
-          color="#fff"
-        />
-      </VCardText>
-    </VCard>
+      <VCard
+        color="primary"
+        width="300"
+      >
+        <VCardText class="pt-3 text-white">
+          Menyimpan Data
+          <VProgressLinear
+            indeterminate
+            class="mt-4"
+            color="#fff"
+          />
+        </VCardText>
+      </VCard>
     </VDialog>
   </VContainer>
-  
 </template>
 
 <style>

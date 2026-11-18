@@ -76,12 +76,7 @@ class PurchaseOrderApprovalGeneratorService
                 'approval_flow' => [
                     sprintf(
                         'Approval flow Purchase Order tidak ditemukan untuk nominal Rp %s.',
-                        number_format(
-                            $totalAmount,
-                            0,
-                            ',',
-                            '.',
-                        ),
+                        angka($totalAmount, 0),
                     ),
                 ],
             ]);

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import axios from '@axios'
 import {
-  showLoadingAlert,
   closeAlert,
-  showErrorToast,
-  showSuccessToast,
   showConfirmAlert,
+  showErrorToast,
+  showLoadingAlert,
+  showSuccessToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { formatNumberWithoutRp, toTitleCase } from '@/utils/textFormatter'
@@ -231,6 +231,7 @@ const normalizeDepartmentItems = (payload: any): DepartmentOption[] => {
   return rawItems.map((item: any) => {
     const id = Number(item.id ?? item.value)
     const kode = item.kode ?? item.code ?? ''
+
     const nama = String(
       item.nama
         ?? item.name
@@ -255,7 +256,8 @@ const fetchDepartmentOptions = async (): Promise<void> => {
     })
 
     departmentOptions.value = normalizeDepartmentItems(response.data)
-  } catch (error: any) {
+  }
+  catch (error: any) {
     showErrorToast({
       title: 'Gagal',
       text: getApiErrorMessage(error, 'Gagal memuat data department.'),
@@ -332,7 +334,8 @@ const getFlowTransactionCategoryLabels = (item: ApprovalFlowItem): string[] => {
 }
 
 const normalizeNumberInput = (value: unknown): number | null => {
-  if (value === null || value === undefined || value === '') return null
+  if (value === null || value === undefined || value === '')
+    return null
 
   const numberValue = Number(value)
 
@@ -363,8 +366,8 @@ const openEditDialog = (flow: any): void => {
       step_order: Number(step.step_order || step.sequence || index + 1),
       approver_type: String(step.approver_type || 'ROLE').toUpperCase() === 'USER' ? 'USER' : 'ROLE',
       approver_id: typeof step.approver_id === 'object'
-      ? Number(step.approver_id?.id ?? step.approver_id?.value ?? 0) || null
-      : Number(step.approver_id || 0) || null,
+        ? Number(step.approver_id?.id ?? step.approver_id?.value ?? 0) || null
+        : Number(step.approver_id || 0) || null,
       approver_name: step.approver_name || step.role_name || step.label || '',
       role_name: step.role_name || step.approver_name || '',
       label: step.label || step.approver_name || step.role_name || '',
@@ -372,9 +375,8 @@ const openEditDialog = (flow: any): void => {
     })),
   }
 
-  if (!editForm.value.steps.length) {
+  if (!editForm.value.steps.length)
     addEditStep()
-  }
 
   isEditDialogOpen.value = true
 }
@@ -392,7 +394,8 @@ const addEditStep = (): void => {
 }
 
 const removeEditStep = (index: number): void => {
-  if (editForm.value.steps.length <= 1) return
+  if (editForm.value.steps.length <= 1)
+    return
 
   editForm.value.steps.splice(index, 1)
 
@@ -405,7 +408,8 @@ const removeEditStep = (index: number): void => {
 const onEditStepTypeChange = (index: number): void => {
   const step = editForm.value.steps[index]
 
-  if (!step) return
+  if (!step)
+    return
 
   step.approver_id = null
   step.label = ''
@@ -414,11 +418,11 @@ const onEditStepTypeChange = (index: number): void => {
 }
 
 const getSelectedApproverId = (value: any): number | null => {
-  if (value === null || value === undefined || value === '') return null
+  if (value === null || value === undefined || value === '')
+    return null
 
-  if (typeof value === 'object') {
+  if (typeof value === 'object')
     return Number(value.id ?? value.value ?? 0) || null
-  }
 
   return Number(value) || null
 }
@@ -429,7 +433,8 @@ const isApproverAlreadySelected = (
   currentStepIndex: number,
 ): boolean => {
   return editForm.value.steps.some((step, index) => {
-    if (index === currentStepIndex) return false
+    if (index === currentStepIndex)
+      return false
 
     return String(step.approver_type).toUpperCase() === approverType
       && Number(getSelectedApproverId(step.approver_id)) === Number(approverId)
@@ -451,7 +456,8 @@ const getAvailableUserOptions = (currentStepIndex: number): MasterUserOption[] =
 const syncEditStepLabel = (index: number): void => {
   const step = editForm.value.steps[index]
 
-  if (!step) return
+  if (!step)
+    return
 
   const selectedApproverId = getSelectedApproverId(step.approver_id)
 
@@ -461,6 +467,7 @@ const syncEditStepLabel = (index: number): void => {
     step.label = ''
     step.role_name = ''
     step.approver_name = ''
+
     return
   }
 
@@ -482,7 +489,8 @@ const syncEditStepLabel = (index: number): void => {
 }
 
 const closeEditDialog = (): void => {
-  if (isEditSubmitting.value) return
+  if (isEditSubmitting.value)
+    return
 
   isEditDialogOpen.value = false
   editSubmitted.value = false
@@ -568,10 +576,10 @@ const validateEditApprovalFlow = (): boolean => {
   }
 
   const duplicateApproverIndex = editForm.value.steps.findIndex((step, index, steps) => {
-  const currentApproverType = String(step.approver_type || '').toUpperCase()
-  const currentApproverId = Number(getSelectedApproverId(step.approver_id))
+    const currentApproverType = String(step.approver_type || '').toUpperCase()
+    const currentApproverId = Number(getSelectedApproverId(step.approver_id))
 
-  return steps.findIndex(otherStep => {
+    return steps.findIndex(otherStep => {
       const otherApproverType = String(otherStep.approver_type || '').toUpperCase()
       const otherApproverId = Number(getSelectedApproverId(otherStep.approver_id))
 
@@ -610,7 +618,8 @@ const normalizeDropdownItems = (payload: any): any[] => {
     ?? payload
     ?? []
 
-  if (!Array.isArray(rawItems)) return []
+  if (!Array.isArray(rawItems))
+    return []
 
   return rawItems.map((item: any) => ({
     id: Number(item.id),
@@ -633,7 +642,8 @@ const loadApproverOptions = async (): Promise<void> => {
 
     roleOptions.value = normalizeDropdownItems(roleResponse.data)
     userOptions.value = normalizeDropdownItems(userResponse.data)
-  } catch (error: any) {
+  }
+  catch (error: any) {
     showErrorToast({
       title: 'Gagal',
       text: error.response?.data?.message || 'Gagal memuat data role atau user approver.',
@@ -642,9 +652,11 @@ const loadApproverOptions = async (): Promise<void> => {
 }
 
 const submitEditApprovalFlow = async (): Promise<void> => {
-  if (isEditSubmitting.value) return
+  if (isEditSubmitting.value)
+    return
 
-  if (!validateEditApprovalFlow()) return
+  if (!validateEditApprovalFlow())
+    return
 
   isEditDialogOpen.value = false
 
@@ -659,6 +671,7 @@ const submitEditApprovalFlow = async (): Promise<void> => {
 
   if (!confirm.isConfirmed) {
     isEditDialogOpen.value = true
+
     return
   }
 
@@ -713,7 +726,8 @@ const submitEditApprovalFlow = async (): Promise<void> => {
       title: 'Gagal',
       text: response.data?.message || 'Gagal memperbarui approval flow.',
     })
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     isEditDialogOpen.value = true
@@ -722,7 +736,8 @@ const submitEditApprovalFlow = async (): Promise<void> => {
       title: 'Gagal',
       text: error.response?.data?.message || 'Gagal memperbarui approval flow.',
     })
-  } finally {
+  }
+  finally {
     isEditSubmitting.value = false
   }
 }
@@ -763,13 +778,15 @@ const hasFilter = computed(() => {
 })
 
 const isFlowActive = (item: ApprovalFlowItem): boolean => {
-  if (typeof item.is_active === 'boolean') return item.is_active
+  if (typeof item.is_active === 'boolean')
+    return item.is_active
 
   return String(item.status || '').toUpperCase() === 'ACTIVE'
 }
 
 const getDocumentTypeLabel = (item: ApprovalFlowItem): string => {
-  if (item.document_type_label) return item.document_type_label
+  if (item.document_type_label)
+    return item.document_type_label
 
   return getApprovalFlowDocumentTypeLabel(item.document_type)
 }
@@ -787,7 +804,8 @@ const getFlowDescription = (item: ApprovalFlowItem): string => {
 }
 
 const formatAmount = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return ''
+  if (value === null || value === undefined)
+    return ''
 
   return `Rp ${formatNumberWithoutRp(Number(value || 0))}`
 }
@@ -799,17 +817,14 @@ const getAmountRangeLabel = (item: ApprovalFlowItem): string => {
   const hasMin = minAmount !== null && minAmount !== undefined && Number(minAmount) > 0
   const hasMax = maxAmount !== null && maxAmount !== undefined && Number(maxAmount) > 0
 
-  if (!hasMin && !hasMax) {
+  if (!hasMin && !hasMax)
     return 'Semua Nilai'
-  }
 
-  if (hasMin && !hasMax) {
+  if (hasMin && !hasMax)
     return `> ${formatAmount(Number(minAmount))}`
-  }
 
-  if (!hasMin && hasMax) {
+  if (!hasMin && hasMax)
     return `≤ ${formatAmount(Number(maxAmount))}`
-  }
 
   return `${formatAmount(Number(minAmount))} - ${formatAmount(Number(maxAmount))}`
 }
@@ -864,7 +879,7 @@ const getComparableMinAmount = (item: ApprovalFlowItem): number => {
  * - > 50 juta = GM -> CFO -> CEO
  */
 
- const getEffectiveApprovalSteps = (
+const getEffectiveApprovalSteps = (
   currentFlow: ApprovalFlowItem,
 ): ApprovalStep[] => {
   /**
@@ -1063,17 +1078,14 @@ const buildParams = (): Record<string, any> => {
     document_type: selectedDocumentType.value,
   }
 
-  if (keyword.value) {
+  if (keyword.value)
     params.search = keyword.value
-  }
 
-  if (selectedDocumentType.value) {
+  if (selectedDocumentType.value)
     params.document_type = selectedDocumentType.value
-  }
 
-  if (selectedStatus.value !== 'all') {
+  if (selectedStatus.value !== 'all')
     params.status = selectedStatus.value
-  }
 
   if (usesAreaMatrixFilter.value) {
     if (selectedAreaType.value !== 'all')
@@ -1134,14 +1146,16 @@ const loadApprovalFlows = async (): Promise<void> => {
     const responseData = response.data?.data ?? response.data
 
     assignResponseData(responseData)
-  } catch (error: any) {
+  }
+  catch (error: any) {
     const err = error as AxiosErrorShape
 
     showErrorToast({
       title: 'Gagal Memuat Data',
       text: getApiErrorMessage(err, 'Gagal memuat data approval flow.'),
     })
-  } finally {
+  }
+  finally {
     isLoading.value = false
   }
 }
@@ -1197,7 +1211,8 @@ const goToEdit = async (item: ApprovalFlowItem): Promise<void> => {
 }
 
 const toggleStatus = async (item: ApprovalFlowItem): Promise<void> => {
-  if (!item.public_id || isActionLoading.value) return
+  if (!item.public_id || isActionLoading.value)
+    return
 
   const active = isFlowActive(item)
 
@@ -1210,7 +1225,8 @@ const toggleStatus = async (item: ApprovalFlowItem): Promise<void> => {
     cancelButtonText: 'Batal',
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   isActionLoading.value = true
 
@@ -1237,7 +1253,8 @@ const toggleStatus = async (item: ApprovalFlowItem): Promise<void> => {
     })
 
     await loadApprovalFlows()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     const err = error as AxiosErrorShape
@@ -1246,13 +1263,15 @@ const toggleStatus = async (item: ApprovalFlowItem): Promise<void> => {
       title: 'Gagal Memproses',
       text: getApiErrorMessage(err, 'Gagal mengubah status approval flow.'),
     })
-  } finally {
+  }
+  finally {
     isActionLoading.value = false
   }
 }
 
 const deleteFlow = async (item: ApprovalFlowItem): Promise<void> => {
-  if (!item.public_id || isActionLoading.value) return
+  if (!item.public_id || isActionLoading.value)
+    return
 
   const confirm = await showConfirmAlert({
     title: 'Hapus Approval Flow?',
@@ -1261,7 +1280,8 @@ const deleteFlow = async (item: ApprovalFlowItem): Promise<void> => {
     cancelButtonText: 'Batal',
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   isActionLoading.value = true
 
@@ -1285,7 +1305,8 @@ const deleteFlow = async (item: ApprovalFlowItem): Promise<void> => {
     })
 
     await loadApprovalFlows()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     const err = error as AxiosErrorShape
@@ -1294,20 +1315,23 @@ const deleteFlow = async (item: ApprovalFlowItem): Promise<void> => {
       title: 'Gagal Menghapus',
       text: getApiErrorMessage(err, 'Gagal menghapus approval flow.'),
     })
-  } finally {
+  }
+  finally {
     isActionLoading.value = false
   }
 }
 
 const goToPreviousPage = async (): Promise<void> => {
-  if (page.value <= 1) return
+  if (page.value <= 1)
+    return
 
   page.value -= 1
   await loadApprovalFlows()
 }
 
 const goToNextPage = async (): Promise<void> => {
-  if (page.value >= lastPage.value) return
+  if (page.value >= lastPage.value)
+    return
 
   page.value += 1
   await loadApprovalFlows()
@@ -1324,7 +1348,8 @@ watch([selectedAreaType, selectedDepartmentId], async () => {
 })
 
 watch(keyword, () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
+  if (searchTimeout)
+    clearTimeout(searchTimeout)
 
   searchTimeout = setTimeout(async () => {
     page.value = 1
@@ -1360,7 +1385,8 @@ onMounted(async () => {
    */
   try {
     await loadApprovalFlowDocumentTypes()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     showErrorToast({
       title: 'Gagal',
       text: getApiErrorMessage(
@@ -1443,8 +1469,8 @@ onMounted(async () => {
               color="secondary"
               prepend-icon="tabler-refresh"
               :loading="isLoading"
-              @click="loadApprovalFlows"
               class="text-none"
+              @click="loadApprovalFlows"
             >
               Refresh
             </VBtn>
@@ -1452,8 +1478,8 @@ onMounted(async () => {
             <VBtn
               color="primary"
               prepend-icon="tabler-plus"
-              @click="goToCreate"
               class="text-none"
+              @click="goToCreate"
             >
               Tambah Flow
             </VBtn>
@@ -1761,8 +1787,8 @@ onMounted(async () => {
           <VBtn
             color="primary"
             prepend-icon="tabler-plus"
-            @click="goToCreate"
             class="text-none"
+            @click="goToCreate"
           >
             Tambah Approval Flow
           </VBtn>
@@ -2125,19 +2151,16 @@ onMounted(async () => {
             <VCol
               cols="12"
               md="6"
-            >
-            </VCol>
+            />
 
             <VCol
               cols="12"
               md="6"
             >
-              <VTextField
+              <AppNumberField
                 v-model="editForm.min_amount"
                 label="Minimal Nilai"
                 placeholder="0"
-                type="number"
-                min="0"
               />
             </VCol>
 
@@ -2145,12 +2168,10 @@ onMounted(async () => {
               cols="12"
               md="6"
             >
-              <VTextField
+              <AppNumberField
                 v-model="editForm.max_amount"
                 label="Maksimal Nilai"
                 placeholder="Kosongkan untuk tanpa batas"
-                type="number"
-                min="0"
               />
             </VCol>
 
@@ -2167,150 +2188,150 @@ onMounted(async () => {
 
           <VDivider class="my-5" />
 
-            <div class="d-flex flex-column flex-sm-row align-sm-center justify-space-between gap-3 mb-3">
-              <div>
-                <div class="font-weight-bold">
-                  Step Approval
-                </div>
-                <div class="text-caption text-medium-emphasis">
-                  Atur urutan approver berdasarkan role atau user tertentu.
-                </div>
+          <div class="d-flex flex-column flex-sm-row align-sm-center justify-space-between gap-3 mb-3">
+            <div>
+              <div class="font-weight-bold">
+                Step Approval
               </div>
-
-              <div class="d-flex align-center gap-2">
-                <VChip
-                  color="warning"
-                  variant="tonal"
-                  size="small"
-                >
-                  {{ editForm.steps.length }} Step
-                </VChip>
-
-                <VBtn
-                  color="primary"
-                  variant="tonal"
-                  size="small"
-                  prepend-icon="tabler-plus"
-                  @click="addEditStep"
-                  class="text-none"
-                >
-                  Tambah Step
-                </VBtn>
+              <div class="text-caption text-medium-emphasis">
+                Atur urutan approver berdasarkan role atau user tertentu.
               </div>
             </div>
 
-            <div class="edit-step-wrapper">
-              <VAlert
-                v-if="!editForm.steps.length"
+            <div class="d-flex align-center gap-2">
+              <VChip
                 color="warning"
                 variant="tonal"
-                density="compact"
+                size="small"
               >
-                Minimal harus ada 1 step approval.
-              </VAlert>
+                {{ editForm.steps.length }} Step
+              </VChip>
 
-              <VCard
-                v-for="(step, index) in editForm.steps"
-                :key="step.local_key"
-                variant="outlined"
-                class="edit-step-card"
+              <VBtn
+                color="primary"
+                variant="tonal"
+                size="small"
+                prepend-icon="tabler-plus"
+                class="text-none"
+                @click="addEditStep"
               >
-                <VCardText>
-                  <div class="d-flex align-center justify-space-between gap-3 mb-4">
-                    <div class="d-flex align-center gap-3">
-                      <VAvatar
-                        color="primary"
-                        variant="flat"
-                        size="34"
-                      >
-                        <span class="text-caption font-weight-bold">
-                          {{ index + 1 }}
-                        </span>
-                      </VAvatar>
+                Tambah Step
+              </VBtn>
+            </div>
+          </div>
 
-                      <div>
-                        <div class="font-weight-bold">
-                          Step {{ index + 1 }}
-                        </div>
-                        <div class="text-caption text-medium-emphasis">
-                          Approval urutan ke-{{ index + 1 }}
-                        </div>
+          <div class="edit-step-wrapper">
+            <VAlert
+              v-if="!editForm.steps.length"
+              color="warning"
+              variant="tonal"
+              density="compact"
+            >
+              Minimal harus ada 1 step approval.
+            </VAlert>
+
+            <VCard
+              v-for="(step, index) in editForm.steps"
+              :key="step.local_key"
+              variant="outlined"
+              class="edit-step-card"
+            >
+              <VCardText>
+                <div class="d-flex align-center justify-space-between gap-3 mb-4">
+                  <div class="d-flex align-center gap-3">
+                    <VAvatar
+                      color="primary"
+                      variant="flat"
+                      size="34"
+                    >
+                      <span class="text-caption font-weight-bold">
+                        {{ index + 1 }}
+                      </span>
+                    </VAvatar>
+
+                    <div>
+                      <div class="font-weight-bold">
+                        Step {{ index + 1 }}
+                      </div>
+                      <div class="text-caption text-medium-emphasis">
+                        Approval urutan ke-{{ index + 1 }}
                       </div>
                     </div>
-
-                    <VBtn
-                      icon
-                      variant="tonal"
-                      color="error"
-                      size="small"
-                      :disabled="editForm.steps.length <= 1"
-                      @click="removeEditStep(index)"
-                    >
-                      <VIcon icon="tabler-trash" />
-                    </VBtn>
                   </div>
 
-                  <VRow>
-                    <VCol
-                      cols="12"
-                      md="4"
-                    >
-                      <VSelect
-                        v-model="step.approver_type"
-                        :items="approverTypeOptions"
-                        label="Kategori Approver *"
-                        density="comfortable"
-                        @update:model-value="onEditStepTypeChange(index)"
-                      />
-                    </VCol>
+                  <VBtn
+                    icon
+                    variant="tonal"
+                    color="error"
+                    size="small"
+                    :disabled="editForm.steps.length <= 1"
+                    @click="removeEditStep(index)"
+                  >
+                    <VIcon icon="tabler-trash" />
+                  </VBtn>
+                </div>
 
-                    <VCol
-                      cols="12"
-                      md="8"
-                    >
-                      <VSelect
-                        v-if="step.approver_type === 'ROLE'"
-                        v-model="step.approver_id"
-                        :items="getAvailableRoleOptions(index)"
-                        item-title="name"
-                        item-value="id"
-                        :return-object="false"
-                        label="Pilih Role *"
-                        density="comfortable"
-                        clearable
-                        :error="editSubmitted && !step.approver_id"
-                        :error-messages="editSubmitted && !step.approver_id ? ['Role approver wajib dipilih'] : []"
-                        @update:model-value="syncEditStepLabel(index)"
-                      />
+                <VRow>
+                  <VCol
+                    cols="12"
+                    md="4"
+                  >
+                    <VSelect
+                      v-model="step.approver_type"
+                      :items="approverTypeOptions"
+                      label="Kategori Approver *"
+                      density="comfortable"
+                      @update:model-value="onEditStepTypeChange(index)"
+                    />
+                  </VCol>
 
-                      <VSelect
-                        v-else
-                        v-model="step.approver_id"
-                        :items="getAvailableUserOptions(index)"
-                        item-title="name"
-                        item-value="id"
-                        :return-object="false"
-                        label="Pilih User *"
-                        density="comfortable"
-                        clearable
-                        :error="editSubmitted && !step.approver_id"
-                        :error-messages="editSubmitted && !step.approver_id ? ['User approver wajib dipilih'] : []"
-                        @update:model-value="syncEditStepLabel(index)"
-                      />
-                    </VCol>
+                  <VCol
+                    cols="12"
+                    md="8"
+                  >
+                    <VSelect
+                      v-if="step.approver_type === 'ROLE'"
+                      v-model="step.approver_id"
+                      :items="getAvailableRoleOptions(index)"
+                      item-title="name"
+                      item-value="id"
+                      :return-object="false"
+                      label="Pilih Role *"
+                      density="comfortable"
+                      clearable
+                      :error="editSubmitted && !step.approver_id"
+                      :error-messages="editSubmitted && !step.approver_id ? ['Role approver wajib dipilih'] : []"
+                      @update:model-value="syncEditStepLabel(index)"
+                    />
 
-                    <VCol cols="12">
-                      <VTextField
-                        v-model="step.label"
-                        label="Label Step"
-                        placeholder="Contoh: GM Procurement / CFO / CEO"
-                        density="comfortable"
-                      />
-                    </VCol>
-                  </VRow>
-                </VCardText>
-              </VCard>
-            </div>
+                    <VSelect
+                      v-else
+                      v-model="step.approver_id"
+                      :items="getAvailableUserOptions(index)"
+                      item-title="name"
+                      item-value="id"
+                      :return-object="false"
+                      label="Pilih User *"
+                      density="comfortable"
+                      clearable
+                      :error="editSubmitted && !step.approver_id"
+                      :error-messages="editSubmitted && !step.approver_id ? ['User approver wajib dipilih'] : []"
+                      @update:model-value="syncEditStepLabel(index)"
+                    />
+                  </VCol>
+
+                  <VCol cols="12">
+                    <VTextField
+                      v-model="step.label"
+                      label="Label Step"
+                      placeholder="Contoh: GM Procurement / CFO / CEO"
+                      density="comfortable"
+                    />
+                  </VCol>
+                </VRow>
+              </VCardText>
+            </VCard>
+          </div>
         </VCardText>
 
         <VDivider />
@@ -2320,8 +2341,8 @@ onMounted(async () => {
             variant="tonal"
             color="secondary"
             :disabled="isEditSubmitting"
-            @click="closeEditDialog"
             class="text-none"
+            @click="closeEditDialog"
           >
             Batal
           </VBtn>
@@ -2331,8 +2352,8 @@ onMounted(async () => {
             variant="flat"
             prepend-icon="tabler-device-floppy"
             :loading="isEditSubmitting"
-            @click="submitEditApprovalFlow"
             class="text-none"
+            @click="submitEditApprovalFlow"
           >
             Simpan Perubahan
           </VBtn>

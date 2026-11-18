@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import axios from '@axios'
 import {
   computed,
   onMounted,
   ref,
   watch,
 } from 'vue'
+import { VAutocomplete } from 'vuetify/components'
+import axios from '@axios'
 
 import {
   closeAlert,
@@ -17,7 +18,7 @@ import {
 } from '@/utils/alert'
 
 import { getApiErrorMessage } from '@/utils/apiHelper'
-import { VAutocomplete } from 'vuetify/components'
+import { usePermissionStore } from '@/stores/permission'
 
 /*
 |--------------------------------------------------------------------------
@@ -403,8 +404,8 @@ const normalizeUserPermissionItems = (
         item.department_ids,
       )
         ? item.department_ids
-            .map((id: unknown) => Number(id))
-            .filter((id: number) => id > 0)
+          .map((id: unknown) => Number(id))
+          .filter((id: number) => id > 0)
         : [],
 
       permission:
@@ -491,8 +492,8 @@ const buildSnapshot = (): string => {
         row.is_checked
         && row.scope === 'ASSIGNED_DEPARTMENTS'
           ? normalizeDepartmentIds(
-              row.department_ids,
-            )
+            row.department_ids,
+          )
           : [],
     }))
     .sort(
@@ -572,15 +573,15 @@ const buildRowsFromUserPermissions = (
 
         scope: isChecked
           ? normalizeScope(
-              assignedPermission?.scope,
-            )
+            assignedPermission?.scope,
+          )
           : getDefaultScope(permission),
 
         department_ids: isChecked
           ? normalizeDepartmentIds(
-              assignedPermission?.department_ids
+            assignedPermission?.department_ids
               ?? [],
-            )
+          )
           : [],
       }
     },
@@ -893,9 +894,8 @@ const onTogglePermission = (
   if (
     supportsScope(row)
     && row.scope === 'NONE'
-  ) {
+  )
     row.scope = 'OWN_DEPARTMENT'
-  }
 
   if (!supportsScope(row)) {
     row.scope = 'NONE'
@@ -912,9 +912,8 @@ const onScopeChange = (
   if (
     row.scope
     !== 'ASSIGNED_DEPARTMENTS'
-  ) {
+  )
     row.department_ids = []
-  }
 }
 
 /*
@@ -1011,9 +1010,8 @@ const buildPayload = (): BulkUserPermissionPayload => {
       if (
         isActive
         && supportsScope(row)
-      ) {
+      )
         scope = row.scope
-      }
 
       if (
         isActive
@@ -1054,9 +1052,8 @@ const resetChanges = async (): Promise<void> => {
     !selectedUserId.value
     || !hasChanges.value
     || isSubmitting.value
-  ) {
+  )
     return
-  }
 
   const confirm = await showConfirmAlert({
     icon: 'question',
@@ -1130,7 +1127,7 @@ const submitPermission = async (): Promise<void> => {
       buildPayload(),
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -1143,6 +1140,13 @@ const submitPermission = async (): Promise<void> => {
      * data final hasil normalisasi backend.
      */
     await fetchUserPermissions()
+
+    /*
+     * Daftar permission milik diri sendiri disegarkan saat itu juga, supaya
+     * perubahan yang baru disimpan langsung berlaku tanpa logout. Lihat
+     * catatan yang sama di layar Role Permissions.
+     */
+    await usePermissionStore().reloadPermissions().catch(() => undefined)
 
     const savedCount = Number(
       response.data?.data?.saved_count
@@ -1157,7 +1161,7 @@ const submitPermission = async (): Promise<void> => {
     showSuccessToast({
       title: 'Berhasil',
       text:
-        `Direct permission berhasil disimpan. `
+        'Direct permission berhasil disimpan. '
         + `${savedCount} permission disimpan dan `
         + `${deletedCount} permission dihapus.`,
     })
@@ -1190,9 +1194,8 @@ watch(
     if (
       Number(newUserId || 0)
       === Number(oldUserId || 0)
-    ) {
+    )
       return
-    }
 
     await fetchUserPermissions()
   },
@@ -1242,79 +1245,75 @@ onMounted(async () => {
             md="5"
           >
             <UserAutocomplete
-                v-model="selectedUserId"
-                :items="userOptions"
-                item-title="search_text"
-                item-value="id"
-                label="Pilih User"
-                placeholder="Cari nama, username, email, atau department"
-                prepend-inner-icon="tabler-user-search"
-                clearable
-                auto-select-first
-                :loading="isLoadingUser"
-                :menu-props="{
-                    maxHeight: 420,
-                }"
-                no-data-text="User tidak ditemukan"
+              v-model="selectedUserId"
+              :items="userOptions"
+              item-title="search_text"
+              item-value="id"
+              label="Pilih User"
+              placeholder="Cari nama, username, email, atau department"
+              prepend-inner-icon="tabler-user-search"
+              clearable
+              auto-select-first
+              :loading="isLoadingUser"
+              :menu-props="{
+                maxHeight: 420,
+              }"
+              no-data-text="User tidak ditemukan"
+            >
+              <!-- Tampilan user yang sudah dipilih. -->
+              <template #selection="{ item }">
+                <div class="d-flex flex-column py-1">
+                  <span class="font-weight-medium">
+                    {{ item.raw.name }}
+                  </span>
+
+                  <span class="text-caption text-medium-emphasis">
+                    {{
+                      [
+                        item.raw.username,
+                        item.raw.email,
+                      ]
+                        .filter(Boolean)
+                        .join(' • ')
+                        || '-'
+                    }}
+                  </span>
+                </div>
+              </template>
+
+              <!-- Tampilan setiap user di dropdown. -->
+              <template #item="{ props, item }">
+                <VListItem
+                  v-bind="props"
+                  :title="item.raw.name"
                 >
-                <!--
-                    Tampilan user yang sudah dipilih.
-                -->
-                <template #selection="{ item }">
-                    <div class="d-flex flex-column py-1">
-                    <span class="font-weight-medium">
-                        {{ item.raw.name }}
-                    </span>
+                  <template #subtitle>
+                    <div class="d-flex flex-column mt-1">
+                      <span
+                        v-if="item.raw.username"
+                        class="text-caption"
+                      >
+                        Username: {{ item.raw.username }}
+                      </span>
 
-                    <span class="text-caption text-medium-emphasis">
-                        {{
-                        [
-                            item.raw.username,
-                            item.raw.email,
-                        ]
-                            .filter(Boolean)
-                            .join(' • ')
-                            || '-'
-                        }}
-                    </span>
+                      <span
+                        v-if="item.raw.email"
+                        class="text-caption"
+                      >
+                        {{ item.raw.email }}
+                      </span>
+
+                      <span
+                        v-if="item.raw.department"
+                        class="text-caption text-medium-emphasis"
+                      >
+                        {{ item.raw.department }}
+                      </span>
                     </div>
-                </template>
-
-                <!--
-                    Tampilan setiap user di dropdown.
-                -->
-                <template #item="{ props, item }">
-                    <VListItem
-                    v-bind="props"
-                    :title="item.raw.name"
-                    >
-                    <template #subtitle>
-                        <div class="d-flex flex-column mt-1">
-                        <span
-                            v-if="item.raw.username"
-                            class="text-caption"
-                        >
-                            Username: {{ item.raw.username }}
-                        </span>
-
-                        <span
-                            v-if="item.raw.email"
-                            class="text-caption"
-                        >
-                            {{ item.raw.email }}
-                        </span>
-
-                        <span
-                            v-if="item.raw.department"
-                            class="text-caption text-medium-emphasis"
-                        >
-                            {{ item.raw.department }}
-                        </span>
-                        </div>
-                    </template>
-                    </VListItem>
-                </template>
-                </UserAutocomplete>
+                  </template>
+                </VListItem>
+              </template>
+            </UserAutocomplete>
           </VCol>
 
           <VCol
@@ -1362,60 +1361,60 @@ onMounted(async () => {
             Status perubahan:
 
             <VChip
-                v-if="hasChanges"
-                color="warning"
-                size="small"
-                variant="tonal"
-                class="ms-2"
+              v-if="hasChanges"
+              color="warning"
+              size="small"
+              variant="tonal"
+              class="ms-2"
             >
-                Belum Disimpan
+              Belum Disimpan
             </VChip>
 
             <VChip
-                v-else
-                color="success"
-                size="small"
-                variant="tonal"
-                class="ms-2"
+              v-else
+              color="success"
+              size="small"
+              variant="tonal"
+              class="ms-2"
             >
-                Tersimpan
+              Tersimpan
             </VChip>
-            </div>
+          </div>
         </VAlert>
 
         <div
-            v-if="selectedUserId"
-            class="d-flex flex-wrap justify-end gap-3 mt-5"
-            >
-            <VBtn
-                variant="outlined"
-                color="secondary"
-                prepend-icon="tabler-refresh"
-                :disabled="
-                !hasChanges
-                    || isSubmitting
-                    || isLoadingUserPermission
-                "
-                @click="resetChanges"
-                class="text-none"
-            >
-                Reset
-            </VBtn>
+          v-if="selectedUserId"
+          class="d-flex flex-wrap justify-end gap-3 mt-5"
+        >
+          <VBtn
+            variant="outlined"
+            color="secondary"
+            prepend-icon="tabler-refresh"
+            :disabled="
+              !hasChanges
+                || isSubmitting
+                || isLoadingUserPermission
+            "
+            class="text-none"
+            @click="resetChanges"
+          >
+            Reset
+          </VBtn>
 
-            <VBtn
-                v-permission="'auth_user_permission.update'"
-                color="primary"
-                prepend-icon="tabler-device-floppy"
-                :loading="isSubmitting"
-                :disabled="
-                !hasChanges
-                    || isLoadingUserPermission
-                "
-                @click="submitPermission"
-                class="text-none"
-            >
-                Simpan Direct Permission
-            </VBtn>
+          <VBtn
+            v-permission="'auth_user_permission.update'"
+            color="primary"
+            prepend-icon="tabler-device-floppy"
+            :loading="isSubmitting"
+            :disabled="
+              !hasChanges
+                || isLoadingUserPermission
+            "
+            class="text-none"
+            @click="submitPermission"
+          >
+            Simpan Direct Permission
+          </VBtn>
         </div>
       </VCardText>
     </VCard>
@@ -1534,29 +1533,29 @@ onMounted(async () => {
 
               <td>
                 <MultiAutocomplete
-                    v-if="
-                        row.is_checked
-                        && row.scope === 'ASSIGNED_DEPARTMENTS'
-                    "
-                    v-model="row.department_ids"
-                    :items="departmentOptions"
-                    item-title="title"
-                    item-value="id"
-                    multiple
-                    chips
-                    closable-chips
-                    clearable
-                    auto-select-first
-                    density="compact"
-                    hide-details
-                    placeholder="Cari dan pilih department"
-                    prepend-inner-icon="tabler-building"
-                    no-data-text="Department tidak ditemukan"
-                    :menu-props="{
-                        maxHeight: 360,
-                        closeOnContentClick: false,
-                    }"
-                    />
+                  v-if="
+                    row.is_checked
+                      && row.scope === 'ASSIGNED_DEPARTMENTS'
+                  "
+                  v-model="row.department_ids"
+                  :items="departmentOptions"
+                  item-title="title"
+                  item-value="id"
+                  multiple
+                  chips
+                  closable-chips
+                  clearable
+                  auto-select-first
+                  density="compact"
+                  hide-details
+                  placeholder="Cari dan pilih department"
+                  prepend-inner-icon="tabler-building"
+                  no-data-text="Department tidak ditemukan"
+                  :menu-props="{
+                    maxHeight: 360,
+                    closeOnContentClick: false,
+                  }"
+                />
 
                 <span
                   v-else

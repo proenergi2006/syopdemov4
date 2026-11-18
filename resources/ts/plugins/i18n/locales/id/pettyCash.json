@@ -1,0 +1,274 @@
+{
+  "noAccess": "Anda tidak memiliki akses ke halaman ini.",
+  "ceiling": {
+    "title": "Plafon Petty Cash",
+    "subtitle": "Satu plafon per cabang, dipegang department Finance. Cabang tanpa plafon aktif berarti claim kecilnya kembali ke jalur Finance seperti biasa.",
+    "intro": {
+      "title": "Plafon menentukan dua hal sekaligus",
+      "body": "Berapa uang tunai yang dipegang cabang, dan sampai nominal berapa sebuah claim wajib dibayar lewat petty cash. Keduanya disetel di sini.",
+      "notice": "Mengubah plafon TIDAK mengubah saldo berjalan. Menaikkan plafon tidak menambah uang di tangan cabang — yang membawanya adalah top up berikutnya."
+    },
+    "addButton": "Tetapkan Plafon",
+    "empty": "Belum ada cabang yang punya plafon petty cash.",
+    "columns": {
+      "branch": "Cabang",
+      "department": "Department",
+      "ceiling": "Plafon",
+      "balance": "Saldo",
+      "threshold": "Ambang Claim",
+      "warning": "Peringatan",
+      "topup": "Perlu Top Up",
+      "status": "Status",
+      "actions": "Aksi"
+    },
+    "form": {
+      "createTitle": "Tetapkan Plafon Petty Cash",
+      "editTitle": "Ubah Plafon Petty Cash",
+      "branch": "Cabang",
+      "department": "Department pemegang kas",
+      "ceiling": "Plafon",
+      "ceilingHint": "Uang tunai yang dipegang cabang ini.",
+      "threshold": "Ambang claim",
+      "thresholdHint": "Claim sampai nominal ini wajib lewat petty cash.",
+      "thresholdError": "Tidak boleh lebih besar daripada plafon.",
+      "warning": "Ambang peringatan",
+      "warningHint": "Persen dari plafon. Di bawah angka ini, pemegang kas kecil diperingatkan di dashboard dan lewat notifikasi harian.",
+      "active": "Aktif",
+      "notes": "Catatan",
+      "openingNotice": "Saat disimpan, saldo awalnya langsung dicatat sebesar plafon ini."
+    },
+    "ledger": {
+      "title": "Buku Mutasi Kas Kecil",
+      "subtitle": "Setiap pergerakan uang, satu baris. Inilah jawaban atas pertanyaan kenapa saldonya sekian.",
+      "empty": "Belum ada mutasi.",
+      "columns": {
+        "date": "Waktu",
+        "type": "Jenis",
+        "amount": "Nominal",
+        "balance": "Saldo Sesudah",
+        "notes": "Keterangan",
+        "by": "Oleh"
+      },
+      "types": {
+        "OPENING": "Saldo awal",
+        "DISBURSEMENT": "Pencairan",
+        "REVERSAL": "Pembalikan",
+        "TOPUP": "Pengisian kembali",
+        "ADJUSTMENT": "Penyesuaian"
+      }
+    },
+    "adjust": {
+      "title": "Penyesuaian Saldo",
+      "subtitle": "Untuk keadaan yang tidak punya dokumen, misalnya selisih hasil hitung fisik kas.",
+      "amount": "Nominal penyesuaian (Rp)",
+      "amountHint": "Angka negatif mengurangi saldo, positif menambah.",
+      "notes": "Alasan",
+      "notesHint": "Wajib. Baris tanpa dokumen hanya bisa dipertanggungjawabkan oleh keterangannya.",
+      "button": "Sesuaikan Saldo"
+    },
+    "deleteConfirm": {
+      "title": "Hapus plafon cabang ini?",
+      "text": "Buku mutasinya tetap tersimpan. Claim kecil di cabang ini akan kembali ke jalur Finance."
+    },
+    "loadFailed": "Gagal memuat plafon petty cash.",
+    "saved": "Plafon petty cash tersimpan.",
+    "deleted": "Plafon petty cash dihapus.",
+    "adjusted": "Saldo kas kecil disesuaikan."
+  },
+  "warningPanel": {
+    "title": "Kas kecil yang Anda pegang",
+    "lowTitle": "Saldo kas kecil {branch} menipis",
+    "lowBody": "Tinggal Rp {balance} dari plafon Rp {ceiling}, di bawah batas {percentage}%.",
+    "topupCta": "Ajukan top up Rp {amount}",
+    "runningTopup": "Top up {number} sedang berjalan ({status}).",
+    "pendingClaims": "{count} claim kecil menunggu dibayar.",
+    "healthy": "Saldo masih di atas ambang peringatan.",
+    "balance": "Saldo",
+    "ceiling": "Plafon",
+    "threshold": "Ambang claim"
+  },
+  "list": {
+    "title": "Petty Cash",
+    "subtitle": "Pembayaran beberapa claim kecil sekaligus dari kas kecil cabang.",
+    "addButton": "Buat Petty Cash",
+    "empty": "Belum ada formulir petty cash.",
+    "search": "Cari nomor atau perihal",
+    "status": "Status",
+    "branch": "Cabang",
+    "dateFrom": "Dari tanggal",
+    "dateTo": "Sampai tanggal",
+    "allStatus": "Semua status",
+    "allBranch": "Semua cabang",
+    "columns": {
+      "number": "Nomor",
+      "date": "Tanggal",
+      "subject": "Perihal",
+      "branch": "Cabang",
+      "claims": "Claim",
+      "total": "Total",
+      "status": "Status",
+      "requester": "Pemohon",
+      "actions": "Aksi"
+    },
+    "claimCount": "{count} claim",
+    "loadFailed": "Gagal memuat daftar petty cash.",
+    "noHolderBranch": "Anda bukan pemegang kas kecil cabang mana pun, atau cabang Anda belum punya plafon aktif.",
+    "filtersTitle": "Filter Petty Cash",
+    "filtersSubtitle": "Saring daftar formulir petty cash sesuai kebutuhan Anda.",
+    "resetButton": "Reset Filter",
+    "emptyTitle": "Belum ada data Petty Cash",
+    "emptySubtitle": "Data akan muncul di sini setelah formulir petty cash dibuat.",
+    "cannotCreate": {
+      "title": "Belum bisa membuat formulir petty cash",
+      "noPermission": "Akun Anda belum memegang permission untuk membuat petty cash.",
+      "noCeiling": "Permissionnya sudah ada, tetapi cabang yang bisa Anda akses belum punya plafon petty cash yang aktif. Pemegang kas kecil adalah orang di cabang yang memang memegang uangnya.",
+      "ceilingList": "Cabang yang plafonnya sudah aktif: {branches}.",
+      "noCeilingAtAll": "Belum ada satu pun cabang yang punya plafon aktif. Tetapkan plafonnya dulu di Master > Plafon Petty Cash."
+    }
+  },
+  "form": {
+    "createTitle": "Buat Petty Cash",
+    "editTitle": "Ubah Petty Cash",
+    "branch": "Cabang",
+    "date": "Tanggal",
+    "subject": "Perihal",
+    "notes": "Catatan",
+    "claims": "Claim yang dibayar",
+    "claimsHint": "Hanya claim yang sudah diterima dan nominalnya tidak melebihi ambang cabang yang muncul di sini.",
+    "noEligible": "Tidak ada claim yang siap dibayar dari kas kecil cabang ini.",
+    "selected": "{count} claim dipilih",
+    "totalSelected": "Total dipilih",
+    "balanceAfter": "Saldo sesudah dicairkan",
+    "overBalance": "Total pilihan melebihi saldo kas kecil. Kurangi pilihannya atau ajukan top up lebih dulu.",
+    "claimColumns": {
+      "number": "Nomor Claim",
+      "date": "Tanggal",
+      "subject": "Perihal",
+      "requester": "Pemohon",
+      "department": "Department",
+      "amount": "Nominal"
+    },
+    "saved": "Petty cash tersimpan.",
+    "saveFailed": "Petty cash gagal disimpan."
+  },
+  "detail": {
+    "title": "Detail Petty Cash",
+    "claims": "Claim di dalamnya",
+    "approvals": "Riwayat Approval",
+    "ceiling": "Keadaan kas kecil",
+    "amountFrozen": "Nominal beku",
+    "amountNow": "Nominal claim sekarang",
+    "amountMismatch": "Nominal claim berubah sesudah masuk formulir ini. Periksa sebelum mencairkan.",
+    "loadFailed": "Gagal memuat detail petty cash."
+  },
+  "action": {
+    "submit": "Ajukan",
+    "approve": "Setujui",
+    "reject": "Tolak",
+    "disburse": "Cairkan",
+    "cancel": "Batalkan",
+    "detail": "Detail",
+    "edit": "Ubah",
+    "delete": "Hapus",
+    "ledger": "Buku Mutasi",
+    "adjust": "Sesuaikan Saldo",
+    "submitConfirm": {
+      "title": "Ajukan petty cash ini?",
+      "text": "Isinya akan diperiksa ulang terhadap keadaan claim sekarang sebelum masuk approval."
+    },
+    "disburseConfirm": {
+      "title": "Cairkan petty cash ini?",
+      "text": "Plafon akan terpotong dan claim di dalamnya ditandai sudah dibayar. Setelah dicairkan, formulir ini tidak bisa dibatalkan."
+    },
+    "cancelConfirm": {
+      "title": "Batalkan petty cash ini?",
+      "text": "Claim di dalamnya dilepas dan bisa dipakai formulir lain. Plafon tidak terpengaruh karena belum dicairkan."
+    },
+    "deleteConfirm": {
+      "title": "Hapus draft ini?",
+      "text": "Claim di dalamnya dilepas dan bisa dipilih lagi."
+    },
+    "rejectTitle": "Tolak Petty Cash",
+    "approveTitle": "Setujui Petty Cash",
+    "disburseTitle": "Cairkan Petty Cash",
+    "cancelTitle": "Batalkan Petty Cash",
+    "notes": "Catatan",
+    "notesRequired": "Alasan (wajib)",
+    "disbursementNotes": "Catatan pencairan",
+    "confirm": "Lanjutkan",
+    "close": "Tutup",
+    "save": "Simpan",
+    "failed": "Aksi gagal diproses."
+  },
+  "topup": {
+    "title": "Top Up Petty Cash",
+    "subtitle": "Pengisian kembali kas kecil cabang sampai plafonnya. Nominalnya dihitung sistem.",
+    "addButton": "Ajukan Top Up",
+    "empty": "Belum ada pengajuan top up.",
+    "columns": {
+      "number": "Nomor",
+      "date": "Tanggal",
+      "branch": "Cabang",
+      "ceiling": "Plafon",
+      "balanceBefore": "Saldo saat diajukan",
+      "amount": "Nominal",
+      "status": "Status",
+      "requester": "Pemohon",
+      "actions": "Aksi"
+    },
+    "form": {
+      "createTitle": "Ajukan Top Up Petty Cash",
+      "editTitle": "Ubah Pengajuan Top Up",
+      "branch": "Cabang",
+      "date": "Tanggal",
+      "subject": "Perihal",
+      "notes": "Catatan",
+      "computed": "Nominal yang akan diajukan",
+      "computedHint": "Dihitung sistem: plafon dikurangi saldo berjalan. Tidak bisa diisi sendiri.",
+      "ceiling": "Plafon",
+      "balance": "Saldo sekarang",
+      "full": "Saldo kas kecil sudah penuh. Tidak ada yang perlu diisi.",
+      "running": "Masih ada pengajuan top up yang berjalan untuk cabang ini: {number} ({status}). Selesaikan atau batalkan dulu yang itu.",
+      "saved": "Pengajuan top up tersimpan.",
+      "saveFailed": "Pengajuan top up gagal disimpan."
+    },
+    "detail": {
+      "balanceNow": "Saldo sekarang",
+      "balanceDrift": "Saldo sudah turun lagi sejak pengajuan ini dibuat. Uang sebesar nominal yang disetujui tidak akan mengembalikan saldo tepat ke plafon."
+    },
+    "action": {
+      "approveTitle": "Setujui Top Up",
+      "rejectTitle": "Tolak Top Up",
+      "cancelTitle": "Batalkan Top Up",
+      "approveConfirm": {
+        "title": "Setujui top up ini?",
+        "text": "Bila ini persetujuan terakhir, saldo kas kecil langsung bertambah dan uangnya dianggap dikirim."
+      },
+      "cancelConfirm": {
+        "title": "Batalkan pengajuan top up ini?",
+        "text": "Pengajuan baru bisa dibuat setelah ini dibatalkan."
+      }
+    },
+    "loadFailed": "Gagal memuat daftar top up.",
+    "filtersTitle": "Filter Top Up",
+    "filtersSubtitle": "Saring daftar pengajuan top up sesuai kebutuhan Anda.",
+    "resetButton": "Reset Filter",
+    "emptyTitle": "Belum ada pengajuan Top Up",
+    "emptySubtitle": "Data akan muncul di sini setelah pengajuan top up dibuat.",
+    "cannotCreate": {
+      "title": "Belum bisa mengajukan top up",
+      "noPermission": "Akun Anda belum memegang permission untuk mengajukan top up petty cash.",
+      "noCeiling": "Permissionnya sudah ada, tetapi cabang yang bisa Anda akses belum punya plafon petty cash yang aktif. Top up hanya mengisi kembali kas kecil yang memang ada.",
+      "ceilingList": "Cabang yang plafonnya sudah aktif: {branches}.",
+      "noCeilingAtAll": "Belum ada satu pun cabang yang punya plafon aktif. Tetapkan plafonnya dulu di Master > Plafon Petty Cash."
+    }
+  },
+  "status": {
+    "DRAFT": "Draft",
+    "IN PROGRESS": "Proses Approval",
+    "APPROVED": "Disetujui",
+    "DISBURSED": "Dicairkan",
+    "REJECTED": "Ditolak",
+    "CANCELLED": "Dibatalkan"
+  }
+}

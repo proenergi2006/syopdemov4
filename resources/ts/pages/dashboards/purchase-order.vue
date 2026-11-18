@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import axios from '@axios'
 import VueApexCharts from 'vue3-apexcharts'
 import {
   computed,
@@ -8,6 +7,8 @@ import {
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import axios from '@axios'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 type PeriodType =
   | 'day'
@@ -1193,7 +1194,6 @@ const departmentBreakdownChartHeight = computed(() => {
   )
 })
 
-
 const executiveCabangBreakdownItems = computed<ExecutiveBreakdownItem[]>(() => {
   return normalizeExecutiveBreakdownItems(
     breakdownByCabang.value,
@@ -1806,6 +1806,7 @@ function getItemPriceBarPercent(
 
 function getLocalDateValue(date: Date): string {
   const year = date.getFullYear()
+
   const month = String(
     date.getMonth() + 1,
   ).padStart(2, '0')
@@ -1819,6 +1820,7 @@ function getLocalDateValue(date: Date): string {
 
 function getMonthValue(date: Date): string {
   const year = date.getFullYear()
+
   const month = String(
     date.getMonth() + 1,
   ).padStart(2, '0')
@@ -1843,8 +1845,8 @@ function getCurrentWeekValue(date: Date): string {
     date.getDate(),
   ))
 
-  const dayNumber =
-    currentDate.getUTCDay() || 7
+  const dayNumber
+    = currentDate.getUTCDay() || 7
 
   currentDate.setUTCDate(
     currentDate.getUTCDate() + 4 - dayNumber,
@@ -1880,7 +1882,7 @@ function getCurrentWeekValue(date: Date): string {
 function formatNumber(
   value: number | null | undefined,
 ): string {
-  return new Intl.NumberFormat('id-ID').format(
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(
     Number(value ?? 0),
   )
 }
@@ -1888,7 +1890,7 @@ function formatNumber(
 function formatDecimal(
   value: number | null | undefined,
 ): string {
-  return new Intl.NumberFormat('id-ID', {
+  return new Intl.NumberFormat(LOCALE_ANGKA, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(Number(value ?? 0))
@@ -1897,7 +1899,7 @@ function formatDecimal(
 function formatCurrency(
   value: number | null | undefined,
 ): string {
-  return new Intl.NumberFormat('id-ID', {
+  return new Intl.NumberFormat(LOCALE_ANGKA, {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
@@ -1960,7 +1962,7 @@ function formatScaledNumber(
 ): string {
   const absValue = Math.abs(Number(value ?? 0))
 
-  return new Intl.NumberFormat('id-ID', {
+  return new Intl.NumberFormat(LOCALE_ANGKA, {
     minimumFractionDigits: 0,
     maximumFractionDigits: absValue >= 100 ? 0 : 1,
   }).format(Number(value ?? 0))
@@ -2263,8 +2265,8 @@ function normalizeOptions(
 ): SelectOption[] {
   return records
     .map(record => {
-      const value =
-        record.id
+      const value
+        = record.id
         ?? record.value
         ?? (
           type === 'cabang'
@@ -2272,21 +2274,21 @@ function normalizeOptions(
             : record.department_id
         )
 
-      let title =
-        record.title
+      let title
+        = record.title
         ?? record.label
         ?? record.name
         ?? record.nama
 
       if (type === 'cabang') {
-        title =
-          record.nama_cabang
+        title
+          = record.nama_cabang
           ?? title
       }
 
       if (type === 'department') {
-        title =
-          record.nama_department
+        title
+          = record.nama_department
           ?? record.nama_departemen
           ?? record.department_name
           ?? title
@@ -2296,9 +2298,8 @@ function normalizeOptions(
         value === undefined
         || value === null
         || !title
-      ) {
+      )
         return null
-      }
 
       return {
         value,
@@ -2397,7 +2398,7 @@ async function fetchFilterOptions(): Promise<void> {
 function buildFilterParams(): Record<
   string,
   string | number
-> {
+  > {
   const params: Record<
     string,
     string | number
@@ -2426,16 +2427,16 @@ function buildFilterParams(): Record<
     selectedCabangId.value !== null
     && selectedCabangId.value !== ''
   ) {
-    params.cabang_id =
-      selectedCabangId.value
+    params.cabang_id
+      = selectedCabangId.value
   }
 
   if (
     selectedDepartmentId.value !== null
     && selectedDepartmentId.value !== ''
   ) {
-    params.department_id =
-      selectedDepartmentId.value
+    params.department_id
+      = selectedDepartmentId.value
   }
 
   return params
@@ -2452,8 +2453,8 @@ async function fetchDashboard(): Promise<void> {
   errorMessage.value = ''
 
   try {
-    const response =
-      await axios.get<DashboardResponse>(
+    const response
+      = await axios.get<DashboardResponse>(
         '/dashboard/purchase-order',
         {
           params: buildFilterParams(),
@@ -2519,14 +2520,14 @@ async function fetchDashboard(): Promise<void> {
       data.value_comparison,
     )
 
-    breakdownByCabang.value =
-        data.breakdown?.by_cabang ?? []
+    breakdownByCabang.value
+        = data.breakdown?.by_cabang ?? []
 
-    breakdownByDepartment.value =
-      data.breakdown?.by_department ?? []
+    breakdownByDepartment.value
+      = data.breakdown?.by_department ?? []
 
-    appliedPeriodLabel.value =
-      selectedPeriodDescription.value
+    appliedPeriodLabel.value
+      = selectedPeriodDescription.value
 
     lastUpdatedAt.value = new Date()
 
@@ -4015,7 +4016,6 @@ onMounted(async () => {
   padding-block: 6px;
 }
 
-
 .dashboard-card :deep(.v-card-title) {
   overflow: visible;
   text-overflow: unset;
@@ -4354,7 +4354,6 @@ onMounted(async () => {
   text-align: center;
 }
 
-
 .item-price-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4571,5 +4570,4 @@ onMounted(async () => {
     text-align: start;
   }
 }
-
 </style>

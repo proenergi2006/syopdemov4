@@ -1,6 +1,7 @@
 import auth from './auth.json'
 import businessTrip from './businessTrip.json'
 import businessTripExpenseCategory from './businessTripExpenseCategory.json'
+import bdv from './bdv.json'
 import cashAdvance from './cashAdvance.json'
 import cashAdvanceRealization from './cashAdvanceRealization.json'
 import claim from './claim.json'
@@ -10,6 +11,7 @@ import errorPage from './errorPage.json'
 import fundRequestLimit from './fundRequestLimit.json'
 import navigation from './navigation.json'
 import paymentSchedule from './paymentSchedule.json'
+import pettyCash from './pettyCash.json'
 import purchaseRequest from './purchaseRequest.json'
 import queueHealth from './queueHealth.json'
 import purchaseOrder from './purchaseOrder.json'
@@ -32,6 +34,8 @@ export default {
   claim,
   queueHealth,
   paymentSchedule,
+  pettyCash,
+  bdv,
   fundRequestLimit,
   businessTrip,
   businessTripExpenseCategory,

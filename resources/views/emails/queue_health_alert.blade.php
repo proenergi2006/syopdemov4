@@ -54,7 +54,7 @@
             <tr>
                 <td style="padding:10px 12px;border:1px solid #e6e7ea;background:#fafbfc;">Job menunggu</td>
                 <td style="padding:10px 12px;border:1px solid #e6e7ea;font-weight:600;">
-                    {{ number_format((int) ($snapshot['waiting']['count'] ?? 0)) }}
+                    {{ angka((int) ($snapshot['waiting']['count'] ?? 0)) }}
                 </td>
             </tr>
             <tr>
@@ -63,14 +63,14 @@
                     @if (($snapshot['waiting']['oldest_waiting_minutes'] ?? null) === null)
                         &mdash;
                     @else
-                        {{ number_format((float) $snapshot['waiting']['oldest_waiting_minutes'], 1) }} menit
+                        {{ angka((float) $snapshot['waiting']['oldest_waiting_minutes'], 1) }} menit
                     @endif
                 </td>
             </tr>
             <tr>
                 <td style="padding:10px 12px;border:1px solid #e6e7ea;background:#fafbfc;">Job gagal (total)</td>
                 <td style="padding:10px 12px;border:1px solid #e6e7ea;font-weight:600;">
-                    {{ number_format((int) ($snapshot['failed']['total'] ?? 0)) }}
+                    {{ angka((int) ($snapshot['failed']['total'] ?? 0)) }}
                 </td>
             </tr>
             <tr>
@@ -78,7 +78,7 @@
                     Job gagal ({{ $snapshot['thresholds']['failure_window_hours'] ?? 24 }} jam terakhir)
                 </td>
                 <td style="padding:10px 12px;border:1px solid #e6e7ea;font-weight:600;">
-                    {{ number_format((int) ($snapshot['failed']['recent'] ?? 0)) }}
+                    {{ angka((int) ($snapshot['failed']['recent'] ?? 0)) }}
                 </td>
             </tr>
         </table>

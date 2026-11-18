@@ -186,8 +186,8 @@ class PreflightApprovalFlowSeeder extends Command
                         '  LINGKUP BERTABRAKAN  %s %s %s: sudah ada flow #%d "%s"',
                         $flow['document_type'],
                         $flow['area_type'] ?? '-',
-                        number_format((float) $flow['min_amount'], 0, ',', '.')
-                            . '-' . number_format((float) $flow['max_amount'], 0, ',', '.'),
+                        angka((float) $flow['min_amount'], 0)
+                            . '-' . angka((float) $flow['max_amount'], 0),
                         $ada->id,
                         $ada->name,
                     ));

@@ -60,6 +60,17 @@ class ApprovalFlow extends Model
     // Perdin = izin perjalanan dinas, mendahului FPU yang membiayainya.
     public const DOCUMENT_TYPE_PERDIN = 'PERDIN';
 
+    /*
+    | Petty cash = pembayaran beberapa claim kecil sekaligus dari kas kecil
+    | cabang, dan pengisian kembali kas kecil itu.
+    |
+    | Keduanya dokumen terpisah dengan alur terpisah: yang pertama diputuskan
+    | di cabang, yang kedua harus sampai ke Finance di HO karena uangnya
+    | dikirim dari sana.
+    */
+    public const DOCUMENT_TYPE_PETTY_CASH = 'PETTY_CASH';
+    public const DOCUMENT_TYPE_PETTY_CASH_TOPUP = 'PETTY_CASH_TOPUP';
+
     public const AREA_HO = 'HO';
     public const AREA_CABANG = 'CABANG';
 

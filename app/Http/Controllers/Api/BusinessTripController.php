@@ -6,6 +6,7 @@ use App\Exports\BusinessTripExport;
 use App\Http\Controllers\Controller;
 use App\Services\FundRequest\CombinedPrintComposer;
 use App\Models\BusinessTrip;
+use App\Support\DocumentActionScope;
 use App\Models\BusinessTripItinerary;
 use App\Models\BusinessTripParticipant;
 use App\Models\User;
@@ -739,7 +740,7 @@ class BusinessTripController extends Controller
             ], 403);
         }
 
-        $trip = $this->findVisible($publicId, $user);
+        $trip = $this->findForAction($publicId, $user, 'business_trip.update');
 
         if (!$trip) {
             return response()->json([
@@ -839,7 +840,7 @@ class BusinessTripController extends Controller
             ], 403);
         }
 
-        $trip = $this->findVisible($publicId, $user);
+        $trip = $this->findForAction($publicId, $user, 'business_trip.delete');
 
         if (!$trip) {
             return response()->json([
@@ -917,7 +918,7 @@ class BusinessTripController extends Controller
         DB::beginTransaction();
 
         try {
-            $trip = $this->lockVisible($publicId, $user);
+            $trip = $this->lockForAction($publicId, $user, 'business_trip.submit');
 
             if (!$trip) {
                 DB::rollBack();
@@ -940,11 +941,7 @@ class BusinessTripController extends Controller
 
             if (!in_array(
                 strtoupper((string) $trip->status),
-                [
-                    BusinessTrip::STATUS_DRAFT,
-                    BusinessTrip::STATUS_REJECTED,
-                    BusinessTrip::STATUS_NEED_REVISION,
-                ],
+                BusinessTrip::SUBMITTABLE_STATUSES,
                 true,
             )) {
                 DB::rollBack();
@@ -1676,7 +1673,7 @@ class BusinessTripController extends Controller
         DB::beginTransaction();
 
         try {
-            $trip = $this->lockVisible($publicId, $user);
+            $trip = $this->lockForAction($publicId, $user, 'business_trip.cancel');
 
             if (!$trip) {
                 DB::rollBack();
@@ -1688,16 +1685,20 @@ class BusinessTripController extends Controller
             }
 
             /*
-            | Draft TIDAK ikut di sini.
+            | Daftarnya ada di modelnya -- lihat CANCELLABLE_STATUSES.
             |
-            | Draft belum pernah dilihat siapa pun: tidak ada yang perlu diberi
-            | tahu, dan tidak ada jejak yang perlu ditinggalkan. Membatalkannya
-            | hanya melahirkan dokumen berstatus CANCELLED yang tidak
-            | menjelaskan apa-apa. Untuk draft, yang tersedia menghapusnya.
+            | Draft tidak ikut: belum pernah dilihat siapa pun, jadi tidak ada
+            | yang perlu diberi tahu dan tidak ada jejak yang perlu
+            | ditinggalkan; untuk draft yang tersedia Hapus.
+            |
+            | Yang sedang butuh revisi IKUT, justru karena alasan yang sama
+            | dibalik: dokumennya sudah pernah diajukan dan sudah dilihat
+            | approver. Tanpa pintu ini, perjalanan yang dikembalikan lalu
+            | memang tidak jadi menggantung selamanya di meja pemohon.
             */
             if (!in_array(
                 strtoupper((string) $trip->status),
-                [BusinessTrip::STATUS_IN_PROGRESS],
+                BusinessTrip::CANCELLABLE_STATUSES,
                 true,
             )) {
                 DB::rollBack();
@@ -2317,6 +2318,15 @@ class BusinessTripController extends Controller
      * berbeda jawabannya, dan yang berbeda itu soal siapa boleh membaca
      * dokumen siapa.
      */
+    /**
+     * Dokumen yang boleh DILIHAT akun ini.
+     *
+     * Termasuk dokumen yang masuk ke alur approval-nya walau di luar
+     * cakupannya -- penyetuju memang harus bisa melihat apa yang ia putuskan.
+     *
+     * UNTUK AKSI YANG MENGUBAH, pakai findForAction(): melihat dan mengubah
+     * bukan hal yang sama, dan scope permission aksinya yang berlaku di sana.
+     */
     public function findVisible(string $publicId, $user): ?BusinessTrip
     {
         try {
@@ -2330,6 +2340,42 @@ class BusinessTripController extends Controller
         $this->applyVisibilityScope($query, $user, $this->resolveViewContext($user));
 
         return $query->first();
+    }
+
+    /**
+     * Dokumen yang boleh DIUBAH akun ini lewat aksi tertentu.
+     *
+     * Dicari dengan aturan lihat, lalu disaring ulang dengan scope permission
+     * AKSINYA. Dua langkah, dan keduanya perlu: yang pertama menjaga dokumen
+     * di luar jangkauannya tidak bocor lewat pesan galat, yang kedua menjaga
+     * scope aksinya benar-benar berlaku.
+     *
+     * Mengembalikan null bila tidak boleh -- pemanggilnya menjawab 404, sama
+     * seperti dokumen yang memang tidak ada. Membedakan "tidak ada" dari "ada
+     * tapi bukan milikmu" memberi tahu keberadaan dokumen orang lain kepada
+     * yang tidak berhak mengetahuinya.
+     */
+    private function findForAction(string $publicId, $user, string $permission): ?BusinessTrip
+    {
+        $trip = $this->findVisible($publicId, $user);
+
+        return $trip && DocumentActionScope::allows($user, $permission, $trip, [
+            'branch' => 'branch',
+            'department' => 'department_id',
+            'owner' => 'created_by',
+        ]) ? $trip : null;
+    }
+
+    /** Sama dengan findForAction, tetapi mengunci barisnya. */
+    private function lockForAction(string $publicId, $user, string $permission): ?BusinessTrip
+    {
+        $trip = $this->lockVisible($publicId, $user);
+
+        return $trip && DocumentActionScope::allows($user, $permission, $trip, [
+            'branch' => 'branch',
+            'department' => 'department_id',
+            'owner' => 'created_by',
+        ]) ? $trip : null;
     }
 
     /**

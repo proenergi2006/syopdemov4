@@ -21,7 +21,7 @@
     */
 
     $rupiah = static fn ($value): string =>
-        'Rp ' . number_format((float) $value, 0, ',', '.');
+        'Rp ' . angka((float) $value, 0);
 
     $tanggal = static fn ($value): string =>
         $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '-';
@@ -37,12 +37,6 @@
         ? trim(($fpu->departmentData->kode ?? '-') . ' - ' . ($fpu->departmentData->nama ?? '-'))
         : '-';
 
-    /*
-    | Lebar kolom penyetuju dibagi rata. Dibatasi minimal 1 agar tidak pernah
-    | membagi dengan nol saat dokumen belum punya penyetuju sama sekali.
-    */
-    $jumlahPenyetuju = max($approvers->count(), 1);
-    $lebarPenyetuju = 100 / $jumlahPenyetuju;
 @endphp
 
     {{-- ============================================================
@@ -147,7 +141,7 @@
 
         $angka = (float) $nilai;
 
-        return rtrim(rtrim(number_format($angka, 2, ',', '.'), '0'), ',');
+        return rtrim(rtrim(angka($angka, 2), '0'), '.');
     };
 @endphp
     <div class="section-title">Rincian Pengajuan</div>
@@ -282,73 +276,15 @@
          Dua kolom saja. Seluruh penyetuju digabung di dalam kolom
          "Disetujui Oleh", berapa pun jumlahnya.
          ============================================================ --}}
-    <div class="signature-section">
-        <table class="signature-frame">
-            <tr>
-                <td style="width: 26%;">
-                    <div class="signature-heading">Dibuat Oleh</div>
+    {{--
+        Blok tanda tangan dipakai bersama FPU, Realisasi, Claim, dan Perdin.
+        Dulu disalin utuh ke keempatnya; kini satu berkas, supaya perubahan
+        tata letaknya cukup sekali dan tidak ada salinan yang tertinggal.
 
-                    <table class="signer-table">
-                        <tr>
-                            <td>
-                                <div class="signer-role">Pemohon</div>
-
-                                <div class="signature-area">
-                                    @if (!empty($requester->signature_file) && file_exists($requester->signature_file))
-                                        <img
-                                            src="{{ $requester->signature_file }}"
-                                            class="signature-image"
-                                            alt="Tanda tangan"
-                                        >
-                                    @endif
-                                </div>
-
-                                <div class="signer-name">{{ $requester->name ?? '-' }}</div>
-
-                                <div class="signer-date">
-                                    {{ $tanggalJam($requester->signed_at ?? null) }}
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-
-                <td style="width: 74%;">
-                    <div class="signature-heading">Disetujui Oleh</div>
-
-                    <table class="signer-table">
-                        <tr>
-                            @forelse ($approvers as $approver)
-                                <td style="width: {{ $lebarPenyetuju }}%;">
-                                    <div class="signer-role">
-                                        {{ $approver->label ?? 'Penyetuju' }}
-                                    </div>
-
-                                    <div class="signature-area">
-                                        @if (!empty($approver->signature_file) && file_exists($approver->signature_file))
-                                            <img
-                                                src="{{ $approver->signature_file }}"
-                                                class="signature-image"
-                                                alt="Tanda tangan"
-                                            >
-                                        @endif
-                                    </div>
-
-                                    <div class="signer-name">{{ $approver->name ?? '-' }}</div>
-
-                                    <div class="signer-date">
-                                        {{ $tanggalJam($approver->signed_at ?? null) }}
-                                    </div>
-                                </td>
-                            @empty
-                                <td class="signer-empty">Belum ada persetujuan.</td>
-                            @endforelse
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
-    </div>
+        Partial ini memakai $requester, $approvers, dan $tanggalJam dari
+        lingkup berkas ini.
+    --}}
+    @include('pdf.partials.signatures')
 
     <div class="footer">
         Dokumen ini dicetak dari sistem SYOP pada {{ now()->format('d/m/Y H:i') }} WIB.

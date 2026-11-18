@@ -94,11 +94,15 @@ const router = createRouter({
     {
       path: '/pages/account-settings',
 
+      /*
+      | Diarahkan ke security, bukan account: tab account tidak pernah ada,
+      | sehingga halamannya terbuka tanpa isi sampai tabnya diklik sendiri.
+      */
       redirect: () => ({
         name: 'pages-account-settings-tab',
 
         params: {
-          tab: 'account',
+          tab: 'security',
         },
       }),
     },
@@ -212,29 +216,29 @@ router.beforeEach(async to => {
 | 1. Public route
 |--------------------------------------------------------------------------
 */
-if (isPublicRoute) {
-  const loggedOut
+  if (isPublicRoute) {
+    const loggedOut
     = to.query.logged_out === '1'
       || to.query.session_expired === '1'
 
-  /*
+    /*
    * Setelah logout, halaman login tetap harus dibuka meskipun
    * masih ada state lama yang belum sepenuhnya terlepas.
    */
-  if (routeName === 'login' && loggedOut)
-    return true
+    if (routeName === 'login' && loggedOut)
+      return true
 
-  const loggedIn = isUserLoggedIn()
+    const loggedIn = isUserLoggedIn()
 
-  if (loggedIn && routeName === 'login') {
-    return {
-      path: '/dashboards/crm',
-      replace: true,
+    if (loggedIn && routeName === 'login') {
+      return {
+        path: '/dashboards/crm',
+        replace: true,
+      }
     }
-  }
 
-  return true
-}
+    return true
+  }
 
   /*
   |--------------------------------------------------------------------------
@@ -292,24 +296,24 @@ if (isPublicRoute) {
   | Session sudah tidak valid atau token hilang saat request berlangsung
   |--------------------------------------------------------------------------
   */
-  if (
-    !isUserLoggedIn()
+    if (
+      !isUserLoggedIn()
     || status === 401
     || status === 419
-  ) {
-    permissionStore.clearPermissions()
-    clearAuthSession()
+    ) {
+      permissionStore.clearPermissions()
+      clearAuthSession()
 
-    return {
-      name: 'login',
+      return {
+        name: 'login',
 
-      query: {
-        session_expired: '1',
-      },
+        query: {
+          session_expired: '1',
+        },
 
-      replace: true,
+        replace: true,
+      }
     }
-  }
 
     /*
     |--------------------------------------------------------------------------
@@ -353,8 +357,17 @@ if (isPublicRoute) {
   | 6. Cek permission database
   |--------------------------------------------------------------------------
   */
+  /*
+  |--------------------------------------------------------------------------
+  | ensureCan, bukan can
+  |--------------------------------------------------------------------------
+  | Permission yang baru diberikan sesudah sesi dimulai tidak ada di daftar
+  | yang dipegang layar. ensureCan menyegarkan daftarnya sekali sebelum
+  | menolak, sehingga perubahan permission berlaku tanpa logout.
+  |--------------------------------------------------------------------------
+  */
   if (requiredPermission) {
-    if (!permissionStore.can(requiredPermission)) {
+    if (!await permissionStore.ensureCan(requiredPermission)) {
       return {
         name: 'forbidden',
 

@@ -74,6 +74,16 @@ return [
         'failed' => 'Failed to receive the claim.',
     ],
 
+    'petty_cash' => [
+        'receive_holder_only' => 'This claim is Rp :amount, within the petty cash threshold for branch :branch (Rp :threshold), '
+            . 'so it is received and paid by that branch petty cash holder.',
+        'pay_via_petty_cash' => 'This claim is paid through a Petty Cash form, not from here. '
+            . 'The petty cash holder of branch :branch creates the form, and this claim becomes paid when that form is disbursed.',
+        'unreceive_locked' => 'This claim receipt cannot be reverted because it is already part of Petty Cash form :number. '
+            . 'Cancel that petty cash form first.',
+        'no_ceiling' => 'Branch :branch has no active petty cash ceiling.',
+    ],
+
     'pay' => [
         'only_received' => 'Only received claims can be reimbursed.',
         'forbidden' => 'You do not have permission to mark a claim as reimbursed.',

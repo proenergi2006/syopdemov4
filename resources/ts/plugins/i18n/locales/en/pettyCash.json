@@ -1,0 +1,274 @@
+{
+  "noAccess": "You do not have access to this page.",
+  "ceiling": {
+    "title": "Petty Cash Ceiling",
+    "subtitle": "One ceiling per branch, held by the Finance department. A branch without an active ceiling keeps paying small claims the usual Finance way.",
+    "intro": {
+      "title": "The ceiling decides two things at once",
+      "body": "How much cash the branch holds, and up to what amount a claim must be paid from petty cash. Both are set here.",
+      "notice": "Changing the ceiling does NOT change the running balance. Raising it does not add cash at the branch — the next top up brings that."
+    },
+    "addButton": "Set Ceiling",
+    "empty": "No branch has a petty cash ceiling yet.",
+    "columns": {
+      "branch": "Branch",
+      "department": "Department",
+      "ceiling": "Ceiling",
+      "balance": "Balance",
+      "threshold": "Claim Threshold",
+      "warning": "Warning",
+      "topup": "Top Up Needed",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "form": {
+      "createTitle": "Set Petty Cash Ceiling",
+      "editTitle": "Edit Petty Cash Ceiling",
+      "branch": "Branch",
+      "department": "Department holding the cash",
+      "ceiling": "Ceiling",
+      "ceilingHint": "The cash this branch holds.",
+      "threshold": "Claim threshold",
+      "thresholdHint": "Claims up to this amount must go through petty cash.",
+      "thresholdError": "Cannot be larger than the ceiling.",
+      "warning": "Warning mark",
+      "warningHint": "Percent of the ceiling. Below this, the petty cash holder is warned on the dashboard and by a daily notification.",
+      "active": "Active",
+      "notes": "Notes",
+      "openingNotice": "On save, the opening balance is recorded at this ceiling amount."
+    },
+    "ledger": {
+      "title": "Petty Cash Ledger",
+      "subtitle": "Every movement of money, one row each. This is the answer to why the balance is what it is.",
+      "empty": "No movements yet.",
+      "columns": {
+        "date": "Time",
+        "type": "Type",
+        "amount": "Amount",
+        "balance": "Balance After",
+        "notes": "Notes",
+        "by": "By"
+      },
+      "types": {
+        "OPENING": "Opening balance",
+        "DISBURSEMENT": "Disbursement",
+        "REVERSAL": "Reversal",
+        "TOPUP": "Top up",
+        "ADJUSTMENT": "Adjustment"
+      }
+    },
+    "adjust": {
+      "title": "Balance Adjustment",
+      "subtitle": "For situations with no document, such as a difference found when counting the cash.",
+      "amount": "Adjustment amount (Rp)",
+      "amountHint": "A negative number reduces the balance, positive increases it.",
+      "notes": "Reason",
+      "notesHint": "Required. A row without a document can only be accounted for by its note.",
+      "button": "Adjust Balance"
+    },
+    "deleteConfirm": {
+      "title": "Delete this branch ceiling?",
+      "text": "The ledger is kept. Small claims at this branch go back to the Finance route."
+    },
+    "loadFailed": "Failed to load petty cash ceilings.",
+    "saved": "Petty cash ceiling saved.",
+    "deleted": "Petty cash ceiling deleted.",
+    "adjusted": "Petty cash balance adjusted."
+  },
+  "warningPanel": {
+    "title": "Petty cash you hold",
+    "lowTitle": "{branch} petty cash balance is running low",
+    "lowBody": "Rp {balance} left of a Rp {ceiling} ceiling, below the {percentage}% mark.",
+    "topupCta": "Request a top up of Rp {amount}",
+    "runningTopup": "Top up {number} is in progress ({status}).",
+    "pendingClaims": "{count} small claims are waiting to be paid.",
+    "healthy": "Balance is still above the warning mark.",
+    "balance": "Balance",
+    "ceiling": "Ceiling",
+    "threshold": "Claim threshold"
+  },
+  "list": {
+    "title": "Petty Cash",
+    "subtitle": "Paying several small claims at once from the branch petty cash.",
+    "addButton": "New Petty Cash",
+    "empty": "No petty cash forms yet.",
+    "search": "Search number or subject",
+    "status": "Status",
+    "branch": "Branch",
+    "dateFrom": "From date",
+    "dateTo": "To date",
+    "allStatus": "All statuses",
+    "allBranch": "All branches",
+    "columns": {
+      "number": "Number",
+      "date": "Date",
+      "subject": "Subject",
+      "branch": "Branch",
+      "claims": "Claims",
+      "total": "Total",
+      "status": "Status",
+      "requester": "Requester",
+      "actions": "Actions"
+    },
+    "claimCount": "{count} claims",
+    "loadFailed": "Failed to load petty cash list.",
+    "noHolderBranch": "You do not hold petty cash for any branch, or your branch has no active ceiling.",
+    "filtersTitle": "Petty Cash Filters",
+    "filtersSubtitle": "Narrow the petty cash list to what you need.",
+    "resetButton": "Reset Filters",
+    "emptyTitle": "No petty cash yet",
+    "emptySubtitle": "Rows appear here once a petty cash form is created.",
+    "cannotCreate": {
+      "title": "Cannot create a petty cash form yet",
+      "noPermission": "Your account does not hold the permission to create petty cash.",
+      "noCeiling": "You hold the permission, but none of the branches you can access has an active petty cash ceiling. The holder is the person at the branch who actually keeps the cash.",
+      "ceilingList": "Branches with an active ceiling: {branches}.",
+      "noCeilingAtAll": "No branch has an active ceiling yet. Set one first under Master > Petty Cash Ceiling."
+    }
+  },
+  "form": {
+    "createTitle": "New Petty Cash",
+    "editTitle": "Edit Petty Cash",
+    "branch": "Branch",
+    "date": "Date",
+    "subject": "Subject",
+    "notes": "Notes",
+    "claims": "Claims being paid",
+    "claimsHint": "Only received claims within this branch threshold appear here.",
+    "noEligible": "No claims are ready to be paid from this branch petty cash.",
+    "selected": "{count} claims selected",
+    "totalSelected": "Selected total",
+    "balanceAfter": "Balance after disbursement",
+    "overBalance": "The selected total exceeds the petty cash balance. Select fewer claims or request a top up first.",
+    "claimColumns": {
+      "number": "Claim Number",
+      "date": "Date",
+      "subject": "Subject",
+      "requester": "Requester",
+      "department": "Department",
+      "amount": "Amount"
+    },
+    "saved": "Petty cash saved.",
+    "saveFailed": "Failed to save petty cash."
+  },
+  "detail": {
+    "title": "Petty Cash Detail",
+    "claims": "Claims inside",
+    "approvals": "Approval History",
+    "ceiling": "Petty cash state",
+    "amountFrozen": "Frozen amount",
+    "amountNow": "Claim amount now",
+    "amountMismatch": "The claim amount changed after it entered this form. Check before disbursing.",
+    "loadFailed": "Failed to load petty cash detail."
+  },
+  "action": {
+    "submit": "Submit",
+    "approve": "Approve",
+    "reject": "Reject",
+    "disburse": "Disburse",
+    "cancel": "Cancel",
+    "detail": "Detail",
+    "edit": "Edit",
+    "delete": "Delete",
+    "ledger": "Ledger",
+    "adjust": "Adjust Balance",
+    "submitConfirm": {
+      "title": "Submit this petty cash?",
+      "text": "Its contents are checked again against the current state of the claims before entering approval."
+    },
+    "disburseConfirm": {
+      "title": "Disburse this petty cash?",
+      "text": "The ceiling is reduced and the claims inside are marked paid. Once disbursed, this form cannot be cancelled."
+    },
+    "cancelConfirm": {
+      "title": "Cancel this petty cash?",
+      "text": "The claims inside are released and can be used by another form. The ceiling is untouched since nothing was disbursed."
+    },
+    "deleteConfirm": {
+      "title": "Delete this draft?",
+      "text": "The claims inside are released and can be selected again."
+    },
+    "rejectTitle": "Reject Petty Cash",
+    "approveTitle": "Approve Petty Cash",
+    "disburseTitle": "Disburse Petty Cash",
+    "cancelTitle": "Cancel Petty Cash",
+    "notes": "Notes",
+    "notesRequired": "Reason (required)",
+    "disbursementNotes": "Disbursement notes",
+    "confirm": "Continue",
+    "close": "Close",
+    "save": "Save",
+    "failed": "The action could not be processed."
+  },
+  "topup": {
+    "title": "Petty Cash Top Up",
+    "subtitle": "Refilling the branch petty cash up to its ceiling. The amount is computed by the system.",
+    "addButton": "Request Top Up",
+    "empty": "No top up requests yet.",
+    "columns": {
+      "number": "Number",
+      "date": "Date",
+      "branch": "Branch",
+      "ceiling": "Ceiling",
+      "balanceBefore": "Balance when requested",
+      "amount": "Amount",
+      "status": "Status",
+      "requester": "Requester",
+      "actions": "Actions"
+    },
+    "form": {
+      "createTitle": "Request Petty Cash Top Up",
+      "editTitle": "Edit Top Up Request",
+      "branch": "Branch",
+      "date": "Date",
+      "subject": "Subject",
+      "notes": "Notes",
+      "computed": "Amount to be requested",
+      "computedHint": "Computed by the system: ceiling minus running balance. It cannot be typed.",
+      "ceiling": "Ceiling",
+      "balance": "Current balance",
+      "full": "The petty cash balance is already full. Nothing needs to be added.",
+      "running": "A top up request is already in progress for this branch: {number} ({status}). Finish or cancel that one first.",
+      "saved": "Top up request saved.",
+      "saveFailed": "Failed to save the top up request."
+    },
+    "detail": {
+      "balanceNow": "Current balance",
+      "balanceDrift": "The balance has dropped again since this request was created. The approved amount will not restore the balance exactly to the ceiling."
+    },
+    "action": {
+      "approveTitle": "Approve Top Up",
+      "rejectTitle": "Reject Top Up",
+      "cancelTitle": "Cancel Top Up",
+      "approveConfirm": {
+        "title": "Approve this top up?",
+        "text": "If this is the final approval, the petty cash balance increases immediately and the money is taken as sent."
+      },
+      "cancelConfirm": {
+        "title": "Cancel this top up request?",
+        "text": "A new request can be created once this one is cancelled."
+      }
+    },
+    "loadFailed": "Failed to load top up list.",
+    "filtersTitle": "Top Up Filters",
+    "filtersSubtitle": "Narrow the top up list to what you need.",
+    "resetButton": "Reset Filters",
+    "emptyTitle": "No top up requests yet",
+    "emptySubtitle": "Rows appear here once a top up is requested.",
+    "cannotCreate": {
+      "title": "Cannot request a top up yet",
+      "noPermission": "Your account does not hold the permission to request a petty cash top up.",
+      "noCeiling": "You hold the permission, but none of the branches you can access has an active petty cash ceiling. A top up only refills cash that exists.",
+      "ceilingList": "Branches with an active ceiling: {branches}.",
+      "noCeilingAtAll": "No branch has an active ceiling yet. Set one first under Master > Petty Cash Ceiling."
+    }
+  },
+  "status": {
+    "DRAFT": "Draft",
+    "IN PROGRESS": "In Approval",
+    "APPROVED": "Approved",
+    "DISBURSED": "Disbursed",
+    "REJECTED": "Rejected",
+    "CANCELLED": "Cancelled"
+  }
+}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Account\UserSignatureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,8 +12,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -450,38 +449,26 @@ class UserController extends Controller
                 ], 404);
             }
 
-            $signatureData = $request->signature;
-
-            if (!str_contains($signatureData, 'base64')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Format tanda tangan tidak valid.',
-                ], 422);
-            }
-
-            $image = str_replace('data:image/png;base64,', '', $signatureData);
-            $image = str_replace(' ', '+', $image);
-
-            $folderName = $user->id . '_' . Str::slug($user->name, '_');
-            $folderPath = 'syopv4/uploads/users/signature/' . $folderName;
-
-            Storage::disk('public')->makeDirectory($folderPath);
-
-            $fileName = 'signature.png';
-            $filePath = $folderPath . '/' . $fileName;
-
-            Storage::disk('public')->put($filePath, base64_decode($image));
-
-            $user->signature_path = $filePath;
-            $user->signature_uploaded_at = now();
-            $user->save();
+            /*
+            | Dialog tanda tangan di modul FPU/Realisasi/Klaim/Perdin/PR/PO
+            | masih memanggil endpoint ini sebelum submit atau approve.
+            |
+            | Penyimpanannya dialihkan ke UserSignatureService supaya hasilnya
+            | menjadi slot biasa: punya file sendiri, tercatat di
+            | user_signatures, dan tidak menimpa tanda tangan yang sudah
+            | dipakai dokumen lama. Sebelumnya semuanya ditulis ke nama file
+            | yang sama, sehingga tanda tangan baru ikut mengubah dokumen yang
+            | sudah selesai.
+            */
+            $signature = app(UserSignatureService::class)
+                ->tambahDariDataUrl($user, (string) $request->signature);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Tanda tangan berhasil disimpan.',
+                'message' => __('signature_messages.created'),
                 'data' => [
-                    'signature_path' => $filePath,
-                    'signature_url' => asset('storage/' . $filePath),
+                    'signature_path' => $signature->file_path,
+                    'signature_url' => $signature->url,
                 ],
             ], 201);
         } catch (ValidationException $e) {

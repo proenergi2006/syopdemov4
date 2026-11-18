@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import axios from '@axios'
+import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import axios from '@axios'
 import {
+  closeAlert,
   showConfirmAlert,
   showErrorAlert,
   showLoadingAlert,
   showSuccessAlert,
   showWarningAlert,
-  closeAlert,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
+
 const route = useRoute()
 const router = useRouter()
 
 const id = route.params.id
-
 
 const po = reactive<any>({
   nomor_po: '',
@@ -76,7 +77,6 @@ const approvalCFO = reactive({
   note: '',
 })
 
-
 const isWaitingCEO = computed(() => {
   return po.disposisi_po === 2
 })
@@ -86,6 +86,7 @@ const isWaitingCFO = computed(() => po.disposisi_po === 1)
 const isApprovedCFO = computed(() => po.cfo_result === 1)
 
 const isRejectedCFO = computed(() => po.cfo_result === 2)
+
 // ====== LOADING ======
 const loading = ref(false)
 
@@ -96,61 +97,65 @@ const fetchPO = async (id: any) => {
   try {
     const res = await axios.get(`/inventory/purchase-order/${id}`)
     const data = res.data
+
     Object.assign(po, {
-        nomor_po: data.nomor_po,
-        tanggal_inven: data.tanggal_inven,
-        volume_po: data.volume_po,
-        volume_bol: data.volume_bol,
+      nomor_po: data.nomor_po,
+      tanggal_inven: data.tanggal_inven,
+      volume_po: data.volume_po,
+      volume_bol: data.volume_bol,
 
-        vendor: data.vendor.nama_vendor,
-        produk: data.produk.merk_dagang,
-        jenis_produk: data.produk.jenis_produk,
-        terminal: data.terminal.nama_terminal,
-        lokasi: data.terminal.lokasi_terminal,
+      vendor: data.vendor.nama_vendor,
+      produk: data.produk.merk_dagang,
+      jenis_produk: data.produk.jenis_produk,
+      terminal: data.terminal.nama_terminal,
+      lokasi: data.terminal.lokasi_terminal,
 
-        kategori_plat: data.kategori_plat,
-        kd_tax: data.kd_tax,
-        ongkos_kirim: data.ongkos_kirim,
-        terms: data.terms,
-        terms_day: data.terms_day,
-        nilai_pbbkb: data.nilai_pbbkb,
-        iuran_migas: data.iuran_migas,
+      kategori_plat: data.kategori_plat,
+      kd_tax: data.kd_tax,
+      ongkos_kirim: data.ongkos_kirim,
+      terms: data.terms,
+      terms_day: data.terms_day,
+      nilai_pbbkb: data.nilai_pbbkb,
+      iuran_migas: data.iuran_migas,
 
-        catatan_po: data.keterangan,
-        internal_notes: data.internal_notes,
-        harga_tebus: data.harga_tebus,
-        pbbkb_po: data.pbbkb_po,
-        pbbkb: data.pbbkb,
-        nominal_migas: data.nominal_migas,
-        subtotal: data.subtotal,
-        ppn: data.ppn_12,
-        pph_22: data.pph_22,
-        total: data.total_order,
-        disposisi_po: data.disposisi_po,
-        is_price_changed: data.is_price_changed,
-        cfo_result: data.cfo_result,
-        cfo_summary: data.cfo_summary,
-        cfo_pic: data.cfo_pic,
-        cfo_tanggal: data.cfo_tanggal,
-        ceo_result: data.ceo_result,
-        ceo_pic: data.ceo_pic,
-        ceo_tanggal: data.ceo_tanggal,
-        ceo_summary: data.ceo_summary,
-        revert_cfo: data.revert_cfo,
-        revert_cfo_summary: data.revert_cfo_summary,
-        revert_ceo: data.revert_ceo,
-        revert_ceo_summary: data.revert_ceo_summary,
+      catatan_po: data.keterangan,
+      internal_notes: data.internal_notes,
+      harga_tebus: data.harga_tebus,
+      pbbkb_po: data.pbbkb_po,
+      pbbkb: data.pbbkb,
+      nominal_migas: data.nominal_migas,
+      subtotal: data.subtotal,
+      ppn: data.ppn_12,
+      pph_22: data.pph_22,
+      total: data.total_order,
+      disposisi_po: data.disposisi_po,
+      is_price_changed: data.is_price_changed,
+      cfo_result: data.cfo_result,
+      cfo_summary: data.cfo_summary,
+      cfo_pic: data.cfo_pic,
+      cfo_tanggal: data.cfo_tanggal,
+      ceo_result: data.ceo_result,
+      ceo_pic: data.ceo_pic,
+      ceo_tanggal: data.ceo_tanggal,
+      ceo_summary: data.ceo_summary,
+      revert_cfo: data.revert_cfo,
+      revert_cfo_summary: data.revert_cfo_summary,
+      revert_ceo: data.revert_ceo,
+      revert_ceo_summary: data.revert_ceo_summary,
 
     })
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err)
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
 const fetchHistory = async () => {
   const res = await axios.get(`/inventory/purchase-order/${id}/history`)
+
   latestHistory.value = res.data.latest || null
   histories.value = res.data.history || []
 }
@@ -163,32 +168,32 @@ const submitApproval = () => {
 }
 
 const isSaving = ref(false)
-const doSubmit = async () => {
 
+const doSubmit = async () => {
 //   loadingSubmit.value = true
   const confirm = await showConfirmAlert({
     title: 'Apakah yakin ingin melakukan approval PO?',
     confirmButtonText: 'Ya, simpan',
     cancelButtonText: 'Batal',
   })
-    if (!confirm.isConfirmed) return
 
-    isSaving.value = true
+  if (!confirm.isConfirmed)
+    return
 
-    try {
-      showLoadingAlert('Menyimpan data...', 'Mohon menunggu')
+  isSaving.value = true
+
+  try {
+    showLoadingAlert('Menyimpan data...', 'Mohon menunggu')
 
     let url = ''
 
     // CFO
-    if (po.disposisi_po === 1) {
+    if (po.disposisi_po === 1)
       url = `/inventory/purchase-order/${id}/approve-cfo`
-    }
 
     // CEO
-    if (po.disposisi_po === 2) {
+    if (po.disposisi_po === 2)
       url = `/inventory/purchase-order/${id}/approve-ceo`
-    }
 
     const res = await axios.post(url, {
       decision: po.result,
@@ -201,33 +206,33 @@ const doSubmit = async () => {
     //   text: `Approve PO berhasil`,
     //   timer: 1800,
     // })
-    
-    if (!res.data.success) {
+
+    if (!res.data.success)
       throw new Error(res.data.message)
-    }
 
     await showSuccessAlert({
       title: 'Berhasil',
       text: 'Approve PO berhasil',
     })
 
-
     await fetchPO(id)
-
-  } catch (error) {
+  }
+  catch (error) {
     closeAlert()
 
-   await showErrorAlert({
+    await showErrorAlert({
       title: 'Error',
       text: String(error),
     })
-  } finally {
+  }
+  finally {
     closeAlert()
     isSaving.value = false
 
     // loadingSubmit.value = false
   }
 }
+
 const userRoles = ref<string[]>([])
 
 const getProfile = async () => {
@@ -237,13 +242,18 @@ const getProfile = async () => {
     userRoles.value = res.data.data.role
 
     console.log('ROLE:', res.data)
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err)
   }
 }
+
 const canApprove = (item: any) => {
-  if (userRoles.value.includes('CFO') && item.disposisi_po === 1) return true
-  if (userRoles.value.includes('CEO') && item.disposisi_po === 2) return true
+  if (userRoles.value.includes('CFO') && item.disposisi_po === 1)
+    return true
+  if (userRoles.value.includes('CEO') && item.disposisi_po === 2)
+    return true
+
   return false
 }
 
@@ -284,25 +294,25 @@ const statusMap: Record<number, {
 }
 
 const noteLabel = computed(() => {
-
-  if (po.result === '1') {
+  if (po.result === '1')
     return 'Catatan Approval'
-  }
 
-  if (po.result === '2') {
+  if (po.result === '2')
     return 'Catatan Reject'
-  }
 
   return 'Catatan'
 })
+
 const formatMoney = (value: number | null): string => {
-   if (value === null || value === undefined) return '0'
-  return new Intl.NumberFormat('id-ID').format(value)
+  if (value === null || value === undefined)
+    return '0'
+
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(value)
 }
 
-
 const toNumber = (value: any): number => {
-  if (value === null || value === undefined || value === '') return 0
+  if (value === null || value === undefined || value === '')
+    return 0
 
   return Number(value) || 0
 }
@@ -328,7 +338,8 @@ const absolutePriceDiff = computed(() => {
 })
 
 const priceDiffPercent = computed(() => {
-  if (previousPrice.value === 0) return 0
+  if (previousPrice.value === 0)
+    return 0
 
   return (priceDiff.value / previousPrice.value) * 100
 })
@@ -354,7 +365,8 @@ const absoluteTotalDiff = computed(() => {
 })
 
 const totalDiffPercent = computed(() => {
-  if (previousTotal.value === 0) return 0
+  if (previousTotal.value === 0)
+    return 0
 
   return (totalDiff.value / previousTotal.value) * 100
 })
@@ -364,22 +376,28 @@ const absoluteTotalDiffPercent = computed(() => {
 })
 
 const priceChangeLabel = computed(() => {
-  if (priceDiff.value > 0) return 'Naik'
-  if (priceDiff.value < 0) return 'Turun'
+  if (priceDiff.value > 0)
+    return 'Naik'
+  if (priceDiff.value < 0)
+    return 'Turun'
 
   return 'Tidak Berubah'
 })
 
 const priceChangeColor = computed(() => {
-  if (priceDiff.value > 0) return 'error'
-  if (priceDiff.value < 0) return 'success'
+  if (priceDiff.value > 0)
+    return 'error'
+  if (priceDiff.value < 0)
+    return 'success'
 
   return 'grey'
 })
 
 const priceChangeIcon = computed(() => {
-  if (priceDiff.value > 0) return 'tabler-trending-up'
-  if (priceDiff.value < 0) return 'tabler-trending-down'
+  if (priceDiff.value > 0)
+    return 'tabler-trending-up'
+  if (priceDiff.value < 0)
+    return 'tabler-trending-down'
 
   return 'tabler-minus'
 })
@@ -391,9 +409,9 @@ onMounted(() => {
   fetchHistory()
 })
 </script>
+
 <template>
   <section>
-
     <!-- Loading -->
     <VCard
       v-if="loading"
@@ -426,14 +444,16 @@ onMounted(() => {
     <!-- Semua isi halaman -->
     <template v-else>
       <!-- HEADER -->
-      <VCard class="mb-6" rounded="lg">
+      <VCard
+        class="mb-6"
+        rounded="lg"
+      >
         <VCardText>
           <div class="d-flex justify-space-between align-center flex-wrap ga-4">
             <div>
               <div class="text-h5 font-weight-bold">
                 Verifikasi PO Supplier
               </div>
-
             </div>
 
             <div class="d-flex align-center gap-3">
@@ -456,7 +476,10 @@ onMounted(() => {
                 size="large"
                 @click="router.back()"
               >
-                <VIcon start icon="tabler-arrow-left" />
+                <VIcon
+                  start
+                  icon="tabler-arrow-left"
+                />
                 Kembali
               </VBtn>
             </div>
@@ -466,8 +489,16 @@ onMounted(() => {
 
       <!-- EXECUTIVE SUMMARY -->
       <VRow class="mb-6">
-        <VCol cols="12" md="3">
-          <VCard rounded="lg" variant="tonal" color="primary" height="100%">
+        <VCol
+          cols="12"
+          md="3"
+        >
+          <VCard
+            rounded="lg"
+            variant="tonal"
+            color="primary"
+            height="100%"
+          >
             <VCardText>
               <div class="text-caption text-medium-emphasis mb-1">
                 Nomor PO
@@ -484,8 +515,16 @@ onMounted(() => {
           </VCard>
         </VCol>
 
-        <VCol cols="12" md="3">
-          <VCard rounded="lg" variant="tonal" color="info" height="100%">
+        <VCol
+          cols="12"
+          md="3"
+        >
+          <VCard
+            rounded="lg"
+            variant="tonal"
+            color="info"
+            height="100%"
+          >
             <VCardText>
               <div class="text-caption text-medium-emphasis mb-1">
                 Vendor
@@ -502,8 +541,16 @@ onMounted(() => {
           </VCard>
         </VCol>
 
-        <VCol cols="12" md="3">
-          <VCard rounded="lg" variant="tonal" color="warning" height="100%">
+        <VCol
+          cols="12"
+          md="3"
+        >
+          <VCard
+            rounded="lg"
+            variant="tonal"
+            color="warning"
+            height="100%"
+          >
             <VCardText>
               <div class="text-caption text-medium-emphasis mb-1">
                 Volume PO
@@ -520,184 +567,221 @@ onMounted(() => {
           </VCard>
         </VCol>
 
-        <VCol cols="12" md="3">
-          <VCard rounded="lg" variant="flat" color="success" height="100%">
+        <VCol
+          cols="12"
+          md="3"
+        >
+          <VCard
+            rounded="lg"
+            variant="flat"
+            color="success"
+            height="100%"
+          >
             <VCardText>
-                <div class="text-caption mb-1">
+              <div class="text-caption mb-1">
                 Total Nilai PO
-                </div>
+              </div>
 
-                <div class="text-h5 font-weight-bold">
-                  Rp {{ formatMoney(po.total) }}
-                </div>
+              <div class="text-h5 font-weight-bold">
+                Rp {{ formatMoney(po.total) }}
+              </div>
 
-                <div class="text-caption mt-2">
-                  Harga dasar: Rp {{ formatMoney(po.harga_tebus) }}
-                </div>
+              <div class="text-caption mt-2">
+                Harga dasar: Rp {{ formatMoney(po.harga_tebus) }}
+              </div>
             </VCardText>
           </VCard>
         </VCol>
       </VRow>
 
-        <!-- PRICE CHANGE ALERT -->
-        <VCard
-          v-if="isPriceChanged"
-          class="mb-6"
-          rounded="lg"
-          :color="priceChangeColor"
-          variant="tonal"
-        >
+      <!-- PRICE CHANGE ALERT -->
+      <VCard
+        v-if="isPriceChanged"
+        class="mb-6"
+        rounded="lg"
+        :color="priceChangeColor"
+        variant="tonal"
+      >
         <VCardText>
-            <div class="d-flex justify-space-between align-center flex-wrap ga-4">
+          <div class="d-flex justify-space-between align-center flex-wrap ga-4">
             <div>
-                <div class="d-flex align-center ga-2 mb-2">
+              <div class="d-flex align-center ga-2 mb-2">
                 <VIcon
-                    size="28"
-                    :icon="priceChangeIcon"
+                  size="28"
+                  :icon="priceChangeIcon"
                 />
 
                 <div class="text-h6 font-weight-bold">
-                    Perubahan Harga Dasar
+                  Perubahan Harga Dasar
                 </div>
 
                 <VChip
-                    size="small"
-                    variant="flat"
-                    :color="priceChangeColor"
+                  size="small"
+                  variant="flat"
+                  :color="priceChangeColor"
                 >
-                    {{ priceChangeLabel }}
+                  {{ priceChangeLabel }}
                 </VChip>
-                </div>
+              </div>
 
-                <div class="text-body-2 text-medium-emphasis">
+              <div class="text-body-2 text-medium-emphasis">
                 Harga dasar berubah dari
                 <strong>Rp {{ formatMoney(previousPrice) }}</strong>
                 menjadi
                 <strong>Rp {{ formatMoney(currentPrice) }}</strong>.
-                </div>
+              </div>
             </div>
 
-            <!-- <div class="text-right">
-                <div class="text-caption text-medium-emphasis">
-                Selisih Harga
-                </div>
+            <!--
+              <div class="text-right">
+              <div class="text-caption text-medium-emphasis">
+              Selisih Harga
+              </div>
 
-                <div class="text-h5 font-weight-bold">
-                {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-                Rp {{ formatMoney(absolutePriceDiff) }}
-                </div>
+              <div class="text-h5 font-weight-bold">
+              {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+              Rp {{ formatMoney(absolutePriceDiff) }}
+              </div>
 
-                <div class="text-body-2">
-                {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-                {{ absolutePriceDiffPercent.toFixed(2) }}%
-                </div>
-            </div> -->
-            </div>
+              <div class="text-body-2">
+              {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+              {{ absolutePriceDiffPercent.toFixed(2) }}%
+              </div>
+              </div>
+            -->
+          </div>
 
-            <VDivider class="my-5" />
+          <VDivider class="my-5" />
 
-            <VRow>
-            <VCol cols="12" md="4">
-                <VCard variant="flat" rounded="lg" class="pa-4">
+          <VRow>
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <VCard
+                variant="flat"
+                rounded="lg"
+                class="pa-4"
+              >
                 <div class="text-caption text-medium-emphasis mb-1">
-                    Harga Sebelumnya
+                  Harga Sebelumnya
                 </div>
 
                 <div class="text-h6 font-weight-bold">
-                    Rp {{ formatMoney(previousPrice) }}
+                  Rp {{ formatMoney(previousPrice) }}
                 </div>
-                </VCard>
+              </VCard>
             </VCol>
 
-            <VCol cols="12" md="4">
-                <VCard variant="flat" rounded="lg" class="pa-4">
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <VCard
+                variant="flat"
+                rounded="lg"
+                class="pa-4"
+              >
                 <div class="text-caption text-medium-emphasis mb-1">
-                    Harga Saat Ini
+                  Harga Saat Ini
                 </div>
 
                 <div class="text-h6 font-weight-bold">
-                    Rp {{ formatMoney(currentPrice) }}
+                  Rp {{ formatMoney(currentPrice) }}
                 </div>
-                </VCard>
+              </VCard>
             </VCol>
 
-            <VCol cols="12" md="4">
-                <VCard variant="flat" rounded="lg" class="pa-4">
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <VCard
+                variant="flat"
+                rounded="lg"
+                class="pa-4"
+              >
                 <div class="text-caption text-medium-emphasis mb-1">
-                    Selisih Harga
+                  Selisih Harga
                 </div>
 
                 <div
-                    class="text-h6 font-weight-bold"
-                    :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
+                  class="text-h6 font-weight-bold"
+                  :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
                 >
-                    {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-                    Rp {{ formatMoney(absolutePriceDiff) }}
+                  {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+                  Rp {{ formatMoney(absolutePriceDiff) }}
                 </div>
 
                 <div
-                    class="text-caption"
-                    :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
+                  class="text-caption"
+                  :class="priceDiff > 0 ? 'text-error' : priceDiff < 0 ? 'text-success' : ''"
                 >
-                    {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
-                    {{ absolutePriceDiffPercent.toFixed(2) }}%
+                  {{ priceDiff > 0 ? '+' : priceDiff < 0 ? '-' : '' }}
+                  {{ absolutePriceDiffPercent.toFixed(2) }}%
                 </div>
-                </VCard>
+              </VCard>
             </VCol>
-            </VRow>
+          </VRow>
 
-            <VAlert
+          <VAlert
             class="mt-5"
             variant="flat"
             color="surface"
             border="start"
-            >
+          >
             <div class="d-flex justify-space-between align-center flex-wrap ga-4">
-                <div>
+              <div>
                 <div class="font-weight-bold mb-1">
-                    Dampak ke Total PO
+                  Dampak ke Total PO
                 </div>
 
                 <div class="text-body-2 text-medium-emphasis">
-                    Total PO berubah dari
-                    <strong>Rp {{ formatMoney(previousTotal) }}</strong>
-                    menjadi
-                    <strong>Rp {{ formatMoney(currentTotal) }}</strong>.
-                </div>
-                </div>
-
-                <div class="text-right">
-                <div class="text-caption text-medium-emphasis">
-                    Selisih Total
-                </div>
-
-                <div
-                    class="text-h6 font-weight-bold"
-                    :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
-                >
-                    {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
-                    Rp {{ formatMoney(absoluteTotalDiff) }}
-                </div>
-
-                <div
-                    class="text-caption"
-                    :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
-                >
-                    {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
-                    {{ absoluteTotalDiffPercent.toFixed(2) }}%
+                  Total PO berubah dari
+                  <strong>Rp {{ formatMoney(previousTotal) }}</strong>
+                  menjadi
+                  <strong>Rp {{ formatMoney(currentTotal) }}</strong>.
                 </div>
               </div>
-          </div>
+
+              <div class="text-right">
+                <div class="text-caption text-medium-emphasis">
+                  Selisih Total
+                </div>
+
+                <div
+                  class="text-h6 font-weight-bold"
+                  :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
+                >
+                  {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
+                  Rp {{ formatMoney(absoluteTotalDiff) }}
+                </div>
+
+                <div
+                  class="text-caption"
+                  :class="totalDiff > 0 ? 'text-error' : totalDiff < 0 ? 'text-success' : ''"
+                >
+                  {{ totalDiff > 0 ? '+' : totalDiff < 0 ? '-' : '' }}
+                  {{ absoluteTotalDiffPercent.toFixed(2) }}%
+                </div>
+              </div>
+            </div>
           </VAlert>
-      </VCardText>
+        </VCardText>
       </VCard>
       <!-- DECISION AREA -->
       <VRow class="mb-6">
         <!-- LEFT: PO SUMMARY -->
-        <VCol cols="12" md="8">
+        <VCol
+          cols="12"
+          md="8"
+        >
           <VCard rounded="lg">
             <VCardTitle class="d-flex align-center ga-2">
-              <VIcon color="primary" icon="tabler-file-invoice" />
+              <VIcon
+                color="primary"
+                icon="tabler-file-invoice"
+              />
               Ringkasan Purchase Order
             </VCardTitle>
 
@@ -705,16 +789,21 @@ onMounted(() => {
 
             <VCardText>
               <VRow>
-                <VCol cols="12" md="6">
+                <VCol
+                  cols="12"
+                  md="6"
+                >
                   <div class="text-subtitle-2 text-medium-emphasis mb-3">
-                  Detail Informasi
+                    Detail Informasi
                   </div>
 
                   <div class="d-flex flex-column ga-3">
-                    <!-- <div class="d-flex justify-space-between">
+                    <!--
+                      <div class="d-flex justify-space-between">
                       <span>Vendor</span>
                       <strong class="text-right">{{ po.vendor || '-' }}</strong>
-                    </div> -->
+                      </div>
+                    -->
 
                     <div class="d-flex justify-space-between">
                       <span>Produk</span>
@@ -723,7 +812,7 @@ onMounted(() => {
 
                     <div class="d-flex justify-space-between">
                       <span>Terminal</span>
-                      <strong class="text-right">{{ po.terminal +' - ' + po.lokasi || '-' }}</strong>
+                      <strong class="text-right">{{ `${po.terminal} - ${po.lokasi}` || '-' }}</strong>
                     </div>
 
                     <div class="d-flex justify-space-between">
@@ -759,7 +848,10 @@ onMounted(() => {
                   </div>
                 </VCol>
 
-                <VCol cols="12" md="6">
+                <VCol
+                  cols="12"
+                  md="6"
+                >
                   <div class="text-subtitle-2 text-medium-emphasis mb-3">
                     Ringkasan Nilai
                   </div>
@@ -845,7 +937,10 @@ onMounted(() => {
         </VCol>
 
         <!-- RIGHT: APPROVAL ACTION -->
-        <VCol cols="12" md="4">
+        <VCol
+          cols="12"
+          md="4"
+        >
           <VCard
             rounded="lg"
             :color="
@@ -894,16 +989,19 @@ onMounted(() => {
               (
                 (userRoles.includes('CFO') || userRoles.includes('Chief Financial Officer'))
                 && po.disposisi_po === 1
-              ) ||
-              (
-                (userRoles.includes('CEO') || userRoles.includes('Chief Executive Officer'))
-                && po.disposisi_po === 2
               )
+                || (
+                  (userRoles.includes('CEO') || userRoles.includes('Chief Executive Officer'))
+                  && po.disposisi_po === 2
+                )
             "
             rounded="lg"
           >
             <VCardTitle class="d-flex align-center ga-2">
-              <VIcon color="primary" icon="tabler-checkup-list" />
+              <VIcon
+                color="primary"
+                icon="tabler-checkup-list"
+              />
 
               {{
                 po.disposisi_po === 1
@@ -961,7 +1059,10 @@ onMounted(() => {
           >
             <VCardText>
               <div class="d-flex align-center ga-3">
-                <VIcon color="grey" icon="tabler-lock" />
+                <VIcon
+                  color="grey"
+                  icon="tabler-lock"
+                />
 
                 <div>
                   <div class="font-weight-bold">
@@ -981,10 +1082,16 @@ onMounted(() => {
       <!-- APPROVAL TIMELINE & HISTORY -->
       <VRow>
         <!-- TIMELINE -->
-        <VCol cols="12" md="4">
+        <VCol
+          cols="12"
+          md="4"
+        >
           <VCard rounded="lg">
             <VCardTitle class="d-flex align-center ga-2">
-              <VIcon color="primary" icon="tabler-timeline" />
+              <VIcon
+                color="primary"
+                icon="tabler-timeline"
+              />
               Approval Timeline
             </VCardTitle>
 
@@ -1187,386 +1294,459 @@ onMounted(() => {
 
         <!-- HISTORY -->
         <!-- HISTORY -->
-      <VCol cols="12" md="8">
-      <VCard rounded="lg">
-          <VCardTitle class="d-flex align-center ga-2">
-          <VIcon color="primary" icon="tabler-history" />
-          Riwayat Perubahan PO
-          </VCardTitle>
+        <VCol
+          cols="12"
+          md="8"
+        >
+          <VCard rounded="lg">
+            <VCardTitle class="d-flex align-center ga-2">
+              <VIcon
+                color="primary"
+                icon="tabler-history"
+              />
+              Riwayat Perubahan PO
+            </VCardTitle>
 
-          <VDivider />
+            <VDivider />
 
-          <VCardText>
-          <template v-if="histories.length > 0">
-              <VExpansionPanels variant="accordion">
-              <VExpansionPanel
-                  v-for="(h, index) in histories"
-                  :key="index"
-              >
-                  <VExpansionPanelTitle>
-                  <div class="d-flex justify-space-between align-center w-100 me-4 flex-wrap ga-3">
-                      <div>
-                      <div class="font-weight-bold">
-                          Riwayat Pengajuan ke-{{ index + 1 }}
-                      </div>
-
-                      <div class="text-caption text-medium-emphasis">
-                          {{ h.nomor_po || '-' }}
-                      </div>
-                      </div>
-
-                      <div class="d-flex align-center ga-2">
-                      <VChip size="small" variant="tonal" color="primary">
-                          {{ h.lastupdate_time || h.tanggal_inven || '-' }}
-                      </VChip>
-
-                      <VChip size="small" variant="flat" color="success">
-                          Rp {{ formatMoney(h.total_order) }}
-                      </VChip>
-                      </div>
-                  </div>
-                  </VExpansionPanelTitle>
-
-                  <VExpansionPanelText>
-                  <VRow>
-                      <!-- INFORMASI PO -->
-                      <VCol cols="12" md="6">
-                      <VCard variant="tonal" color="primary" rounded="lg">
-                          <VCardTitle class="text-subtitle-1 font-weight-bold">
-                          <VIcon start icon="tabler-file-invoice" />
-                          Informasi PO
-                          </VCardTitle>
-
-                          <VDivider />
-
-                          <VCardText>
-                          <div class="d-flex flex-column ga-3">
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Nomor PO
-                              </span>
-
-                              <strong class="text-right">
-                                  {{ h.nomor_po || '-' }}
-                              </strong>
-                              </div>
-
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Tanggal PO
-                              </span>
-
-                              <strong class="text-right">
-                                  {{ h.tanggal_inven || '-' }}
-                              </strong>
-                              </div>
-
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Produk
-                              </span>
-
-                              <strong class="text-right">
-                                  {{ h.produk.jenis_produk || '-' }}
-                                  <template v-if="h.produk.merk_dagang">
-                                  - {{ h.produk.merk_dagang }}
-                                  </template>
-                              </strong>
-                              </div>
-
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Terminal
-                              </span>
-
-                              <strong class="text-right">
-                                  {{ h.terminal.nama_terminal || '-' }}
-
-                                  <template v-if="h.terminal.tanki_terminal">
-                                  ({{ h.terminal.tanki_terminal }})
-                                  </template>
-
-                                  <template v-if="h.terminal.lokasi_terminal">
-                                  - {{ h.terminal.lokasi_terminal }}
-                                  </template>
-                              </strong>
-                              </div>
-
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Vendor
-                              </span>
-
-                              <strong class="text-right">
-                                  {{ h.vendor.nama_vendor || '-' }}
-                              </strong>
-                              </div>
+            <VCardText>
+              <template v-if="histories.length > 0">
+                <VExpansionPanels variant="accordion">
+                  <VExpansionPanel
+                    v-for="(h, index) in histories"
+                    :key="index"
+                  >
+                    <VExpansionPanelTitle>
+                      <div class="d-flex justify-space-between align-center w-100 me-4 flex-wrap ga-3">
+                        <div>
+                          <div class="font-weight-bold">
+                            Riwayat Pengajuan ke-{{ index + 1 }}
                           </div>
-                          </VCardText>
-                      </VCard>
-                      </VCol>
 
-                      <!-- PENGIRIMAN & TERMS -->
-                      <VCol cols="12" md="6">
-                      <VCard variant="tonal" color="info" rounded="lg">
-                          <VCardTitle class="text-subtitle-1 font-weight-bold">
-                          <VIcon start icon="tabler-truck-delivery" />
-                          Pengiriman & Terms
-                          </VCardTitle>
+                          <div class="text-caption text-medium-emphasis">
+                            {{ h.nomor_po || '-' }}
+                          </div>
+                        </div>
 
-                          <VDivider />
+                        <div class="d-flex align-center ga-2">
+                          <VChip
+                            size="small"
+                            variant="tonal"
+                            color="primary"
+                          >
+                            {{ h.lastupdate_time || h.tanggal_inven || '-' }}
+                          </VChip>
 
-                          <VCardText>
-                          <div class="d-flex flex-column ga-3">
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Jenis Kirim
-                              </span>
+                          <VChip
+                            size="small"
+                            variant="flat"
+                            color="success"
+                          >
+                            Rp {{ formatMoney(h.total_order) }}
+                          </VChip>
+                        </div>
+                      </div>
+                    </VExpansionPanelTitle>
 
-                              <strong>
-                                  {{ Number(h.jenis_kirim) === 1 ? 'Truck' : 'Ship' }}
-                              </strong>
+                    <VExpansionPanelText>
+                      <VRow>
+                        <!-- INFORMASI PO -->
+                        <VCol
+                          cols="12"
+                          md="6"
+                        >
+                          <VCard
+                            variant="tonal"
+                            color="primary"
+                            rounded="lg"
+                          >
+                            <VCardTitle class="text-subtitle-1 font-weight-bold">
+                              <VIcon
+                                start
+                                icon="tabler-file-invoice"
+                              />
+                              Informasi PO
+                            </VCardTitle>
+
+                            <VDivider />
+
+                            <VCardText>
+                              <div class="d-flex flex-column ga-3">
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Nomor PO
+                                  </span>
+
+                                  <strong class="text-right">
+                                    {{ h.nomor_po || '-' }}
+                                  </strong>
+                                </div>
+
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Tanggal PO
+                                  </span>
+
+                                  <strong class="text-right">
+                                    {{ h.tanggal_inven || '-' }}
+                                  </strong>
+                                </div>
+
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Produk
+                                  </span>
+
+                                  <strong class="text-right">
+                                    {{ h.produk.jenis_produk || '-' }}
+                                    <template v-if="h.produk.merk_dagang">
+                                      - {{ h.produk.merk_dagang }}
+                                    </template>
+                                  </strong>
+                                </div>
+
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Terminal
+                                  </span>
+
+                                  <strong class="text-right">
+                                    {{ h.terminal.nama_terminal || '-' }}
+
+                                    <template v-if="h.terminal.tanki_terminal">
+                                      ({{ h.terminal.tanki_terminal }})
+                                    </template>
+
+                                    <template v-if="h.terminal.lokasi_terminal">
+                                      - {{ h.terminal.lokasi_terminal }}
+                                    </template>
+                                  </strong>
+                                </div>
+
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Vendor
+                                  </span>
+
+                                  <strong class="text-right">
+                                    {{ h.vendor.nama_vendor || '-' }}
+                                  </strong>
+                                </div>
                               </div>
+                            </VCardText>
+                          </VCard>
+                        </VCol>
 
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Terms
-                              </span>
+                        <!-- PENGIRIMAN & TERMS -->
+                        <VCol
+                          cols="12"
+                          md="6"
+                        >
+                          <VCard
+                            variant="tonal"
+                            color="info"
+                            rounded="lg"
+                          >
+                            <VCardTitle class="text-subtitle-1 font-weight-bold">
+                              <VIcon
+                                start
+                                icon="tabler-truck-delivery"
+                              />
+                              Pengiriman & Terms
+                            </VCardTitle>
 
-                              <strong>
-                                  {{ h.terms || '-' }}
+                            <VDivider />
 
-                                  <template v-if="h.terms === 'NET'">
-                                  ({{ h.terms_day || 0 }} Hari)
-                                  </template>
-                              </strong>
-                              </div>
+                            <VCardText>
+                              <div class="d-flex flex-column ga-3">
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Jenis Kirim
+                                  </span>
 
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Volume PO
-                              </span>
+                                  <strong>
+                                    {{ Number(h.jenis_kirim) === 1 ? 'Truck' : 'Ship' }}
+                                  </strong>
+                                </div>
 
-                              <strong>
-                                  {{ formatMoney(h.volume_po) }} Liter
-                              </strong>
-                              </div>
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Terms
+                                  </span>
 
-                              
-                              <div class="d-flex justify-space-between ga-4" v-if="h.kategori_plat">
-                                <span class="text-medium-emphasis">
-                                  Kategori Plat
-                                </span>
+                                  <strong>
+                                    {{ h.terms || '-' }}
 
-                                <strong>
-                                    {{ h.kategori_plat }} 
-                                </strong>
-                              </div>
-                              <div class="d-flex justify-space-between ga-4" v-if="Number(h.ongkos_angkut)>0">
-                                <span class="text-medium-emphasis">
+                                    <template v-if="h.terms === 'NET'">
+                                      ({{ h.terms_day || 0 }} Hari)
+                                    </template>
+                                  </strong>
+                                </div>
+
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Volume PO
+                                  </span>
+
+                                  <strong>
+                                    {{ formatMoney(h.volume_po) }} Liter
+                                  </strong>
+                                </div>
+
+                                <div
+                                  v-if="h.kategori_plat"
+                                  class="d-flex justify-space-between ga-4"
+                                >
+                                  <span class="text-medium-emphasis">
+                                    Kategori Plat
+                                  </span>
+
+                                  <strong>
+                                    {{ h.kategori_plat }}
+                                  </strong>
+                                </div>
+                                <div
+                                  v-if="Number(h.ongkos_angkut) > 0"
+                                  class="d-flex justify-space-between ga-4"
+                                >
+                                  <span class="text-medium-emphasis">
                                     Ongkos Angkut
-                                </span>
+                                  </span>
 
-                                <strong>
+                                  <strong>
                                     {{ formatMoney(h.ongkos_angkut) }} Liter
-                                </strong>
+                                  </strong>
+                                </div>
+
+                                <div class="d-flex justify-space-between ga-4">
+                                  <span class="text-medium-emphasis">
+                                    Jenis Harga
+                                  </span>
+
+                                  <VChip
+                                    size="small"
+                                    variant="tonal"
+                                    :color="Number(h.jenis_harga) === 1 ? 'success' : 'warning'"
+                                  >
+                                    {{ Number(h.jenis_harga) === 1 ? 'Final' : 'Sementara' }}
+                                  </VChip>
+                                </div>
+                              </div>
+                            </VCardText>
+                          </VCard>
+                        </VCol>
+
+                        <!-- NILAI PO -->
+                        <VCol cols="12">
+                          <VCard
+                            variant="outlined"
+                            rounded="lg"
+                          >
+                            <VCardTitle class="text-subtitle-1 font-weight-bold">
+                              <VIcon
+                                start
+                                color="success"
+                                icon="tabler-cash"
+                              />
+                              Ringkasan Nilai PO
+                            </VCardTitle>
+
+                            <VDivider />
+
+                            <VCardText>
+                              <VRow>
+                                <VCol
+                                  cols="12"
+                                  md="4"
+                                >
+                                  <VCard
+                                    variant="tonal"
+                                    color="warning"
+                                    rounded="lg"
+                                  >
+                                    <VCardText>
+                                      <div class="text-caption text-medium-emphasis mb-1">
+                                        Harga Dasar
+                                      </div>
+
+                                      <div class="text-h6 font-weight-bold">
+                                        Rp {{ formatMoney(h.harga_tebus) }}
+                                      </div>
+                                    </VCardText>
+                                  </VCard>
+                                </VCol>
+
+                                <VCol
+                                  cols="12"
+                                  md="4"
+                                >
+                                  <VCard
+                                    variant="tonal"
+                                    color="primary"
+                                    rounded="lg"
+                                  >
+                                    <VCardText>
+                                      <div class="text-caption text-medium-emphasis mb-1">
+                                        Subtotal
+                                      </div>
+
+                                      <div class="text-h6 font-weight-bold">
+                                        Rp {{ formatMoney(h.subtotal) }}
+                                      </div>
+                                    </VCardText>
+                                  </VCard>
+                                </VCol>
+
+                                <VCol
+                                  cols="12"
+                                  md="4"
+                                >
+                                  <VCard
+                                    variant="flat"
+                                    color="success"
+                                    rounded="lg"
+                                  >
+                                    <VCardText>
+                                      <div class="text-caption mb-1">
+                                        Total Order
+                                      </div>
+
+                                      <div class="text-h6 font-weight-bold">
+                                        Rp {{ formatMoney(h.total_order) }}
+                                      </div>
+                                    </VCardText>
+                                  </VCard>
+                                </VCol>
+                              </VRow>
+
+                              <VDivider class="my-4" />
+
+                              <VRow>
+                                <VCol
+                                  cols="12"
+                                  md="6"
+                                >
+                                  <div class="d-flex flex-column ga-3">
+                                    <div class="d-flex justify-space-between">
+                                      <span>DPP 11/12</span>
+
+                                      <strong>
+                                        Rp {{ formatMoney(h.dpp_11_12) }}
+                                      </strong>
+                                    </div>
+
+                                    <div class="d-flex justify-space-between">
+                                      <span>PPN 12%</span>
+
+                                      <strong>
+                                        Rp {{ formatMoney(h.ppn_12) }}
+                                      </strong>
+                                    </div>
+
+                                    <div class="d-flex justify-space-between">
+                                      <span>PPH 22</span>
+
+                                      <strong>
+                                        Rp {{ formatMoney(h.pph_22) }}
+                                      </strong>
+                                    </div>
+                                  </div>
+                                </VCol>
+
+                                <VCol
+                                  cols="12"
+                                  md="6"
+                                >
+                                  <div class="d-flex flex-column ga-3">
+                                    <div class="d-flex justify-space-between">
+                                      <span>PBBKB {{ h.nilai_pbbkb ?? 0 }}%</span>
+
+                                      <strong>
+                                        Rp {{ formatMoney(h.pbbkb) ?? 0 }}
+                                      </strong>
+                                    </div>
+
+                                    <div class="d-flex justify-space-between">
+                                      <span>Nominal PBBKB</span>
+
+                                      <strong>
+                                        Rp {{ formatMoney(h.pbbkb_po) }}
+                                      </strong>
+                                    </div>
+
+                                    <div class="d-flex justify-space-between">
+                                      <span>Iuran Migas</span>
+
+                                      <strong>
+                                        Rp {{ formatMoney(h.nominal_migas) }}
+                                      </strong>
+                                    </div>
+                                  </div>
+                                </VCol>
+                              </VRow>
+                            </VCardText>
+                          </VCard>
+                        </VCol>
+
+                        <!-- CATATAN -->
+                        <VCol cols="12">
+                          <VAlert
+                            variant="tonal"
+                            color="secondary"
+                            border="start"
+                          >
+                            <div class="font-weight-bold mb-2">
+                              Catatan PO
+                            </div>
+
+                            <div style="white-space: pre-line;">
+                              {{ h.keterangan || '-' }}
+                            </div>
+
+                            <template v-if="h.keterangan_resubmission">
+                              <VDivider class="my-3" />
+
+                              <div class="font-weight-bold mb-2">
+                                Catatan Pengajuan Ulang PO
                               </div>
 
-                              <div class="d-flex justify-space-between ga-4">
-                              <span class="text-medium-emphasis">
-                                  Jenis Harga
-                              </span>
-
-                              <VChip
-                                  size="small"
-                                  variant="tonal"
-                                  :color="Number(h.jenis_harga) === 1 ? 'success' : 'warning'"
-                              >
-                                  {{ Number(h.jenis_harga) === 1 ? 'Final' : 'Sementara' }}
-                              </VChip>
+                              <div style="white-space: pre-line;">
+                                {{ h.keterangan_resubmission }}
                               </div>
+                            </template>
+                          </VAlert>
+                        </VCol>
+
+                        <!-- UPDATED INFO -->
+                        <VCol cols="12">
+                          <div class="d-flex justify-space-between align-center flex-wrap ga-3 text-caption text-medium-emphasis">
+                            <div>
+                              Updated by:
+                              <strong>{{ h.lastupdate_by || '-' }}</strong>
+                            </div>
+
+                            <div>
+                              Tanggal update:
+                              <strong>{{ h.lastupdate_time || '-' }}</strong>
+                            </div>
                           </div>
-                          </VCardText>
-                      </VCard>
-                      </VCol>
+                        </VCol>
+                      </VRow>
+                    </VExpansionPanelText>
+                  </VExpansionPanel>
+                </VExpansionPanels>
+              </template>
 
-                      <!-- NILAI PO -->
-                      <VCol cols="12">
-                      <VCard variant="outlined" rounded="lg">
-                          <VCardTitle class="text-subtitle-1 font-weight-bold">
-                          <VIcon start color="success" icon="tabler-cash" />
-                          Ringkasan Nilai PO
-                          </VCardTitle>
-
-                          <VDivider />
-
-                          <VCardText>
-                          <VRow>
-                              <VCol cols="12" md="4">
-                              <VCard variant="tonal" color="warning" rounded="lg">
-                                  <VCardText>
-                                  <div class="text-caption text-medium-emphasis mb-1">
-                                      Harga Dasar
-                                  </div>
-
-                                  <div class="text-h6 font-weight-bold">
-                                      Rp {{ formatMoney(h.harga_tebus) }}
-                                  </div>
-                                  </VCardText>
-                              </VCard>
-                              </VCol>
-
-                              <VCol cols="12" md="4">
-                              <VCard variant="tonal" color="primary" rounded="lg">
-                                  <VCardText>
-                                  <div class="text-caption text-medium-emphasis mb-1">
-                                      Subtotal
-                                  </div>
-
-                                  <div class="text-h6 font-weight-bold">
-                                      Rp {{ formatMoney(h.subtotal) }}
-                                  </div>
-                                  </VCardText>
-                              </VCard>
-                              </VCol>
-
-                              <VCol cols="12" md="4">
-                              <VCard variant="flat" color="success" rounded="lg">
-                                  <VCardText>
-                                  <div class="text-caption mb-1">
-                                      Total Order
-                                  </div>
-
-                                  <div class="text-h6 font-weight-bold">
-                                      Rp {{ formatMoney(h.total_order) }}
-                                  </div>
-                                  </VCardText>
-                              </VCard>
-                              </VCol>
-                          </VRow>
-
-                          <VDivider class="my-4" />
-
-                          <VRow>
-                              <VCol cols="12" md="6">
-                              <div class="d-flex flex-column ga-3">
-                                  <div class="d-flex justify-space-between">
-                                  <span>DPP 11/12</span>
-
-                                  <strong>
-                                      Rp {{ formatMoney(h.dpp_11_12) }}
-                                  </strong>
-                                  </div>
-
-                                  <div class="d-flex justify-space-between">
-                                  <span>PPN 12%</span>
-
-                                  <strong>
-                                      Rp {{ formatMoney(h.ppn_12) }}
-                                  </strong>
-                                  </div>
-
-                                  <div class="d-flex justify-space-between">
-                                  <span>PPH 22</span>
-
-                                  <strong>
-                                      Rp {{ formatMoney(h.pph_22) }}
-                                  </strong>
-                                  </div>
-                              </div>
-                              </VCol>
-
-                              <VCol cols="12" md="6">
-                              <div class="d-flex flex-column ga-3">
-                                  <div class="d-flex justify-space-between">
-                                  <span>PBBKB {{ h.nilai_pbbkb ?? 0 }}%</span>
-
-                                  <strong>
-                                      Rp {{ formatMoney(h.pbbkb) ?? 0 }}
-                                  </strong>
-                                  </div>
-
-                                  <div class="d-flex justify-space-between">
-                                  <span>Nominal PBBKB</span>
-
-                                  <strong>
-                                      Rp {{ formatMoney(h.pbbkb_po) }}
-                                  </strong>
-                                  </div>
-
-                                  <div class="d-flex justify-space-between">
-                                  <span>Iuran Migas</span>
-
-                                  <strong>
-                                      Rp {{ formatMoney(h.nominal_migas) }}
-                                  </strong>
-                                  </div>
-                              </div>
-                              </VCol>
-                          </VRow>
-                          </VCardText>
-                      </VCard>
-                      </VCol>
-
-                      <!-- CATATAN -->
-                      <VCol cols="12">
-                      <VAlert
-                          variant="tonal"
-                          color="secondary"
-                          border="start"
-                      >
-                          <div class="font-weight-bold mb-2">
-                          Catatan PO
-                          </div>
-
-                          <div style="white-space: pre-line;">
-                          {{ h.keterangan || '-' }}
-                          </div>
-
-                          <template v-if="h.keterangan_resubmission">
-                          <VDivider class="my-3" />
-
-                          <div class="font-weight-bold mb-2">
-                              Catatan Pengajuan Ulang PO
-                          </div>
-
-                          <div style="white-space: pre-line;">
-                              {{ h.keterangan_resubmission }}
-                          </div>
-                          </template>
-                      </VAlert>
-                      </VCol>
-
-                      <!-- UPDATED INFO -->
-                      <VCol cols="12">
-                      <div class="d-flex justify-space-between align-center flex-wrap ga-3 text-caption text-medium-emphasis">
-                          <div>
-                          Updated by:
-                          <strong>{{ h.lastupdate_by || '-' }}</strong>
-                          </div>
-
-                          <div>
-                          Tanggal update:
-                          <strong>{{ h.lastupdate_time || '-' }}</strong>
-                          </div>
-                      </div>
-                      </VCol>
-                  </VRow>
-                  </VExpansionPanelText>
-              </VExpansionPanel>
-              </VExpansionPanels>
-          </template>
-
-          <VAlert
-              v-else
-              type="info"
-              variant="tonal"
-          >
-              Belum ada riwayat perubahan PO.
-          </VAlert>
-          </VCardText>
-      </VCard>
-      </VCol>
+              <VAlert
+                v-else
+                type="info"
+                variant="tonal"
+              >
+                Belum ada riwayat perubahan PO.
+              </VAlert>
+            </VCardText>
+          </VCard>
+        </VCol>
       </VRow>
 
       <!-- CONFIRMATION DIALOG -->
@@ -1576,7 +1756,10 @@ onMounted(() => {
       >
         <VCard rounded="lg">
           <VCardTitle class="d-flex align-center ga-2">
-            <VIcon color="warning" icon="tabler-alert-circle" />
+            <VIcon
+              color="warning"
+              icon="tabler-alert-circle"
+            />
             Konfirmasi Approval
           </VCardTitle>
 
@@ -1632,6 +1815,6 @@ onMounted(() => {
           </VCardText>
         </VCard>
       </VDialog>
-      </template>
+    </template>
   </section>
 </template>

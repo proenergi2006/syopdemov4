@@ -24,9 +24,26 @@ interface AxiosErrorShape {
   }
 }
 
-type MenuItem = {
+/*
+ * Section pengelompokan sidebar.
+ *
+ * Hanya melekat pada menu INDUK; submenu mengikuti induknya. Backend ikut
+ * menegakkannya -- menu yang punya parent disimpan dengan section kosong,
+ * berapa pun yang dikirim layar.
+ */
+interface MenuSection {
+  id: number
+  name: string
+  icon: string | null
+  order_no: number
+  is_active: boolean
+  menus_count?: number
+}
+
+interface MenuItem {
   id: number
   parent_id: number | null
+  menu_section_id: number | null
   name: string
   path: string | null
   route_name: string | null
@@ -43,10 +60,11 @@ type FlatMenuItem = MenuItem & {
   level: number
 }
 
-type MenuForm = {
+interface MenuForm {
   id: number | null
   type: 'GROUP' | 'SIDEBAR_PAGE' | 'HIDDEN_PAGE'
   parent_id: number | null
+  menu_section_id: number | null
   name: string
   path: string
   route_name: string
@@ -97,6 +115,7 @@ const form = ref<MenuForm>({
   id: null,
   type: 'SIDEBAR_PAGE',
   parent_id: null,
+  menu_section_id: null,
   name: '',
   path: '',
   route_name: '',
@@ -188,9 +207,8 @@ const flattenMenus = (
       level,
     })
 
-    if (item.children?.length) {
+    if (item.children?.length)
       result.push(...flattenMenus(item.children, level + 1))
-    }
   })
 
   return result
@@ -358,8 +376,8 @@ const filteredMenus = computed(() => {
         .filter(Boolean)
         .some(value => String(value).toLowerCase().includes(keyword))
 
-    const matchStatus =
-      statusFilter.value === 'ALL'
+    const matchStatus
+      = statusFilter.value === 'ALL'
       || (statusFilter.value === 'ACTIVE' && item.is_active)
       || (statusFilter.value === 'INACTIVE' && !item.is_active)
 
@@ -395,17 +413,18 @@ watch(
       form.value.route_name = ''
       form.value.permission_key = ''
       form.value.show_in_sidebar = true
+
       return
     }
 
     if (type === 'SIDEBAR_PAGE') {
       form.value.show_in_sidebar = true
+
       return
     }
 
-    if (type === 'HIDDEN_PAGE') {
+    if (type === 'HIDDEN_PAGE')
       form.value.show_in_sidebar = false
-    }
   },
 )
 
@@ -429,7 +448,8 @@ const fetchMenus = async () => {
     const response = await axiosIns.get('/master/menus')
 
     menus.value = response.data?.data?.tree ?? []
-  } catch (error: any) {
+  }
+  catch (error: any) {
     if (isForbiddenResponse(error)) {
       await redirectToForbidden()
 
@@ -442,7 +462,8 @@ const fetchMenus = async () => {
         error.response?.data?.message
         ?? 'Terjadi kesalahan saat memuat data menu.',
     })
-  } finally {
+  }
+  finally {
     isLoading.value = false
   }
 }
@@ -455,8 +476,207 @@ const refreshNavigationStorage = async () => {
       'navItems',
       JSON.stringify(response.data),
     )
-  } catch {
+  }
+  catch {
     // Tidak perlu mengganggu proses utama.
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Section pengelompokan sidebar
+|--------------------------------------------------------------------------
+| Dikelola di layar ini juga, bukan di halaman tersendiri. Section adalah
+| bagian dari penataan menu, dan memisahkannya berarti menata satu sidebar di
+| dua tempat -- berpindah bolak-balik hanya untuk melihat hasilnya.
+|
+| Izinnya menumpang auth_menu.* yang sudah ada, jadi tidak ada permission baru
+| yang harus diberikan ke tiap role.
+|--------------------------------------------------------------------------
+*/
+const sections = ref<MenuSection[]>([])
+const isSectionDialogVisible = ref(false)
+const isSectionSaving = ref(false)
+const editingSectionId = ref<number | null>(null)
+
+const sectionForm = ref({
+  name: '',
+  icon: '',
+  order_no: 0,
+  is_active: true,
+})
+
+/** Pilihan untuk dropdown Section pada formulir menu. */
+const sectionOptions = computed(() => [
+  { title: 'Tanpa Section (tampil di paling atas)', value: null },
+
+  ...sections.value
+    .filter(item => item.is_active)
+    .map(item => ({
+      title: item.name,
+      value: item.id,
+    })),
+])
+
+const fetchSections = async () => {
+  try {
+    const response = await axiosIns.get('/master/menu-sections')
+
+    sections.value = Array.isArray(response.data?.data)
+      ? response.data.data
+      : []
+  }
+  catch {
+    /*
+     * Gagal memuat section bukan alasan menggagalkan seluruh layar: daftar
+     * menunya tetap berguna, dan dropdown sectionnya cukup menyisakan pilihan
+     * "Tanpa Section".
+     */
+    sections.value = []
+  }
+}
+
+const resetSectionForm = () => {
+  editingSectionId.value = null
+
+  sectionForm.value = {
+    name: '',
+    icon: '',
+
+    /*
+     * Diberi angka di belakang section terakhir, bukan nol. Section baru yang
+     * selalu lahir di urutan nol akan menyelinap ke paling atas sidebar --
+     * mengubah tata letak yang sudah ditata, tanpa diminta.
+     */
+    order_no: sections.value.length
+      ? Math.max(...sections.value.map(item => item.order_no)) + 10
+      : 10,
+
+    is_active: true,
+  }
+}
+
+const openSectionDialog = async () => {
+  if (!canView.value) {
+    await redirectToForbidden()
+
+    return
+  }
+
+  await fetchSections()
+
+  resetSectionForm()
+
+  isSectionDialogVisible.value = true
+}
+
+const editSection = (item: MenuSection) => {
+  editingSectionId.value = item.id
+
+  sectionForm.value = {
+    name: item.name ?? '',
+    icon: item.icon ?? '',
+    order_no: item.order_no ?? 0,
+    is_active: Boolean(item.is_active),
+  }
+}
+
+const saveSection = async (): Promise<void> => {
+  if (isSectionSaving.value)
+    return
+
+  const nama = sectionForm.value.name.trim()
+
+  if (!nama) {
+    showErrorToast({ title: 'Nama Section Wajib Diisi', text: 'Isi dulu nama sectionnya.' })
+
+    return
+  }
+
+  isSectionSaving.value = true
+
+  const payload = {
+    name: nama,
+    icon: sectionForm.value.icon.trim() || null,
+    order_no: Number(sectionForm.value.order_no || 0),
+    is_active: Boolean(sectionForm.value.is_active),
+  }
+
+  try {
+    if (editingSectionId.value)
+      await axiosIns.put(`/master/menu-sections/${editingSectionId.value}`, payload)
+    else
+      await axiosIns.post('/master/menu-sections', payload)
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text: editingSectionId.value ? 'Section berhasil diperbarui.' : 'Section berhasil dibuat.',
+    })
+
+    await fetchSections()
+
+    resetSectionForm()
+
+    /* Sidebar ikut berubah begitu sectionnya berubah. */
+    await refreshNavigationStorage()
+  }
+  catch (error: unknown) {
+    /*
+     * Memakai getApiErrorMessage yang sudah dipakai layar lain: ia yang tahu
+     * cara mengeluarkan pesan validasi Laravel dari `errors`, termasuk pesan
+     * "nama section sudah digunakan" dari backend.
+     */
+    showErrorToast({
+      title: 'Gagal Menyimpan Section',
+      text: getApiErrorMessage(error, 'Terjadi kesalahan saat menyimpan section.'),
+    })
+  }
+  finally {
+    isSectionSaving.value = false
+  }
+}
+
+const deleteSection = async (item: MenuSection): Promise<void> => {
+  const jumlah = Number(item.menus_count ?? 0)
+
+  const confirm = await showConfirmAlert({
+    title: `Bubarkan Section "${item.name}"?`,
+
+    /*
+     * Dikatakan terang-terangan bahwa menunya tidak ikut terhapus. Tanpa itu,
+     * kata "hapus" pada sebuah kelompok mudah terbaca seolah seluruh isinya
+     * ikut lenyap -- dan orang akan ragu menekannya.
+     */
+    text: jumlah > 0
+      ? `${jumlah} menu di dalamnya tidak ikut terhapus, hanya kembali ke bagian tanpa section.`
+      : 'Section ini belum berisi menu apa pun.',
+
+    confirmButtonText: 'Ya, bubarkan',
+    cancelButtonText: 'Batal',
+  })
+
+  if (!confirm.isConfirmed)
+    return
+
+  try {
+    const response = await axiosIns.delete(`/master/menu-sections/${item.id}`)
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text: response.data?.message ?? 'Section berhasil dibubarkan.',
+    })
+
+    await Promise.all([fetchSections(), fetchMenus()])
+
+    resetSectionForm()
+
+    await refreshNavigationStorage()
+  }
+  catch (error: unknown) {
+    showErrorToast({
+      title: 'Gagal Membubarkan Section',
+      text: getApiErrorMessage(error, 'Terjadi kesalahan saat membubarkan section.'),
+    })
   }
 }
 
@@ -465,6 +685,7 @@ const resetForm = () => {
     id: null,
     type: 'SIDEBAR_PAGE',
     parent_id: null,
+    menu_section_id: null,
     name: '',
     path: '',
     route_name: '',
@@ -516,6 +737,7 @@ const openEditDialog = async (item: MenuItem) => {
         ? 'HIDDEN_PAGE'
         : 'SIDEBAR_PAGE',
     parent_id: item.parent_id,
+    menu_section_id: item.menu_section_id ?? null,
     name: item.name ?? '',
     path: item.path ?? '',
     route_name: item.route_name ?? '',
@@ -591,13 +813,23 @@ const buildPayload = () => {
 
   return {
     parent_id: form.value.parent_id,
+
+    /*
+     * Section hanya untuk menu induk. Submenu mengikuti induknya, jadi
+     * nilainya sengaja dikosongkan di sini -- bukan dibiarkan terbawa dari
+     * isian sebelumnya ketika seseorang mengubah menu induk menjadi submenu.
+     */
+    menu_section_id: form.value.parent_id === null
+      ? form.value.menu_section_id
+      : null,
+
     name: form.value.name.trim(),
     path: isGroup ? null : form.value.path.trim(),
     route_name: isGroup ? null : (form.value.route_name.trim() || null),
     icon: form.value.icon.trim() || null,
     order_no: Number(form.value.order_no || 0),
     permission_key: null,
-    show_in_sidebar: isGroup || isSidebarPage ? true : false,
+    show_in_sidebar: !!(isGroup || isSidebarPage),
     is_active: Boolean(form.value.is_active),
   }
 }
@@ -627,6 +859,7 @@ const saveMenu = async (): Promise<void> => {
 
   if (!confirm.isConfirmed) {
     isDialogVisible.value = true
+
     return
   }
 
@@ -640,14 +873,15 @@ const saveMenu = async (): Promise<void> => {
     if (isEditMode.value && form.value.id) {
       await axiosIns.put(`/master/menus/${form.value.id}`, payload, {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       })
-    } else {
+    }
+    else {
       await axiosIns.post('/master/menus', payload, {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       })
@@ -665,7 +899,8 @@ const saveMenu = async (): Promise<void> => {
     resetForm()
     await fetchMenus()
     await refreshNavigationStorage()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     if (isForbiddenResponse(error)) {
@@ -682,7 +917,8 @@ const saveMenu = async (): Promise<void> => {
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal menyimpan menu.'),
     })
-  } finally {
+  }
+  finally {
     isSaving.value = false
   }
 }
@@ -736,7 +972,8 @@ const toggleActive = async (item: MenuItem): Promise<void> => {
 
     await fetchMenus()
     await refreshNavigationStorage()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     if (isForbiddenResponse(error)) {
@@ -756,7 +993,8 @@ const toggleActive = async (item: MenuItem): Promise<void> => {
           : 'Gagal menonaktifkan menu.',
       ),
     })
-  } finally {
+  }
+  finally {
     isActionLoading.value = false
   }
 }
@@ -801,7 +1039,8 @@ const deleteMenu = async (item: MenuItem): Promise<void> => {
 
     await fetchMenus()
     await refreshNavigationStorage()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     if (isForbiddenResponse(error)) {
@@ -816,23 +1055,30 @@ const deleteMenu = async (item: MenuItem): Promise<void> => {
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal menghapus menu.'),
     })
-  } finally {
+  }
+  finally {
     isActionLoading.value = false
   }
 }
 
 const typeColor = (type: string) => {
-  if (type === 'GROUP') return 'primary'
-  if (type === 'SIDEBAR_PAGE') return 'success'
-  if (type === 'HIDDEN_PAGE') return 'warning'
+  if (type === 'GROUP')
+    return 'primary'
+  if (type === 'SIDEBAR_PAGE')
+    return 'success'
+  if (type === 'HIDDEN_PAGE')
+    return 'warning'
 
   return 'secondary'
 }
 
 const typeLabel = (type: string) => {
-  if (type === 'GROUP') return 'Group'
-  if (type === 'SIDEBAR_PAGE') return 'Sidebar Page'
-  if (type === 'HIDDEN_PAGE') return 'Hidden Page'
+  if (type === 'GROUP')
+    return 'Group'
+  if (type === 'SIDEBAR_PAGE')
+    return 'Sidebar Page'
+  if (type === 'HIDDEN_PAGE')
+    return 'Hidden Page'
 
   return type
 }
@@ -846,7 +1092,7 @@ onMounted(async () => {
     return
   }
 
-  await fetchMenus()
+  await Promise.all([fetchMenus(), fetchSections()])
 })
 </script>
 
@@ -866,77 +1112,89 @@ onMounted(async () => {
               </VCardSubtitle>
             </div>
 
-            <VBtn
+            <div class="d-flex align-center flex-wrap gap-3">
+              <VBtn
+                variant="tonal"
+                color="secondary"
+                prepend-icon="tabler-layout-list"
+                class="text-none"
+                @click="openSectionDialog"
+              >
+                Kelola Section
+              </VBtn>
+
+              <VBtn
                 v-if="canCreate"
                 color="primary"
                 prepend-icon="tabler-plus"
-                @click="openCreateDialog"
                 class="text-none"
-                >
+                @click="openCreateDialog"
+              >
                 Tambah Menu
-            </VBtn>
+              </VBtn>
+            </div>
           </div>
         </VCardItem>
 
         <VDivider />
 
         <VCardText>
-            <VRow class="align-center">
-                <VCol
-                cols="12"
-                md="4"
-                >
-                <VTextField
-                    v-model="search"
-                    label="Search"
-                    placeholder="Cari menu, path, permission..."
-                    prepend-inner-icon="tabler-search"
-                    clearable
-                    density="comfortable"
-                />
-                </VCol>
+          <VRow class="align-center">
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <VTextField
+                v-model="search"
+                label="Search"
+                placeholder="Cari menu, path, permission..."
+                prepend-inner-icon="tabler-search"
+                clearable
+                density="comfortable"
+              />
+            </VCol>
 
-                <VCol
-                cols="12"
-                md="3"
-                >
-                <VSelect
-                    v-model="statusFilter"
-                    :items="statusOptions"
-                    label="Status"
-                    density="comfortable"
-                />
-                </VCol>
+            <VCol
+              cols="12"
+              md="3"
+            >
+              <VSelect
+                v-model="statusFilter"
+                :items="statusOptions"
+                label="Status"
+                density="comfortable"
+              />
+            </VCol>
 
-                <VCol
-                cols="12"
-                md="2"
-                >
-                <VBtn
-                    color="secondary"
-                    variant="tonal"
-                    prepend-icon="tabler-refresh"
-                    block
-                    @click="resetFilter"
-                    class="text-none"
-                >
-                    Reset Filter
-                </VBtn>
-                </VCol>
+            <VCol
+              cols="12"
+              md="2"
+            >
+              <VBtn
+                color="secondary"
+                variant="tonal"
+                prepend-icon="tabler-refresh"
+                block
+                class="text-none"
+                @click="resetFilter"
+              >
+                Reset Filter
+              </VBtn>
+            </VCol>
 
-                <VCol
-                cols="12"
-                md="2"
-                class="ms-auto"
-                >
-                <VSelect
-                    v-model="itemsPerPage"
-                    :items="itemsPerPageOptions"
-                    label="Tampilkan"
-                    density="comfortable"
-                />
-                </VCol>
-            </VRow>
+            <VCol
+              cols="12"
+              md="2"
+              class="ms-auto"
+            >
+              <VSelect
+                v-model="itemsPerPage"
+                :items="itemsPerPageOptions"
+                label="Tampilkan"
+                density="comfortable"
+              />
+            </VCol>
+          </VRow>
         </VCardText>
 
         <VDivider />
@@ -1161,277 +1419,506 @@ onMounted(async () => {
     v-model="isDialogVisible"
     max-width="760"
     persistent
-    >
+  >
     <VCard>
-        <VCardItem>
+      <VCardItem>
         <VCardTitle>
-            {{ isEditMode ? 'Edit Menu' : 'Tambah Menu' }}
+          {{ isEditMode ? 'Edit Menu' : 'Tambah Menu' }}
         </VCardTitle>
 
         <VCardSubtitle>
-            Kelola group, sidebar page, atau hidden route.
+          Kelola group, sidebar page, atau hidden route.
         </VCardSubtitle>
-        </VCardItem>
+      </VCardItem>
 
-        <VDivider />
+      <VDivider />
 
-        <VCardText>
+      <VCardText>
         <VRow>
-            <VCol
+          <VCol
             cols="12"
             md="6"
-            >
+          >
             <VSelect
-            v-model="form.type"
-            :items="typeOptions"
-            item-title="title"
-            item-value="value"
-            label="Tipe Menu"
+              v-model="form.type"
+              :items="typeOptions"
+              item-title="title"
+              item-value="value"
+              label="Tipe Menu"
+              density="comfortable"
+            />
+          </VCol>
+
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <VSelect
+              v-model="form.parent_id"
+              :items="parentOptions"
+              item-title="title"
+              item-value="value"
+              label="Parent Menu"
+              clearable
+              density="comfortable"
+              hint="Pilih Top Level jika menu ingin menjadi menu utama. Pilih parent jika menu ingin masuk ke dalam group tertentu."
+              persistent-hint
+            >
+              <template #selection="{ item }">
+                <div class="d-flex align-center gap-2">
+                  <VIcon
+                    :icon="item.raw.icon"
+                    size="18"
+                  />
+
+                  <span>{{ item.raw.name }}</span>
+
+                  <VChip
+                    size="x-small"
+                    variant="tonal"
+                    :color="parentOptionTypeColor(item.raw.type)"
+                  >
+                    {{ parentOptionTypeLabel(item.raw.type) }}
+                  </VChip>
+                </div>
+              </template>
+
+              <template #item="{ props, item }">
+                <VListItem
+                  v-bind="props"
+                  :title="undefined"
+                  :subtitle="undefined"
+                  class="py-2"
+                >
+                  <template #prepend>
+                    <div
+                      class="d-flex align-center"
+                      :style="{ width: `${item.raw.level * 22 + 28}px` }"
+                    >
+                      <VIcon
+                        v-if="item.raw.level > 0"
+                        icon="tabler-corner-down-right"
+                        size="16"
+                        color="secondary"
+                        class="me-1"
+                      />
+
+                      <VIcon
+                        :icon="item.raw.icon"
+                        size="20"
+                      />
+                    </div>
+                  </template>
+
+                  <VListItemTitle class="font-weight-medium">
+                    {{ item.raw.name }}
+                  </VListItemTitle>
+
+                  <VListItemSubtitle>
+                    {{ item.raw.subtitle }}
+                  </VListItemSubtitle>
+
+                  <template #append>
+                    <VChip
+                      size="x-small"
+                      variant="tonal"
+                      :color="parentOptionTypeColor(item.raw.type)"
+                    >
+                      {{ parentOptionTypeLabel(item.raw.type) }}
+                    </VChip>
+                  </template>
+                </VListItem>
+              </template>
+            </VSelect>
+          </VCol>
+
+          <!--
+            Section hanya untuk menu induk.
+
+            Digambar cuma ketika Parent Menu kosong. Submenu mengikuti
+            induknya, dan menampilkan pilihan ini padanya akan mengundang
+            orang mengisinya lalu bertanya kenapa tidak berpengaruh.
+          -->
+          <VCol
+            v-if="form.parent_id === null"
+            cols="12"
+            md="6"
+          >
+            <VSelect
+              v-model="form.menu_section_id"
+              :items="sectionOptions"
+              item-title="title"
+              item-value="value"
+              label="Section Sidebar"
+              density="comfortable"
+              hint="Judul kelompok di sidebar. Kosongkan jika menu ini ingin tampil di paling atas, sebelum judul kelompok mana pun."
+              persistent-hint
+            />
+          </VCol>
+
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <VTextField
+              v-model="form.name"
+              label="Nama Menu"
+              placeholder="Contoh: Vendor"
+              density="comfortable"
+              hint="Gunakan Bahasa Inggris. Nama ini dipakai sebagai kunci terjemahan multi-bahasa di sidebar (lihat resources/ts/plugins/i18n/locales/*/navigation.json)."
+              persistent-hint
+            />
+          </VCol>
+
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <VTextField
+              v-model.number="form.order_no"
+              label="Order"
+              type="number"
+              density="comfortable"
+              hint="Nomor urutan dalam parent menu yang sama."
+              persistent-hint
+              append-inner-icon="tabler-refresh"
+              @click:append-inner="applyNextOrderNo"
+            />
+          </VCol>
+
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <VCombobox
+              v-model="form.icon"
+              :items="tablerIconOptions"
+              label="Icon"
+              placeholder="Contoh: tabler-settings"
+              density="comfortable"
+              clearable
+              hint="Gunakan nama icon Tabler, contoh: tabler-settings, tabler-user, tabler-shopping-cart."
+              persistent-hint
+            >
+              <template #prepend-inner>
+                <VIcon
+                  v-if="form.icon"
+                  :icon="form.icon"
+                  size="20"
+                />
+              </template>
+
+              <template #append-inner>
+                <VBtn
+                  icon
+                  size="x-small"
+                  variant="text"
+                  color="primary"
+                  @click.stop="openTablerIconReference"
+                >
+                  <VIcon icon="tabler-external-link" />
+                  <VTooltip
+                    activator="parent"
+                    location="top"
+                  >
+                    Buka referensi Tabler Icon
+                  </VTooltip>
+                </VBtn>
+              </template>
+
+              <template #item="{ props, item }">
+                <VListItem
+                  v-bind="props"
+                  :title="undefined"
+                >
+                  <template #prepend>
+                    <VIcon
+                      :icon="item.raw"
+                      size="20"
+                    />
+                  </template>
+
+                  <VListItemTitle>
+                    {{ item.raw }}
+                  </VListItemTitle>
+                </VListItem>
+              </template>
+            </VCombobox>
+          </VCol>
+
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <VTextField
+              v-model="form.route_name"
+              label="Route Name"
+              placeholder="Contoh: master-vendor"
+              :disabled="form.type === 'GROUP'"
+              density="comfortable"
+            />
+          </VCol>
+
+          <VCol cols="12">
+            <VTextField
+              v-model="form.path"
+              label="Path"
+              placeholder="Contoh: /master/vendor"
+              :disabled="form.type === 'GROUP'"
+              density="comfortable"
+            />
+          </VCol>
+
+          <!--
+            <VCol cols="12">
+            <VTextField
+            v-model="form.permission_key"
+            label="Permission Key"
+            placeholder="Contoh: vendor.view"
+            :disabled="form.type === 'GROUP'"
             density="comfortable"
             />
             </VCol>
+          -->
 
-            <VCol
+          <VCol
             cols="12"
             md="6"
-            >
-                <VSelect
-                v-model="form.parent_id"
-                :items="parentOptions"
-                item-title="title"
-                item-value="value"
-                label="Parent Menu"
-                clearable
-                density="comfortable"
-                hint="Pilih Top Level jika menu ingin menjadi menu utama. Pilih parent jika menu ingin masuk ke dalam group tertentu."
-                persistent-hint
-                >
-                <template #selection="{ item }">
-                    <div class="d-flex align-center gap-2">
-                    <VIcon
-                        :icon="item.raw.icon"
-                        size="18"
-                    />
-
-                    <span>{{ item.raw.name }}</span>
-
-                    <VChip
-                        size="x-small"
-                        variant="tonal"
-                        :color="parentOptionTypeColor(item.raw.type)"
-                    >
-                        {{ parentOptionTypeLabel(item.raw.type) }}
-                    </VChip>
-                    </div>
-                </template>
-
-                <template #item="{ props, item }">
-                    <VListItem
-                    v-bind="props"
-                    :title="undefined"
-                    :subtitle="undefined"
-                    class="py-2"
-                    >
-                    <template #prepend>
-                        <div
-                        class="d-flex align-center"
-                        :style="{ width: `${item.raw.level * 22 + 28}px` }"
-                        >
-                        <VIcon
-                            v-if="item.raw.level > 0"
-                            icon="tabler-corner-down-right"
-                            size="16"
-                            color="secondary"
-                            class="me-1"
-                        />
-
-                        <VIcon
-                            :icon="item.raw.icon"
-                            size="20"
-                        />
-                        </div>
-                    </template>
-
-                    <VListItemTitle class="font-weight-medium">
-                        {{ item.raw.name }}
-                    </VListItemTitle>
-
-                    <VListItemSubtitle>
-                        {{ item.raw.subtitle }}
-                    </VListItemSubtitle>
-
-                    <template #append>
-                        <VChip
-                        size="x-small"
-                        variant="tonal"
-                        :color="parentOptionTypeColor(item.raw.type)"
-                        >
-                        {{ parentOptionTypeLabel(item.raw.type) }}
-                        </VChip>
-                    </template>
-                    </VListItem>
-                </template>
-                </VSelect>
-            </VCol>
-
-            <VCol
-            cols="12"
-            md="6"
-            >
-            <VTextField
-                v-model="form.name"
-                label="Nama Menu"
-                placeholder="Contoh: Vendor"
-                density="comfortable"
-                hint="Gunakan Bahasa Inggris. Nama ini dipakai sebagai kunci terjemahan multi-bahasa di sidebar (lihat resources/ts/plugins/i18n/locales/*/navigation.json)."
-                persistent-hint
-            />
-            </VCol>
-
-            <VCol
-            cols="12"
-            md="6"
-            >
-                <VTextField
-                v-model.number="form.order_no"
-                label="Order"
-                type="number"
-                density="comfortable"
-                hint="Nomor urutan dalam parent menu yang sama."
-                persistent-hint
-                append-inner-icon="tabler-refresh"
-                @click:append-inner="applyNextOrderNo"
-                />
-            </VCol>
-
-            <VCol
-            cols="12"
-            md="6"
-            >
-            <VCombobox
-                v-model="form.icon"
-                :items="tablerIconOptions"
-                label="Icon"
-                placeholder="Contoh: tabler-settings"
-                density="comfortable"
-                clearable
-                hint="Gunakan nama icon Tabler, contoh: tabler-settings, tabler-user, tabler-shopping-cart."
-                persistent-hint
-                >
-                <template #prepend-inner>
-                    <VIcon
-                    v-if="form.icon"
-                    :icon="form.icon"
-                    size="20"
-                    />
-                </template>
-
-                <template #append-inner>
-                    <VBtn
-                    icon
-                    size="x-small"
-                    variant="text"
-                    color="primary"
-                    @click.stop="openTablerIconReference"
-                    >
-                    <VIcon icon="tabler-external-link" />
-                    <VTooltip
-                        activator="parent"
-                        location="top"
-                    >
-                        Buka referensi Tabler Icon
-                    </VTooltip>
-                    </VBtn>
-                </template>
-
-                <template #item="{ props, item }">
-                    <VListItem
-                    v-bind="props"
-                    :title="undefined"
-                    >
-                    <template #prepend>
-                        <VIcon
-                        :icon="item.raw"
-                        size="20"
-                        />
-                    </template>
-
-                    <VListItemTitle>
-                        {{ item.raw }}
-                    </VListItemTitle>
-                    </VListItem>
-                </template>
-            </VCombobox>
-            </VCol>
-
-            <VCol
-            cols="12"
-            md="6"
-            >
-            <VTextField
-                v-model="form.route_name"
-                label="Route Name"
-                placeholder="Contoh: master-vendor"
-                :disabled="form.type === 'GROUP'"
-                density="comfortable"
-            />
-            </VCol>
-
-            <VCol cols="12">
-            <VTextField
-                v-model="form.path"
-                label="Path"
-                placeholder="Contoh: /master/vendor"
-                :disabled="form.type === 'GROUP'"
-                density="comfortable"
-            />
-            </VCol>
-
-            <!-- <VCol cols="12">
-                <VTextField
-                    v-model="form.permission_key"
-                    label="Permission Key"
-                    placeholder="Contoh: vendor.view"
-                    :disabled="form.type === 'GROUP'"
-                    density="comfortable"
-                />
-            </VCol> -->
-
-            <VCol
-            cols="12"
-            md="6"
-            >
+          >
             <VSwitch
-                v-model="form.is_active"
-                label="Active"
-                color="success"
+              v-model="form.is_active"
+              label="Active"
+              color="success"
             />
-            </VCol>
+          </VCol>
         </VRow>
-        </VCardText>
+      </VCardText>
 
-        <VDivider />
+      <VDivider />
 
-        <VCardActions>
+      <VCardActions>
         <VSpacer />
 
         <VBtn
-            variant="tonal"
-            color="secondary"
-            :disabled="isSaving"
-            @click="closeDialog"
+          variant="tonal"
+          color="secondary"
+          :disabled="isSaving"
+          @click="closeDialog"
         >
-            Batal
+          Batal
         </VBtn>
 
         <VBtn
-            color="primary"
-            :loading="isSaving"
-            @click="saveMenu"
+          color="primary"
+          :loading="isSaving"
+          @click="saveMenu"
         >
-            Simpan
+          Simpan
         </VBtn>
-        </VCardActions>
+      </VCardActions>
     </VCard>
-    </VDialog>
+  </VDialog>
+
+  <!--
+    KELOLA SECTION
+
+    Daftar di kiri, formulir di kanan. Sengaja berdampingan, bukan
+    bertumpuk: menata urutan section menuntut melihat urutan yang sudah ada
+    sambil mengetik angkanya.
+  -->
+  <VDialog
+    v-model="isSectionDialogVisible"
+    max-width="880"
+    persistent
+  >
+    <VCard>
+      <VCardItem>
+        <VCardTitle>Kelola Section Sidebar</VCardTitle>
+
+        <VCardSubtitle>
+          Judul kelompok yang memisahkan menu di sidebar. Menu induk tanpa section
+          tampil di paling atas, sebelum judul kelompok mana pun.
+        </VCardSubtitle>
+      </VCardItem>
+
+      <VDivider />
+
+      <VCardText>
+        <VRow>
+          <!-- Daftar section -->
+          <VCol
+            cols="12"
+            md="7"
+          >
+            <div class="text-caption text-medium-emphasis mb-2">
+              Urutan kecil tampil lebih dulu.
+            </div>
+
+            <div
+              v-if="!sections.length"
+              class="text-body-2 text-medium-emphasis py-6 text-center"
+            >
+              Belum ada section. Tambahkan lewat formulir di samping.
+            </div>
+
+            <VList
+              v-else
+              class="py-0"
+              border
+              rounded
+            >
+              <VListItem
+                v-for="item in sections"
+                :key="`section-${item.id}`"
+                :active="editingSectionId === item.id"
+                @click="editSection(item)"
+              >
+                <template #prepend>
+                  <VAvatar
+                    size="34"
+                    variant="tonal"
+                    :color="item.is_active ? 'primary' : 'secondary'"
+                    rounded
+                  >
+                    <VIcon
+                      :icon="item.icon || 'tabler-layout-list'"
+                      size="18"
+                    />
+                  </VAvatar>
+                </template>
+
+                <VListItemTitle class="font-weight-medium">
+                  {{ item.name }}
+                </VListItemTitle>
+
+                <VListItemSubtitle>
+                  Urutan {{ item.order_no }} &middot; berisi {{ item.menus_count ?? 0 }} menu
+                </VListItemSubtitle>
+
+                <template #append>
+                  <div class="d-flex align-center gap-2">
+                    <VChip
+                      v-if="!item.is_active"
+                      size="x-small"
+                      variant="tonal"
+                      color="secondary"
+                    >
+                      Nonaktif
+                    </VChip>
+
+                    <VBtn
+                      v-if="canDelete"
+                      icon
+                      variant="text"
+                      color="error"
+                      size="small"
+                      @click.stop="deleteSection(item)"
+                    >
+                      <VIcon
+                        icon="tabler-trash"
+                        size="18"
+                      />
+                    </VBtn>
+                  </div>
+                </template>
+              </VListItem>
+            </VList>
+          </VCol>
+
+          <!-- Formulir -->
+          <VCol
+            cols="12"
+            md="5"
+          >
+            <div class="d-flex align-center justify-space-between mb-3">
+              <span class="text-body-1 font-weight-medium">
+                {{ editingSectionId ? 'Ubah Section' : 'Section Baru' }}
+              </span>
+
+              <VBtn
+                v-if="editingSectionId"
+                variant="text"
+                size="small"
+                class="text-none"
+                @click="resetSectionForm"
+              >
+                Batal ubah
+              </VBtn>
+            </div>
+
+            <VTextField
+              v-model="sectionForm.name"
+              label="Nama Section"
+              placeholder="Contoh: Finance"
+              density="comfortable"
+              class="mb-3"
+            />
+
+            <VTextField
+              v-model="sectionForm.icon"
+              label="Ikon (opsional)"
+              placeholder="Contoh: mdi-cash-multiple"
+              density="comfortable"
+              class="mb-3"
+              hint="Hanya tampil saat sidebar diciutkan."
+              persistent-hint
+            />
+
+            <VTextField
+              v-model.number="sectionForm.order_no"
+              type="number"
+              min="0"
+              label="Urutan"
+              density="comfortable"
+              class="mb-3"
+            />
+
+            <VSwitch
+              v-model="sectionForm.is_active"
+              label="Aktif"
+              density="comfortable"
+              hide-details
+              class="mb-4"
+            />
+
+            <!--
+              Dikatakan sekarang, bukan setelah orangnya terlanjur
+              menonaktifkan dan mengira menunya hilang.
+            -->
+            <VAlert
+              v-if="!sectionForm.is_active"
+              density="compact"
+              variant="tonal"
+              color="info"
+              class="mb-4"
+            >
+              Section nonaktif tidak digambar, dan menu di dalamnya naik ke bagian
+              paling atas sidebar — bukan ikut hilang.
+            </VAlert>
+
+            <VBtn
+              block
+              color="primary"
+              :loading="isSectionSaving"
+              @click="saveSection"
+            >
+              {{ editingSectionId ? 'Simpan Perubahan' : 'Tambah Section' }}
+            </VBtn>
+          </VCol>
+        </VRow>
+      </VCardText>
+
+      <VDivider />
+
+      <VCardActions class="justify-end">
+        <VBtn
+          variant="tonal"
+          color="secondary"
+          @click="isSectionDialogVisible = false"
+        >
+          Tutup
+        </VBtn>
+      </VCardActions>
+    </VCard>
+  </VDialog>
 </template>

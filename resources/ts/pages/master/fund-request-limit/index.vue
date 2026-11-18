@@ -515,12 +515,16 @@ onMounted(() => {
                 -->
                 <td class="text-center font-weight-medium">
                   <span v-if="row.is_unlimited">—</span>
-                  <template v-else>{{ row.max_outstanding }}</template>
+                  <template v-else>
+                    {{ row.max_outstanding }}
+                  </template>
                 </td>
 
                 <td class="text-center font-weight-medium">
                   <span v-if="row.is_unlimited">—</span>
-                  <template v-else>{{ row.max_realization_days }}</template>
+                  <template v-else>
+                    {{ row.max_realization_days }}
+                  </template>
                 </td>
 
                 <td class="text-center">
@@ -646,9 +650,9 @@ onMounted(() => {
             >
               <VTextField
                 v-model.number="form.max_outstanding"
-                :label="t('fundRequestLimit.form.maxOutstanding')"
                 type="number"
                 min="1"
+                :label="t('fundRequestLimit.form.maxOutstanding')"
                 :max="maxOutstandingCap"
                 density="comfortable"
                 :hint="t('fundRequestLimit.form.maxOutstandingHint')"

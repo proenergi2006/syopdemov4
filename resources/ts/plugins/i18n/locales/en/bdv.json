@@ -1,0 +1,140 @@
+{
+  "noAccess": "You do not have access to this page.",
+
+  "status": {
+    "DRAFT": "Draft",
+    "IN PROGRESS": "In Approval",
+    "NEED REVISION": "Needs Revision",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected",
+    "CANCELLED": "Cancelled"
+  },
+
+  "list": {
+    "filtersTitle": "Bank Disbursement Voucher",
+    "filtersSubtitle": "Bank payment vouchers for documents that are fully approved and whose paperwork has been received.",
+    "resetButton": "Reset",
+    "search": "Search BDV or document number",
+    "status": "Status",
+    "documentType": "Document Type",
+    "branch": "Branch",
+    "department": "Department",
+    "dateFrom": "Date From",
+    "dateTo": "Date To",
+    "dateRangeInvalid": "Date To cannot be earlier than Date From.",
+    "addButton": "Create BDV",
+    "empty": "No Bank Disbursement Vouchers yet.",
+    "emptyFiltered": "No BDV matches these filters.",
+    "loadFailed": "Failed to load the BDV list.",
+    "showing": "Showing {from}-{to} of {total}",
+    "columns": {
+      "number": "BDV Number",
+      "date": "Date",
+      "documentType": "Document Type",
+      "sourceNumber": "Document Number",
+      "branch": "Branch",
+      "department": "Department",
+      "amount": "Amount",
+      "status": "Status",
+      "requester": "Created By",
+      "actions": "Actions"
+    },
+    "notNumbered": "Not numbered yet"
+  },
+
+  "create": {
+    "title": "Create Bank Disbursement Voucher",
+    "subtitle": "Choose the document to be disbursed. One BDV raises one document.",
+    "back": "Back to list",
+
+    "step1": {
+      "title": "Document Type",
+      "subtitle": "Decide which kind of document this voucher will disburse.",
+      "label": "Document Type",
+      "loadFailed": "Failed to load document types."
+    },
+
+    "step2": {
+      "title": "Document Number",
+      "subtitle": "Only documents that are fully approved and whose paperwork has been received appear here.",
+      "label": "Document Number",
+      "hint": "Type part of the number or subject to search.",
+      "empty": "No document of this type can be raised right now.",
+      "emptySearch": "No document matches that search.",
+      "waitingType": "Choose the document type first.",
+      "loadFailed": "Failed to load the document list.",
+      "limited": "Showing the {count} most recent documents. Type to find others."
+    },
+
+    "step3": {
+      "title": "Document Details",
+      "subtitle": "Check this before continuing. The amount shown will be copied onto the BDV.",
+      "waiting": "Choose the document number first.",
+      "loadFailed": "Failed to load the document details.",
+      "changeDocument": "Change document"
+    },
+
+    "detail": {
+      "number": "Document Number",
+      "documentType": "Document Type",
+      "date": "Document Date",
+      "subject": "Subject",
+      "branch": "Branch",
+      "department": "Department",
+      "category": "Transaction Category",
+      "amount": "Document Amount",
+      "requester": "Requester",
+      "status": "Document Status",
+      "receivedAt": "Paperwork Received",
+      "scheduledPaymentDate": "Payment Schedule",
+      "notes": "Notes",
+      "empty": "-"
+    },
+
+    "voucher": {
+      "title": "Voucher Data",
+      "subtitle": "Fields belonging to this voucher. Branch follows the selected document.",
+      "cashBankLoadFailed": "Failed to load the cash and bank list from Accurate.",
+      "cashBankReload": "Reload accounts from Accurate",
+      "cashBankLoading": "Loading...",
+      "cashBankEmpty": "No cash or bank account matches.",
+      "branchFromDocument": "Follows the branch of the selected document.",
+      "required": "This field is required.",
+      "invalid": "Some required fields are still empty. Check the ones marked with an asterisk.",
+      "saveButton": "Save",
+      "notSavedTitle": "Not saved yet",
+      "notSavedText": "The form is complete, but saving a BDV is not wired to the server yet.",
+      "fields": {
+        "cashBank": "Cash / Bank",
+        "bdvNumber": "BDV Number",
+        "date": "Date",
+        "checkNumber": "Cheque No",
+        "payee": "Payee",
+        "branch": "Branch",
+        "notes": "Notes"
+      }
+    },
+    "items": {
+      "title": "Line Items",
+      "subtitle": "Taken as-is from the source document and not editable here.",
+      "count": "{count} items",
+      "empty": "This document has no line items.",
+      "total": "Items total",
+      "mismatch": "The items total {items} differs from the document amount {document}. The document amount can be revised when the paperwork is received by Finance, so this gap is not necessarily wrong.",
+      "accountLoadFailed": "Failed to load the account list from Accurate.",
+      "accountLoading": "Loading...",
+      "accountReload": "Reload accounts from Accurate",
+      "accountEmpty": "The Accurate account list is not connected yet.",
+      "columns": {
+        "no": "No",
+        "date": "Date",
+        "description": "Description",
+        "category": "Category",
+        "qty": "Qty",
+        "unitPrice": "Unit Price",
+        "amount": "Amount",
+        "account": "Accurate Account"
+      }
+    }
+  }
+}

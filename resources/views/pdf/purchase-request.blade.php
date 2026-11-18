@@ -623,12 +623,7 @@
                     <td class="text-center">
                         {{ rtrim(
                             rtrim(
-                                number_format(
-                                    $item->qty,
-                                    2,
-                                    ',',
-                                    '.'
-                                ),
+                                angka($item->qty, 2),
                                 '0'
                             ),
                             ','
@@ -640,21 +635,11 @@
                     </td>
 
                     <td class="text-right nowrap">
-                        Rp {{ number_format(
-                            $hargaUnit,
-                            0,
-                            ',',
-                            '.'
-                        ) }}
+                        Rp {{ angka($hargaUnit, 0) }}
                     </td>
 
                     <td class="text-right text-bold nowrap">
-                        Rp {{ number_format(
-                            $subtotal,
-                            0,
-                            ',',
-                            '.'
-                        ) }}
+                        Rp {{ angka($subtotal, 0) }}
                     </td>
                 </tr>
             @empty
@@ -681,12 +666,7 @@
                 </td>
 
                 <td class="text-right summary-value nowrap">
-                    Rp {{ number_format(
-                        $totalAmount,
-                        0,
-                        ',',
-                        '.'
-                    ) }}
+                    Rp {{ angka($totalAmount, 0) }}
                 </td>
             </tr>
         </table>

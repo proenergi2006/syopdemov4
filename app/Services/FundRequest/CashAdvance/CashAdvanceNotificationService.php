@@ -260,7 +260,7 @@ class CashAdvanceNotificationService
 
         $messageParams = [
             'advance_number' => $cashAdvance->advance_number,
-            'total_amount' => number_format((float) $cashAdvance->total_amount, 0, ',', '.'),
+            'total_amount' => angka((float) $cashAdvance->total_amount, 0),
         ];
 
         foreach ($recipients as $user) {
@@ -411,7 +411,7 @@ class CashAdvanceNotificationService
 
         $messageParams = [
             'advance_number' => $cashAdvance->advance_number,
-            'total_amount' => number_format((float) $cashAdvance->total_amount, 0, ',', '.'),
+            'total_amount' => angka((float) $cashAdvance->total_amount, 0),
         ];
 
         foreach ($recipients as $user) {
@@ -472,7 +472,7 @@ class CashAdvanceNotificationService
         }
 
         $rupiah = static fn ($nilai): string =>
-            'Rp ' . number_format((float) $nilai, 0, ',', '.');
+            'Rp ' . angka((float) $nilai, 0);
 
         $messageParams = [
             'advance_number' => $cashAdvance->advance_number,

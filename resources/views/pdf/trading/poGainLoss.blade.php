@@ -209,11 +209,11 @@
             </td>
 
             <td align="right">
-                {{ number_format($gr->volume_bol) }}
+                {{ angka($gr->volume_bol) }}
             </td>
 
             <td align="right">
-                {{ number_format($po->harga_tebus, 2, '.', ',') }}
+                {{ angka($po->harga_tebus, 2) }}
             </td>
 
             <td align="center">
@@ -221,7 +221,7 @@
             </td>
 
             <td align="right">
-                {{ number_format(($po->harga_tebus*$gr->volume_bol), 2, '.', ',') }}
+                {{ angka(($po->harga_tebus*$gr->volume_bol), 2) }}
             </td>
 
         </tr>
@@ -240,11 +240,11 @@
             </td>
 
             <td align="right">
-                {{ number_format($gl->volume) }}
+                {{ angka($gl->volume) }}
             </td>
 
             <td align="right">
-                {{ number_format($po->harga_tebus, 2, '.', ',') }}
+                {{ angka($po->harga_tebus, 2) }}
             </td>
 
             <td align="center">
@@ -260,7 +260,7 @@
                       $totalgainloss =0;
                     }
                 @endphp
-                {{ number_format($totalgainloss, 2, '.', ',') }}
+                {{ angka($totalgainloss, 2) }}
             </td>
 
         </tr>
@@ -303,28 +303,28 @@
                 <tr>
                     <td>Subtotal</td>
                     <td align="right">
-                        {{ number_format($po->subtotal,2) }}
+                        {{ angka($po->subtotal, 2) }}
                     </td>
                 </tr>
 
                 <tr>
                     <td>DPP</td>
                     <td align="right">
-                        {{ number_format($po->dpp_11_12,2) }}
+                        {{ angka($po->dpp_11_12, 2) }}
                     </td>
                 </tr>
 
                 <tr>
                     <td>PPN 12%</td>
                     <td align="right">
-                        {{ number_format($po->ppn_12,2) }}
+                        {{ angka($po->ppn_12, 2) }}
                     </td>
                 </tr>
 
                 <tr>
                     <td>PPh 22</td>
                     <td align="right">
-                        {{ number_format($po->pph_22,2) }}
+                        {{ angka($po->pph_22, 2) }}
                     </td>
                 </tr>
 
@@ -335,7 +335,7 @@
 
                     <td align="right">
                         <strong>
-                            {{ number_format($po->total_order,2) }}
+                            {{ angka($po->total_order, 2) }}
                         </strong>
                     </td>
                 </tr>

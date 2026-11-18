@@ -68,6 +68,44 @@ class AccurateController extends Controller
             $query_params['filter.keywords.val'] = $request->q;
         }
 
+        /*
+        |----------------------------------------------------------------------
+        | Penyaring jenis akun
+        |----------------------------------------------------------------------
+        | Dua arah, dan keduanya dipakai BDV:
+        |
+        |   account_type          hanya jenis ini   -- kolom Kas/Bank
+        |   exclude_account_type  selain jenis ini  -- kolom akun per item
+        |
+        | Keduanya dikerjakan Accurate, bukan disaring ulang di sini setelah
+        | datanya turun. Menyaring di sini akan merusak paginasi: satu halaman
+        | tiga puluh baris bisa menyusut menjadi dua puluhan, dan pengguna
+        | melihat jumlah yang berubah-ubah tanpa sebab yang jelas.
+        |
+        | Bagan akun di Accurate punya enam belas jenis, jadi "semua kecuali
+        | satu" TIDAK ditulis sebagai daftar lima belas jenis -- daftar seperti
+        | itu akan diam-diam usang begitu Accurate menambah jenis baru.
+        | Dipakai operator NOT_EQUAL, yang sudah diuji diterima Accurate.
+        |
+        | Tanpa kedua parameter ini perilakunya persis seperti sebelumnya,
+        | sehingga pemanggil lama tidak terpengaruh.
+        |----------------------------------------------------------------------
+        */
+        $bersihkan = fn ($nilai): array => array_values(array_filter(
+            (array) $nilai,
+            fn ($satu): bool => is_string($satu) && trim($satu) !== '',
+        ));
+
+        $hanyaJenis = $bersihkan($request->input('account_type', []));
+        $kecualiJenis = $bersihkan($request->input('exclude_account_type', []));
+
+        if ($hanyaJenis !== []) {
+            $query_params['filter.accountType.val'] = $hanyaJenis;
+        } elseif ($kecualiJenis !== []) {
+            $query_params['filter.accountType.op'] = 'NOT_EQUAL';
+            $query_params['filter.accountType.val'] = $kecualiJenis;
+        }
+
         $url = config('services.accurate.base_url') . '/accurate/api/glaccount/list.do?' . http_build_query($query_params);
 
         $result = $api->get($url);

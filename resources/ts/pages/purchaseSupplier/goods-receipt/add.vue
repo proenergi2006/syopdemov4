@@ -1,26 +1,28 @@
 <script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from '@axios'
-import { ref, computed, onMounted, watch } from 'vue'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import {
+  closeAlert,
   showConfirmAlert,
   showErrorAlert,
   showLoadingAlert,
   showSuccessAlert,
   showWarningAlert,
-  closeAlert,
 } from '@/utils/alert'
-import { useRouter } from 'vue-router'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 const router = useRouter()
+
 const onEdit = (item: any) => {
   router.push({
-  path: '/purchaseSupplier/po-supplier/add',
-  query: { id: item }
-})
+    path: '/purchaseSupplier/po-supplier/add',
+    query: { id: item },
+  })
 }
 
-type InventoryPO = {
+interface InventoryPO {
   id_master: number
   nomor_po: string
   tanggal_inven: string
@@ -32,8 +34,8 @@ type InventoryPO = {
   status_label?: string
 
   vendor?: { nama_vendor: string }
-  produk?: { merk_dagang: string, jenis_produk: string }
-  terminal?: { nama_terminal: string, lokasi_terminal:string }
+  produk?: { merk_dagang: string; jenis_produk: string }
+  terminal?: { nama_terminal: string; lokasi_terminal: string }
 }
 
 // STATE
@@ -53,12 +55,15 @@ const totalPage = ref(1)
 const paginationData = computed(() => {
   const start = (currentPage.value - 1) * rowPerPage.value + 1
   const end = Math.min(currentPage.value * rowPerPage.value, totalData.value)
+
   return `${start}-${end} of ${totalData.value}`
 })
 
 // FORMAT DATE
 const formatDate = (date: string) => {
-  if (!date) return '-'
+  if (!date)
+    return '-'
+
   return new Date(date).toLocaleDateString('id-ID')
 }
 
@@ -80,19 +85,18 @@ const getData = async () => {
     rows.value = res.data?.data ?? []
     totalData.value = res.data?.total ?? 0
     totalPage.value = res.data?.last_page ?? 1
-
-  } catch (err) {
+  }
+  catch (err) {
     console.error('FETCH ERROR:', err)
     rows.value = []
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
-
 const vendorList = ref<any[]>([])
 const terminalList = ref<any[]>([])
-
 
 const getVendor = async (): Promise<void> => {
   try {
@@ -105,7 +109,8 @@ const getVendor = async (): Promise<void> => {
         : []
 
     vendorList.value = data
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     vendorList.value = []
 
     await showErrorAlert({
@@ -117,6 +122,7 @@ const getVendor = async (): Promise<void> => {
 
 const getTerminal = async () => {
   const res = await axios.get('/terminal')
+
   terminalList.value = res.data.map((p: any) => ({
     id: p.id,
     nama_terminal: p.nama_terminal,
@@ -125,11 +131,12 @@ const getTerminal = async () => {
 }
 
 const formatNumber = (value: number) => {
-  return new Intl.NumberFormat('id-ID', {
+  return new Intl.NumberFormat(LOCALE_ANGKA, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 20,
   }).format(value)
 }
+
 // AUTO FETCH
 onMounted(() => {
   getData()
@@ -160,23 +167,31 @@ const getStatusLabel = (val: unknown) => {
   return map[Number(val)] ?? '-'
 }
 </script>
+
 <template>
   <section>
     <!-- Filters -->
-    
 
     <VCard class="mb-4 pa-4">
-      <h3 class="mb-3">PENCARIAN</h3>
+      <h3 class="mb-3">
+        PENCARIAN
+      </h3>
 
       <VRow>
-        <VCol cols="12" md="6">
+        <VCol
+          cols="12"
+          md="6"
+        >
           <VTextField
             label="Kata Kunci"
             density="comfortable"
           />
         </VCol>
-      
-        <VCol cols="12" md="6">
+
+        <VCol
+          cols="12"
+          md="6"
+        >
           <VSelect
             label="Terminal/Depot"
             :items="terminalList"
@@ -186,19 +201,25 @@ const getStatusLabel = (val: unknown) => {
           />
         </VCol>
 
-        <VCol cols="12" md="6">
-         <VAutocomplete
-          label="Vendor *"
-          :items="vendorList"
-          item-title="nama_vendor"
-          item-value="id"
-          clearable
-          density="comfortable"
-          :menu-props="{ maxHeight: 300 }"
-        ></VAutocomplete>
+        <VCol
+          cols="12"
+          md="6"
+        >
+          <VAutocomplete
+            label="Vendor *"
+            :items="vendorList"
+            item-title="nama_vendor"
+            item-value="id"
+            clearable
+            density="comfortable"
+            :menu-props="{ maxHeight: 300 }"
+          />
         </VCol>
 
-        <VCol cols="12" md="3">
+        <VCol
+          cols="12"
+          md="3"
+        >
           <VTextField
             label="Tanggal Awal"
             type="date"
@@ -206,7 +227,10 @@ const getStatusLabel = (val: unknown) => {
           />
         </VCol>
 
-        <VCol cols="12" md="3">
+        <VCol
+          cols="12"
+          md="3"
+        >
           <VTextField
             label="Tanggal Akhir"
             type="date"
@@ -228,15 +252,22 @@ const getStatusLabel = (val: unknown) => {
     <!-- Table -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
-       <VBtn
-        to="po-supplier/add"
+        <VBtn
+          to="po-supplier/add"
         >
-        <VIcon start icon="ri-add-circle-line"/> Tambah Data
+          <VIcon
+            start
+            icon="ri-add-circle-line"
+          /> Tambah Data
         </VBtn>
 
         <VSpacer />
 
-        <VChip v-if="loading" size="small" variant="tonal">
+        <VChip
+          v-if="loading"
+          size="small"
+          variant="tonal"
+        >
           Loading...
         </VChip>
       </VCardText>
@@ -245,36 +276,43 @@ const getStatusLabel = (val: unknown) => {
 
       <VTable class="custom-table">
         <thead>
-         <tr>
-           <th>No </th>
-           <th>No PO</th>
-           <th>Tanggal</th>
-           <th>Vendor / Terminal</th>
-           <th>Produk</th>
-           <th>Volume</th>
-           <th>Harga Tebus</th>
-           <th>Disposisi</th>
-           <th>Aksi</th>
-         </tr>
-       </thead>
+          <tr>
+            <th>No </th>
+            <th>No PO</th>
+            <th>Tanggal</th>
+            <th>Vendor / Terminal</th>
+            <th>Produk</th>
+            <th>Volume</th>
+            <th>Harga Tebus</th>
+            <th>Disposisi</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr v-for="(v, index) in rows" :key="v.id_master">
+          <tr
+            v-for="(v, index) in rows"
+            :key="v.id_master"
+          >
             <td>
               {{ (currentPage - 1) * rowPerPage + index + 1 }}
             </td>
 
-            <td class="text-no-wrap">{{ v.nomor_po || '-' }}</td>
+            <td class="text-no-wrap">
+              {{ v.nomor_po || '-' }}
+            </td>
 
             <td>{{ formatDate(v.tanggal_inven) }}</td>
 
-            <td> 
+            <td>
               <div><strong>{{ v.vendor?.nama_vendor || '-' }}</strong></div>
               <div class="text-caption text-grey">
-                {{ v.terminal?.nama_terminal+' - '+ v.terminal?.lokasi_terminal|| '-' }}
+                {{ `${v.terminal?.nama_terminal} - ${v.terminal?.lokasi_terminal}` || '-' }}
               </div>
             </td>
 
-            <td class="text-no-wrap">{{ v.produk?.jenis_produk +' - '+v.produk?.merk_dagang  || '-' }}</td>
+            <td class="text-no-wrap">
+              {{ `${v.produk?.jenis_produk} - ${v.produk?.merk_dagang}` || '-' }}
+            </td>
 
             <td>{{ formatNumber(v.volume_po) }}</td>
 
@@ -282,7 +320,6 @@ const getStatusLabel = (val: unknown) => {
 
             <td>
               <div class="d-flex flex-column">
-                
                 <VChip
                   size="small"
                   color="info"
@@ -292,52 +329,76 @@ const getStatusLabel = (val: unknown) => {
                 </VChip>
 
                 <small class="text-medium-emphasis">
-                  {{ (v.ceo_tanggal) }}
+                  {{ v.ceo_tanggal }}
                 </small>
-
               </div>
             </td>
 
-              <td class="text-center" style="width: 5rem;">
-                <VBtn size="x-small" color="default" variant="plain" icon>
-                  <VIcon size="24" icon="mdi-dots-vertical" />
+            <td
+              class="text-center"
+              style="width: 5rem;"
+            >
+              <VBtn
+                size="x-small"
+                color="default"
+                variant="plain"
+                icon
+              >
+                <VIcon
+                  size="24"
+                  icon="mdi-dots-vertical"
+                />
 
-                  <VMenu activator="parent">
-                    <VList>
-                      <VListItem href="javascript:void(0)" >
-                        <template #prepend>
-                          <VIcon icon="tabler-eye" :size="20" class="me-3" />
-                        </template>
-                        <VListItemTitle>Lihat Detail</VListItemTitle>
-                      </VListItem>
+                <VMenu activator="parent">
+                  <VList>
+                    <VListItem href="javascript:void(0)">
+                      <template #prepend>
+                        <VIcon
+                          icon="tabler-eye"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+                      <VListItemTitle>Lihat Detail</VListItemTitle>
+                    </VListItem>
 
-                      <VListItem @click="onEdit(v.id_master)">
-                        <template #prepend>
-                          <VIcon icon="mdi-pencil-outline" :size="20" class="me-3" />
-                        </template>
-                        <VListItemTitle>Edit</VListItemTitle>
-                      </VListItem>
-                    </VList>
-                  </VMenu>
-                </VBtn>
-              </td>
+                    <VListItem @click="onEdit(v.id_master)">
+                      <template #prepend>
+                        <VIcon
+                          icon="mdi-pencil-outline"
+                          :size="20"
+                          class="me-3"
+                        />
+                      </template>
+                      <VListItemTitle>Edit</VListItemTitle>
+                    </VListItem>
+                  </VList>
+                </VMenu>
+              </VBtn>
+            </td>
           </tr>
         </tbody>
 
-       <tfoot v-if="!rows.length && !loading">
-        <tr>
-          <td colspan="9" class="text-center">
-            No data available
-          </td>
-        </tr>
-      </tfoot>
+        <tfoot v-if="!rows.length && !loading">
+          <tr>
+            <td
+              colspan="9"
+              class="text-center"
+            >
+              No data available
+            </td>
+          </tr>
+        </tfoot>
       </VTable>
 
       <VDivider />
 
       <!-- Footer pagination -->
       <VCardText class="d-flex align-center flex-wrap justify-end gap-4 pa-2">
-        <div class="d-flex align-center me-3" style="width: 220px;">
+        <div
+          class="d-flex align-center me-3"
+          style="width: 220px;"
+        >
           <span class="text-no-wrap me-3">Rows per page:</span>
 
           <VSelect
@@ -363,9 +424,9 @@ const getStatusLabel = (val: unknown) => {
         </div>
       </VCardText>
     </VCard>
-    
   </section>
 </template>
+
 <style>
   .custom-table th,
   .custom-table td {

@@ -1,5 +1,5 @@
-import axios from '@axios'
 import { defineStore } from 'pinia'
+import axios from '@axios'
 
 /*
 |--------------------------------------------------------------------------
@@ -47,7 +47,41 @@ interface PermissionState {
   isLoaded: boolean
   isLoading: boolean
   loadingPromise: Promise<void> | null
+
+  /** Kapan daftar terakhir diambil dari server, untuk menilai basi. */
+  loadedAt: number
+
+  /** Kapan terakhir dipaksa muat ulang, untuk menahan permintaan beruntun. */
+  lastForcedAt: number
 }
+
+/*
+|--------------------------------------------------------------------------
+| Umur daftar permission
+|--------------------------------------------------------------------------
+| Daftar permission dulu dimuat SEKALI per sesi dan tidak pernah diperbarui.
+| Akibatnya permission yang baru diberikan tidak berlaku sampai orangnya
+| logout dan login lagi -- dan yang baru dicabut tetap terbuka di layarnya.
+|
+| Dua pagar, dan keduanya bekerja tanpa satu pun halaman perlu diubah:
+|
+| 1. BASI KARENA UMUR. loadPermissions() mengambil ulang bila daftarnya sudah
+|    lebih tua dari STALE_AFTER_MS. Setiap halaman memanggilnya saat dibuka,
+|    jadi seluruh aplikasi ikut menikmatinya. Menangani pemberian MAUPUN
+|    pencabutan, termasuk yang dilakukan orang lain dari komputer lain.
+|
+| 2. BASI KARENA TIDAK DIKENAL. ensureCan() memaksa muat ulang ketika sebuah
+|    permission tidak ditemukan, lalu memeriksanya sekali lagi. Permission
+|    yang baru lahir sesudah sesi dimulai memang tidak akan ada di daftar
+|    lama -- dan itulah penanda paling jelas bahwa daftarnya perlu disegarkan.
+|
+| COOLDOWN_MS menahan pagar kedua: orang yang memang tidak punya izin jangan
+| sampai memukul server setiap kali ia menekan menu yang terlarang baginya.
+|--------------------------------------------------------------------------
+*/
+const STALE_AFTER_MS = 60 * 1000
+
+const COOLDOWN_MS = 10 * 1000
 
 /*
 |--------------------------------------------------------------------------
@@ -147,9 +181,8 @@ const normalizePermissionMap = (
     !payload
     || typeof payload !== 'object'
     || Array.isArray(payload)
-  ) {
+  )
     return {}
-  }
 
   const normalizedPermissions:
   Record<string, PermissionValue> = {}
@@ -189,9 +222,8 @@ const normalizePermissionMap = (
         !value
         || typeof value !== 'object'
         || Array.isArray(value)
-      ) {
+      )
         return
-      }
 
       const ability = value as {
         allowed?: unknown
@@ -288,6 +320,8 @@ export const usePermissionStore = defineStore(
       isLoaded: false,
       isLoading: false,
       loadingPromise: null,
+      loadedAt: 0,
+      lastForcedAt: 0,
     }),
 
     /*
@@ -320,15 +354,13 @@ export const usePermissionStore = defineStore(
           if (
             permission === undefined
             || permission === null
-          ) {
+          )
             return false
-          }
 
           if (
             typeof permission === 'boolean'
-          ) {
+          )
             return permission
-          }
 
           return Boolean(
             permission.allowed,
@@ -360,9 +392,8 @@ export const usePermissionStore = defineStore(
             permission === undefined
             || permission === null
             || typeof permission === 'boolean'
-          ) {
+          )
             return 'NONE'
-          }
 
           return normalizePermissionScope(
             permission.scope,
@@ -394,9 +425,8 @@ export const usePermissionStore = defineStore(
             permission === undefined
             || permission === null
             || typeof permission === 'boolean'
-          ) {
+          )
             return []
-          }
 
           return normalizeDepartmentIds(
             permission.department_ids,
@@ -441,9 +471,8 @@ export const usePermissionStore = defineStore(
                 if (
                   !prefix
                   || prefix === '/'
-                ) {
+                )
                   return false
-                }
 
                 return normalizedPath === prefix
                   || normalizedPath.startsWith(
@@ -494,22 +523,21 @@ export const usePermissionStore = defineStore(
             firstSegment === 'create'
             || firstSegment === 'new'
             || firstSegment === 'add'
-          ) {
+          )
             action = 'create'
-          }
+
           else if (
             firstSegment === 'edit'
             || firstSegment === 'update'
-          ) {
+          )
             action = 'update'
-          }
+
           else if (
             firstSegment === 'detail'
             || firstSegment === 'show'
             || firstSegment === 'view'
-          ) {
+          )
             action = 'view'
-          }
 
           return `${matchedModule.code}.${action}`
         }
@@ -528,16 +556,23 @@ export const usePermissionStore = defineStore(
       ): Promise<void> {
         /*
         |--------------------------------------------------------------------------
-        | Permission sudah dimuat
+        | Permission sudah dimuat DAN belum basi
+        |--------------------------------------------------------------------------
+        | Syarat "belum basi" inilah yang membuat perubahan permission berlaku
+        | tanpa logout. Tanpanya, daftar yang sekali dimuat dipegang sampai
+        | sesinya berakhir.
         |--------------------------------------------------------------------------
         */
+
+        const basi = this.loadedAt > 0
+          && (Date.now() - this.loadedAt) > STALE_AFTER_MS
 
         if (
           this.isLoaded
           && !force
-        ) {
+          && !basi
+        )
           return
-        }
 
         /*
         |--------------------------------------------------------------------------
@@ -582,11 +617,13 @@ export const usePermissionStore = defineStore(
                 )
 
               this.isLoaded = true
+              this.loadedAt = Date.now()
             }
             catch (error: unknown) {
               this.permissions = {}
               this.modules = []
               this.isLoaded = false
+              this.loadedAt = 0
 
               throw error
             }
@@ -613,6 +650,56 @@ export const usePermissionStore = defineStore(
 
       /*
       |--------------------------------------------------------------------------
+      | Ensure Can
+      |--------------------------------------------------------------------------
+      | Memeriksa izin, dan bila TIDAK ADA, memuat ulang daftarnya sekali lalu
+      | memeriksanya lagi.
+      |
+      | Permission yang baru lahir sesudah sesi dimulai mustahil ada di daftar
+      | lama. Jadi "tidak ditemukan" bukan sekadar berarti tidak boleh -- ia
+      | juga penanda paling jelas bahwa daftarnya sudah ketinggalan.
+      |
+      | Hanya dipaksa untuk permission yang BELUM DIKENAL. Yang sudah ada di
+      | daftar tetapi bernilai false memang keputusan server, bukan daftar
+      | basi, jadi tidak perlu ditanyakan ulang.
+      |
+      | Dibatasi cooldown supaya orang yang memang tidak berhak tidak memukul
+      | server setiap kali menekan menu terlarang.
+      */
+      async ensureCan(permissionCode: string): Promise<boolean> {
+        const code = String(permissionCode || '').trim()
+
+        if (!code)
+          return false
+
+        if (this.can(code))
+          return true
+
+        const belumDikenal = this.permissions[code] === undefined
+
+        const bolehCoba = Date.now() - this.lastForcedAt > COOLDOWN_MS
+
+        if (!belumDikenal || !bolehCoba)
+          return false
+
+        this.lastForcedAt = Date.now()
+
+        try {
+          await this.loadPermissions(true)
+        }
+        catch {
+          /*
+           * Gagal menyegarkan bukan alasan untuk mengizinkan. Keputusannya
+           * jatuh ke daftar yang ada sekarang -- yang berarti tetap ditolak.
+           */
+          return false
+        }
+
+        return this.can(code)
+      },
+
+      /*
+      |--------------------------------------------------------------------------
       | Clear Store
       |--------------------------------------------------------------------------
       */
@@ -623,6 +710,8 @@ export const usePermissionStore = defineStore(
         this.isLoaded = false
         this.isLoading = false
         this.loadingPromise = null
+        this.loadedAt = 0
+        this.lastForcedAt = 0
       },
     },
   },

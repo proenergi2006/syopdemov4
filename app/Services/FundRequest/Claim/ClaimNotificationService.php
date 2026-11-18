@@ -258,7 +258,7 @@ class ClaimNotificationService
 
         $messageParams = [
             'claim_number' => $claim->claim_number,
-            'total_amount' => number_format((float) $claim->total_amount, 0, ',', '.'),
+            'total_amount' => angka((float) $claim->total_amount, 0),
         ];
 
         foreach ($recipients as $user) {
@@ -315,7 +315,7 @@ class ClaimNotificationService
         }
 
         $rupiah = static fn ($nilai): string =>
-            'Rp ' . number_format((float) $nilai, 0, ',', '.');
+            'Rp ' . angka((float) $nilai, 0);
 
         $messageParams = [
             'claim_number' => $claim->claim_number,
@@ -458,7 +458,7 @@ class ClaimNotificationService
 
         $messageParams = [
             'claim_number' => $claim->claim_number,
-            'total_amount' => number_format((float) $claim->total_amount, 0, ',', '.'),
+            'total_amount' => angka((float) $claim->total_amount, 0),
         ];
 
         foreach ($recipients as $user) {

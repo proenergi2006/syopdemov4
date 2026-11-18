@@ -327,7 +327,7 @@ const avatarBadgeProps = {
             :to="{
               name: 'pages-account-settings-tab',
               params: {
-                tab: 'account',
+                tab: 'security',
               },
             }"
           >

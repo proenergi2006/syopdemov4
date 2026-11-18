@@ -81,6 +81,16 @@ interface TripRow {
 
   status: string
   is_editable: boolean
+
+  /*
+  | Masih boleh diajukan pemohonnya. Dihitung server dari daftar status yang
+  | sama dengan yang dipakai endpoint submit-nya, jadi tombol di layar tidak
+  | mungkin berbeda pendapat dengan yang akan diterima server.
+  */
+  is_submittable?: boolean
+
+  /* Masih boleh dibatalkan. Dihitung server, sama seperti is_submittable. */
+  is_cancellable?: boolean
   can_approve: boolean
 
   /*
@@ -1311,8 +1321,20 @@ const printDetail = (): void => {
     askPrint(detailRow.value)
 }
 
+/*
+| Status yang boleh diajukan datang dari SERVER, lewat row.is_submittable.
+|
+| Dahulu daftarnya ditulis ulang di sini -- dan kehilangan NEED REVISION,
+| sehingga dokumen yang dikembalikan approver kepada pemohonnya tidak punya
+| satu pun tombol Ajukan. Pemohon bisa memperbaikinya, tidak bisa
+| mengirimkannya kembali, dan dokumennya berhenti di sana tanpa ada yang
+| merasa sedang menahannya.
+|
+| Satu daftar, satu tempat: yang ditulis dua kali pada akhirnya akan
+| berbeda, dan yang berbeda di sini menyembunyikan tombol.
+*/
 const canSubmitRow = (row: TripRow): boolean =>
-  abilities.value.can_submit && ['DRAFT', 'REJECTED'].includes(row.status)
+  abilities.value.can_submit && row.is_submittable === true
 
 const canEditRow = (row: TripRow): boolean =>
   abilities.value.can_update && row.is_editable
@@ -1321,15 +1343,20 @@ const canDeleteRow = (row: TripRow): boolean =>
   abilities.value.can_delete && row.status === 'DRAFT'
 
 /*
-| Batalkan hanya untuk yang SUDAH DIAJUKAN.
+| Batalkan hanya untuk yang SUDAH DIAJUKAN -- daftar statusnya dari server,
+| lewat row.is_cancellable.
 |
-| Draft belum pernah dilihat siapa pun -- tidak ada yang perlu diberi tahu,
-| dan tidak ada jejak yang perlu ditinggalkan. Untuk draft yang tersedia
-| Hapus, dan keduanya sengaja tidak pernah muncul bersamaan: dua tombol yang
-| terasa serupa pada satu baris hanya membuat orang menebak mana yang benar.
+| Draft belum pernah dilihat siapa pun: tidak ada yang perlu diberi tahu, dan
+| tidak ada jejak yang perlu ditinggalkan. Untuk draft yang tersedia Hapus,
+| dan keduanya sengaja tidak pernah muncul bersamaan: dua tombol yang terasa
+| serupa pada satu baris hanya membuat orang menebak mana yang benar.
+|
+| Yang sedang butuh revisi IKUT. Dokumennya sudah pernah diajukan dan sudah
+| dilihat approver; perjalanan yang dikembalikan lalu memang tidak jadi harus
+| punya jalan ditutup, bukan menggantung selamanya di meja pemohon.
 */
 const canCancelRow = (row: TripRow): boolean =>
-  abilities.value.can_cancel && row.status === 'IN PROGRESS'
+  abilities.value.can_cancel && row.is_cancellable === true
 
 /*
 | Kabar keberhasilan dari halaman formulir, dititipkan lewat URL.
@@ -1672,8 +1699,7 @@ onMounted(async () => {
                           memang wajar.
                         -->
                         <VChip
-                          v-if="row.is_departure_passed
-                            && ['DRAFT', 'REJECTED'].includes(row.status)"
+                          v-if="row.is_departure_passed && row.is_submittable"
                           size="x-small"
                           color="error"
                           variant="tonal"

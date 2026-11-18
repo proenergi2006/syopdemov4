@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import axios from '@axios';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue'
+import axios from '@axios'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
-type Opt = { id: number; name: string }
+interface Opt { id: number; name: string }
 
-type Row = {
+interface Row {
   id: number
   id_transportir: number
   id_wil_angkut: number
@@ -42,35 +43,35 @@ const optKabupaten = ref<Opt[]>([]) // ✅ dependent provinsi
 // ===== Helpers =====
 function pickName(x: any): string {
   return (
-    x?.nama_transportir ??
-    x?.transportir ??
-    x?.nama_perusahaan ??
+    x?.nama_transportir
+    ?? x?.transportir
+    ?? x?.nama_perusahaan
 
     // wilayah angkut
-    x?.wilayah_angkut ??
-    x?.nama_wilayah_angkut ??
-    x?.nama_wilayah ??
-    x?.wilayah ??
+    ?? x?.wilayah_angkut
+    ?? x?.nama_wilayah_angkut
+    ?? x?.nama_wilayah
+    ?? x?.wilayah
 
     // prov/kab
-    x?.nama_provinsi ??
-    x?.provinsi ??
-    x?.nama_kabupaten ??
-    x?.kabupaten ??
+    ?? x?.nama_provinsi
+    ?? x?.provinsi
+    ?? x?.nama_kabupaten
+    ?? x?.kabupaten
 
     // volume
-    x?.volume_angkut ??
-    x?.nama_volume ??
-    x?.volume ??
+    ?? x?.volume_angkut
+    ?? x?.nama_volume
+    ?? x?.volume
 
     // umum
-    x?.nama ??
-    x?.name ??
-    x?.title ??
-    x?.label ??
-    x?.kode ??
-    x?.keterangan ??
-    String(x?.id ?? '')
+    ?? x?.nama
+    ?? x?.name
+    ?? x?.title
+    ?? x?.label
+    ?? x?.kode
+    ?? x?.keterangan
+    ?? String(x?.id ?? '')
   )
 }
 
@@ -97,7 +98,8 @@ function nKabupaten(id: number) { return mapKabupaten.value.get(Number(id)) ?? '
 
 function fmtRp(n: any) {
   const v = Number(n ?? 0)
-  return new Intl.NumberFormat('id-ID').format(v)
+
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(v)
 }
 
 // ===== Modal =====
@@ -158,32 +160,40 @@ async function openEdit(r: Row) {
 async function fetchOptions() {
   try {
     const { data } = await axios.get('/master/transportir', { params: { per_page: 999 } })
+
     optTransportir.value = toOpt(data?.data ?? data)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('fetch transportir opt error', e)
     optTransportir.value = []
   }
 
   try {
     const { data } = await axios.get('/master/wilayah-angkut', { params: { per_page: 999 } })
+
     optWilayah.value = toOpt(data?.data ?? data)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('fetch wilayah opt error', e)
     optWilayah.value = []
   }
 
   try {
     const { data } = await axios.get('/master/volume', { params: { per_page: 999 } })
+
     optVolume.value = toOpt(data?.data ?? data)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('fetch volume opt error', e)
     optVolume.value = []
   }
 
   try {
     const { data } = await axios.get('/master/provinsi', { params: { per_page: 999 } })
+
     optProvinsi.value = toOpt(data?.data ?? data)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('fetch provinsi opt error', e)
     optProvinsi.value = []
   }
@@ -197,14 +207,17 @@ async function fetchKabupatenByProvinsi(provId: number | null) {
   if (!provId) {
     optKabupaten.value = []
     form.value.id_kab_angkut = null
+
     return
   }
 
   try {
     const { data } = await axios.get(`/kabupaten/${provId}`)
     const list = data?.data ?? data
+
     optKabupaten.value = toOpt(list || [])
-  } catch (e) {
+  }
+  catch (e) {
     console.error('fetch kabupaten by provinsi error', e)
     optKabupaten.value = []
   }
@@ -218,7 +231,7 @@ watch(
       form.value.id_kab_angkut = null
       await fetchKabupatenByProvinsi(v ? Number(v) : null)
     }
-  }
+  },
 )
 
 // ===== Fetch List =====
@@ -229,19 +242,27 @@ async function fetchList() {
       page: page.value,
       per_page: perPage.value,
     }
-    if (search.value) params.search = search.value
-    if (fTransportir.value) params.id_transportir = fTransportir.value
-    if (fWilayah.value) params.id_wil_angkut = fWilayah.value
-    if (fVolume.value) params.id_vol_angkut = fVolume.value
+
+    if (search.value)
+      params.search = search.value
+    if (fTransportir.value)
+      params.id_transportir = fTransportir.value
+    if (fWilayah.value)
+      params.id_wil_angkut = fWilayah.value
+    if (fVolume.value)
+      params.id_vol_angkut = fVolume.value
 
     const { data } = await axios.get('/master/ongkos-angkut', { params })
+
     rows.value = data?.data ?? []
     total.value = Number(data?.total ?? rows.value.length)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('fetchList error', e)
     rows.value = []
     total.value = 0
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -255,11 +276,16 @@ watch([search, fTransportir, fWilayah, fVolume], () => {
 
 // ===== CRUD =====
 async function save() {
-  if (!form.value.id_transportir) return alert('Transportir wajib diisi')
-  if (!form.value.id_wil_angkut) return alert('Wilayah wajib diisi')
-  if (!form.value.id_prov_angkut) return alert('Provinsi wajib diisi')
-  if (!form.value.id_kab_angkut) return alert('Kabupaten wajib diisi')
-  if (!form.value.id_vol_angkut) return alert('Volume wajib diisi')
+  if (!form.value.id_transportir)
+    return alert('Transportir wajib diisi')
+  if (!form.value.id_wil_angkut)
+    return alert('Wilayah wajib diisi')
+  if (!form.value.id_prov_angkut)
+    return alert('Provinsi wajib diisi')
+  if (!form.value.id_kab_angkut)
+    return alert('Kabupaten wajib diisi')
+  if (!form.value.id_vol_angkut)
+    return alert('Volume wajib diisi')
 
   isSaving.value = true
   try {
@@ -275,28 +301,34 @@ async function save() {
     if (isEdit.value && form.value.id) {
       // ✅ FIX: apiResource update harus PUT/PATCH
       await axios.put(`/master/ongkos-angkut/${form.value.id}`, payload)
+
       // atau PATCH:
       // await axios.patch(`/master/ongkos-angkut/${form.value.id}`, payload)
-    } else {
+    }
+    else {
       await axios.post('/master/ongkos-angkut', payload)
     }
 
     isOpen.value = false
     await fetchList()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     console.error('save error', e)
     alert(e?.response?.data?.message ?? 'Gagal simpan')
-  } finally {
+  }
+  finally {
     isSaving.value = false
   }
 }
 
 async function removeRow(r: Row) {
-  if (!confirm('Hapus data ongkos angkut ini?')) return
+  if (!confirm('Hapus data ongkos angkut ini?'))
+    return
   try {
     await axios.delete(`/master/ongkos-angkut/${r.id}`)
     await fetchList()
-  } catch (e) {
+  }
+  catch (e) {
     console.error('delete error', e)
   }
 }
@@ -312,13 +344,18 @@ onMounted(async () => {
     <!-- Header -->
     <div class="d-flex align-center justify-space-between">
       <div>
-        <h2 class="text-h5 mb-1">Ongkos Angkut</h2>
+        <h2 class="text-h5 mb-1">
+          Ongkos Angkut
+        </h2>
         <div class="text-caption text-medium-emphasis">
           Master ongkos angkut berdasarkan transportir, wilayah, provinsi/kabupaten, dan volume.
         </div>
       </div>
 
-      <VBtn color="primary" @click="openCreate">
+      <VBtn
+        color="primary"
+        @click="openCreate"
+      >
         + Tambah Ongkos
       </VBtn>
     </div>
@@ -327,7 +364,10 @@ onMounted(async () => {
     <VCard>
       <VCardText>
         <VRow dense>
-          <VCol cols="12" md="5">
+          <VCol
+            cols="12"
+            md="5"
+          >
             <VTextField
               v-model="search"
               label="Cari (transportir / wilayah / prov / kab / volume)"
@@ -337,7 +377,10 @@ onMounted(async () => {
             />
           </VCol>
 
-          <VCol cols="12" md="3">
+          <VCol
+            cols="12"
+            md="3"
+          >
             <VSelect
               v-model="fTransportir"
               :items="optTransportir"
@@ -350,7 +393,10 @@ onMounted(async () => {
             />
           </VCol>
 
-          <VCol cols="12" md="2">
+          <VCol
+            cols="12"
+            md="2"
+          >
             <VSelect
               v-model="fWilayah"
               :items="optWilayah"
@@ -363,7 +409,10 @@ onMounted(async () => {
             />
           </VCol>
 
-          <VCol cols="12" md="2">
+          <VCol
+            cols="12"
+            md="2"
+          >
             <VSelect
               v-model="fVolume"
               :items="optVolume"
@@ -388,7 +437,9 @@ onMounted(async () => {
           </div>
 
           <div class="d-flex gap-2 align-center">
-            <div class="text-caption">Per page</div>
+            <div class="text-caption">
+              Per page
+            </div>
             <VSelect
               v-model="perPage"
               :items="[10, 20, 50, 100]"
@@ -399,7 +450,10 @@ onMounted(async () => {
           </div>
         </div>
 
-        <VTable class="rounded-lg" density="compact">
+        <VTable
+          class="rounded-lg"
+          density="compact"
+        >
           <thead>
             <tr>
               <th>Transportir</th>
@@ -407,31 +461,64 @@ onMounted(async () => {
               <th>Provinsi</th>
               <th>Kabupaten</th>
               <th>Volume</th>
-              <th class="text-right">Ongkos (Rp)</th>
-              <th class="text-right">Actions</th>
+              <th class="text-right">
+                Ongkos (Rp)
+              </th>
+              <th class="text-right">
+                Actions
+              </th>
             </tr>
           </thead>
 
           <tbody>
             <tr v-if="loading">
-              <td colspan="7" class="text-center py-6 text-medium-emphasis">Loading...</td>
+              <td
+                colspan="7"
+                class="text-center py-6 text-medium-emphasis"
+              >
+                Loading...
+              </td>
             </tr>
 
             <tr v-else-if="rows.length === 0">
-              <td colspan="7" class="text-center py-6 text-medium-emphasis">Tidak ada data.</td>
+              <td
+                colspan="7"
+                class="text-center py-6 text-medium-emphasis"
+              >
+                Tidak ada data.
+              </td>
             </tr>
 
-            <tr v-else v-for="r in rows" :key="r.id">
+            <tr
+              v-for="r in rows"
+              v-else
+              :key="r.id"
+            >
               <td>{{ r.transportir?.nama_transportir ?? nTransportir(r.id_transportir) }}</td>
               <td>{{ r.wilayahAngkut ? pickName(r.wilayahAngkut) : nWilayah(r.id_wil_angkut) }}</td>
               <td>{{ r.provinsi ? pickName(r.provinsi) : nProvinsi(r.id_prov_angkut) }}</td>
               <td>{{ r.kabupaten ? pickName(r.kabupaten) : nKabupaten(r.id_kab_angkut) }}</td>
               <td>{{ r.volume ? pickName(r.volume) : nVolume(r.id_vol_angkut) }}</td>
-              <td class="text-right">{{ fmtRp(r.ongkos_angkut) }}</td>
+              <td class="text-right">
+                {{ fmtRp(r.ongkos_angkut) }}
+              </td>
               <td class="text-right">
                 <div class="d-flex gap-2 justify-end">
-                  <VBtn size="small" variant="tonal" @click="openEdit(r)">Edit</VBtn>
-                  <VBtn size="small" color="error" variant="tonal" @click="removeRow(r)">Hapus</VBtn>
+                  <VBtn
+                    size="small"
+                    variant="tonal"
+                    @click="openEdit(r)"
+                  >
+                    Edit
+                  </VBtn>
+                  <VBtn
+                    size="small"
+                    color="error"
+                    variant="tonal"
+                    @click="removeRow(r)"
+                  >
+                    Hapus
+                  </VBtn>
                 </div>
               </td>
             </tr>
@@ -439,29 +526,57 @@ onMounted(async () => {
         </VTable>
 
         <div class="d-flex justify-end mt-4">
-          <VPagination v-model="page" :length="pageCount" :total-visible="7" density="comfortable" />
+          <VPagination
+            v-model="page"
+            :length="pageCount"
+            :total-visible="7"
+            density="comfortable"
+          />
         </div>
       </VCardText>
     </VCard>
 
     <!-- Modal -->
-    <VDialog v-model="isOpen" max-width="980" persistent>
+    <VDialog
+      v-model="isOpen"
+      max-width="980"
+      persistent
+    >
       <VCard class="rounded-lg">
         <VCardTitle class="text-h5 d-flex align-center justify-space-between">
           <span>{{ dialogTitle }}</span>
 
           <div class="d-flex gap-2">
-            <VBtn variant="tonal" @click="isOpen = false" :disabled="isSaving">Cancel</VBtn>
-            <VBtn color="primary" @click="save" :loading="isSaving" :disabled="isSaving">Save</VBtn>
+            <VBtn
+              variant="tonal"
+              :disabled="isSaving"
+              @click="isOpen = false"
+            >
+              Cancel
+            </VBtn>
+            <VBtn
+              color="primary"
+              :loading="isSaving"
+              :disabled="isSaving"
+              @click="save"
+            >
+              Save
+            </VBtn>
           </div>
         </VCardTitle>
 
         <VDivider />
 
-        <VCardText class="pt-6" style="max-height: 72vh; overflow: auto;">
+        <VCardText
+          class="pt-6"
+          style="max-height: 72vh; overflow: auto;"
+        >
           <VForm>
             <VRow dense>
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VSelect
                   v-model="form.id_transportir"
                   :items="optTransportir"
@@ -474,7 +589,10 @@ onMounted(async () => {
                 />
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VSelect
                   v-model="form.id_wil_angkut"
                   :items="optWilayah"
@@ -487,7 +605,10 @@ onMounted(async () => {
                 />
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VSelect
                   v-model="form.id_prov_angkut"
                   :items="optProvinsi"
@@ -500,7 +621,10 @@ onMounted(async () => {
                 />
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VSelect
                   v-model="form.id_kab_angkut"
                   :items="optKabupaten"
@@ -516,7 +640,10 @@ onMounted(async () => {
                 />
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VSelect
                   v-model="form.id_vol_angkut"
                   :items="optVolume"
@@ -529,12 +656,16 @@ onMounted(async () => {
                 />
               </VCol>
 
-              <VCol cols="12" md="6">
-                <VTextField
-                  v-model.number="form.ongkos_angkut"
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <AppNumberField
+                  v-model="form.ongkos_angkut"
+                  empty-as-zero
+                  :desimal="2"
                   label="Ongkos Angkut (Rp) *"
-                  type="number"
-                  min="0"
+
                   variant="outlined"
                   density="compact"
                 />

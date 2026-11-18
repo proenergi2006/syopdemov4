@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class User extends Authenticatable
 {
@@ -698,6 +699,33 @@ class User extends Authenticatable
         ksort($permissions);
 
         return $permissions;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tanda tangan digital
+    |--------------------------------------------------------------------------
+    | Satu user boleh menyimpan beberapa tanda tangan, satu di antaranya aktif.
+    | Kolom signature_path tetap dipakai sebagai cermin yang aktif, supaya
+    | seluruh modul yang sudah membacanya tidak perlu tahu soal tabel ini.
+    |--------------------------------------------------------------------------
+    */
+    public function signatures(): HasMany
+    {
+        return $this->hasMany(
+            UserSignature::class,
+            'user_id',
+        )
+            ->orderBy('id');
+    }
+
+    public function activeSignature(): HasOne
+    {
+        return $this->hasOne(
+            UserSignature::class,
+            'user_id',
+        )
+            ->where('is_active', true);
     }
 
     public function accessAssignments(): HasMany

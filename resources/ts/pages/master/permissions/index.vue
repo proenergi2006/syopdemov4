@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import axios from '@axios'
 import {
   computed,
   onMounted,
   ref,
   watch,
 } from 'vue'
+import { VAutocomplete } from 'vuetify/components'
+import axios from '@axios'
 
 import {
   closeAlert,
@@ -16,7 +17,7 @@ import {
 } from '@/utils/alert'
 
 import { getApiErrorMessage } from '@/utils/apiHelper'
-import { VAutocomplete } from 'vuetify/components'
+import { usePermissionStore } from '@/stores/permission'
 
 /*
 |--------------------------------------------------------------------------
@@ -55,10 +56,10 @@ interface PermissionItem {
 
 type PermissionScope
   = | 'NONE'
-    | 'OWN_DATA'
-    | 'OWN_DEPARTMENT'
-    | 'OWN_CABANG'
-    | 'ALL'
+  | 'OWN_DATA'
+  | 'OWN_DEPARTMENT'
+  | 'OWN_CABANG'
+  | 'ALL'
 
 interface RolePermissionItem {
   id?: number
@@ -657,8 +658,8 @@ const buildRowsFromRolePermissions = (
         scope:
           isChecked
             ? normalizeScope(
-                assignedPermission?.scope,
-              )
+              assignedPermission?.scope,
+            )
             : getDefaultScope(permission),
       }
     },
@@ -933,9 +934,8 @@ const onTogglePermission = (
   if (
     supportsScope(row)
     && row.scope === 'NONE'
-  ) {
+  )
     row.scope = 'OWN_DEPARTMENT'
-  }
 
   if (!supportsScope(row))
     row.scope = 'NONE'
@@ -955,9 +955,8 @@ const checkAllVisible = (): void => {
     if (
       supportsScope(row)
       && row.scope === 'NONE'
-    ) {
+    )
       row.scope = 'OWN_DEPARTMENT'
-    }
 
     if (!supportsScope(row))
       row.scope = 'NONE'
@@ -1048,7 +1047,7 @@ const submitPermission = async (): Promise<void> => {
       buildPayload(),
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -1057,6 +1056,19 @@ const submitPermission = async (): Promise<void> => {
     closeAlert()
 
     initialSnapshot.value = buildSnapshot()
+
+    /*
+     * Daftar permission milik diri sendiri disegarkan saat itu juga.
+     *
+     * Yang mengubah permission hampir selalu mengubah miliknya sendiri juga,
+     * lalu langsung mencoba membuka halaman yang baru ia izinkan. Tanpa ini
+     * ia tertolak -- dan sangkanya settingnya yang belum benar, padahal
+     * layarnya yang masih memegang daftar lama.
+     *
+     * Gagal menyegarkan tidak digagalkan ke pengguna: penyimpanannya sendiri
+     * sudah berhasil, dan pagar umur di store akan menyusul membereskannya.
+     */
+    await usePermissionStore().reloadPermissions().catch(() => undefined)
 
     showSuccessToast({
       title: 'Berhasil',
@@ -1130,6 +1142,7 @@ onMounted(async () => {
   }
 })
 </script>
+
 <template>
   <section>
     <VCard class="mb-6 rounded-lg">
@@ -1161,23 +1174,28 @@ onMounted(async () => {
               Refresh
             </VBtn>
 
-            <!-- <VBtn
+            <!--
+              <VBtn
               color="primary"
               prepend-icon="tabler-device-floppy"
               :loading="isSubmitting"
               :disabled="!hasSelectedRole || !hasChanges"
               class="text-none"
               @click="submitPermission"
-            >
+              >
               Simpan Permission
-            </VBtn> -->
+              </VBtn>
+            -->
           </div>
         </div>
       </VCardText>
     </VCard>
 
     <VRow class="mb-6">
-      <VCol cols="12" md="4">
+      <VCol
+        cols="12"
+        md="4"
+      >
         <VCard class="rounded-lg">
           <VCardText>
             <div class="d-flex align-center justify-space-between">
@@ -1191,7 +1209,11 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <VAvatar color="primary" variant="tonal" rounded>
+              <VAvatar
+                color="primary"
+                variant="tonal"
+                rounded
+              >
                 <VIcon icon="tabler-shield-lock" />
               </VAvatar>
             </div>
@@ -1199,7 +1221,10 @@ onMounted(async () => {
         </VCard>
       </VCol>
 
-      <VCol cols="12" md="4">
+      <VCol
+        cols="12"
+        md="4"
+      >
         <VCard class="rounded-lg">
           <VCardText>
             <div class="d-flex align-center justify-space-between">
@@ -1213,7 +1238,11 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <VAvatar color="success" variant="tonal" rounded>
+              <VAvatar
+                color="success"
+                variant="tonal"
+                rounded
+              >
                 <VIcon icon="tabler-circle-check" />
               </VAvatar>
             </div>
@@ -1221,7 +1250,10 @@ onMounted(async () => {
         </VCard>
       </VCol>
 
-      <VCol cols="12" md="4">
+      <VCol
+        cols="12"
+        md="4"
+      >
         <VCard class="rounded-lg">
           <VCardText>
             <div class="d-flex align-center justify-space-between">
@@ -1235,7 +1267,11 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <VAvatar color="info" variant="tonal" rounded>
+              <VAvatar
+                color="info"
+                variant="tonal"
+                rounded
+              >
                 <VIcon icon="tabler-database-search" />
               </VAvatar>
             </div>
@@ -1247,7 +1283,11 @@ onMounted(async () => {
     <VCard class="mb-6 rounded-lg permission-filter-card">
       <VCardText>
         <VRow class="align-center">
-        <VCol cols="12" md="6" lg="3">
+          <VCol
+            cols="12"
+            md="6"
+            lg="3"
+          >
             <VTextField
               v-model="keyword"
               label="Cari Permission"
@@ -1258,7 +1298,11 @@ onMounted(async () => {
               hide-details
             />
           </VCol>
-          <VCol cols="12" md="6" lg="3">
+          <VCol
+            cols="12"
+            md="6"
+            lg="3"
+          >
             <MultiAutocomplete
               v-model="selectedRoleIds"
               :items="roleOptions"
@@ -1301,7 +1345,11 @@ onMounted(async () => {
             </MultiAutocomplete>
           </VCol>
 
-          <VCol cols="12" md="6" lg="3">
+          <VCol
+            cols="12"
+            md="6"
+            lg="3"
+          >
             <VSelect
               v-model="selectedModule"
               label="Module"
@@ -1319,7 +1367,12 @@ onMounted(async () => {
             />
           </VCol>
 
-          <VCol cols="12" md="6" lg="3" class="d-flex gap-2">
+          <VCol
+            cols="12"
+            md="6"
+            lg="3"
+            class="d-flex gap-2"
+          >
             <VBtn
               block
               variant="tonal"
@@ -1423,8 +1476,16 @@ onMounted(async () => {
           v-else-if="hasSelectedRole && !permissionRows.length"
           class="py-10 text-center"
         >
-          <VAvatar color="secondary" variant="tonal" size="64" class="mb-4">
-            <VIcon icon="tabler-shield-off" size="34" />
+          <VAvatar
+            color="secondary"
+            variant="tonal"
+            size="64"
+            class="mb-4"
+          >
+            <VIcon
+              icon="tabler-shield-off"
+              size="34"
+            />
           </VAvatar>
 
           <div class="text-h6 font-weight-semibold mb-1">
@@ -1500,8 +1561,16 @@ onMounted(async () => {
             v-if="!groupedPermissionRows.length"
             class="py-10 text-center"
           >
-            <VAvatar color="secondary" variant="tonal" size="64" class="mb-4">
-              <VIcon icon="tabler-search-off" size="34" />
+            <VAvatar
+              color="secondary"
+              variant="tonal"
+              size="64"
+              class="mb-4"
+            >
+              <VIcon
+                icon="tabler-search-off"
+                size="34"
+              />
             </VAvatar>
 
             <div class="text-h6 font-weight-semibold mb-1">
@@ -1520,8 +1589,16 @@ onMounted(async () => {
           >
             <div class="d-flex align-center justify-space-between gap-3 mb-3">
               <div class="d-flex align-center gap-2">
-                <VAvatar color="primary" variant="tonal" size="32" rounded>
-                  <VIcon icon="tabler-settings-check" size="18" />
+                <VAvatar
+                  color="primary"
+                  variant="tonal"
+                  size="32"
+                  rounded
+                >
+                  <VIcon
+                    icon="tabler-settings-check"
+                    size="18"
+                  />
                 </VAvatar>
 
                 <div>
@@ -1540,17 +1617,31 @@ onMounted(async () => {
               <VTable class="permission-table">
                 <thead>
                   <tr>
-                    <th style="width: 80px;" class="text-center text-none">
+                    <th
+                      style="width: 80px;"
+                      class="text-center text-none"
+                    >
                       Aktif
                     </th>
-                    <th class="text-none">Permission</th>
-                    <th style="width: 130px;" class="text-none">
+                    <th class="text-none">
+                      Permission
+                    </th>
+                    <th
+                      style="width: 130px;"
+                      class="text-none"
+                    >
                       Action
                     </th>
-                    <th style="width: 230px;" class="text-none">
+                    <th
+                      style="width: 230px;"
+                      class="text-none"
+                    >
                       Scope
                     </th>
-                    <th style="width: 160px;" class="text-none">
+                    <th
+                      style="width: 160px;"
+                      class="text-none"
+                    >
                       Status
                     </th>
                   </tr>
@@ -1643,6 +1734,7 @@ onMounted(async () => {
     </VCard>
   </section>
 </template>
+
 <style scoped>
 .permission-filter-card :deep(.v-card-text) {
   padding: 20px;

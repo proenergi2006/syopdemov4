@@ -35,6 +35,24 @@ return [
         'token' => env('ACCURATE_API_TOKEN'),
         'secret' => env('ACCURATE_API_SECRET'),
         'base_url' => env('ACCURATE_BASE_URL'),
+
+        /*
+        |----------------------------------------------------------------------
+        | Batas permintaan per detik
+        |----------------------------------------------------------------------
+        | Accurate Online membatasi sekitar 8 permintaan per detik, dan
+        | melewatinya berisiko memblokir seluruh sambungan aplikasi ini --
+        | bukan hanya permintaan yang kelebihan itu.
+        |
+        | Dipasang 6, bukan 8, dengan sengaja. Hitungannya memakai cache file
+        | yang penambahannya tidak dijamin atomik antar proses, jadi angkanya
+        | bisa meleset sedikit saat ramai; selisih dua itulah ruang amannya.
+        |
+        | Yang menjaganya AccurateApiService, sehingga berlaku untuk seluruh
+        | pemanggil -- termasuk proses latar yang tidak ada orang menunggui.
+        |----------------------------------------------------------------------
+        */
+        'max_per_second' => env('ACCURATE_MAX_PER_SECOND', 6),
     ],
 
     'legacy_sso' => [

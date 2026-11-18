@@ -231,12 +231,7 @@
                                         font-size: 13px;
                                         font-weight: bold;
                                     ">
-                                        Rp {{ number_format(
-                                            $displayTotal,
-                                            0,
-                                            ',',
-                                            '.'
-                                        ) }}
+                                        Rp {{ angka($displayTotal, 0) }}
                                     </td>
                                 </tr>
 
