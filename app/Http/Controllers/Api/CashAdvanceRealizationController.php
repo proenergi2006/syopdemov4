@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
 use App\Support\DocumentActionScope;
+use App\Support\LineAttachment;
 use App\Support\UserHomeAccess;
 use App\Services\FundRequest\CombinedPrintComposer;
 use App\Http\Controllers\Api\BusinessTripController;
@@ -17,6 +18,7 @@ use App\Services\FundRequest\DocumentRevisionService;
 use App\Services\FundRequest\RevisionNotifier;
 use App\Models\FundRequestRevision;
 use App\Models\CashAdvance;
+use App\Models\CashAdvanceAttachment;
 use App\Models\FundRequestArrangedCategory;
 use App\Services\FundRequest\BusinessTripExpenseBreakdownService;
 use App\Services\FundRequest\TransactionCategorySetService;
@@ -35,6 +37,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -382,6 +385,16 @@ class CashAdvanceRealizationController extends Controller
                     */
                     'items.expenseCategory',
                     'items.transactionCategory:id,name',
+
+                    /*
+                    | Lampiran tiap baris FPU, supaya form realisasi bisa
+                    | menampilkan dasar pengajuannya berdampingan dengan bukti
+                    | pengeluaran yang sedang diisi. Dimuat sekaligus di sini,
+                    | bukan per FPU saat dipilih: daftar ini sudah dibatasi
+                    | seratus baris, dan permintaan kedua hanya menambah
+                    | tunggu di saat orang sedang mengisi.
+                    */
+                    'attachments',
                 ])
                 ->where('status', CashAdvance::STATUS_DISBURSED)
                 ->whereDoesntHave('realization');
@@ -431,6 +444,25 @@ class CashAdvanceRealizationController extends Controller
                     (int) $cashAdvance->id,
                 )
                 : [];
+
+            /*
+            | Pengelompokan lampiran dihitung sekali per FPU, lalu dipakai
+            | ulang oleh seluruh barisnya. Tanpa simpanan ini, satu FPU
+            | berisi sepuluh baris akan mengelompokkan lampirannya sepuluh
+            | kali -- dan daftar ini memuat sampai seratus FPU sekaligus.
+            */
+            $lampiranPerFpu = [];
+
+            $lampiranBaris = function (
+                CashAdvance $cashAdvance,
+                int $itemId,
+            ) use (&$lampiranPerFpu): array {
+                $kunci = (int) $cashAdvance->id;
+
+                $lampiranPerFpu[$kunci] ??= $this->sourceAttachmentsByItem($cashAdvance);
+
+                return $lampiranPerFpu[$kunci]->get($itemId, []);
+            };
 
             return response()->json([
                 'success' => true,
@@ -497,6 +529,17 @@ class CashAdvanceRealizationController extends Controller
                         'items' => $cashAdvance->items
                             ->map(fn($item) => [
                                 'id' => $item->id,
+
+                                /*
+                                | Lampiran baris FPU ini. Dibawa ke form
+                                | realisasi sebagai rujukan yang tidak bisa
+                                | diubah -- lihat sourceAttachmentsByItem().
+                                */
+                                'source_attachments' => $lampiranBaris(
+                                    $cashAdvance,
+                                    (int) $item->id,
+                                ),
+
                                 'date' => optional($item->date)->toDateString(),
                                 'description' => $item->description,
                                 'amount' => (float) $item->amount,
@@ -579,7 +622,15 @@ class CashAdvanceRealizationController extends Controller
                     'mimes:' . self::ATTACHMENT_MIMES,
                     'max:' . self::ATTACHMENT_MAX_KB,
                 ],
-            ]);
+
+                /*
+                | Jumlah lampiran yang DINYATAKAN layar. Dipakai
+                | ExplainUploadFailure untuk menangkap berkas yang dibuang
+                | PHP tanpa jejak; di sini cukup dipastikan bentuknya.
+                */
+                'attachment_count' => ['nullable', 'integer', 'min:0'],
+
+            ], LineAttachment::messages(), LineAttachment::attributes($request));
 
             $cashAdvance = $this->resolveRealizableCashAdvance(
                 $request->input('cash_advance_public_id'),
@@ -770,7 +821,14 @@ class CashAdvanceRealizationController extends Controller
             }
 
             $realization->load([
-                'cashAdvance',
+
+                /*
+                | Lampirannya ikut: rincian realisasi menampilkan lampiran FPU
+                | di samping bukti pengeluarannya, dan tanpa dimuat di sini
+                | pemetaannya akan mengambilnya sendiri satu per satu.
+                */
+                'cashAdvance.attachments',
+
                 'branchData',
                 'departmentData',
                 'transactionCategory',
@@ -845,7 +903,14 @@ class CashAdvanceRealizationController extends Controller
             }
 
             $realization->load([
-                'cashAdvance',
+
+                /*
+                | Lampirannya ikut: rincian realisasi menampilkan lampiran FPU
+                | di samping bukti pengeluarannya, dan tanpa dimuat di sini
+                | pemetaannya akan mengambilnya sendiri satu per satu.
+                */
+                'cashAdvance.attachments',
+
                 'branchData',
                 'departmentData',
                 'transactionCategory',
@@ -1043,7 +1108,15 @@ class CashAdvanceRealizationController extends Controller
                     'mimes:' . self::ATTACHMENT_MIMES,
                     'max:' . self::ATTACHMENT_MAX_KB,
                 ],
-            ]);
+
+                /*
+                | Jumlah lampiran yang DINYATAKAN layar. Dipakai
+                | ExplainUploadFailure untuk menangkap berkas yang dibuang
+                | PHP tanpa jejak; di sini cukup dipastikan bentuknya.
+                */
+                'attachment_count' => ['nullable', 'integer', 'min:0'],
+
+            ], LineAttachment::messages(), LineAttachment::attributes($request));
 
             $cashAdvance = CashAdvance::findOrFail($realization->cash_advance_id);
 
@@ -4343,8 +4416,25 @@ class CashAdvanceRealizationController extends Controller
         }
 
         foreach ($files as $file) {
-            if (!$file || !$file->isValid()) {
-                continue;
+            /*
+            | DULU DILEWATI DIAM-DIAM.
+            |
+            | Berkas yang tidak utuh cukup di-continue, sehingga dokumennya
+            | tersimpan lengkap sementara buktinya tidak ada -- dan tidak
+            | satu kalimat pun menyebutkannya. Sekarang penyimpanannya
+            | dibatalkan: dokumen pengeluaran tanpa bukti lebih buruk
+            | daripada dokumen yang gagal disimpan.
+            */
+            if (!$file instanceof UploadedFile || !$file->isValid()) {
+                throw ValidationException::withMessages([
+                    'line_attachments' => [
+                        __('upload.not_received', [
+                            'file' => $file instanceof UploadedFile
+                                ? ($file->getClientOriginalName() ?: $file->getFilename())
+                                : '-',
+                        ]),
+                    ],
+                ]);
             }
 
             $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
@@ -4407,7 +4497,21 @@ class CashAdvanceRealizationController extends Controller
         foreach ($grouped as $index => $files) {
             $itemId = $itemIdsByIndex[(int) $index] ?? null;
 
-            if ($itemId === null || !is_array($files)) {
+            /*
+            | Lampiran yang menunjuk baris yang tidak ada pada rincian.
+            | Dulu dibuang diam-diam, jadi berkasnya lenyap tanpa jejak --
+            | padahal ini pertanda kiriman dan layar sudah tidak sejalan,
+            | yang justru harus diketahui, bukan ditutupi.
+            */
+            if ($itemId === null) {
+                throw ValidationException::withMessages([
+                    "line_attachments.{$index}" => [
+                        __('upload.orphan_row', ['row' => (int) $index + 1]),
+                    ],
+                ]);
+            }
+
+            if (!is_array($files)) {
                 continue;
             }
 
@@ -4714,6 +4818,68 @@ class CashAdvanceRealizationController extends Controller
         ];
     }
 
+    /**
+     * Lampiran FPU, dikelompokkan menurut baris rincian FPU-nya.
+     *
+     * KENAPA DIBAWA KE REALISASI.
+     *
+     * Realisasi mempertanggungjawabkan FPU: tiap barisnya menjawab baris
+     * pengajuan, dan yang memeriksanya perlu melihat dua-duanya berdampingan.
+     * Selama ini bukti FPU hanya ada di dokumen FPU, sehingga pemeriksa harus
+     * membuka dua layar untuk satu pertanyaan.
+     *
+     * KENAPA TIDAK DICAMPUR DENGAN BUKTI REALISASI.
+     *
+     * Keduanya menjawab hal yang berbeda. Lampiran FPU adalah dasar
+     * pengajuan -- penawaran, perkiraan harga, undangan. Lampiran realisasi
+     * adalah bukti uangnya benar-benar keluar -- kuitansi, struk, tiket
+     * terpakai. Menggabungkannya membuat perkiraan harga terbaca sebagai
+     * bukti pengeluaran, dan itu persis kekeliruan yang harus dicegah oleh
+     * dokumen realisasi.
+     *
+     * Karena itu lampiran FPU dikirim pada kunci yang berbeda, dan di layar
+     * tidak pernah bisa dihapus maupun ditambah dari sini: ia milik dokumen
+     * lain.
+     *
+     * Hanya lampiran REQUEST yang ikut. Bukti transfer dari Finance dan
+     * berkas tanda terima bukan dasar pengeluaran, jadi tidak ada urusannya
+     * dengan baris rincian mana pun.
+     *
+     * @return \Illuminate\Support\Collection<int, array<int, array<string, mixed>>>
+     */
+    private function sourceAttachmentsByItem(?CashAdvance $cashAdvance)
+    {
+        if (!$cashAdvance) {
+            return collect();
+        }
+
+        $cashAdvance->loadMissing('attachments');
+
+        return $cashAdvance->attachments
+            ->filter(
+                fn(CashAdvanceAttachment $attachment): bool =>
+                strtoupper(trim((string) $attachment->attachment_type))
+                    === CashAdvanceAttachment::TYPE_REQUEST
+                && $attachment->cash_advance_item_id !== null,
+            )
+            ->groupBy('cash_advance_item_id')
+            ->map(
+                fn($berkas) => collect($berkas)
+                    ->map(fn(CashAdvanceAttachment $attachment): array => [
+                        'id' => $attachment->id,
+                        'filename' => $attachment->filename,
+                        'original_filename' => $attachment->original_filename,
+                        'mime_type' => $attachment->mime_type,
+                        'file_size' => $attachment->file_size,
+                        'url' => $attachment->filepath
+                            ? Storage::disk('public')->url($attachment->filepath)
+                            : null,
+                    ])
+                    ->values()
+                    ->all(),
+            );
+    }
+
     private function transformItems(CashAdvanceRealization $realization)
     {
         /*
@@ -4728,6 +4894,15 @@ class CashAdvanceRealizationController extends Controller
                 && $attachment->cash_advance_realization_item_id !== null,
             )
             ->groupBy('cash_advance_realization_item_id');
+
+        /*
+        | Lampiran FPU-nya, dicocokkan lewat cash_advance_item_id. Baris
+        | tambahan -- pengeluaran di luar rencana -- tidak punya pasangan di
+        | FPU, jadi memang kosong, dan itu bukan kekurangan data.
+        */
+        $sourceByAdvanceItem = $this->sourceAttachmentsByItem(
+            $realization->cashAdvance,
+        );
 
         return $realization->items
             ->map(fn(CashAdvanceRealizationItem $item): array => [
@@ -4765,6 +4940,7 @@ class CashAdvanceRealizationController extends Controller
                 'qty' => $item->qty !== null ? (float) $item->qty : null,
                 'unit_price' => $item->unit_price !== null ? (float) $item->unit_price : null,
 
+                /* Bukti pengeluaran milik realisasi ini. */
                 'attachments' => collect($attachmentsByItem->get($item->id, []))
                     ->map(fn(CashAdvanceRealizationAttachment $attachment): array => [
                         'id' => $attachment->id,
@@ -4777,6 +4953,14 @@ class CashAdvanceRealizationController extends Controller
                             : null,
                     ])
                     ->values(),
+
+                /*
+                | Lampiran baris FPU-nya. Kunci terpisah dengan sengaja --
+                | lihat keterangan di sourceAttachmentsByItem().
+                */
+                'source_attachments' => $item->cash_advance_item_id !== null
+                    ? $sourceByAdvanceItem->get((int) $item->cash_advance_item_id, [])
+                    : [],
             ])
             ->values();
     }

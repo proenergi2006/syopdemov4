@@ -55,6 +55,7 @@
     },
     "httpStatus": {
         "noConnection": "Unable to connect to the server.",
+        "uploadTimeout": "The submission timed out before all attachments finished uploading, so the document was NOT saved. Reduce or shrink the attachments, then try again.",
         "badRequest": "Invalid request.",
         "sessionExpired": "Your session has expired. Please log in again.",
         "forbidden": "You do not have access.",

@@ -2,8 +2,8 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import axios from '@axios'
 import SignaturePad from 'signature_pad'
+import axios from '@axios'
 import {
   closeAlert,
   showConfirmAlert,
@@ -4201,32 +4201,74 @@ onMounted(async () => {
                       </td>
 
                       <td>
+                        <!--
+                          DUA KELOMPOK, BUKAN SATU DAFTAR.
+
+                          Lampiran FPU adalah dasar pengajuan -- penawaran, perkiraan harga.
+                          Lampiran realisasi adalah bukti uangnya benar-benar keluar --
+                          kuitansi, struk. Disatukan, perkiraan harga akan terbaca sebagai
+                          bukti pengeluaran, dan pemeriksa menyetujui sesuatu yang belum
+                          pernah dibuktikan. Karena itu keduanya diberi nama masing-masing.
+                        -->
                         <div
-                          v-if="(item.attachments || []).length"
-                          class="d-flex flex-column gap-1"
+                          v-if="(item.source_attachments || []).length"
+                          class="car-detail__file-group"
                         >
+                          <div class="car-detail__file-group-title">
+                            {{ t('cashAdvanceRealization.detail.itemSourceAttachment') }}
+                          </div>
+
                           <a
-                            v-for="attachment in item.attachments"
-                            :key="`detail-item-${item.id}-file-${attachment.id}`"
-                            class="car-detail__line-file"
-                            :href="attachment.url || undefined"
+                            v-for="berkas in item.source_attachments"
+                            :key="`detail-item-${item.id}-fpu-${berkas.id}`"
+                            class="car-detail__line-file car-detail__line-file--source"
+                            :href="berkas.url || undefined"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
                             <VIcon
-                              :icon="getAttachmentIcon(attachment.mime_type)"
+                              :icon="getAttachmentIcon(berkas.mime_type)"
+                              size="18"
+                              color="secondary"
+                            />
+
+                            <span class="car-detail__line-file-name">
+                              {{ berkas.original_filename || berkas.filename }}
+                            </span>
+                          </a>
+                        </div>
+
+                        <div
+                          v-if="(item.attachments || []).length"
+                          class="car-detail__file-group"
+                        >
+                          <div class="car-detail__file-group-title">
+                            {{ t('cashAdvanceRealization.form.attachment.ownTitle') }}
+                          </div>
+
+                          <a
+                            v-for="berkas in item.attachments"
+                            :key="`detail-item-${item.id}-file-${berkas.id}`"
+                            class="car-detail__line-file"
+                            :href="berkas.url || undefined"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <VIcon
+                              :icon="getAttachmentIcon(berkas.mime_type)"
                               size="18"
                               color="primary"
                             />
 
                             <span class="car-detail__line-file-name">
-                              {{ attachment.original_filename || attachment.filename }}
+                              {{ berkas.original_filename || berkas.filename }}
                             </span>
                           </a>
                         </div>
 
                         <span
-                          v-else
+                          v-if="!(item.source_attachments || []).length
+                            && !(item.attachments || []).length"
                           class="car-detail__meta"
                         >—</span>
                       </td>
@@ -4385,32 +4427,74 @@ onMounted(async () => {
 
                     <!-- Bukti milik baris ini -->
                     <td>
+                      <!--
+                        DUA KELOMPOK, BUKAN SATU DAFTAR.
+
+                        Lampiran FPU adalah dasar pengajuan -- penawaran, perkiraan harga.
+                        Lampiran realisasi adalah bukti uangnya benar-benar keluar --
+                        kuitansi, struk. Disatukan, perkiraan harga akan terbaca sebagai
+                        bukti pengeluaran, dan pemeriksa menyetujui sesuatu yang belum
+                        pernah dibuktikan. Karena itu keduanya diberi nama masing-masing.
+                      -->
                       <div
-                        v-if="(item.attachments || []).length"
-                        class="d-flex flex-column gap-1"
+                        v-if="(item.source_attachments || []).length"
+                        class="car-detail__file-group"
                       >
+                        <div class="car-detail__file-group-title">
+                          {{ t('cashAdvanceRealization.detail.itemSourceAttachment') }}
+                        </div>
+
                         <a
-                          v-for="attachment in item.attachments"
-                          :key="`detail-item-${item.id}-file-${attachment.id}`"
-                          class="car-detail__line-file"
-                          :href="attachment.url || undefined"
+                          v-for="berkas in item.source_attachments"
+                          :key="`detail-item-${item.id}-fpu-${berkas.id}`"
+                          class="car-detail__line-file car-detail__line-file--source"
+                          :href="berkas.url || undefined"
                           target="_blank"
-                          rel="noopener"
+                          rel="noopener noreferrer"
                         >
                           <VIcon
-                            :icon="getAttachmentIcon(attachment.mime_type)"
+                            :icon="getAttachmentIcon(berkas.mime_type)"
+                            size="18"
+                            color="secondary"
+                          />
+
+                          <span class="car-detail__line-file-name">
+                            {{ berkas.original_filename || berkas.filename }}
+                          </span>
+                        </a>
+                      </div>
+
+                      <div
+                        v-if="(item.attachments || []).length"
+                        class="car-detail__file-group"
+                      >
+                        <div class="car-detail__file-group-title">
+                          {{ t('cashAdvanceRealization.form.attachment.ownTitle') }}
+                        </div>
+
+                        <a
+                          v-for="berkas in item.attachments"
+                          :key="`detail-item-${item.id}-file-${berkas.id}`"
+                          class="car-detail__line-file"
+                          :href="berkas.url || undefined"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <VIcon
+                            :icon="getAttachmentIcon(berkas.mime_type)"
                             size="18"
                             color="primary"
                           />
 
                           <span class="car-detail__line-file-name">
-                            {{ attachment.original_filename || attachment.filename }}
+                            {{ berkas.original_filename || berkas.filename }}
                           </span>
                         </a>
                       </div>
 
                       <span
-                        v-else
+                        v-if="!(item.source_attachments || []).length
+                          && !(item.attachments || []).length"
                         class="car-detail__meta"
                       >—</span>
                     </td>
@@ -5755,6 +5839,32 @@ onMounted(async () => {
 }
 
 /* Bukti yang menempel pada satu baris rincian. */
+/* Satu kelompok lampiran, berikut namanya. */
+.car-detail__file-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.car-detail__file-group + .car-detail__file-group {
+  margin-block-start: 0.5rem;
+}
+
+.car-detail__file-group-title {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/*
+  Lampiran FPU diredupkan dengan sengaja: ia rujukan, bukan bukti yang
+  sedang dinilai. Yang dinilai pemeriksa adalah kelompok di bawahnya.
+*/
+.car-detail__line-file--source {
+  opacity: 0.75;
+}
+
 .car-detail__line-file {
   display: flex;
   align-items: center;

@@ -8,6 +8,8 @@ use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Api\BusinessTripController;
 use App\Http\Controllers\Controller;
+use App\Support\DocumentActionScope;
+use App\Support\LineAttachment;
 use App\Support\UserHomeAccess;
 use App\Services\FundRequest\CombinedPrintComposer;
 use App\Services\FundRequest\PrintAttachmentCollector;
@@ -26,6 +28,7 @@ use App\Services\FundRequest\Claim\ClaimApprovalService;
 use App\Services\FundRequest\Claim\ClaimMailService;
 use App\Services\FundRequest\Claim\ClaimNotificationService;
 use App\Services\FundRequest\Claim\ClaimNumberService;
+use App\Services\FundRequest\PettyCash\PettyCashEligibilityService;
 use App\Services\FundRequest\RupiahWords;
 use App\Services\FundRequest\TransactionCategorySetService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -33,6 +36,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -421,7 +425,15 @@ class ClaimController extends Controller
                     'mimes:' . self::ATTACHMENT_MIMES,
                     'max:' . self::ATTACHMENT_MAX_KB,
                 ],
-            ]);
+
+                /*
+                | Jumlah lampiran yang DINYATAKAN layar. Dipakai
+                | ExplainUploadFailure untuk menangkap berkas yang dibuang
+                | PHP tanpa jejak; di sini cukup dipastikan bentuknya.
+                */
+                'attachment_count' => ['nullable', 'integer', 'min:0'],
+
+            ], LineAttachment::messages(), LineAttachment::attributes($request));
 
             $this->assertUserAccessAssignment(
                 $user,
@@ -770,6 +782,29 @@ class ClaimController extends Controller
                 ->findOrFail($id);
 
             /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "claim.update" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'claim.update', $claim, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Claim tidak ditemukan.',
+                ], 404);
+            }
+
+            /*
             | Draft, dan dokumen yang sedang butuh revisi.
             |
             | Keduanya sama-sama berada di tangan pemohon dan tidak sedang
@@ -831,7 +866,15 @@ class ClaimController extends Controller
                     'mimes:' . self::ATTACHMENT_MIMES,
                     'max:' . self::ATTACHMENT_MAX_KB,
                 ],
-            ]);
+
+                /*
+                | Jumlah lampiran yang DINYATAKAN layar. Dipakai
+                | ExplainUploadFailure untuk menangkap berkas yang dibuang
+                | PHP tanpa jejak; di sini cukup dipastikan bentuknya.
+                */
+                'attachment_count' => ['nullable', 'integer', 'min:0'],
+
+            ], LineAttachment::messages(), LineAttachment::attributes($request));
 
             $this->assertUserAccessAssignment(
                 $user,
@@ -1013,6 +1056,29 @@ class ClaimController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($id);
 
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "claim.delete" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'claim.delete', $claim, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Claim tidak ditemukan.',
+                ], 404);
+            }
+
             if (strtoupper((string) $claim->status) !== Claim::STATUS_DRAFT) {
                 DB::rollBack();
 
@@ -1080,6 +1146,29 @@ class ClaimController extends Controller
             $claim = Claim::with(['items'])
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "claim.submit" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'claim.submit', $claim, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Claim tidak ditemukan.',
+                ], 404);
+            }
 
             /*
             | Draft, dan dokumen revisian yang sudah diperbaiki.
@@ -1607,6 +1696,22 @@ class ClaimController extends Controller
             }
 
             /*
+            | Claim kecil di cabang berkas kecil hanya diterima pemegangnya.
+            | Diperiksa sesudah status, supaya Finance yang menyentuh dokumen
+            | yang memang belum waktunya tetap mendapat pesan yang tepat.
+            */
+            $penahanPettyCash = $this->pettyCashBlockingReceipt($claim, $user);
+
+            if ($penahanPettyCash) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $penahanPettyCash,
+                ], 422);
+            }
+
+            /*
             | Nominalnya dibetulkan lebih dulu, selagi statusnya masih
             | Approved. Kalau revisinya ditolak, dokumennya tidak boleh
             | terlanjur tercatat diterima.
@@ -1635,10 +1740,9 @@ class ClaimController extends Controller
                 'received_by' => $user->id,
                 'received_at' => $diterimaPada,
                 'receipt_notes' => $this->clean($validated['notes'] ?? '') ?: null,
-                'scheduled_payment_date' => $this->freezePaymentDate(
-                    'CLAIM',
+                'scheduled_payment_date' => $this->freezePaymentDateUnlessPettyCash(
+                    $claim,
                     $diterimaPada,
-                    $claim->transaction_category_id,
                 ),
             ]);
 
@@ -1733,6 +1837,23 @@ class ClaimController extends Controller
             $claim = Claim::query()
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            /*
+            | Claim yang sudah terikat formulir petty cash hidup tidak boleh
+            | turun ke APPROVED. Diperiksa sebelum layanannya dipanggil,
+            | supaya pesannya menyebut nomor formulir yang menahannya --
+            | bukan sekadar "tidak bisa".
+            */
+            $penahanPettyCash = $this->pettyCashBlockingUnreceive($claim);
+
+            if ($penahanPettyCash) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $penahanPettyCash,
+                ], 422);
+            }
 
             $hasil = app(ReceiptReversalService::class)->revert(
                 document: $claim,
@@ -1833,16 +1954,32 @@ class ClaimController extends Controller
                         );
                     }
 
+                    /*
+                    | Aturan yang sama berlaku pada penerimaan massal.
+                    |
+                    | Tanpa ini, aturan "claim kecil hanya diterima pemegang
+                    | kas kecil" bisa dilewati justru lewat jalan pintas:
+                    | centang semuanya, tekan sekali, dan tidak ada yang
+                    | memeriksa nominalnya.
+                    */
+                    $penahanPettyCash = $this->pettyCashBlockingReceipt($terkunci, $user);
+
+                    if ($penahanPettyCash) {
+                        throw new BulkDocumentActionException(
+                            (string) $terkunci->claim_number,
+                            $penahanPettyCash,
+                        );
+                    }
+
                     $diterimaPada = now();
 
                     $terkunci->update([
                         'status' => Claim::STATUS_RECEIVED,
                         'received_by' => $user->id,
                         'received_at' => $diterimaPada,
-                        'scheduled_payment_date' => $this->freezePaymentDate(
-                            'CLAIM',
+                        'scheduled_payment_date' => $this->freezePaymentDateUnlessPettyCash(
+                            $terkunci,
                             $diterimaPada,
-                            $terkunci->transaction_category_id,
                         ),
                     ]);
 
@@ -1948,6 +2085,16 @@ class ClaimController extends Controller
                         );
                     }
 
+                    /* Claim kecil dibayar lewat formulir petty cash, juga di sini. */
+                    $penahanPettyCash = $this->pettyCashBlockingPayment($terkunci);
+
+                    if ($penahanPettyCash) {
+                        throw new BulkDocumentActionException(
+                            (string) $terkunci->claim_number,
+                            $penahanPettyCash,
+                        );
+                    }
+
                     /* Pembayaran hanya boleh jatuh pada hari pembayaran. */
                     if (!$this->canPayToday(
                         'CLAIM',
@@ -1996,6 +2143,118 @@ class ClaimController extends Controller
             'data' => $hasil,
         ], 200);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Claim kecil yang wajib lewat kas kecil
+    |--------------------------------------------------------------------------
+    | Tiga penjaga, ditulis berdekatan supaya terbaca sebagai satu aturan.
+    |
+    | Aturannya DITURUNKAN DARI NOMINAL, bukan dari pengaturan terpisah.
+    | Permission tidak punya tempat untuk menyimpan rentang nominal, dan satu
+    | pun tabel pemetaan tidak dibuat untuk ini: yang menentukan adalah plafon
+    | kas kecil cabang claim itu -- ada atau tidak, dan ambangnya berapa.
+    |
+    | Akibatnya menyeluruh dan sengaja: pada cabang yang punya kas kecil,
+    | claim di bawah ambangnya TIDAK LAGI bisa diterima maupun dibayar dari
+    | layar Claim oleh Finance. Yang mengerjakannya pemegang kas kecil cabang
+    | itu, lewat formulir Petty Cash. Daftar dan dashboard tidak berubah --
+    | Finance tetap melihat seluruhnya, hanya tidak mengerjakan yang kecil.
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Penahan penerimaan claim, bila claim ini wajib lewat kas kecil dan yang
+     * mengerjakannya bukan pemegangnya.
+     */
+    private function pettyCashBlockingReceipt(Claim $claim, $user): ?string
+    {
+        $kelayakan = app(PettyCashEligibilityService::class);
+
+        if (!$kelayakan->requiresPettyCash($claim)) {
+            return null;
+        }
+
+        if ($kelayakan->isHolderFor($user, (int) $claim->branch)) {
+            return null;
+        }
+
+        return __('claim_messages.petty_cash.receive_holder_only', [
+            'amount' => angka((float) $claim->total_amount, 0),
+            'branch' => $this->branchLabel($claim),
+            'threshold' => angka((float) $kelayakan->thresholdForBranch((int) $claim->branch), 0),
+        ]);
+    }
+
+    /**
+     * Penahan pembayaran claim dari layar Claim.
+     *
+     * Berbeda dari penerimaan: di sini tidak ada pengecualian untuk pemegang
+     * kas kecil sekalipun. Pembayaran claim kecil TIDAK dikerjakan satu per
+     * satu dari layar ini, melainkan sebagai akibat dari dicairkannya
+     * formulir petty cash -- supaya tidak ada claim yang berpindah ke PAID
+     * tanpa plafon yang terpotong.
+     */
+    private function pettyCashBlockingPayment(Claim $claim): ?string
+    {
+        if (!app(PettyCashEligibilityService::class)->requiresPettyCash($claim)) {
+            return null;
+        }
+
+        return __('claim_messages.petty_cash.pay_via_petty_cash', [
+            'branch' => $this->branchLabel($claim),
+        ]);
+    }
+
+    /**
+     * Penahan penarikan kembali penerimaan.
+     *
+     * Claim yang sudah masuk formulir petty cash hidup tidak boleh turun ke
+     * APPROVED: formulirnya akan tetap menunjuknya dan memotong plafon atas
+     * dokumen yang statusnya sudah tidak layak dibayar.
+     */
+    private function pettyCashBlockingUnreceive(Claim $claim): ?string
+    {
+        $nomor = app(PettyCashEligibilityService::class)
+            ->livePettyCashNumberFor((int) $claim->id);
+
+        if (!$nomor) {
+            return null;
+        }
+
+        return __('claim_messages.petty_cash.unreceive_locked', ['number' => $nomor]);
+    }
+
+    /**
+     * Tanggal pembayaran yang dibekukan saat berkas diterima.
+     *
+     * Claim yang wajib lewat kas kecil TIDAK mendapat tanggal.
+     *
+     * Jadwal pembayaran itu jadwal kasir Finance; kas kecil tidak menunggu
+     * hari. Kalau tanggalnya tetap dibekukan, claim-claim ini akan muncul di
+     * penyaring "jadwal pembayaran" milik Finance dan tampak terlambat
+     * dibayar, padahal bukan Finance yang membayarnya.
+     */
+    private function freezePaymentDateUnlessPettyCash(Claim $claim, $diterimaPada)
+    {
+        if (app(PettyCashEligibilityService::class)->requiresPettyCash($claim)) {
+            return null;
+        }
+
+        return $this->freezePaymentDate(
+            'CLAIM',
+            $diterimaPada,
+            $claim->transaction_category_id,
+        );
+    }
+
+    private function branchLabel(Claim $claim): string
+    {
+        $claim->loadMissing('branchData');
+
+        return (string) ($claim->branchData?->nama_cabang ?? $claim->branch ?? '-');
+    }
+
     /**
      * Perjalanan dinas yang menahan pembayaran Claim ini, bila ada.
      *
@@ -2077,6 +2336,23 @@ class ClaimController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => __('claim_messages.pay.only_received'),
+                ], 422);
+            }
+
+            /*
+            | Claim kecil dibayar lewat formulir petty cash, bukan dari sini.
+            | Tanpa penjaga ini, claim bisa berpindah ke PAID tanpa plafon
+            | yang terpotong -- dan kas kecil akan tampak utuh padahal uangnya
+            | sudah keluar.
+            */
+            $penahanPettyCash = $this->pettyCashBlockingPayment($claim);
+
+            if ($penahanPettyCash) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $penahanPettyCash,
                 ], 422);
             }
 
@@ -2384,6 +2660,29 @@ class ClaimController extends Controller
             $claim = Claim::query()
                 ->lockForUpdate()
                 ->findOrFail($id);
+
+            /*
+            | Scope permission AKSI INI, bukan scope view.
+            |
+            | Tanpa ini, "claim.cancel" bercakupan OWN_DATA tidak berarti
+            | apa-apa: dokumennya tetap diambil dan tetap bisa disentuh.
+            |
+            | Dijawab 404, sama seperti dokumen yang memang tidak ada --
+            | membedakan keduanya memberi tahu keberadaan dokumen orang lain
+            | kepada yang tidak berhak mengetahuinya.
+            */
+            if (!DocumentActionScope::allows($user, 'claim.cancel', $claim, [
+                'branch' => 'branch',
+                'department' => 'department_id',
+                'owner' => 'created_by',
+            ])) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Claim tidak ditemukan.',
+                ], 404);
+            }
 
             /*
             | Dokumen yang sudah diterima tetapi belum dibayarkan masih boleh
@@ -3533,8 +3832,25 @@ class ClaimController extends Controller
         }
 
         foreach ($files as $file) {
-            if (!$file || !$file->isValid()) {
-                continue;
+            /*
+            | DULU DILEWATI DIAM-DIAM.
+            |
+            | Berkas yang tidak utuh cukup di-continue, sehingga dokumennya
+            | tersimpan lengkap sementara buktinya tidak ada -- dan tidak
+            | satu kalimat pun menyebutkannya. Sekarang penyimpanannya
+            | dibatalkan: dokumen pengeluaran tanpa bukti lebih buruk
+            | daripada dokumen yang gagal disimpan.
+            */
+            if (!$file instanceof UploadedFile || !$file->isValid()) {
+                throw ValidationException::withMessages([
+                    'line_attachments' => [
+                        __('upload.not_received', [
+                            'file' => $file instanceof UploadedFile
+                                ? ($file->getClientOriginalName() ?: $file->getFilename())
+                                : '-',
+                        ]),
+                    ],
+                ]);
             }
 
             $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
@@ -3598,7 +3914,21 @@ class ClaimController extends Controller
         foreach ($grouped as $index => $files) {
             $itemId = $itemIdsByIndex[(int) $index] ?? null;
 
-            if ($itemId === null || !is_array($files)) {
+            /*
+            | Lampiran yang menunjuk baris yang tidak ada pada rincian.
+            | Dulu dibuang diam-diam, jadi berkasnya lenyap tanpa jejak --
+            | padahal ini pertanda kiriman dan layar sudah tidak sejalan,
+            | yang justru harus diketahui, bukan ditutupi.
+            */
+            if ($itemId === null) {
+                throw ValidationException::withMessages([
+                    "line_attachments.{$index}" => [
+                        __('upload.orphan_row', ['row' => (int) $index + 1]),
+                    ],
+                ]);
+            }
+
+            if (!is_array($files)) {
                 continue;
             }
 

@@ -5,11 +5,33 @@ const apiBaseUrl = String(
   import.meta.env.VITE_API_BASE_URL || '/api',
 ).replace(/\/+$/, '')
 
+/*
+|--------------------------------------------------------------------------
+| Tenggat untuk pengiriman berlampiran
+|--------------------------------------------------------------------------
+| Tenggat bawaan di bawah -- 30 detik -- dihitung sejak permintaan berangkat,
+| bukan sejak seluruh isinya terkirim. Untuk permintaan biasa itu masuk akal;
+| untuk formulir berisi lampiran, ia ikut membatasi waktu MENGUNGGAH.
+|
+| Lampiran di modul pengajuan dana boleh 3 MB per berkas, dan satu dokumen
+| bisa memuat belasan. Di jaringan kantor yang unggahannya sekadar beberapa
+| ratus Kbps, kiriman seperti itu jelas melewati 30 detik -- dan ketika
+| tenggatnya habis, pengirimannya diputus di tengah jalan. Server tidak
+| pernah menerimanya utuh, jadi tidak ada yang tersimpan, sementara di layar
+| yang terbaca hanya "tidak dapat terhubung ke server".
+|
+| Dipakai dengan menyebutkannya pada permintaan yang bersangkutan, bukan
+| dengan menaikkan tenggat bawaan: permintaan tanpa lampiran justru lebih
+| baik menyerah cepat.
+|--------------------------------------------------------------------------
+*/
+export const UPLOAD_TIMEOUT_MS = 300000
+
 const axiosIns = axios.create({
   baseURL: apiBaseUrl,
   timeout: 30000,
   headers: {
-    Accept: 'application/json',
+    'Accept': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
   },
 })
@@ -65,6 +87,7 @@ axiosIns.interceptors.response.use(
   async error => {
     if (error.response?.status === 401) {
       const reason = String(error.response?.data?.reason ?? '')
+
       const message = String(
         error.response?.data?.message
         ?? 'Sesi Anda telah berakhir. Silakan login kembali.',
