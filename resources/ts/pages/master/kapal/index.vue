@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import axios from '@axios'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from '@axios'
 import {
+  closeAlert,
   showConfirmAlert,
   showErrorAlert,
   showLoadingAlert,
   showSuccessAlert,
-  closeAlert,
 } from '@/utils/alert'
 
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
+
 const router = useRouter()
 
 const loading = ref(false)
@@ -37,7 +39,7 @@ const paginationData = computed(() => {
 
 const fetchData = async () => {
   loading.value = true
-  
+
   try {
     const res = await axios.get('/master/oa-kapal', {
       params: {
@@ -55,7 +57,8 @@ const fetchData = async () => {
     totalPage.value = res.data.last_page
     totalItems.value = res.data.total
     currentPage.value = res.data.current_page
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -65,7 +68,7 @@ watch(
   async () => {
     await fetchData()
   },
-  { deep: true }
+  { deep: true },
 )
 
 watch(
@@ -73,7 +76,7 @@ watch(
   () => {
     currentPage.value = 1
   },
-  { deep: true }
+  { deep: true },
 )
 
 const fetchTransportir = async () => {
@@ -97,14 +100,14 @@ const form = ref<any>({
 })
 
 const filteredItems = ref<any[]>([])
+
 const totalHarga = (row: any) => {
   return Number(row.harga_angkut || 0) * Number(row.volume_angkut || 0)
 }
 
 const formatNumber = (value: number) => {
-  return new Intl.NumberFormat('id-ID').format(value)
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(value)
 }
-
 
 const addData = () => {
   router.push('/master/kapal/create')
@@ -113,25 +116,23 @@ const addData = () => {
 const deleteData = async (id: number) => {
   try {
     const confirm = await showConfirmAlert({
-      title : '<h5>Apakah yakin ingin hapus?<h5>'
+      title: '<h5>Apakah yakin ingin hapus?<h5>',
     })
 
     if (!confirm.isConfirmed)
       return
 
-
     await axios.delete(`/master/oa-kapal/${id}`)
     await showSuccessAlert({
       title: 'Berhasil',
-      text: `Simpan Data berhasil`,
+      text: 'Simpan Data berhasil',
       timer: 1800,
-      })
+    })
     await fetchData()
-  }finally{
-  loading.value = false
   }
-
-
+  finally {
+    loading.value = false
+  }
 }
 
 const openEdit = (item: any) => {
@@ -151,19 +152,19 @@ const openEdit = (item: any) => {
 }
 
 const updateData = async () => {
-   try {
+  try {
     const confirm = await showConfirmAlert({
-      title : '<h5>Apakah yakin ingin submit?<h5>'
+      title: '<h5>Apakah yakin ingin submit?<h5>',
     })
 
     if (!confirm.isConfirmed)
       return
 
     showLoadingAlert()
-    
+
     loading.value = true
 
-      await axios.put(`/master/oa-kapal/${form.value.id}`, form.value)
+    await axios.put(`/master/oa-kapal/${form.value.id}`, form.value)
 
     editDialog.value = false
     fetchData()
@@ -171,14 +172,13 @@ const updateData = async () => {
 
     await showSuccessAlert({
       title: 'Berhasil',
-      text: `Simpan Data berhasil`,
+      text: 'Simpan Data berhasil',
       timer: 1800,
-      })
-
-  } finally {
+    })
+  }
+  finally {
     loading.value = false
   }
-
 }
 
 onMounted(async () => {
@@ -191,11 +191,9 @@ onMounted(async () => {
 
 <template>
   <VContainer fluid>
-
     <!-- HEADER -->
     <VCard class="mb-4">
       <VCardText class="d-flex justify-space-between align-center">
-
         <div>
           <h4 class="text-h5 font-weight-bold">
             Master OA Kapal
@@ -205,13 +203,13 @@ onMounted(async () => {
             Data Ongkos Angkut Kapal
           </div>
         </div>
-
       </VCardText>
-         <VCardText>
-
+      <VCardText>
         <VRow>
-
-          <VCol cols="12" md="3">
+          <VCol
+            cols="12"
+            md="3"
+          >
             <VTextField
               v-model="search.asal_angkut"
               label="Asal"
@@ -219,7 +217,10 @@ onMounted(async () => {
             />
           </VCol>
 
-          <VCol cols="12" md="3">
+          <VCol
+            cols="12"
+            md="3"
+          >
             <VTextField
               v-model="search.tujuan_angkut"
               label="Tujuan"
@@ -227,7 +228,10 @@ onMounted(async () => {
             />
           </VCol>
 
-          <VCol cols="12" md="3">
+          <VCol
+            cols="12"
+            md="3"
+          >
             <VSelect
               v-model="search.transportir"
               label="Transportir"
@@ -251,32 +255,33 @@ onMounted(async () => {
               Search
             </VBtn>
           </VCol>
-
         </VRow>
-
       </VCardText>
     </VCard>
 
-
     <!-- TABLE -->
     <VCard>
-        <VCardText class="d-flex flex-wrap gap-4 align-center">
-       
+      <VCardText class="d-flex flex-wrap gap-4 align-center">
         <VBtn
-            color="primary"
-            prepend-icon="tabler-plus"
-            @click="addData"
+          color="primary"
+          prepend-icon="tabler-plus"
+          @click="addData"
         >
-            Tambah Data
+          Tambah Data
         </VBtn>
 
         <VSpacer />
 
-        <VChip v-if="loading" size="small" variant="tonal">Loading...</VChip>
+        <VChip
+          v-if="loading"
+          size="small"
+          variant="tonal"
+        >
+          Loading...
+        </VChip>
       </VCardText>
 
       <VTable>
-
         <thead>
           <tr>
             <th>No</th>
@@ -287,20 +292,27 @@ onMounted(async () => {
             <th>Volume Angkut</th>
             <th>Harga/Liter</th>
             <th>Total Harga</th>
-            <th width="120">Aksi</th>
+            <th width="120">
+              Aksi
+            </th>
           </tr>
         </thead>
 
         <tbody>
-
           <tr v-if="loading">
-            <td colspan="10" class="text-center py-6">
+            <td
+              colspan="10"
+              class="text-center py-6"
+            >
               Loading...
             </td>
           </tr>
 
           <tr v-else-if="items.length === 0">
-            <td colspan="10" class="text-center py-6">
+            <td
+              colspan="10"
+              class="text-center py-6"
+            >
               Tidak ada data
             </td>
           </tr>
@@ -312,12 +324,11 @@ onMounted(async () => {
             <td>{{ index + 1 }}</td>
 
             <td class="text-no-wrap">
-             <div class="text-caption font-weight-bold">
+              <div class="text-caption font-weight-bold">
                 {{ item.transportir?.nama_suplier }}
               </div>
               {{ item.nama_kapal }} - {{ item.tipe_kapal }}
             </td>
-
 
             <td>
               {{ formatNumber(item.max_kapal) }}
@@ -340,7 +351,6 @@ onMounted(async () => {
             </td>
 
             <td>
-
               <VBtn
                 icon="tabler-edit"
                 size="small"
@@ -356,16 +366,15 @@ onMounted(async () => {
                 color="error"
                 @click="deleteData(item.id)"
               />
-
             </td>
-
           </tr>
-
         </tbody>
-
       </VTable>
-         <VCardText class="d-flex align-center flex-wrap justify-end gap-4 pa-2">
-        <div class="d-flex align-center me-3" style="width: 171px;">
+      <VCardText class="d-flex align-center flex-wrap justify-end gap-4 pa-2">
+        <div
+          class="d-flex align-center me-3"
+          style="width: 171px;"
+        >
           <span class="text-no-wrap me-3">Rows per page:</span>
 
           <VSelect
@@ -390,12 +399,13 @@ onMounted(async () => {
           />
         </div>
       </VCardText>
-
     </VCard>
 
-    <VDialog v-model="editDialog" max-width="1000">
+    <VDialog
+      v-model="editDialog"
+      max-width="1000"
+    >
       <VCard>
-
         <VCardTitle>
           Edit OA Kapal
         </VCardTitle>
@@ -404,56 +414,90 @@ onMounted(async () => {
 
         <VCardText>
           <VRow>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VSelect
+                v-model="form.transportir"
+                label="Transportir"
+                :items="transportirs"
+                item-title="nama_suplier"
+                item-value="id"
+                clearable
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VTextField
+                v-model="form.nama_kapal"
+                label="Nama Kapal"
+              />
+            </VCol>
 
-            <VCol cols="12" md="6">
-                <VSelect
-                    v-model="form.transportir"
-                    label="Transportir"
-                    :items="transportirs"
-                    item-title="nama_suplier"
-                    item-value="id"
-                    clearable
-                  />
+            <VCol
+              cols="12"
+              md="3"
+            >
+              <VTextField
+                v-model="form.tipe_kapal"
+                label="Tipe Kapal"
+              />
             </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model="form.nama_kapal" label="Nama Kapal" />
-            </VCol>
-
-            <VCol cols="12" md="3">
-              <VTextField v-model="form.tipe_kapal" label="Tipe Kapal" />
-            </VCol>
-            <VCol cols="12" md="3">
+            <VCol
+              cols="12"
+              md="3"
+            >
               <VTextField
                 v-model="form.max_kapal"
                 label="Max Kapal"
                 type="number"
               />
             </VCol>
-            <VCol cols="12" md="3">
-              <VTextField
+            <VCol
+              cols="12"
+              md="3"
+            >
+              <AppNumberField
                 v-model="form.volume_angkut"
+                empty-as-zero
+                :desimal="2"
                 label="Volume Angkut"
-                type="number"
               />
             </VCol>
 
-            <VCol cols="12" md="3">
-              <VTextField
+            <VCol
+              cols="12"
+              md="3"
+            >
+              <AppNumberField
                 v-model="form.harga_angkut"
+                empty-as-zero
+                :desimal="2"
                 label="Harga / Liter"
-                type="number"
               />
             </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model="form.asal_angkut" label="Asal" />
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VTextField
+                v-model="form.asal_angkut"
+                label="Asal"
+              />
             </VCol>
 
-            <VCol cols="12" md="6">
-              <VTextField v-model="form.tujuan_angkut" label="Tujuan" />
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VTextField
+                v-model="form.tujuan_angkut"
+                label="Tujuan"
+              />
             </VCol>
-
-           
-
           </VRow>
         </VCardText>
 
@@ -476,13 +520,12 @@ onMounted(async () => {
           >
             Simpan
           </VBtn>
-
         </VCardActions>
-
       </VCard>
     </VDialog>
   </VContainer>
 </template>
+
 <style>
 .swal2-container.swal2-center {
   z-index: 99999 !important;

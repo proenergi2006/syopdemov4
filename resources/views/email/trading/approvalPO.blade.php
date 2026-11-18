@@ -54,7 +54,7 @@
                     </tr>
                     <tr>
                         <td><b>Volume</b></td>
-                        <td>: {{ number_format($po['volume_po']) }} L</td>
+                        <td>: {{ angka($po['volume_po']) }} L</td>
                     </tr>
                     <tr>
                         <td><b>Dibuat Oleh</b></td>

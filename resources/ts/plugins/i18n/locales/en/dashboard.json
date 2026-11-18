@@ -1,523 +1,1022 @@
 {
-  "goodsReceipt": {
-    "header": {
-      "title": "Goods Receipt Management Dashboard",
-      "description": "Track what has arrived, what is still on the way, and what went back to the vendor.",
-      "lastUpdated": "Updated",
-      "refresh": "Reload data"
+    "goodsReceipt": {
+        "header": {
+            "title": "Goods Receipt Management Dashboard",
+            "description": "Track what has arrived, what is still on the way, and what went back to the vendor.",
+            "lastUpdated": "Updated",
+            "refresh": "Reload data"
+        },
+        "filters": {
+            "periodType": "Period Type",
+            "pickDate": "Pick Date",
+            "pickWeek": "Pick Week",
+            "pickMonth": "Pick Month",
+            "pickYear": "Pick Year",
+            "startDate": "Start Date",
+            "endDate": "End Date",
+            "branch": "Branch",
+            "allBranches": "All Branches",
+            "department": "Department",
+            "allDepartments": "All Departments",
+            "scopeNote": "Branch and department filters follow your permission scope.",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date Range"
+            }
+        },
+        "empty": {
+            "title": "No goods receipt in this period",
+            "description": "The zeros below are not a loading failure — there simply are no documents yet.",
+            "showYear": "View the whole year"
+        },
+        "errors": {
+            "periodInvalid": "Please complete the period selection first.",
+            "dashboardFailed": "Failed to load the Goods Receipt dashboard."
+        },
+        "stats": {
+            "received": "Goods Received",
+            "outstanding": "Not Yet Delivered",
+            "outstandingHint": "{po} POs, {items} items awaiting delivery",
+            "draft": "Unposted Drafts",
+            "draftHint": "Goods arrived but stock is not recorded yet",
+            "returned": "Returned"
+        },
+        "performance": {
+            "fulfillmentTitle": "Fulfillment Rate",
+            "fulfillmentLabel": "Fulfilled",
+            "fulfillmentHint": "Share of approved PO quantity that has actually been received.",
+            "leadTitle": "Average Delivery Time",
+            "days": "days",
+            "leadHint": "Measured from PO approval to goods received.",
+            "returnTitle": "Return Rate",
+            "returnHint": "{amount} returned out of {received} received.",
+            "partialLabel": "Partial receipts"
+        },
+        "attention": {
+            "title": "Needs Follow-Up",
+            "subtitle": "Documents pending more than {days} days are marked red.",
+            "badge": "{overdue} overdue of {total}",
+            "outstandingTitle": "POs Not Fully Received",
+            "outstandingEmpty": "Every approved PO has been fully received.",
+            "receivedPercent": "{percent}% fulfilled",
+            "idleDays": "Waiting {days} days",
+            "draftTitle": "Receipts Still in Draft",
+            "draftEmpty": "No receipt has been left as a draft.",
+            "draftDays": "Draft for {days} days",
+            "openModule": "Open the Goods Receipt module"
+        },
+        "chart": {
+            "title": "Goods Receipt Trend",
+            "subtitle": "Document count compared with the value of goods received.",
+            "empty": "No data in this period.",
+            "seriesCount": "Receipt Documents",
+            "seriesPosted": "Posted",
+            "seriesAmount": "Received Value",
+            "axisCount": "Document Count",
+            "axisAmount": "Value"
+        },
+        "status": {
+            "title": "Receipt Status",
+            "subtitle": "Document distribution by status.",
+            "empty": "No data in this period.",
+            "totalLabel": "Total",
+            "draft": "Draft",
+            "posted": "Posted",
+            "cancelled": "Cancelled"
+        },
+        "vendor": {
+            "title": "Vendor Performance",
+            "subtitle": "Sorted by value received. Watch the delivery speed and return rate together.",
+            "empty": "No receipts from any vendor in this period.",
+            "receiptCount": "{count} receipts",
+            "leadDays": "{days} days"
+        },
+        "breakdown": {
+            "branchTitle": "Breakdown by Branch",
+            "departmentTitle": "Breakdown by Department",
+            "subtitle": "Sorted by the largest received value.",
+            "empty": "No data in this period.",
+            "count": "{count} receipts",
+            "detail": "{posted} posted, {draft} still draft."
+        },
+        "reason": {
+            "title": "Return Reasons",
+            "subtitle": "The pattern of problems that sent goods back to the vendor.",
+            "empty": "No goods were returned in this period.",
+            "count": "{count} times"
+        }
     },
-    "filters": {
-      "periodType": "Period Type",
-      "pickDate": "Pick Date",
-      "pickWeek": "Pick Week",
-      "pickMonth": "Pick Month",
-      "pickYear": "Pick Year",
-      "startDate": "Start Date",
-      "endDate": "End Date",
-      "branch": "Branch",
-      "allBranches": "All Branches",
-      "department": "Department",
-      "allDepartments": "All Departments",
-      "scopeNote": "Branch and department filters follow your permission scope.",
-      "periodOptions": {
-        "day": "Daily",
-        "week": "Weekly",
-        "month": "Monthly",
-        "year": "Yearly",
-        "range": "Date Range"
-      }
+    "goodsReturn": {
+        "header": {
+            "title": "Goods Return Dashboard",
+            "description": "Goods returned to vendors: how much, why, and who it happens to most.",
+            "lastUpdated": "Updated",
+            "refresh": "Reload data",
+            "openModule": "Open Goods Return module"
+        },
+        "filters": {
+            "periodType": "Period type",
+            "pickDate": "Pick a date",
+            "pickWeek": "Pick a week",
+            "pickMonth": "Pick a month",
+            "pickYear": "Pick a year",
+            "startDate": "Start date",
+            "endDate": "End date",
+            "branch": "Branch",
+            "department": "Department",
+            "allBranches": "All branches",
+            "allDepartments": "All departments",
+            "scopeNote": "Some filters are locked to your access scope.",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date range"
+            }
+        },
+        "empty": {
+            "title": "No returns in this period",
+            "description": "No goods were returned to vendors within the selected date range.",
+            "showYear": "View the whole year"
+        },
+        "errors": {
+            "periodInvalid": "The selected period is incomplete.",
+            "dashboardFailed": "Failed to load the Goods Return dashboard."
+        },
+        "stats": {
+            "returnedTitle": "Goods returned",
+            "returnedSubtitle": "{count} documents · {qty} units returned",
+            "rateTitle": "Return rate",
+            "rateSubtitle": "By value of goods received",
+            "rateQty": "By unit count: {percent}%",
+            "detectTitle": "Defect found after",
+            "detectSubtitle": "Average gap from receipt to return",
+            "detectEmpty": "No data yet",
+            "draftTitle": "Drafts left open",
+            "draftSubtitle": "Goods rejected, document not yet posted",
+            "days": "days",
+            "documents": "documents"
+        },
+        "comparison": {
+            "title": "Received and returned",
+            "subtitle": "Value comparison over the same period",
+            "received": "Received value",
+            "returned": "Returned value",
+            "note": "Without this comparison, the number of returns has no scale."
+        },
+        "reason": {
+            "title": "Return reasons",
+            "subtitle": "What causes it most often",
+            "empty": "No reasons recorded in this period.",
+            "columnReason": "Reason",
+            "columnQty": "Qty",
+            "columnAmount": "Value",
+            "columnShare": "Share",
+            "unfilled": "Not filled in"
+        },
+        "chart": {
+            "title": "Return trend",
+            "subtitle": "Returned value across the period",
+            "amount": "Returned value",
+            "empty": "Nothing to plot yet."
+        },
+        "status": {
+            "title": "Document status",
+            "subtitle": "Cancelled ones included",
+            "draft": "Draft",
+            "posted": "Posted",
+            "cancelled": "Cancelled",
+            "empty": "No documents in this period.",
+            "cancelledNote": "Cancelled returns do not count as returned goods — their quantity went back to the PO."
+        },
+        "vendor": {
+            "title": "Vendors with the largest returns",
+            "subtitle": "Compared with what they delivered",
+            "empty": "No returns to any vendor in this period.",
+            "columnVendor": "Vendor",
+            "columnCount": "Returns",
+            "columnQty": "Qty",
+            "columnAmount": "Returned value",
+            "columnReceived": "Delivered value",
+            "columnRate": "Rate",
+            "noReceipt": "No receipts in this period"
+        },
+        "item": {
+            "title": "Most problematic goods",
+            "subtitle": "Items returned again and again",
+            "empty": "No goods returned in this period.",
+            "columnItem": "Item",
+            "columnDocuments": "Documents",
+            "columnQty": "Qty",
+            "columnAmount": "Value"
+        },
+        "attention": {
+            "title": "Needs follow-up",
+            "subtitle": "Drafts left open: goods rejected, paperwork unfinished",
+            "note": "Deliberately not limited to the period: the ones left open since last month are exactly what needs to be seen.",
+            "empty": "No drafts left open.",
+            "columnNumber": "Number",
+            "columnVendor": "Vendor",
+            "columnPlace": "Branch / Department",
+            "columnAmount": "Value",
+            "columnAge": "Open for",
+            "days": "days"
+        },
+        "breakdown": {
+            "branchTitle": "By branch",
+            "departmentTitle": "By department",
+            "subtitle": "Sorted by the largest value",
+            "empty": "No data in this period.",
+            "columnName": "Name",
+            "columnCount": "Documents",
+            "columnAmount": "Value",
+            "columnPosted": "Posted",
+            "columnDraft": "Draft"
+        }
     },
-    "empty": {
-      "title": "No goods receipt in this period",
-      "description": "The zeros below are not a loading failure — there simply are no documents yet.",
-      "showYear": "View the whole year"
+    "moduleLauncher": {
+        "header": {
+            "title": "Management Dashboard",
+            "badge": "Management View",
+            "description": "Choose a category and module you want to monitor in more detail.",
+            "categoryLabel": "Category",
+            "totalModulesLabel": "Total Modules"
+        },
+        "filters": {
+            "categoryLabel": "Module Category",
+            "displayLabel": "Show",
+            "displayOptions": {
+                "four": "4 Modules",
+                "eight": "8 Modules",
+                "twelve": "12 Modules",
+                "all": "Show All"
+            },
+            "allCategory": "All"
+        },
+        "section": {
+            "title": "{category} Dashboard",
+            "description": "Choose a module to open its dashboard and detailed analytics.",
+            "permissionBadge": "Based on permission"
+        },
+        "empty": {
+            "title": "No modules available",
+            "description": "There are no dashboard modules to show in this category."
+        },
+        "card": {
+            "available": "Available",
+            "comingSoon": "Coming Soon",
+            "openDashboard": "Open dashboard",
+            "notAvailable": "Not available yet",
+            "pendingApproval": "{count} awaiting your approval",
+            "viewAll": "View All"
+        },
+        "infiniteScroll": {
+            "loadMore": "Scroll to load more modules",
+            "allLoaded": "All modules have been shown"
+        },
+        "errors": {
+            "groupsFailed": "Failed to load dashboard categories.",
+            "modulesFailed": "Failed to load dashboard modules."
+        }
     },
-    "errors": {
-      "periodInvalid": "Please complete the period selection first.",
-      "dashboardFailed": "Failed to load the Goods Receipt dashboard."
+    "purchaseOrder": {
+        "header": {
+            "title": "Purchase Order Management Dashboard",
+            "description": "Comparison between Purchase Requisition needs and Purchase Order realization.",
+            "lastUpdated": "Last updated"
+        },
+        "filters": {
+            "title": "Data Filter",
+            "activePeriod": "Active period:",
+            "periodType": "Period Type",
+            "pickDate": "Pick a Date",
+            "pickWeek": "Pick a Week",
+            "pickMonth": "Pick a Month",
+            "pickYear": "Pick a Year",
+            "startDate": "Start Date",
+            "endDate": "End Date",
+            "weekLabel": "Week {week}, {year}",
+            "yearLabel": "Year {year}",
+            "rangeLabel": "{start} to {end}",
+            "allBranches": "All Branches",
+            "branch": "Branch",
+            "allDepartments": "All Departments",
+            "department": "Department",
+            "scopeNote": "Branch and department filters follow the user's permission scope.",
+            "incompletePeriod": "Please complete the period selection first.",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date Range"
+            },
+            "scope": {
+                "label": "Scope {scope}",
+                "all": "All",
+                "ownCabang": "My Branch",
+                "ownDepartment": "My Department"
+            }
+        },
+        "errors": {
+            "periodInvalid": "The period filter has not been filled in correctly.",
+            "dashboardFailed": "Failed to load the Purchase Order dashboard data.",
+            "pendingApprovalsFailed": "Failed to load the list of Purchase Orders awaiting approval."
+        },
+        "stats": {
+            "totalPr": {
+                "title": "Total Purchase Requisition",
+                "shortTitle": "PR",
+                "subtitle": "Number of submitted requests"
+            },
+            "prAmount": {
+                "title": "Purchase Requisition Value",
+                "shortTitle": "PR Value",
+                "subtitle": "Total value of purchase needs"
+            },
+            "totalPo": {
+                "title": "Total Purchase Order",
+                "shortTitle": "PO",
+                "subtitle": "Number of orders issued"
+            },
+            "poAmount": {
+                "title": "Purchase Order Value",
+                "shortTitle": "PO Value",
+                "subtitle": "Total value of realized purchases"
+            }
+        },
+        "operational": {
+            "prNotOrdered": "PR Not Yet a PO",
+            "pendingApproval": "PO Awaiting Approval",
+            "outstandingReceipt": "Outstanding Receipt",
+            "conversionRate": "PR to PO Conversion"
+        },
+        "insight": {
+            "okTitle": "Procurement process is under control",
+            "okMessage": "No PR or PO requiring special attention was found for the selected period.",
+            "warningTitle": "Needs management attention",
+            "prNotOrdered": "{count} approved PR(s) have not been processed into a PO",
+            "pendingApproval": "{count} PO(s) are still awaiting approval",
+            "outstandingReceipt": "{count} PO(s) have not been fully received",
+            "conversionRate": "the PR to PO conversion rate is only {rate}%"
+        },
+        "chart": {
+            "realizationTitle": "PO Realization against PR",
+            "realizationSubtitle": "Ratio of PO value compared to PR needs in the active period",
+            "realizationSeriesLabel": "PO vs PR",
+            "realizationCenterLabel": "Realization",
+            "prAmountLabel": "PR Value",
+            "poAmountLabel": "PO Value",
+            "unrealizedGap": "Unrealized gap",
+            "noComparisonData": "No PR and PO data yet",
+            "trendTitle": "PR and PO Value Trend",
+            "trendSubtitlePrefix": "Movement of needs and realization in",
+            "noTrendData": "No trend data yet",
+            "noTrendChartData": "No PR and PO trend data yet",
+            "transactionValueAxis": "Transaction value ({scale})",
+            "scale": {
+                "rupiah": "Rupiah",
+                "thousand": "Thousand Rupiah",
+                "million": "Million Rupiah",
+                "billion": "Billion Rupiah",
+                "trillion": "Trillion Rupiah"
+            }
+        },
+        "breakdown": {
+            "byBranch": {
+                "title": "PR and PO Analysis by Branch",
+                "subtitle": "Comparison of needs and realization by branch",
+                "note": "Showing the top {shown} branches out of {total} branches.",
+                "empty": "No data by branch yet"
+            },
+            "byDepartment": {
+                "title": "PR and PO Analysis by Department",
+                "subtitle": "Comparison of needs and realization by department",
+                "note": "Showing the top {shown} departments out of {total} departments.",
+                "empty": "No data by department yet"
+            },
+            "prLabel": "PR",
+            "poLabel": "PO",
+            "metricOptions": {
+                "amount": "Transaction Value",
+                "count": "Document Count"
+            }
+        },
+        "status": {
+            "title": "Purchase Order Status",
+            "subtitle": "PO condition for the selected period",
+            "empty": "No status data yet.",
+            "inProgress": "In Progress",
+            "approved": "Approved"
+        },
+        "pendingApproval": {
+            "title": "Purchase Orders Needing Attention",
+            "subtitle": "POs awaiting approval within the period filter above, sorted by the longest pending since submission",
+            "countBadge": "{count} PO",
+            "columnPo": "Purchase Order",
+            "columnValue": "Value",
+            "columnWaiting": "Awaiting Approval",
+            "submittedOn": "Submitted {date}",
+            "createdOn": "(PO created {date})",
+            "unknownApprover": "Not yet determined",
+            "empty": "No Purchase Orders awaiting approval"
+        }
     },
-    "stats": {
-      "received": "Goods Received",
-      "outstanding": "Not Yet Delivered",
-      "outstandingHint": "{po} POs, {items} items awaiting delivery",
-      "draft": "Unposted Drafts",
-      "draftHint": "Goods arrived but stock is not recorded yet",
-      "returned": "Returned"
+    "purchaseRequest": {
+        "header": {
+            "title": "Purchase Requisition Management Dashboard",
+            "description": "Track what is being requested, where the process stalls, and what needs follow-up.",
+            "lastUpdated": "Updated",
+            "refresh": "Reload data"
+        },
+        "filters": {
+            "periodType": "Period Type",
+            "pickDate": "Pick Date",
+            "pickWeek": "Pick Week",
+            "pickMonth": "Pick Month",
+            "pickYear": "Pick Year",
+            "startDate": "Start Date",
+            "endDate": "End Date",
+            "branch": "Branch",
+            "allBranches": "All Branches",
+            "department": "Department",
+            "allDepartments": "All Departments",
+            "scopeNote": "Branch and department filters follow your permission scope.",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date Range"
+            }
+        },
+        "empty": {
+            "title": "No purchase requisition in this period.",
+            "description": "The zeros below mean the period is empty, not that loading failed. Try another period.",
+            "showYear": "Show the whole year"
+        },
+        "errors": {
+            "periodInvalid": "Please complete the period selection first.",
+            "dashboardFailed": "Failed to load the Purchase Requisition dashboard."
+        },
+        "stats": {
+            "total": "Total PR",
+            "waiting": "Awaiting Approval",
+            "approved": "Approved",
+            "notFollowedUp": "No PO Yet",
+            "averageApproval": "Average Approval Time",
+            "averageApprovalHint": "Measured from submission to the final approval.",
+            "days": "days",
+            "approvalRate": "Approval Rate",
+            "approvalRateHint": "{approved} of {official} active PRs were approved."
+        },
+        "attention": {
+            "title": "Needs Follow-up",
+            "subtitle": "Documents idle for more than {days} days are flagged red.",
+            "badge": "{overdue} overdue of {total}",
+            "stuckTitle": "Stuck in Approval",
+            "stuckEmpty": "No purchase requisition is stuck in approval.",
+            "awaitingPoTitle": "Awaiting Purchase Order",
+            "awaitingPoEmpty": "Every approved requisition has been followed up.",
+            "waitingDays": "Waiting {days} days",
+            "idleDays": "Idle {days} days",
+            "approvedOn": "Approved",
+            "openModule": "Open Purchase Requisition"
+        },
+        "bottleneck": {
+            "title": "Approval Bottleneck",
+            "subtitle": "Which step holds the most requisitions, and for how long.",
+            "empty": "No purchase requisition is awaiting approval.",
+            "step": "Step {order}",
+            "average": "{days} days on average",
+            "longest": "Longest wait is {days} days."
+        },
+        "chart": {
+            "title": "Submission Trend",
+            "subtitle": "Requisition count against requested value.",
+            "empty": "No data for this period yet.",
+            "seriesCount": "Submitted",
+            "seriesApproved": "Approved",
+            "seriesAmount": "Requested Value",
+            "axisCount": "Requisitions",
+            "axisAmount": "Value"
+        },
+        "status": {
+            "title": "Status Breakdown",
+            "subtitle": "Includes the ones that fell through, not just the active ones.",
+            "empty": "No data for this period yet.",
+            "totalLabel": "Total PR"
+        },
+        "breakdown": {
+            "branchTitle": "By Branch",
+            "departmentTitle": "By Department",
+            "typeTitle": "By Request Type",
+            "subtitle": "Sorted by highest requested value.",
+            "empty": "No data for this period yet.",
+            "detail": "{waiting} awaiting approval, {approved} approved."
+        }
     },
-    "performance": {
-      "fulfillmentTitle": "Fulfillment Rate",
-      "fulfillmentLabel": "Fulfilled",
-      "fulfillmentHint": "Share of approved PO quantity that has actually been received.",
-      "leadTitle": "Average Delivery Time",
-      "days": "days",
-      "leadHint": "Measured from PO approval to goods received.",
-      "returnTitle": "Return Rate",
-      "returnHint": "{amount} returned out of {received} received.",
-      "partialLabel": "Partial receipts"
+    "cashAdvance": {
+        "header": {
+            "title": "Cash Advance Dashboard",
+            "description": "Cash advance requests: amounts requested, where approvals pile up, and funds not yet accounted for.",
+            "lastUpdated": "Updated",
+            "refresh": "Refresh",
+            "openModule": "Open Cash Advance"
+        },
+        "scope": {
+            "ownData": "You are seeing the requests you created yourself.",
+            "ownBranch": "You are seeing data for branch {branch}, department {department}.",
+            "ownDepartment": "You are seeing data for department {department} across all branches."
+        },
+        "filters": {
+            "periodType": "Period Type",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date Range"
+            },
+            "pickDate": "Date",
+            "pickWeek": "Week",
+            "pickMonth": "Month",
+            "pickYear": "Year",
+            "startDate": "From",
+            "endDate": "To",
+            "branch": "Branch",
+            "department": "Department",
+            "allBranches": "All Branches",
+            "allDepartments": "All Departments",
+            "apply": "Apply"
+        },
+        "empty": {
+            "title": "No cash advances in this period",
+            "description": "Try widening the period, or loosening the branch and department filters.",
+            "showYear": "Show Whole Year"
+        },
+        "errors": {
+            "periodInvalid": "Complete the period selection first.",
+            "dashboardFailed": "Cash advance dashboard failed to load."
+        },
+        "stats": {
+            "submitted": "Submitted",
+            "waiting": "Awaiting Approval",
+            "approved": "Approved",
+            "disbursed": "Disbursed",
+            "outstanding": "Funds Outstanding",
+            "outstandingCount": "{count} not yet accounted for",
+            "outstandingHint": "Current position, independent of the selected period. Money already paid out with no valid realization against it."
+        },
+        "performance": {
+            "title": "Process Speed",
+            "approvalRate": "Approval Rate",
+            "approvalRateHint": "Out of decided requests only.",
+            "approvalDays": "Avg. to Approval",
+            "approvalDaysHint": "From submission to final approval.",
+            "disbursementDays": "Avg. to Disbursement",
+            "disbursementDaysHint": "From approval to money leaving.",
+            "days": "days"
+        },
+        "attention": {
+            "title": "Needs Follow-up",
+            "subtitle": "Every list below shows the current position, not the selected period — the oldest items are the ones that most need to be seen.",
+            "badge": "{count} need action",
+            "overdueBadge": "{count} past due",
+            "stuckTitle": "Stuck in Approval",
+            "stuckEmpty": "Nothing is stuck.",
+            "awaitingTitle": "Approved, Not Disbursed",
+            "awaitingEmpty": "Everything approved has been disbursed.",
+            "overdueTitle": "Past Realization Limit",
+            "overdueEmpty": "Nothing is past {days} days.",
+            "waitingDays": "{days} days",
+            "idleDays": "{days} days",
+            "overdueDays": "{days} days late",
+            "approvedOn": "Approved {date}",
+            "disbursedOn": "Disbursed {date}",
+            "showMore": "Show {count} more",
+            "hide": "Collapse"
+        },
+        "bottleneck": {
+            "title": "Approval Pile-up",
+            "subtitle": "The step where cash advances are waiting most right now.",
+            "empty": "No cash advance is currently awaiting approval.",
+            "step": "Level {order}",
+            "average": "{days} days on average",
+            "longest": "{days} days longest"
+        },
+        "chart": {
+            "title": "Submission Trend",
+            "subtitle": "Number of requests against the amount actually disbursed.",
+            "empty": "No data to plot yet.",
+            "seriesCount": "Submitted",
+            "seriesApproved": "Approved",
+            "seriesDisbursed": "Amount Disbursed",
+            "axisCount": "Requests"
+        },
+        "status": {
+            "title": "Status Breakdown",
+            "empty": "No data yet.",
+            "totalLabel": "Total"
+        },
+        "breakdown": {
+            "branchTitle": "By Branch",
+            "departmentTitle": "By Department",
+            "categoryTitle": "By Transaction Category",
+            "categorySubtitle": "What the funds were requested for.",
+            "empty": "No data yet.",
+            "detail": "{count} requests · {waiting} waiting · {disbursed} disbursed",
+            "categoryDetail": "{count} requests"
+        }
     },
-    "attention": {
-      "title": "Needs Follow-Up",
-      "subtitle": "Documents pending more than {days} days are marked red.",
-      "badge": "{overdue} overdue of {total}",
-      "outstandingTitle": "POs Not Fully Received",
-      "outstandingEmpty": "Every approved PO has been fully received.",
-      "receivedPercent": "{percent}% fulfilled",
-      "idleDays": "Waiting {days} days",
-      "draftTitle": "Receipts Still in Draft",
-      "draftEmpty": "No receipt has been left as a draft.",
-      "draftDays": "Draft for {days} days",
-      "openModule": "Open the Goods Receipt module"
+    "cashAdvanceRealization": {
+        "header": {
+            "title": "Cash Advance Realization Dashboard",
+            "description": "Accounting for cash advances: differences to return or reimburse, and disbursed advances with no realization yet.",
+            "lastUpdated": "Updated",
+            "refresh": "Refresh",
+            "openModule": "Open Realization"
+        },
+        "scope": {
+            "ownData": "You are seeing the realizations you created yourself.",
+            "ownBranch": "You are seeing data for branch {branch}, department {department}.",
+            "ownDepartment": "You are seeing data for department {department} across all branches."
+        },
+        "filters": {
+            "periodType": "Period Type",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date Range"
+            },
+            "pickDate": "Date",
+            "pickWeek": "Week",
+            "pickMonth": "Month",
+            "pickYear": "Year",
+            "startDate": "From",
+            "endDate": "To",
+            "branch": "Branch",
+            "department": "Department",
+            "allBranches": "All Branches",
+            "allDepartments": "All Departments",
+            "apply": "Apply"
+        },
+        "empty": {
+            "title": "No realizations in this period",
+            "description": "Try widening the period, or loosening the branch and department filters.",
+            "showYear": "Show Whole Year"
+        },
+        "errors": {
+            "periodInvalid": "Complete the period selection first.",
+            "dashboardFailed": "Realization dashboard failed to load."
+        },
+        "stats": {
+            "submitted": "Realizations In",
+            "waiting": "Awaiting Approval",
+            "approved": "Approved",
+            "settled": "Settled",
+            "notSubmitted": "Not Yet Accounted For",
+            "notSubmittedCount": "{count} disbursed advances without a valid realization",
+            "notSubmittedHint": "Current position, independent of the selected period. The document does not exist yet, so it appears in no Realization list."
+        },
+        "performance": {
+            "title": "Process Speed",
+            "approvalRate": "Approval Rate",
+            "approvalRateHint": "Out of decided realizations only.",
+            "approvalDays": "Avg. to Approval",
+            "approvalDaysHint": "From submission to final approval.",
+            "settlementDays": "Avg. to Settlement",
+            "settlementDaysHint": "From approval to the document being closed.",
+            "days": "days"
+        },
+        "difference": {
+            "title": "Advance vs Realization",
+            "subtitle": "From approved realizations. The gap between the two bars is the difference.",
+            "advance": "Advance given",
+            "realization": "Actually spent",
+            "returned": "To Be Returned",
+            "reimbursed": "To Be Reimbursed",
+            "exact": "Exact Requests",
+            "exactHint": "{count} realizations with no difference",
+            "docCount": "{count} realizations",
+            "outstandingTitle": "Difference Outstanding",
+            "outstandingCount": "{count} realizations not yet closed",
+            "outstandingHint": "Current position. Approved but not settled, so the money has not actually come back or been paid.",
+            "toReturn": "To return",
+            "toReimburse": "To pay"
+        },
+        "attention": {
+            "title": "Needs Follow-up",
+            "subtitle": "Every list below shows the current position, not the selected period — the oldest items are the ones that most need to be seen.",
+            "badge": "{count} need action",
+            "overdueBadge": "{count} past due",
+            "notSubmittedTitle": "Not Yet Accounted For",
+            "notSubmittedEmpty": "Every disbursed advance has a realization.",
+            "stuckTitle": "Stuck in Approval",
+            "stuckEmpty": "Nothing is stuck.",
+            "unsettledTitle": "Difference Not Settled",
+            "unsettledEmpty": "No difference is outstanding.",
+            "inProgress": "With the approver",
+            "notCreated": "Not created",
+            "waitingDays": "{days} days",
+            "idleDays": "{days} days",
+            "ageDays": "disbursed {days} days ago",
+            "overdueDays": "{days} days late",
+            "showMore": "Show {count} more",
+            "hide": "Collapse"
+        },
+        "bottleneck": {
+            "title": "Approval Pile-up",
+            "subtitle": "The step where realizations are waiting most right now.",
+            "empty": "No realization is currently awaiting approval.",
+            "step": "Level {order}",
+            "average": "{days} days on average",
+            "longest": "{days} days longest"
+        },
+        "chart": {
+            "title": "Realization Trend",
+            "subtitle": "Advance against what was actually spent, with document counts.",
+            "empty": "No data to plot yet.",
+            "seriesAdvance": "Advance",
+            "seriesRealization": "Realization",
+            "seriesCount": "Documents",
+            "axisAmount": "Amount"
+        },
+        "status": {
+            "title": "Status Breakdown",
+            "empty": "No data yet.",
+            "totalLabel": "Total"
+        },
+        "breakdown": {
+            "branchTitle": "By Branch",
+            "departmentTitle": "By Department",
+            "categoryTitle": "By Transaction Category",
+            "categorySubtitle": "What the funds were spent on.",
+            "empty": "No data yet.",
+            "detail": "{count} realizations · {settled} settled · difference {difference}",
+            "categoryDetail": "{count} realizations"
+        }
     },
-    "chart": {
-      "title": "Goods Receipt Trend",
-      "subtitle": "Document count compared with the value of goods received.",
-      "empty": "No data in this period.",
-      "seriesCount": "Receipt Documents",
-      "seriesPosted": "Posted",
-      "seriesAmount": "Received Value",
-      "axisCount": "Document Count",
-      "axisAmount": "Value"
+    "claim": {
+        "header": {
+            "title": "Claim Dashboard",
+            "description": "Reimbursing employees: how much is still owed, which claims are past their payment date, and which have no date at all.",
+            "lastUpdated": "Updated",
+            "refresh": "Refresh",
+            "openModule": "Open Claim"
+        },
+        "scope": {
+            "ownData": "You are seeing the claims you submitted yourself.",
+            "ownBranch": "You are seeing data for branch {branch}, department {department}.",
+            "ownDepartment": "You are seeing data for department {department} across all branches."
+        },
+        "filters": {
+            "periodType": "Period Type",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date Range"
+            },
+            "pickDate": "Date",
+            "pickWeek": "Week",
+            "pickMonth": "Month",
+            "pickYear": "Year",
+            "startDate": "From",
+            "endDate": "To",
+            "branch": "Branch",
+            "department": "Department",
+            "allBranches": "All Branches",
+            "allDepartments": "All Departments",
+            "apply": "Apply"
+        },
+        "empty": {
+            "title": "No claims in this period",
+            "description": "Try widening the period, or loosening the branch and department filters.",
+            "showYear": "Show Whole Year"
+        },
+        "errors": {
+            "periodInvalid": "Complete the period selection first.",
+            "dashboardFailed": "Claim dashboard failed to load."
+        },
+        "stats": {
+            "submitted": "Claims In",
+            "waiting": "Awaiting Approval",
+            "approved": "Approved",
+            "paid": "Paid",
+            "unpaid": "Still Owed",
+            "unpaidCount": "{count} approved claims not yet paid out",
+            "unpaidHint": "Current position, independent of the selected period. Every rupiah here is an employee's own money the company is holding."
+        },
+        "performance": {
+            "title": "Process Speed",
+            "approvalRate": "Approval Rate",
+            "approvalRateHint": "Out of decided claims only.",
+            "approvalDays": "Avg. to Approval",
+            "approvalDaysHint": "From submission to final approval.",
+            "paymentDays": "Avg. to Payment",
+            "paymentDaysHint": "From approval to the money reaching the employee.",
+            "days": "days"
+        },
+        "schedule": {
+            "title": "Payment Schedule",
+            "overdue": "Past Due",
+            "overdueHint": "A date was set and it has already passed.",
+            "unscheduled": "Not Scheduled",
+            "unscheduledHint": "No payment date at all yet."
+        },
+        "revision": {
+            "title": "Amount Revisions",
+            "subtitle": "Claims whose amount Finance trimmed before approving.",
+            "empty": "No claim had its amount revised in this period.",
+            "requested": "Requested",
+            "approved": "Approved by Finance",
+            "trimmed": "Total Trimmed",
+            "trimmedHint": "The gap between requested and approved.",
+            "rate": "Share Revised",
+            "rateHint": "{count} of the approved claims"
+        },
+        "attention": {
+            "title": "Needs Follow-up",
+            "subtitle": "Every list below shows the current position, not the selected period — the oldest items are the ones that most need to be seen.",
+            "badge": "{count} need action",
+            "overdueBadge": "{count} past due",
+            "stuckTitle": "Stuck in Approval",
+            "stuckEmpty": "Nothing is stuck.",
+            "unscheduledTitle": "Not Scheduled",
+            "unscheduledEmpty": "Every approved claim has a payment date.",
+            "overdueTitle": "Past Payment Date",
+            "overdueEmpty": "Nothing is past its payment date.",
+            "waitingDays": "{days} days",
+            "idleDays": "{days} days",
+            "overdueDays": "{days} days late",
+            "approvedOn": "Approved {date}",
+            "scheduledOn": "Due {date}",
+            "showMore": "Show {count} more",
+            "hide": "Collapse"
+        },
+        "bottleneck": {
+            "title": "Approval Pile-up",
+            "subtitle": "The step where claims are waiting most right now.",
+            "empty": "No claim is currently awaiting approval.",
+            "step": "Level {order}",
+            "average": "{days} days on average",
+            "longest": "{days} days longest"
+        },
+        "chart": {
+            "title": "Claim Trend",
+            "subtitle": "Amount claimed against the amount actually paid out. The gap is employee money still being held.",
+            "empty": "No data to plot yet.",
+            "seriesAmount": "Claimed",
+            "seriesPaid": "Paid",
+            "seriesCount": "Claims",
+            "axisAmount": "Amount"
+        },
+        "status": {
+            "title": "Status Breakdown",
+            "empty": "No data yet.",
+            "totalLabel": "Total"
+        },
+        "breakdown": {
+            "branchTitle": "By Branch",
+            "departmentTitle": "By Department",
+            "categoryTitle": "By Transaction Category",
+            "categorySubtitle": "What the expense was for.",
+            "empty": "No data yet.",
+            "detail": "{count} claims · {paid} paid · {unpaid} still owed",
+            "categoryDetail": "{count} claims"
+        }
     },
-    "status": {
-      "title": "Receipt Status",
-      "subtitle": "Document distribution by status.",
-      "empty": "No data in this period.",
-      "totalLabel": "Total",
-      "draft": "Draft",
-      "posted": "Posted",
-      "cancelled": "Cancelled"
-    },
-    "vendor": {
-      "title": "Vendor Performance",
-      "subtitle": "Sorted by value received. Watch the delivery speed and return rate together.",
-      "empty": "No receipts from any vendor in this period.",
-      "receiptCount": "{count} receipts",
-      "leadDays": "{days} days"
-    },
-    "breakdown": {
-      "branchTitle": "Breakdown by Branch",
-      "departmentTitle": "Breakdown by Department",
-      "subtitle": "Sorted by the largest received value.",
-      "empty": "No data in this period.",
-      "count": "{count} receipts",
-      "detail": "{posted} posted, {draft} still draft."
-    },
-    "reason": {
-      "title": "Return Reasons",
-      "subtitle": "The pattern of problems that sent goods back to the vendor.",
-      "empty": "No goods were returned in this period.",
-      "count": "{count} times"
+    "businessTrip": {
+        "header": {
+            "title": "Business Trip Dashboard",
+            "description": "Departure readiness: approvals racing the departure date, bookings not yet arranged, and funding not yet requested.",
+            "lastUpdated": "Updated",
+            "refresh": "Refresh",
+            "openModule": "Open Business Trip"
+        },
+        "scope": {
+            "ownData": "You are seeing the trips you submitted yourself.",
+            "ownBranch": "You are seeing data for branch {branch}, department {department}.",
+            "ownDepartment": "You are seeing data for department {department} across all branches."
+        },
+        "filters": {
+            "periodType": "Period Type",
+            "periodOptions": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "year": "Yearly",
+                "range": "Date Range"
+            },
+            "pickDate": "Date",
+            "pickWeek": "Week",
+            "pickMonth": "Month",
+            "pickYear": "Year",
+            "startDate": "From",
+            "endDate": "To",
+            "branch": "Branch",
+            "department": "Department",
+            "allBranches": "All Branches",
+            "allDepartments": "All Departments",
+            "apply": "Apply",
+            "periodHint": "The period filters on DEPARTURE DATE, not submission date. A trip submitted in January to depart in March counts as a March trip."
+        },
+        "empty": {
+            "title": "No trips in this period",
+            "description": "Try widening the period, or loosening the branch and department filters.",
+            "showYear": "Show Whole Year"
+        },
+        "errors": {
+            "periodInvalid": "Complete the period selection first.",
+            "dashboardFailed": "Business trip dashboard failed to load."
+        },
+        "stats": {
+            "submitted": "Trips",
+            "waiting": "Awaiting Approval",
+            "approved": "Approved",
+            "upcoming": "Upcoming",
+            "upcomingHint": "Current position, independent of the selected period.",
+            "travelers": "{count} people"
+        },
+        "performance": {
+            "title": "Process Speed",
+            "approvalRate": "Approval Rate",
+            "approvalRateHint": "Out of decided trips only.",
+            "approvalDays": "Avg. to Approval",
+            "approvalDaysHint": "From submission to final approval.",
+            "leadDays": "Approval to Departure",
+            "leadDaysHint": "The time GA has left to book tickets and lodging.",
+            "leadDaysNegative": "Negative: on average approval arrives AFTER the traveler has left.",
+            "days": "days"
+        },
+        "readiness": {
+            "title": "Departure Readiness",
+            "subtitle": "Counted only for trips that have not departed yet.",
+            "withoutArrangement": "No Booking Yet",
+            "withoutArrangementHint": "{count} people, no tickets or lodging arranged",
+            "withoutFunding": "No Funding Yet",
+            "withoutFundingHint": "{count} people, no cash advance or claim",
+            "arrangementTypes": "Bookings already arranged",
+            "arrangementEmpty": "No bookings at all yet."
+        },
+        "attention": {
+            "title": "Needs Follow-up",
+            "subtitle": "Ordered by departure date, not document age. Flagged red when departure is within {days} days or already passed.",
+            "badge": "{count} need action",
+            "urgentBadge": "{count} urgent",
+            "stuckTitle": "Stuck in Approval",
+            "stuckEmpty": "Nothing is stuck.",
+            "arrangementTitle": "No Booking Yet",
+            "arrangementEmpty": "Every trip has a booking.",
+            "fundingTitle": "No Funding Yet",
+            "fundingEmpty": "Every trip has a cash advance or claim.",
+            "people": "{count} people",
+            "departsIn": "in {days} days",
+            "departsToday": "departs today",
+            "departedAgo": "{days} days past",
+            "noDepartDate": "no departure date",
+            "showMore": "Show {count} more",
+            "hide": "Collapse"
+        },
+        "bottleneck": {
+            "title": "Approval Pile-up",
+            "subtitle": "The step where trips are waiting most right now.",
+            "empty": "No trip is currently awaiting approval.",
+            "step": "Level {order}",
+            "average": "{days} days on average",
+            "longest": "{days} days longest"
+        },
+        "chart": {
+            "title": "Departure Trend",
+            "subtitle": "Grouped by departure date — when people are actually out of the office.",
+            "empty": "No data to plot yet.",
+            "seriesCount": "Trips",
+            "seriesApproved": "Approved",
+            "seriesTravelers": "People",
+            "axisCount": "Trips",
+            "axisTravelers": "People"
+        },
+        "status": {
+            "title": "Status Breakdown",
+            "empty": "No data yet.",
+            "totalLabel": "Total Trips"
+        },
+        "breakdown": {
+            "branchTitle": "By Branch",
+            "departmentTitle": "By Department",
+            "destinationTitle": "By Destination",
+            "destinationSubtitle": "Where these people are going.",
+            "empty": "No data yet.",
+            "tripCount": "{count} trips",
+            "detail": "{people} people · {waiting} waiting · {approved} approved"
+        }
     }
-  },
-  "goodsReturn": {
-    "header": {
-      "title": "Goods Return Dashboard",
-      "description": "Goods returned to vendors: how much, why, and who it happens to most.",
-      "lastUpdated": "Updated",
-      "refresh": "Reload data",
-      "openModule": "Open Goods Return module"
-    },
-    "filters": {
-      "periodType": "Period type",
-      "pickDate": "Pick a date",
-      "pickWeek": "Pick a week",
-      "pickMonth": "Pick a month",
-      "pickYear": "Pick a year",
-      "startDate": "Start date",
-      "endDate": "End date",
-      "branch": "Branch",
-      "department": "Department",
-      "allBranches": "All branches",
-      "allDepartments": "All departments",
-      "scopeNote": "Some filters are locked to your access scope.",
-      "periodOptions": {
-        "day": "Daily",
-        "week": "Weekly",
-        "month": "Monthly",
-        "year": "Yearly",
-        "range": "Date range"
-      }
-    },
-    "empty": {
-      "title": "No returns in this period",
-      "description": "No goods were returned to vendors within the selected date range.",
-      "showYear": "View the whole year"
-    },
-    "errors": {
-      "periodInvalid": "The selected period is incomplete.",
-      "dashboardFailed": "Failed to load the Goods Return dashboard."
-    },
-    "stats": {
-      "returnedTitle": "Goods returned",
-      "returnedSubtitle": "{count} documents · {qty} units returned",
-      "rateTitle": "Return rate",
-      "rateSubtitle": "By value of goods received",
-      "rateQty": "By unit count: {percent}%",
-      "detectTitle": "Defect found after",
-      "detectSubtitle": "Average gap from receipt to return",
-      "detectEmpty": "No data yet",
-      "draftTitle": "Drafts left open",
-      "draftSubtitle": "Goods rejected, document not yet posted",
-      "days": "days",
-      "documents": "documents"
-    },
-    "comparison": {
-      "title": "Received and returned",
-      "subtitle": "Value comparison over the same period",
-      "received": "Received value",
-      "returned": "Returned value",
-      "note": "Without this comparison, the number of returns has no scale."
-    },
-    "reason": {
-      "title": "Return reasons",
-      "subtitle": "What causes it most often",
-      "empty": "No reasons recorded in this period.",
-      "columnReason": "Reason",
-      "columnQty": "Qty",
-      "columnAmount": "Value",
-      "columnShare": "Share",
-      "unfilled": "Not filled in"
-    },
-    "chart": {
-      "title": "Return trend",
-      "subtitle": "Returned value across the period",
-      "amount": "Returned value",
-      "empty": "Nothing to plot yet."
-    },
-    "status": {
-      "title": "Document status",
-      "subtitle": "Cancelled ones included",
-      "draft": "Draft",
-      "posted": "Posted",
-      "cancelled": "Cancelled",
-      "empty": "No documents in this period.",
-      "cancelledNote": "Cancelled returns do not count as returned goods — their quantity went back to the PO."
-    },
-    "vendor": {
-      "title": "Vendors with the largest returns",
-      "subtitle": "Compared with what they delivered",
-      "empty": "No returns to any vendor in this period.",
-      "columnVendor": "Vendor",
-      "columnCount": "Returns",
-      "columnQty": "Qty",
-      "columnAmount": "Returned value",
-      "columnReceived": "Delivered value",
-      "columnRate": "Rate",
-      "noReceipt": "No receipts in this period"
-    },
-    "item": {
-      "title": "Most problematic goods",
-      "subtitle": "Items returned again and again",
-      "empty": "No goods returned in this period.",
-      "columnItem": "Item",
-      "columnDocuments": "Documents",
-      "columnQty": "Qty",
-      "columnAmount": "Value"
-    },
-    "attention": {
-      "title": "Needs follow-up",
-      "subtitle": "Drafts left open: goods rejected, paperwork unfinished",
-      "note": "Deliberately not limited to the period: the ones left open since last month are exactly what needs to be seen.",
-      "empty": "No drafts left open.",
-      "columnNumber": "Number",
-      "columnVendor": "Vendor",
-      "columnPlace": "Branch / Department",
-      "columnAmount": "Value",
-      "columnAge": "Open for",
-      "days": "days"
-    },
-    "breakdown": {
-      "branchTitle": "By branch",
-      "departmentTitle": "By department",
-      "subtitle": "Sorted by the largest value",
-      "empty": "No data in this period.",
-      "columnName": "Name",
-      "columnCount": "Documents",
-      "columnAmount": "Value",
-      "columnPosted": "Posted",
-      "columnDraft": "Draft"
-    }
-  },
-  "moduleLauncher": {
-    "header": {
-      "title": "Management Dashboard",
-      "badge": "Management View",
-      "description": "Choose a category and module you want to monitor in more detail.",
-      "categoryLabel": "Category",
-      "totalModulesLabel": "Total Modules"
-    },
-    "filters": {
-      "categoryLabel": "Module Category",
-      "displayLabel": "Show",
-      "displayOptions": {
-        "four": "4 Modules",
-        "eight": "8 Modules",
-        "twelve": "12 Modules",
-        "all": "Show All"
-      },
-      "allCategory": "All"
-    },
-    "section": {
-      "title": "{category} Dashboard",
-      "description": "Choose a module to open its dashboard and detailed analytics.",
-      "permissionBadge": "Based on permission"
-    },
-    "empty": {
-      "title": "No modules available",
-      "description": "There are no dashboard modules to show in this category."
-    },
-    "card": {
-      "available": "Available",
-      "comingSoon": "Coming Soon",
-      "openDashboard": "Open dashboard",
-      "notAvailable": "Not available yet",
-      "pendingApproval": "{count} awaiting your approval",
-      "viewAll": "View All"
-    },
-    "infiniteScroll": {
-      "loadMore": "Scroll to load more modules",
-      "allLoaded": "All modules have been shown"
-    },
-    "errors": {
-      "groupsFailed": "Failed to load dashboard categories.",
-      "modulesFailed": "Failed to load dashboard modules."
-    }
-  },
-  "purchaseOrder": {
-    "header": {
-      "title": "Purchase Order Management Dashboard",
-      "description": "Comparison between Purchase Requisition needs and Purchase Order realization.",
-      "lastUpdated": "Last updated"
-    },
-    "filters": {
-      "title": "Data Filter",
-      "activePeriod": "Active period:",
-      "periodType": "Period Type",
-      "pickDate": "Pick a Date",
-      "pickWeek": "Pick a Week",
-      "pickMonth": "Pick a Month",
-      "pickYear": "Pick a Year",
-      "startDate": "Start Date",
-      "endDate": "End Date",
-      "weekLabel": "Week {week}, {year}",
-      "yearLabel": "Year {year}",
-      "rangeLabel": "{start} to {end}",
-      "allBranches": "All Branches",
-      "branch": "Branch",
-      "allDepartments": "All Departments",
-      "department": "Department",
-      "scopeNote": "Branch and department filters follow the user's permission scope.",
-      "incompletePeriod": "Please complete the period selection first.",
-      "periodOptions": {
-        "day": "Daily",
-        "week": "Weekly",
-        "month": "Monthly",
-        "year": "Yearly",
-        "range": "Date Range"
-      },
-      "scope": {
-        "label": "Scope {scope}",
-        "all": "All",
-        "ownCabang": "My Branch",
-        "ownDepartment": "My Department"
-      }
-    },
-    "errors": {
-      "periodInvalid": "The period filter has not been filled in correctly.",
-      "dashboardFailed": "Failed to load the Purchase Order dashboard data.",
-      "pendingApprovalsFailed": "Failed to load the list of Purchase Orders awaiting approval."
-    },
-    "stats": {
-      "totalPr": {
-        "title": "Total Purchase Requisition",
-        "shortTitle": "PR",
-        "subtitle": "Number of submitted requests"
-      },
-      "prAmount": {
-        "title": "Purchase Requisition Value",
-        "shortTitle": "PR Value",
-        "subtitle": "Total value of purchase needs"
-      },
-      "totalPo": {
-        "title": "Total Purchase Order",
-        "shortTitle": "PO",
-        "subtitle": "Number of orders issued"
-      },
-      "poAmount": {
-        "title": "Purchase Order Value",
-        "shortTitle": "PO Value",
-        "subtitle": "Total value of realized purchases"
-      }
-    },
-    "operational": {
-      "prNotOrdered": "PR Not Yet a PO",
-      "pendingApproval": "PO Awaiting Approval",
-      "outstandingReceipt": "Outstanding Receipt",
-      "conversionRate": "PR to PO Conversion"
-    },
-    "insight": {
-      "okTitle": "Procurement process is under control",
-      "okMessage": "No PR or PO requiring special attention was found for the selected period.",
-      "warningTitle": "Needs management attention",
-      "prNotOrdered": "{count} approved PR(s) have not been processed into a PO",
-      "pendingApproval": "{count} PO(s) are still awaiting approval",
-      "outstandingReceipt": "{count} PO(s) have not been fully received",
-      "conversionRate": "the PR to PO conversion rate is only {rate}%"
-    },
-    "chart": {
-      "realizationTitle": "PO Realization against PR",
-      "realizationSubtitle": "Ratio of PO value compared to PR needs in the active period",
-      "realizationSeriesLabel": "PO vs PR",
-      "realizationCenterLabel": "Realization",
-      "prAmountLabel": "PR Value",
-      "poAmountLabel": "PO Value",
-      "unrealizedGap": "Unrealized gap",
-      "noComparisonData": "No PR and PO data yet",
-      "trendTitle": "PR and PO Value Trend",
-      "trendSubtitlePrefix": "Movement of needs and realization in",
-      "noTrendData": "No trend data yet",
-      "noTrendChartData": "No PR and PO trend data yet",
-      "transactionValueAxis": "Transaction value ({scale})",
-      "scale": {
-        "rupiah": "Rupiah",
-        "thousand": "Thousand Rupiah",
-        "million": "Million Rupiah",
-        "billion": "Billion Rupiah",
-        "trillion": "Trillion Rupiah"
-      }
-    },
-    "breakdown": {
-      "byBranch": {
-        "title": "PR and PO Analysis by Branch",
-        "subtitle": "Comparison of needs and realization by branch",
-        "note": "Showing the top {shown} branches out of {total} branches.",
-        "empty": "No data by branch yet"
-      },
-      "byDepartment": {
-        "title": "PR and PO Analysis by Department",
-        "subtitle": "Comparison of needs and realization by department",
-        "note": "Showing the top {shown} departments out of {total} departments.",
-        "empty": "No data by department yet"
-      },
-      "prLabel": "PR",
-      "poLabel": "PO",
-      "metricOptions": {
-        "amount": "Transaction Value",
-        "count": "Document Count"
-      }
-    },
-    "status": {
-      "title": "Purchase Order Status",
-      "subtitle": "PO condition for the selected period",
-      "empty": "No status data yet.",
-      "inProgress": "In Progress",
-      "approved": "Approved"
-    },
-    "pendingApproval": {
-      "title": "Purchase Orders Needing Attention",
-      "subtitle": "POs awaiting approval within the period filter above, sorted by the longest pending since submission",
-      "countBadge": "{count} PO",
-      "columnPo": "Purchase Order",
-      "columnValue": "Value",
-      "columnWaiting": "Awaiting Approval",
-      "submittedOn": "Submitted {date}",
-      "createdOn": "(PO created {date})",
-      "unknownApprover": "Not yet determined",
-      "empty": "No Purchase Orders awaiting approval"
-    }
-  },
-  "purchaseRequest": {
-    "header": {
-      "title": "Purchase Requisition Management Dashboard",
-      "description": "Track what is being requested, where the process stalls, and what needs follow-up.",
-      "lastUpdated": "Updated",
-      "refresh": "Reload data"
-    },
-    "filters": {
-      "periodType": "Period Type",
-      "pickDate": "Pick Date",
-      "pickWeek": "Pick Week",
-      "pickMonth": "Pick Month",
-      "pickYear": "Pick Year",
-      "startDate": "Start Date",
-      "endDate": "End Date",
-      "branch": "Branch",
-      "allBranches": "All Branches",
-      "department": "Department",
-      "allDepartments": "All Departments",
-      "scopeNote": "Branch and department filters follow your permission scope.",
-      "periodOptions": {
-        "day": "Daily",
-        "week": "Weekly",
-        "month": "Monthly",
-        "year": "Yearly",
-        "range": "Date Range"
-      }
-    },
-    "empty": {
-      "title": "No purchase requisition in this period.",
-      "description": "The zeros below mean the period is empty, not that loading failed. Try another period.",
-      "showYear": "Show the whole year"
-    },
-    "errors": {
-      "periodInvalid": "Please complete the period selection first.",
-      "dashboardFailed": "Failed to load the Purchase Requisition dashboard."
-    },
-    "stats": {
-      "total": "Total PR",
-      "waiting": "Awaiting Approval",
-      "approved": "Approved",
-      "notFollowedUp": "No PO Yet",
-      "averageApproval": "Average Approval Time",
-      "averageApprovalHint": "Measured from submission to the final approval.",
-      "days": "days",
-      "approvalRate": "Approval Rate",
-      "approvalRateHint": "{approved} of {official} active PRs were approved."
-    },
-    "attention": {
-      "title": "Needs Follow-up",
-      "subtitle": "Documents idle for more than {days} days are flagged red.",
-      "badge": "{overdue} overdue of {total}",
-      "stuckTitle": "Stuck in Approval",
-      "stuckEmpty": "No purchase requisition is stuck in approval.",
-      "awaitingPoTitle": "Awaiting Purchase Order",
-      "awaitingPoEmpty": "Every approved requisition has been followed up.",
-      "waitingDays": "Waiting {days} days",
-      "idleDays": "Idle {days} days",
-      "approvedOn": "Approved",
-      "openModule": "Open Purchase Requisition"
-    },
-    "bottleneck": {
-      "title": "Approval Bottleneck",
-      "subtitle": "Which step holds the most requisitions, and for how long.",
-      "empty": "No purchase requisition is awaiting approval.",
-      "step": "Step {order}",
-      "average": "{days} days on average",
-      "longest": "Longest wait is {days} days."
-    },
-    "chart": {
-      "title": "Submission Trend",
-      "subtitle": "Requisition count against requested value.",
-      "empty": "No data for this period yet.",
-      "seriesCount": "Submitted",
-      "seriesApproved": "Approved",
-      "seriesAmount": "Requested Value",
-      "axisCount": "Requisitions",
-      "axisAmount": "Value"
-    },
-    "status": {
-      "title": "Status Breakdown",
-      "subtitle": "Includes the ones that fell through, not just the active ones.",
-      "empty": "No data for this period yet.",
-      "totalLabel": "Total PR"
-    },
-    "breakdown": {
-      "branchTitle": "By Branch",
-      "departmentTitle": "By Department",
-      "typeTitle": "By Request Type",
-      "subtitle": "Sorted by highest requested value.",
-      "empty": "No data for this period yet.",
-      "detail": "{waiting} awaiting approval, {approved} approved."
-    }
-  }
 }

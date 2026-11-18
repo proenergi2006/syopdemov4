@@ -5,14 +5,21 @@ import AccountSettingsBillingAndPlans from '@/views/pages/account-settings/Accou
 import AccountSettingsConnections from '@/views/pages/account-settings/AccountSettingsConnections.vue'
 import AccountSettingsNotification from '@/views/pages/account-settings/AccountSettingsNotification.vue'
 import AccountSettingsSecurity from '@/views/pages/account-settings/AccountSettingsSecurity.vue'
+import AccountSettingsSignature from '@/views/pages/account-settings/AccountSettingsSignature.vue'
 
 const route = useRoute()
 
 const activeTab = ref(route.params.tab)
 
 // tabs
+/*
+| Tanda tangan sengaja dipisah dari Security. Yang ada di Security adalah
+| pengamanan akun -- password, dan nanti OTP. Tanda tangan bukan pengaman:
+| ia identitas yang tercetak di dokumen, dan dikelola dengan alur sendiri.
+*/
 const tabs = [
   { title: 'Security', icon: 'mdi-lock-open-outline', tab: 'security' },
+  { title: 'Tanda Tangan', icon: 'mdi-signature-freehand', tab: 'signature' },
 ]
 </script>
 
@@ -45,6 +52,11 @@ const tabs = [
       <!-- Security -->
       <VWindowItem value="security">
         <AccountSettingsSecurity />
+      </VWindowItem>
+
+      <!-- Tanda tangan digital -->
+      <VWindowItem value="signature">
+        <AccountSettingsSignature />
       </VWindowItem>
     </VWindow>
   </div>

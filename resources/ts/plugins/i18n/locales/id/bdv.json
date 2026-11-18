@@ -1,0 +1,140 @@
+{
+  "noAccess": "Anda tidak memiliki akses ke halaman ini.",
+
+  "status": {
+    "DRAFT": "Draft",
+    "IN PROGRESS": "Proses Approval",
+    "NEED REVISION": "Perlu Revisi",
+    "APPROVED": "Disetujui",
+    "REJECTED": "Ditolak",
+    "CANCELLED": "Dibatalkan"
+  },
+
+  "list": {
+    "filtersTitle": "Bank Disbursement Voucher",
+    "filtersSubtitle": "Voucher pencairan lewat bank atas dokumen yang sudah disetujui dan berkasnya sudah diterima.",
+    "resetButton": "Reset",
+    "search": "Cari nomor BDV atau nomor dokumen",
+    "status": "Status",
+    "documentType": "Jenis Dokumen",
+    "branch": "Cabang",
+    "department": "Department",
+    "dateFrom": "Tanggal Dari",
+    "dateTo": "Tanggal Sampai",
+    "dateRangeInvalid": "Tanggal Sampai tidak boleh lebih awal dari Tanggal Dari.",
+    "addButton": "Buat BDV",
+    "empty": "Belum ada Bank Disbursement Voucher.",
+    "emptyFiltered": "Tidak ada BDV yang cocok dengan penyaring ini.",
+    "loadFailed": "Gagal memuat daftar BDV.",
+    "showing": "Menampilkan {from}-{to} dari {total} data",
+    "columns": {
+      "number": "Nomor BDV",
+      "date": "Tanggal",
+      "documentType": "Jenis Dokumen",
+      "sourceNumber": "Nomor Dokumen",
+      "branch": "Cabang",
+      "department": "Department",
+      "amount": "Nilai",
+      "status": "Status",
+      "requester": "Dibuat Oleh",
+      "actions": "Aksi"
+    },
+    "notNumbered": "Belum bernomor"
+  },
+
+  "create": {
+    "title": "Buat Bank Disbursement Voucher",
+    "subtitle": "Pilih dokumen yang akan dicairkan. Satu BDV mengangkat satu dokumen.",
+    "back": "Kembali ke daftar",
+
+    "step1": {
+      "title": "Jenis Dokumen",
+      "subtitle": "Tentukan dokumen apa yang akan dicairkan lewat voucher ini.",
+      "label": "Jenis Dokumen",
+      "loadFailed": "Gagal memuat jenis dokumen."
+    },
+
+    "step2": {
+      "title": "Nomor Dokumen",
+      "subtitle": "Hanya dokumen yang sudah disetujui penuh dan berkasnya sudah diterima yang muncul di sini.",
+      "label": "Nomor Dokumen",
+      "hint": "Ketik sebagian nomor atau perihalnya untuk mencari.",
+      "empty": "Tidak ada dokumen yang bisa diangkat untuk jenis ini.",
+      "emptySearch": "Tidak ada dokumen yang cocok dengan pencarian itu.",
+      "waitingType": "Pilih jenis dokumennya terlebih dahulu.",
+      "loadFailed": "Gagal memuat daftar dokumen.",
+      "limited": "Menampilkan {count} dokumen terbaru. Ketik untuk mencari yang lain."
+    },
+
+    "step3": {
+      "title": "Rincian Dokumen",
+      "subtitle": "Periksa kembali sebelum melanjutkan. Nilai yang tertera akan disalin ke BDV.",
+      "waiting": "Pilih nomor dokumennya terlebih dahulu.",
+      "loadFailed": "Gagal memuat rincian dokumen.",
+      "changeDocument": "Ganti dokumen"
+    },
+
+    "detail": {
+      "number": "Nomor Dokumen",
+      "documentType": "Jenis Dokumen",
+      "date": "Tanggal Dokumen",
+      "subject": "Perihal",
+      "branch": "Cabang",
+      "department": "Department",
+      "category": "Keterangan Transaksi",
+      "amount": "Nilai Dokumen",
+      "requester": "Pemohon",
+      "status": "Status Dokumen",
+      "receivedAt": "Berkas Diterima",
+      "scheduledPaymentDate": "Jadwal Pembayaran",
+      "notes": "Catatan",
+      "empty": "-"
+    },
+
+    "voucher": {
+      "title": "Data Voucher",
+      "subtitle": "Isian milik voucher ini sendiri. Branch mengikuti cabang dokumen yang dipilih.",
+      "cashBankLoadFailed": "Gagal memuat daftar kas dan bank dari Accurate.",
+      "cashBankReload": "Muat ulang akun dari Accurate",
+      "cashBankLoading": "Sedang mengambil data...",
+      "cashBankEmpty": "Tidak ada akun kas atau bank yang cocok.",
+      "branchFromDocument": "Mengikuti cabang dokumen yang dipilih.",
+      "required": "Wajib diisi.",
+      "invalid": "Ada isian wajib yang belum lengkap. Periksa kembali kolom bertanda bintang.",
+      "saveButton": "Simpan",
+      "notSavedTitle": "Belum tersimpan",
+      "notSavedText": "Isian sudah lengkap, tetapi penyimpanan BDV belum tersambung ke server.",
+      "fields": {
+        "cashBank": "Kas / Bank",
+        "bdvNumber": "Nomor BDV",
+        "date": "Tanggal",
+        "checkNumber": "No Cek",
+        "payee": "Penerima",
+        "branch": "Branch",
+        "notes": "Catatan"
+      }
+    },
+    "items": {
+      "title": "Rincian Item",
+      "subtitle": "Diambil apa adanya dari dokumen sumber dan tidak bisa diubah dari sini.",
+      "count": "{count} item",
+      "empty": "Dokumen ini tidak punya rincian item.",
+      "total": "Jumlah item",
+      "mismatch": "Jumlah item {items} berbeda dari nilai dokumen {document}. Nilai dokumen bisa direvisi saat berkasnya diterima Finance, jadi selisih ini belum tentu keliru.",
+      "accountLoadFailed": "Gagal memuat daftar akun dari Accurate.",
+      "accountLoading": "Sedang mengambil data...",
+      "accountReload": "Muat ulang akun dari Accurate",
+      "accountEmpty": "Daftar akun Accurate belum tersambung.",
+      "columns": {
+        "no": "No",
+        "date": "Tanggal",
+        "description": "Keterangan",
+        "category": "Kategori",
+        "qty": "Qty",
+        "unitPrice": "Harga Satuan",
+        "amount": "Nominal",
+        "account": "Akun Accurate"
+      }
+    }
+  }
+}

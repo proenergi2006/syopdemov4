@@ -18,10 +18,25 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrustProxies::class,
         \Illuminate\Http\Middleware\HandleCors::class,
         \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
+
+        /*
+        | Locale dipasang SEBELUM ValidatePostSize.
+        |
+        | ValidatePostSize menolak kiriman yang melebihi post_max_size, dan
+        | penolakan itu perlu terbaca dalam bahasa penggunanya. Middleware ini
+        | hanya membaca header X-App-Locale -- header tetap utuh walaupun body
+        | kirimannya dibuang PHP, jadi aman dijalankan sepagi ini.
+        */
+        \App\Http\Middleware\SetRequestLocale::class,
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-        \App\Http\Middleware\SetRequestLocale::class,
+
+        /*
+        | Menerjemahkan "gagal diunggah" menjadi sebab yang sebenarnya,
+        | sebelum request menyentuh controller mana pun.
+        */
+        \App\Http\Middleware\ExplainUploadFailure::class,
     ];
 
     /**
@@ -67,5 +82,6 @@ class Kernel extends HttpKernel
         'auth.token.idle' => \App\Http\Middleware\EnsureSanctumTokenIsNotIdle::class,
         'log.activity' => \App\Http\Middleware\LogUserActivity::class,
         'set.locale' => \App\Http\Middleware\SetRequestLocale::class,
+        'block.impersonation' => \App\Http\Middleware\BlockDuringImpersonation::class,
     ];
 }

@@ -207,12 +207,79 @@ class BusinessTrip extends Model
         return Crypt::encryptString((string) $this->id);
     }
 
+    /**
+     * Status yang masih boleh diajukan pemohonnya.
+     *
+     * Draft, yang pernah ditolak, dan yang sedang butuh revisi. Ketiganya
+     * masuk lewat pintu yang sama karena yang terjadi setelahnya memang
+     * sama: rantai approval dibuat ulang, statusnya menjadi berjalan, dan
+     * approver tahap pertama dikabari.
+     *
+     * Ditulis SEKALI di sini, lalu dibaca server maupun layar. Sebelumnya
+     * daftar ini hidup di dua tempat, dan yang di layar kehilangan satu
+     * nilai: NEED REVISION. Akibatnya dokumen yang dikembalikan approver
+     * kepada pemohonnya tidak punya satu pun tombol Ajukan -- pemohon bisa
+     * memperbaikinya, tetapi tidak bisa mengirimkannya kembali, dan
+     * dokumennya berhenti di sana tanpa ada yang merasa sedang menahannya.
+     */
+    public const SUBMITTABLE_STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_REJECTED,
+        self::STATUS_NEED_REVISION,
+    ];
+
+    /**
+     * Status yang masih boleh dibatalkan.
+     *
+     * DRAFT TIDAK IKUT, dan itu disengaja. Draft belum pernah dilihat siapa
+     * pun: tidak ada yang perlu diberi tahu, dan tidak ada jejak yang perlu
+     * ditinggalkan. Membatalkannya hanya melahirkan dokumen berstatus
+     * CANCELLED yang tidak menjelaskan apa-apa -- untuk draft yang tersedia
+     * Hapus.
+     *
+     * NEED REVISION ikut, justru karena alasan yang sama dibalik: dokumennya
+     * SUDAH pernah diajukan dan sudah dilihat approver. Nomornya beredar,
+     * dan orang-orang yang pernah menanganinya berhak tahu bahwa rencananya
+     * batal. Tanpa pintu ini, perjalanan yang dikembalikan lalu memang tidak
+     * jadi akan menggantung selamanya di meja pemohon -- satu-satunya cara
+     * menutupnya adalah mengajukannya ulang hanya untuk dibatalkan.
+     *
+     * REJECTED dan CANCELLED tidak ikut: keduanya sudah mati.
+     */
+    public const CANCELLABLE_STATUSES = [
+        self::STATUS_IN_PROGRESS,
+        self::STATUS_NEED_REVISION,
+    ];
+
     /** Masih bisa disunting pemohonnya. */
     public function getIsEditableAttribute(): bool
     {
+        return in_array($this->status, self::SUBMITTABLE_STATUSES, true);
+    }
+
+    /** Masih bisa dibatalkan. */
+    public function getIsCancellableAttribute(): bool
+    {
         return in_array(
-            $this->status,
-            [self::STATUS_DRAFT, self::STATUS_REJECTED, self::STATUS_NEED_REVISION],
+            strtoupper(trim((string) $this->status)),
+            self::CANCELLABLE_STATUSES,
+            true,
+        );
+    }
+
+    /**
+     * Masih bisa diajukan pemohonnya.
+     *
+     * Hari ini isinya sama persis dengan is_editable, dan tetap ditulis
+     * terpisah: "boleh disunting" dan "boleh diajukan" adalah dua pertanyaan
+     * berbeda yang kebetulan berjawaban sama. Menyatukannya berarti
+     * perubahan pada salah satunya diam-diam mengubah yang lain.
+     */
+    public function getIsSubmittableAttribute(): bool
+    {
+        return in_array(
+            strtoupper(trim((string) $this->status)),
+            self::SUBMITTABLE_STATUSES,
             true,
         );
     }

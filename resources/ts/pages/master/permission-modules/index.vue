@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from 'vue'
 import axiosIns from '@/plugins/axios'
 import {
   closeAlert,
@@ -8,15 +17,6 @@ import {
   showSuccessToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-  watch,
-  nextTick
-} from 'vue'
 
 interface PermissionModuleItem {
   id: number
@@ -26,6 +26,10 @@ interface PermissionModuleItem {
   route_prefix: string
   sort_order: number
   is_active: boolean
+  approval_document_type: string | null
+  approval_document_label: string | null
+  approval_uses_area_matrix: boolean
+  approval_uses_transaction_category: boolean
   permissions_count: number
   active_permissions_count: number
   created_at: string | null
@@ -51,6 +55,22 @@ interface CreateModuleForm {
   description: string
   route_prefix: string
   sort_order: number
+
+  /*
+  | Pendaftaran module ini sebagai jenis dokumen Approval Flow.
+  | Dikosongkan berarti module tidak punya approval flow sama sekali.
+  */
+  approval_document_type: string
+  approval_document_label: string
+  approval_uses_area_matrix: boolean
+  approval_uses_transaction_category: boolean
+}
+
+interface ApprovalSettingsForm {
+  approval_document_type: string
+  approval_document_label: string
+  approval_uses_area_matrix: boolean
+  approval_uses_transaction_category: boolean
 }
 
 interface PermissionForm {
@@ -67,6 +87,8 @@ interface FieldErrors {
   description?: string[]
   route_prefix?: string[]
   sort_order?: string[]
+  approval_document_type?: string[]
+  approval_document_label?: string[]
   is_active?: string[]
 }
 
@@ -101,11 +123,13 @@ const isSubmittingEditPermission = ref(false)
 const isUpdatingModuleStatus = ref(false)
 const isUpdatingPermissionStatus = ref(false)
 const isDeletingPermission = ref(false)
+const isSubmittingApproval = ref(false)
 
 const isCreateDialogOpen = ref(false)
 const isDetailDialogOpen = ref(false)
 const isCreatePermissionDialogOpen = ref(false)
 const isEditPermissionDialogOpen = ref(false)
+const isApprovalDialogOpen = ref(false)
 
 const search = ref('')
 const statusFilter = ref<'all' | '1' | '0'>('all')
@@ -113,6 +137,7 @@ const statusFilter = ref<'all' | '1' | '0'>('all')
 const createFormRef = ref()
 const createPermissionFormRef = ref()
 const editPermissionFormRef = ref()
+const approvalFormRef = ref()
 
 const createForm = reactive<CreateModuleForm>({
   code: '',
@@ -120,6 +145,10 @@ const createForm = reactive<CreateModuleForm>({
   description: '',
   route_prefix: '',
   sort_order: 0,
+  approval_document_type: '',
+  approval_document_label: '',
+  approval_uses_area_matrix: false,
+  approval_uses_transaction_category: false,
 })
 
 const createPermissionForm = reactive<PermissionForm>({
@@ -138,9 +167,17 @@ const editPermissionForm = reactive<PermissionForm>({
   requires_scope: true,
 })
 
+const approvalForm = reactive<ApprovalSettingsForm>({
+  approval_document_type: '',
+  approval_document_label: '',
+  approval_uses_area_matrix: false,
+  approval_uses_transaction_category: false,
+})
+
 const fieldErrors = ref<FieldErrors>({})
 const permissionFieldErrors = ref<PermissionFieldErrors>({})
 const editPermissionFieldErrors = ref<PermissionFieldErrors>({})
+const approvalFieldErrors = ref<FieldErrors>({})
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -155,9 +192,8 @@ const requiredRule = (value: unknown) => {
     value === null
     || value === undefined
     || String(value).trim() === ''
-  ) {
+  )
     return 'Field ini wajib diisi.'
-  }
 
   return true
 }
@@ -230,6 +266,10 @@ function resetCreateForm() {
   createForm.description = ''
   createForm.route_prefix = ''
   createForm.sort_order = 0
+  createForm.approval_document_type = ''
+  createForm.approval_document_label = ''
+  createForm.approval_uses_area_matrix = false
+  createForm.approval_uses_transaction_category = false
 
   fieldErrors.value = {}
   createFormRef.value?.resetValidation()
@@ -337,21 +377,20 @@ async function fetchModules() {
     const payload = response.data
     const responseData = payload?.data
 
-    if (Array.isArray(responseData)) {
+    if (Array.isArray(responseData))
       moduleItems.value = responseData
-    }
-    else if (Array.isArray(responseData?.modules)) {
+
+    else if (Array.isArray(responseData?.modules))
       moduleItems.value = responseData.modules
-    }
-    else if (Array.isArray(responseData?.data)) {
+
+    else if (Array.isArray(responseData?.data))
       moduleItems.value = responseData.data
-    }
-    else if (Array.isArray(payload)) {
+
+    else if (Array.isArray(payload))
       moduleItems.value = payload
-    }
-    else {
+
+    else
       moduleItems.value = []
-    }
   }
   catch (error: any) {
     moduleItems.value = []
@@ -439,9 +478,8 @@ function closeDetailDialog() {
     || isSubmittingEditPermission.value
     || isUpdatingPermissionStatus.value
     || isDeletingPermission.value
-  ) {
+  )
     return
-  }
 
   isDetailDialogOpen.value = false
   selectedModule.value = null
@@ -458,6 +496,130 @@ async function restoreDetailDialogAfterAlert() {
   if (selectedModule.value) {
     isDetailDialogOpen.value = true
     await nextTick()
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Pengaturan Approval Flow pada module yang sudah ada
+|--------------------------------------------------------------------------
+| Dibuat sebagai dialog tersendiri, bukan isian yang menempel di dialog
+| Kelola, karena dialog itu sudah penuh oleh daftar permission -- dan karena
+| keempat nilai ini berubah jauh lebih jarang daripada permission.
+|--------------------------------------------------------------------------
+*/
+async function openApprovalDialog() {
+  if (!selectedModule.value)
+    return
+
+  approvalFieldErrors.value = {}
+
+  approvalForm.approval_document_type
+    = selectedModule.value.approval_document_type ?? ''
+
+  approvalForm.approval_document_label
+    = selectedModule.value.approval_document_label ?? ''
+
+  approvalForm.approval_uses_area_matrix
+    = Boolean(selectedModule.value.approval_uses_area_matrix)
+
+  approvalForm.approval_uses_transaction_category
+    = Boolean(selectedModule.value.approval_uses_transaction_category)
+
+  isApprovalDialogOpen.value = true
+
+  await nextTick()
+}
+
+function closeApprovalDialog() {
+  if (isSubmittingApproval.value)
+    return
+
+  isApprovalDialogOpen.value = false
+  approvalFieldErrors.value = {}
+}
+
+async function submitApprovalSettings() {
+  if (!selectedModule.value)
+    return
+
+  approvalFieldErrors.value = {}
+
+  const moduleData = selectedModule.value
+
+  isSubmittingApproval.value = true
+
+  try {
+    showLoadingAlert(
+      'Menyimpan Pengaturan Approval Flow',
+      'Mohon tunggu sebentar.',
+    )
+
+    /*
+    | Kolom module lain ikut dikirim apa adanya karena endpoint update
+    | mewajibkannya. Yang berubah hanya keempat kolom approval.
+    */
+    const response = await axiosIns.put(
+      `/master/permission-modules/${moduleData.id}`,
+      {
+        name: moduleData.name,
+        description: moduleData.description,
+        route_prefix: moduleData.route_prefix,
+        sort_order: Number(moduleData.sort_order),
+        is_active: moduleData.is_active,
+
+        approval_document_type: approvalForm.approval_document_type,
+        approval_document_label: approvalForm.approval_document_label,
+        approval_uses_area_matrix: approvalForm.approval_uses_area_matrix,
+        approval_uses_transaction_category:
+          approvalForm.approval_uses_transaction_category,
+      },
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+
+    closeAlert()
+
+    selectedModule.value = {
+      ...moduleData,
+      ...response.data?.data,
+    }
+
+    isApprovalDialogOpen.value = false
+
+    showSuccessToast({
+      title: 'Berhasil',
+      text:
+        response.data?.message
+        ?? 'Pengaturan Approval Flow berhasil disimpan.',
+    })
+
+    await refreshPermissionModuleData()
+  }
+  catch (error: any) {
+    closeAlert()
+
+    const err = error as AxiosErrorShape
+
+    if (err.response?.status === 422) {
+      approvalFieldErrors.value
+        = (err.response?.data?.errors ?? {}) as FieldErrors
+    }
+
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(
+        err,
+        'Gagal menyimpan pengaturan Approval Flow.',
+      ),
+    })
+  }
+  finally {
+    isSubmittingApproval.value = false
   }
 }
 
@@ -501,11 +663,16 @@ async function submitCreateModule() {
           createForm.description.trim() || null,
         route_prefix: createForm.route_prefix,
         sort_order: Number(createForm.sort_order || 0),
+
+        approval_document_type: createForm.approval_document_type,
+        approval_document_label: createForm.approval_document_label,
+        approval_uses_area_matrix: createForm.approval_uses_area_matrix,
+        approval_uses_transaction_category: createForm.approval_uses_transaction_category,
         is_active: false,
       },
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -590,7 +757,7 @@ async function submitCreatePermission() {
       },
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -651,9 +818,8 @@ async function submitUpdatePermission() {
   if (
     !selectedModule.value
     || !selectedPermission.value
-  ) {
+  )
     return
-  }
 
   editPermissionFieldErrors.value = {}
 
@@ -683,7 +849,7 @@ async function submitUpdatePermission() {
       },
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -766,6 +932,7 @@ async function updateModuleStatus(nextStatus: boolean) {
 
   if (!confirm.isConfirmed) {
     await restoreDetailDialogAfterAlert()
+
     return
   }
 
@@ -790,7 +957,7 @@ async function updateModuleStatus(nextStatus: boolean) {
       },
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -864,6 +1031,7 @@ async function updatePermissionStatus(
 
   if (!confirm.isConfirmed) {
     await restoreDetailDialogAfterAlert()
+
     return
   }
 
@@ -892,7 +1060,7 @@ async function updatePermissionStatus(
       },
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -952,6 +1120,7 @@ async function deletePermission(permission: PermissionItem) {
 
   if (!confirm.isConfirmed) {
     await restoreDetailDialogAfterAlert()
+
     return
   }
 
@@ -1049,8 +1218,8 @@ onBeforeUnmount(() => {
               variant="outlined"
               prepend-icon="tabler-refresh"
               :loading="isLoading"
-              @click="fetchModules"
               class="text-none"
+              @click="fetchModules"
             >
               Refresh
             </VBtn>
@@ -1059,8 +1228,8 @@ onBeforeUnmount(() => {
               v-permission="'auth_permission_module.create'"
               color="primary"
               prepend-icon="tabler-plus"
-              @click="openCreateDialog"
               class="text-none"
+              @click="openCreateDialog"
             >
               Tambah Module
             </VBtn>
@@ -1217,8 +1386,8 @@ onBeforeUnmount(() => {
                     color="primary"
                     variant="tonal"
                     prepend-icon="tabler-settings"
-                    @click="openDetailDialog(item)"
                     class="text-none"
+                    @click="openDetailDialog(item)"
                   >
                     Kelola
                   </VBtn>
@@ -1367,6 +1536,84 @@ onBeforeUnmount(() => {
                   max="999999"
                   :error-messages="fieldErrors.sort_order"
                   hint="Semakin kecil akan tampil lebih dahulu."
+                  persistent-hint
+                />
+              </VCol>
+
+              <!--
+                Pendaftaran ke Approval Flow.
+
+                Sebelumnya keempat kolom ini hanya bisa diisi lewat seeder,
+                sehingga module yang dibuat dari layar ini tersimpan rapi
+                lalu tidak pernah muncul di Approval Flow -- tanpa ada
+                keterangan apa pun yang menjelaskan kenapa.
+              -->
+              <VCol cols="12">
+                <VDivider class="mb-4" />
+
+                <div class="text-subtitle-1 font-weight-medium">
+                  Approval Flow
+                </div>
+
+                <div class="text-body-2 text-medium-emphasis mb-4">
+                  Isi bila module ini punya alur persetujuan. Dikosongkan
+                  berarti module tidak muncul di layar Approval Flow.
+                </div>
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VTextField
+                  v-model="createForm.approval_document_type"
+                  label="Jenis Dokumen"
+                  :error-messages="fieldErrors.approval_document_type"
+                  hint="Contoh: FPU, CLAIM, BDV. Otomatis disimpan huruf besar."
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VTextField
+                  v-model="createForm.approval_document_label"
+                  label="Label Dokumen"
+                  :disabled="!createForm.approval_document_type"
+                  :error-messages="fieldErrors.approval_document_label"
+                  hint="Yang dibaca orang di layar Approval Flow. Kosong akan memakai nama module."
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <!--
+                  Dimatikan selagi jenis dokumen kosong: tanpa jenis dokumen,
+                  kedua setelan ini tidak pernah terbaca oleh siapa pun.
+                -->
+                <VSwitch
+                  v-model="createForm.approval_uses_area_matrix"
+                  :disabled="!createForm.approval_document_type"
+                  label="Pakai Kondisi Matrix"
+                  hint="Alurnya wajib mengisi area type dan department. Dimatikan berarti alur berlaku global."
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VSwitch
+                  v-model="createForm.approval_uses_transaction_category"
+                  :disabled="!createForm.approval_document_type"
+                  label="Pakai Keterangan Transaksi"
+                  hint="Alurnya bisa dibatasi keterangan transaksi tertentu."
                   persistent-hint
                 />
               </VCol>
@@ -1548,6 +1795,83 @@ onBeforeUnmount(() => {
             tersedia dan berstatus aktif.
           </VAlert>
 
+          <VCard
+            variant="outlined"
+            class="mb-5"
+          >
+            <VCardText>
+              <div class="d-flex flex-wrap align-center justify-space-between gap-4">
+                <div>
+                  <div class="text-subtitle-1 font-weight-medium mb-1">
+                    Approval Flow
+                  </div>
+
+                  <div
+                    v-if="selectedModule.approval_document_type"
+                    class="text-body-2"
+                  >
+                    Terdaftar sebagai jenis dokumen
+                    <code>{{ selectedModule.approval_document_type }}</code>
+                    dengan label
+                    <strong>{{ selectedModule.approval_document_label }}</strong>.
+                  </div>
+
+                  <div
+                    v-else
+                    class="text-body-2 text-medium-emphasis"
+                  >
+                    Module ini belum terdaftar, sehingga tidak muncul di layar
+                    Approval Flow.
+                  </div>
+
+                  <div
+                    v-if="selectedModule.approval_document_type"
+                    class="d-flex flex-wrap gap-2 mt-3"
+                  >
+                    <VChip
+                      size="small"
+                      variant="tonal"
+                      :color="
+                        selectedModule.approval_uses_area_matrix
+                          ? 'primary'
+                          : 'secondary'
+                      "
+                    >
+                      {{
+                        selectedModule.approval_uses_area_matrix
+                          ? 'Pakai Kondisi Matrix'
+                          : 'Berlaku Global'
+                      }}
+                    </VChip>
+
+                    <VChip
+                      v-if="selectedModule.approval_uses_transaction_category"
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                    >
+                      Pakai Keterangan Transaksi
+                    </VChip>
+                  </div>
+                </div>
+
+                <VBtn
+                  v-permission="'auth_permission_module.update'"
+                  variant="tonal"
+                  color="primary"
+                  prepend-icon="tabler-settings"
+                  :disabled="
+                    isLoadingDetail
+                      || isUpdatingModuleStatus
+                  "
+                  @click="openApprovalDialog"
+                >
+                  Atur Approval Flow
+                </VBtn>
+              </div>
+            </VCardText>
+          </VCard>
+
           <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
             <div>
               <h5 class="text-h5">
@@ -1562,8 +1886,8 @@ onBeforeUnmount(() => {
 
             <div class="d-flex flex-wrap align-center gap-3">
               <VBtn
-                class="text-none"
                 v-permission="'auth_permission_module.update'"
+                class="text-none"
                 :color="
                   selectedModule.is_active
                     ? 'warning'
@@ -1607,8 +1931,8 @@ onBeforeUnmount(() => {
                     || isUpdatingPermissionStatus
                     || isDeletingPermission
                 "
-                @click="openCreatePermissionDialog"
                 class="text-none"
+                @click="openCreatePermissionDialog"
               >
                 Tambah Permission
               </VBtn>
@@ -1624,8 +1948,8 @@ onBeforeUnmount(() => {
                     || isUpdatingPermissionStatus
                     || isDeletingPermission
                 "
-                @click="refreshModuleDetail"
                 class="text-none"
+                @click="refreshModuleDetail"
               >
                 Refresh
               </VBtn>
@@ -2126,6 +2450,153 @@ onBeforeUnmount(() => {
               :loading="isSubmittingEditPermission"
             >
               Simpan Perubahan
+            </VBtn>
+          </VCardActions>
+        </VForm>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="isApprovalDialogOpen"
+      max-width="620"
+      persistent
+    >
+      <VCard v-if="selectedModule">
+        <VCardText class="d-flex align-center justify-space-between pa-6 pb-4">
+          <div>
+            <h5 class="text-h5">
+              Pengaturan Approval Flow
+            </h5>
+
+            <div class="text-body-2 text-medium-emphasis">
+              Module <code>{{ selectedModule.code }}</code>
+            </div>
+          </div>
+
+          <VBtn
+            icon
+            variant="text"
+            size="small"
+            :disabled="isSubmittingApproval"
+            @click="closeApprovalDialog"
+          >
+            <VIcon icon="tabler-x" />
+          </VBtn>
+        </VCardText>
+
+        <VDivider />
+
+        <VForm
+          ref="approvalFormRef"
+          @submit.prevent="submitApprovalSettings"
+        >
+          <VCardText class="pa-6">
+            <!--
+              Catatan ini sengaja ada. Mendaftarkan jenis dokumen di sini
+              hanya membuat module muncul di layar Approval Flow; yang
+              membentuk baris approval saat dokumen diajukan tetap kode
+              module itu sendiri. Tanpa keterangan ini, orang bisa mengisi
+              kolom di bawah lalu menunggu approval yang tidak akan pernah
+              terbentuk.
+            -->
+            <VAlert
+              type="info"
+              variant="tonal"
+              density="comfortable"
+              class="mb-5"
+            >
+              Pengaturan ini menentukan module muncul atau tidak di layar
+              Approval Flow, beserta aturan pengisian alurnya. Pembentukan
+              baris approval saat dokumen diajukan tetap mengikuti kode
+              module yang bersangkutan.
+            </VAlert>
+
+            <VRow>
+              <VCol cols="12">
+                <VTextField
+                  v-model="approvalForm.approval_document_type"
+                  label="Jenis Dokumen"
+                  :error-messages="approvalFieldErrors.approval_document_type"
+                  hint="Contoh: FPU, CLAIM, BDV. Dikosongkan akan melepas module ini dari Approval Flow."
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <VTextField
+                  v-model="approvalForm.approval_document_label"
+                  label="Label Dokumen"
+                  :disabled="!approvalForm.approval_document_type"
+                  :error-messages="approvalFieldErrors.approval_document_label"
+                  hint="Yang dibaca orang di layar Approval Flow. Kosong akan memakai nama module."
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <VSwitch
+                  v-model="approvalForm.approval_uses_area_matrix"
+                  :disabled="!approvalForm.approval_document_type"
+                  label="Pakai Kondisi Matrix"
+                  hint="Alurnya wajib mengisi area type dan department. Dimatikan berarti alur berlaku global."
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <VSwitch
+                  v-model="approvalForm.approval_uses_transaction_category"
+                  :disabled="!approvalForm.approval_document_type"
+                  label="Pakai Keterangan Transaksi"
+                  hint="Alurnya bisa dibatasi keterangan transaksi tertentu."
+                  persistent-hint
+                />
+              </VCol>
+
+              <!--
+                Peringatan saat pendaftaran dicabut: alur yang terlanjur dibuat
+                tidak ikut terhapus, tetapi berhenti terbaca.
+              -->
+              <VCol
+                v-if="
+                  selectedModule.approval_document_type
+                    && !approvalForm.approval_document_type
+                "
+                cols="12"
+              >
+                <VAlert
+                  type="warning"
+                  variant="tonal"
+                  density="comfortable"
+                >
+                  Jenis dokumen dikosongkan. Module ini akan hilang dari layar
+                  Approval Flow, dan alur yang sudah dibuat untuknya berhenti
+                  terbaca walaupun datanya tetap tersimpan.
+                </VAlert>
+              </VCol>
+            </VRow>
+          </VCardText>
+
+          <VDivider />
+
+          <VCardActions class="justify-end gap-3 px-6 py-4">
+            <VBtn
+              variant="outlined"
+              color="secondary"
+              :disabled="isSubmittingApproval"
+              @click="closeApprovalDialog"
+            >
+              Batal
+            </VBtn>
+
+            <VBtn
+              v-permission="'auth_permission_module.update'"
+              type="submit"
+              color="primary"
+              prepend-icon="tabler-device-floppy"
+              :loading="isSubmittingApproval"
+            >
+              Simpan
             </VBtn>
           </VCardActions>
         </VForm>

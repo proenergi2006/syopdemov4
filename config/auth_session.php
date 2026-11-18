@@ -29,4 +29,19 @@ return [
     |--------------------------------------------------------------------------
     */
     'remember_me_minutes' => env('AUTH_REMEMBER_ME_MINUTES', 60 * 24 * 30),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Umur Sesi Penyamaran
+    |--------------------------------------------------------------------------
+    | Berapa lama token penyamaran super admin berlaku. Dibuat jauh lebih
+    | pendek daripada token biasa karena token ini bisa ditukar kembali
+    | menjadi token admin, sehingga nilainya setara token super admin.
+    |
+    | Lewat batas ini, admin keluar sepenuhnya dan harus login lagi sebagai
+    | dirinya sendiri. Sesi yang menggantung ditutup otomatis saat ia login
+    | berikutnya, ditandai berakhir karena kedaluwarsa.
+    |--------------------------------------------------------------------------
+    */
+    'impersonation_minutes' => env('AUTH_IMPERSONATION_MINUTES', 60),
 ];

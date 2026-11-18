@@ -211,7 +211,7 @@
         <tr>
             <td width="20%">Muatan Kapal</td>
             <td width="2%">:</td>
-            <td>{{ number_format((float) ($res->quantity ?? 0)) }} Liter ({{ $res->satuan ?? '-' }})</td>
+            <td>{{ angka((float) ($res->quantity ?? 0)) }} Liter ({{ $res->satuan ?? '-' }})</td>
         </tr>
         <tr>
             <td width="20%">Pelabuhan Muat</td>
@@ -226,12 +226,12 @@
         <tr>
             <td width="20%">Ongkos Angkut Transport</td>
             <td width="2%" style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">Rp {{ number_format((float) ($res->freight ?? 0)) }} /liter (diluar PPN 11%) dan termasuk PPh</td>
+            <td style="vertical-align: top;">Rp {{ angka((float) ($res->freight ?? 0)) }} /liter (diluar PPN 11%) dan termasuk PPh</td>
         </tr>
         <tr>
             <td width="20%">Biaya <i>Demurrage</i></td>
             <td width="2%">:</td>
-            <td>Rp {{ number_format((float) ($res->demurrage ?? 0)) }} ({{ terbilang($res->demurrage ?? 0) }} Rupiah) (24 Jam) (<i>pdpr; per day pro rata</i>)</td>
+            <td>Rp {{ angka((float) ($res->demurrage ?? 0)) }} ({{ terbilang($res->demurrage ?? 0) }} Rupiah) (24 Jam) (<i>pdpr; per day pro rata</i>)</td>
         </tr>
         <tr>
             <td width="20%" style="vertical-align: top;">Waktu Muat & Bongkar</td>

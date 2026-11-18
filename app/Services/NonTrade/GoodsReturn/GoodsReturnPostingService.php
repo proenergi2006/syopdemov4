@@ -404,12 +404,7 @@ class GoodsReturnPostingService
     ): string {
         return rtrim(
             rtrim(
-                number_format(
-                    $qty,
-                    4,
-                    ',',
-                    '.',
-                ),
+                angka($qty, 4),
                 '0',
             ),
             ',',

@@ -49,6 +49,24 @@ class Kernel extends ConsoleKernel
         $schedule->command('queue:health-check')
             ->everyFifteenMinutes()
             ->withoutOverlapping();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Peringatan saldo kas kecil
+        |--------------------------------------------------------------------------
+        | Memperingatkan pemegang kas kecil yang saldonya sudah di bawah ambang,
+        | supaya top up diajukan SEBELUM ada claim kecil yang tidak bisa dibayar.
+        |
+        | Harian pada pukul 07:00, bukan tiap jam: peringatan yang muncul
+        | berulang sepanjang hari akan berhenti dibaca, dan sesudah itu ia tidak
+        | lagi memperingatkan apa pun. Jamnya dipilih supaya sudah ada di layar
+        | ketika ADH membuka aplikasi pagi-pagi, bukan menyusul di tengah hari
+        | saat claim-nya sudah menumpuk.
+        |--------------------------------------------------------------------------
+        */
+        $schedule->command('petty-cash:warn-low-balance')
+            ->dailyAt('07:00')
+            ->withoutOverlapping();
     }
 
     /**

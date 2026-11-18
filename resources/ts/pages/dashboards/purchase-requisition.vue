@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import axios from '@axios'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { usePermissionStore } from '@/stores/permission'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 /*
 |--------------------------------------------------------------------------
@@ -234,16 +235,16 @@ const byType = ref<TypeRow[]>([])
 |--------------------------------------------------------------------------
 */
 const formatNumber = (value: number | null | undefined): string =>
-  new Intl.NumberFormat('id-ID').format(Number(value ?? 0))
+  new Intl.NumberFormat(LOCALE_ANGKA).format(Number(value ?? 0))
 
 const formatDecimal = (value: number | null | undefined): string =>
-  new Intl.NumberFormat('id-ID', {
+  new Intl.NumberFormat(LOCALE_ANGKA, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(Number(value ?? 0))
 
 const formatCurrency = (value: number | null | undefined): string =>
-  new Intl.NumberFormat('id-ID', {
+  new Intl.NumberFormat(LOCALE_ANGKA, {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
@@ -258,7 +259,7 @@ const formatCompactCurrency = (value: number | null | undefined): string => {
   const scale = (divisor: number, suffix: string): string => {
     const scaled = amount / divisor
 
-    return `Rp ${new Intl.NumberFormat('id-ID', {
+    return `Rp ${new Intl.NumberFormat(LOCALE_ANGKA, {
       minimumFractionDigits: 0,
       maximumFractionDigits: Math.abs(scaled) >= 100 ? 0 : 1,
     }).format(scaled)} ${suffix}`

@@ -254,10 +254,10 @@
                 <tr>
                     <td class="center">{{ $index + 1 }}</td>
                     <td>{{ ucfirst($item->nama_item) }}</td>
-                    <td class="center">{{ rtrim(rtrim(number_format($item->qty, 2, ',', '.'), '0'), ',') }}</td>
+                    <td class="center">{{ rtrim(rtrim(angka($item->qty, 2), '0'), '.') }}</td>
                     <td class="center">{{ $item->unit->nama ?? '-' }}</td>
-                    <td class="right nowrap">Rp {{ number_format($item->harga_unit, 0, ',', '.') }}</td>
-                    <td class="right bold nowrap">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                    <td class="right nowrap">Rp {{ angka($item->harga_unit, 0) }}</td>
+                    <td class="right bold nowrap">Rp {{ angka($item->subtotal, 0) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -265,20 +265,20 @@
             @if ($poStatusPkpSnapshot === 'PKP')
                 <tr>
                     <td colspan="5" class="right summary-label">{{ __('purchase_order.subtotal') }}</td>
-                    <td class="right summary-value nowrap">Rp {{ number_format($po->items->sum('subtotal'), 0, ',', '.') }}</td>
+                    <td class="right summary-value nowrap">Rp {{ angka($po->items->sum('subtotal'), 0) }}</td>
                 </tr>
                 <tr>
                     <td colspan="5" class="right summary-label">{{ __('purchase_order.dpp') }}</td>
-                    <td class="right summary-value nowrap">Rp {{ number_format($po->dpp, 0, ',', '.') }}</td>
+                    <td class="right summary-value nowrap">Rp {{ angka($po->dpp, 0) }}</td>
                 </tr>
                 <tr>
                     <td colspan="5" class="right summary-label">{{ __('purchase_order.vat') }}</td>
-                    <td class="right summary-value nowrap">Rp {{ number_format($po->ppn, 0, ',', '.') }}</td>
+                    <td class="right summary-value nowrap">Rp {{ angka($po->ppn, 0) }}</td>
                 </tr>
             @endif
             <tr>
                 <td colspan="5" class="right grand-total-label">{{ __('purchase_order.grand_total') }}</td>
-                <td class="right grand-total-value nowrap">Rp {{ number_format($po->total_nilai, 0, ',', '.') }}</td>
+                <td class="right grand-total-value nowrap">Rp {{ angka($po->total_nilai, 0) }}</td>
             </tr>
         </tfoot>
     </table>

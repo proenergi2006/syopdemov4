@@ -50,7 +50,7 @@
     $accentColor = $currentMode === 'rejected' ? '#b3261e' : '#1f4e78';
 
     $rupiah = static fn ($value): string =>
-        'Rp ' . number_format((float) $value, 0, ',', '.');
+        'Rp ' . angka((float) $value, 0);
 
     /*
     | Jadwal pembayaran dan ketepatannya -- hanya untuk email pencairan.

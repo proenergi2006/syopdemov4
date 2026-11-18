@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Auth\ImpersonationService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,6 +35,15 @@ class LogUserActivity
     */
     private const EXCLUDED_PATH_PATTERNS = [
         'api/auth/logout',
+
+        /*
+        | Mulai dan berhenti menyamar sudah dicatat sendiri oleh
+        | ImpersonationService ke log "auth", lengkap dengan alasan, id sesi,
+        | dan siapa menjadi siapa. Dicatat lagi di sini hanya menghasilkan
+        | baris kembar yang justru lebih miskin keterangan.
+        */
+        'api/auth/impersonate',
+        'api/auth/impersonate/*',
     ];
 
     /*
@@ -49,6 +59,13 @@ class LogUserActivity
         'api',
         'transaction',
         'master',
+
+        /*
+        | Semua route di bawah /account menyangkut akun user yang sedang masuk,
+        | jadi menyebutnya lagi di deskripsi hanya menambah kata tanpa menambah
+        | keterangan: "Ganti Password" sudah jelas milik siapa.
+        */
+        'account',
     ];
 
     /*
@@ -76,6 +93,8 @@ class LogUserActivity
         'assign' => ['Assign', 'assign'],
         'unassign' => ['Batalkan Assign', 'unassign'],
         'store-signature' => ['Simpan Tanda Tangan', 'update'],
+        'activate' => ['Pakai', 'update'],
+        'preview' => ['Pratinjau', 'view'],
         'restore' => ['Pulihkan', 'restore'],
         'force-delete' => ['Hapus Permanen', 'delete'],
     ];
@@ -102,6 +121,7 @@ class LogUserActivity
         'users' => 'User',
         'notifications' => 'Notifikasi',
         'access-assignments' => 'Assignment Akses',
+        'signatures' => 'Tanda Tangan',
     ];
 
     public function handle(
@@ -138,15 +158,42 @@ class LogUserActivity
 
         [$description, $eventKey] = $this->describe($request);
 
+        $properties = [
+            'method' => $request->method(),
+            'path' => '/' . ltrim($request->path(), '/'),
+            'route_name' => $request->route()?->getName(),
+            'status_code' => $statusCode,
+            'ip' => $request->ip(),
+        ];
+
+        /*
+        |----------------------------------------------------------------------
+        | Penyamaran super admin
+        |----------------------------------------------------------------------
+        | causer tetap user yang disamari, karena memang hak user itulah yang
+        | dipakai request ini. Tapi tanpa dua nilai di bawah, log terbaca
+        | seolah-olah orang tersebut yang melakukannya sendiri -- dan karena
+        | penyamaran di aplikasi ini penuh serta tidak memberi tahu yang
+        | bersangkutan, catatan inilah satu-satunya yang membedakan keduanya.
+        |
+        | Middleware ini satu-satunya jalur yang dilewati SEMUA POST/PUT/
+        | PATCH/DELETE di aplikasi, jadi satu tempat ini menutupi seluruh
+        | modul -- termasuk modul yang belum ditulis.
+        |----------------------------------------------------------------------
+        */
+        $sesiPenyamaran = app(ImpersonationService::class)
+            ->sesiUntukRequest($request);
+
+        if ($sesiPenyamaran) {
+            $properties['impersonation_session_id'] = $sesiPenyamaran->id;
+            $properties['impersonated_by'] = $sesiPenyamaran->admin_user_id;
+            $properties['impersonated_by_username'] = $sesiPenyamaran
+                ->admin?->username;
+        }
+
         activity('activity')
             ->causedBy($user)
-            ->withProperties([
-                'method' => $request->method(),
-                'path' => '/' . ltrim($request->path(), '/'),
-                'route_name' => $request->route()?->getName(),
-                'status_code' => $statusCode,
-                'ip' => $request->ip(),
-            ])
+            ->withProperties($properties)
             ->event($isSuccess ? $eventKey : $eventKey . '_failed')
             ->log($description);
     }

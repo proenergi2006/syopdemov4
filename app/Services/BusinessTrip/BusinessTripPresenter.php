@@ -34,6 +34,26 @@ class BusinessTripPresenter
             'status' => $trip->status,
             'is_editable' => $trip->is_editable,
 
+            /*
+            | Masih boleh diajukan pemohonnya.
+            |
+            | Dikirim dari sini, bukan disusun ulang di layar dari daftar
+            | status. Daftar itu dahulu memang ditulis dua kali, dan yang di
+            | layar kehilangan NEED REVISION -- sehingga dokumen yang
+            | dikembalikan approver kepada pemohonnya tidak punya satu pun
+            | tombol Ajukan. Pemohon bisa memperbaikinya, tidak bisa
+            | mengirimkannya kembali, dan dokumennya berhenti di sana tanpa
+            | ada yang merasa sedang menahannya.
+            */
+            'is_submittable' => $trip->is_submittable,
+
+            /*
+            | Masih boleh dibatalkan. Dikirim dari sini dengan alasan yang
+            | sama seperti is_submittable: daftar statusnya milik server, dan
+            | layar yang menyusunnya sendiri pada akhirnya akan berbeda.
+            */
+            'is_cancellable' => $trip->is_cancellable,
+
             /* Menjelaskan kenapa FPU-nya sudah boleh atau masih terkunci. */
             'is_on_time' => $trip->is_on_time,
 

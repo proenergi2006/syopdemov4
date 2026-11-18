@@ -1694,12 +1694,7 @@ class GoodsReturnController extends Controller
                 if ($qtyReturn > $qtyReturnable) {
                     $formattedQtyReturnable = rtrim(
                         rtrim(
-                            number_format(
-                                $qtyReturnable,
-                                4,
-                                ',',
-                                '.',
-                            ),
+                            angka($qtyReturnable, 4),
                             '0',
                         ),
                         ',',
@@ -3751,12 +3746,7 @@ class GoodsReturnController extends Controller
                 ) {
                     $formattedQtyReturnable = rtrim(
                         rtrim(
-                            number_format(
-                                $qtyReturnable,
-                                4,
-                                ',',
-                                '.',
-                            ),
+                            angka($qtyReturnable, 4),
                             '0',
                         ),
                         ',',

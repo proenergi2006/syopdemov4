@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import axios from '@axios'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from '@axios'
 
 import {
   closeAlert,
@@ -187,7 +187,8 @@ const loadSpecialDocumentTypes = async (): Promise<void> => {
       code: String(item.code || ''),
       name: String(item.name || '-'),
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Special Document Types] FETCH ERROR:', error)
     specialDocumentTypeOptions.value = []
   }
@@ -402,13 +403,13 @@ const loadPermissionModule = async (): Promise<void> => {
     const modules: PermissionModuleOption[]
       = Array.isArray(rawItems)
         ? rawItems.map((item: any) => ({
-            id: Number(item.id),
-            code: String(item.code || ''),
-            name: String(item.name || ''),
-            is_active: Boolean(
-              item.is_active ?? true,
-            ),
-          }))
+          id: Number(item.id),
+          code: String(item.code || ''),
+          name: String(item.name || ''),
+          is_active: Boolean(
+            item.is_active ?? true,
+          ),
+        }))
         : []
 
     const selectedModule = modules.find(module => {
@@ -449,7 +450,6 @@ const loadPermissionModule = async (): Promise<void> => {
     isLoadingPermissionModule.value = false
   }
 }
-
 
 /*
  * PR dan FPU dibedakan per area + department, sehingga kedua field itu wajib
@@ -499,10 +499,12 @@ const loadTransactionCategories = async (): Promise<void> => {
       code: String(item.code || ''),
       title: String(item.title || item.name || '-'),
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Transaction Categories] FETCH ERROR:', error)
     transactionCategoryOptions.value = []
-  } finally {
+  }
+  finally {
     isLoadingTransactionCategory.value = false
   }
 }
@@ -596,7 +598,8 @@ const applyDocumentTypeDefaults = (): void => {
     form.cabang = null
     form.all_departments = false
     form.department_ids = []
-  } else if (!form.area_type) {
+  }
+  else if (!form.area_type) {
     form.area_type = 'HO'
   }
 
@@ -648,7 +651,8 @@ onMounted(async () => {
    */
   try {
     await loadApprovalFlowDocumentTypes()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     showErrorToast({
       title: 'Gagal',
       text: getApiErrorMessage(
@@ -769,14 +773,16 @@ const loadApproverOptions = async (): Promise<void> => {
 
     roleOptions.value = normalizeDropdownItems(roleResponse.data) as MasterRoleOption[]
     userOptions.value = normalizeDropdownItems(userResponse.data) as MasterUserOption[]
-  } catch (error: any) {
+  }
+  catch (error: any) {
     const err = error as AxiosErrorShape
 
     showErrorToast({
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal memuat data role atau user approver.'),
     })
-  } finally {
+  }
+  finally {
     isLoadingRole.value = false
     isLoadingUser.value = false
   }
@@ -791,7 +797,8 @@ const loadDepartmentOptions = async (): Promise<void> => {
     })
 
     departmentOptions.value = normalizeDropdownItems(response.data) as MasterDepartmentOption[]
-  } catch (error: any) {
+  }
+  catch (error: any) {
     departmentOptions.value = []
 
     const err = error as AxiosErrorShape
@@ -800,7 +807,8 @@ const loadDepartmentOptions = async (): Promise<void> => {
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal memuat data department.'),
     })
-  } finally {
+  }
+  finally {
     isLoadingDepartment.value = false
   }
 }
@@ -820,7 +828,8 @@ const loadBranchOptions = async (): Promise<void> => {
         value: Number(item.id),
       }))
       .filter(item => Number(item.id) > 0)
-  } catch (error: any) {
+  }
+  catch (error: any) {
     branchOptions.value = []
 
     const err = error as AxiosErrorShape
@@ -829,7 +838,8 @@ const loadBranchOptions = async (): Promise<void> => {
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal memuat data cabang.'),
     })
-  } finally {
+  }
+  finally {
     isLoadingBranch.value = false
   }
 }
@@ -971,30 +981,30 @@ const validateForm = (): boolean => {
 
   if (minAmount < 0) {
     showErrorToast({
-        title: 'Validasi Gagal',
-        text: 'Minimal nilai tidak boleh lebih kecil dari 0.',
+      title: 'Validasi Gagal',
+      text: 'Minimal nilai tidak boleh lebih kecil dari 0.',
     })
 
     return false
-    }
+  }
 
-    if (maxAmount < 0) {
+  if (maxAmount < 0) {
     showErrorToast({
-        title: 'Validasi Gagal',
-        text: 'Maksimal nilai tidak boleh lebih kecil dari 0.',
+      title: 'Validasi Gagal',
+      text: 'Maksimal nilai tidak boleh lebih kecil dari 0.',
     })
 
     return false
-    }
+  }
 
-    if (hasAmountError.value) {
+  if (hasAmountError.value) {
     showErrorToast({
-        title: 'Validasi Gagal',
-        text: minAmountErrorMessage.value || maxAmountErrorMessage.value,
+      title: 'Validasi Gagal',
+      text: minAmountErrorMessage.value || maxAmountErrorMessage.value,
     })
 
     return false
-    }
+  }
 
   if (usesAreaMatrix.value) {
     if (!form.area_type) {
@@ -1236,37 +1246,39 @@ const submit = async (): Promise<void> => {
 
   submitLoading.value = true
 
-    try {
-        showLoadingAlert('Menyimpan Approval Flow', 'Mohon tunggu sebentar')
+  try {
+    showLoadingAlert('Menyimpan Approval Flow', 'Mohon tunggu sebentar')
 
-        await axios.post(APPROVAL_FLOW_STORE_ENDPOINT, buildPayload(), {
-            headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            },
-        })
+    await axios.post(APPROVAL_FLOW_STORE_ENDPOINT, buildPayload(), {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
 
-        closeAlert()
+    closeAlert()
 
-        await router.replace({
-            path: APPROVAL_FLOW_INDEX_PATH,
-            query: {
-            document_type: form.document_type,
-            success: 'created',
-            },
-        })
-    } catch (error: any) {
-        closeAlert()
+    await router.replace({
+      path: APPROVAL_FLOW_INDEX_PATH,
+      query: {
+        document_type: form.document_type,
+        success: 'created',
+      },
+    })
+  }
+  catch (error: any) {
+    closeAlert()
 
-        const err = error as AxiosErrorShape
+    const err = error as AxiosErrorShape
 
-        showErrorToast({
-            title: 'Gagal',
-            text: getApiErrorMessage(err, 'Gagal menyimpan approval flow.'),
-        })
-    } finally {
-        submitLoading.value = false
-    }
+    showErrorToast({
+      title: 'Gagal',
+      text: getApiErrorMessage(err, 'Gagal menyimpan approval flow.'),
+    })
+  }
+  finally {
+    submitLoading.value = false
+  }
 }
 
 const goBack = async (): Promise<void> => {
@@ -1416,8 +1428,8 @@ const formatAmount = (value: number | string | null | undefined): string => {
                   :error-messages="
                     isSubmitted
                       && !form.permission_module_id
-                        ? ['Module belum tersedia']
-                        : []
+                      ? ['Module belum tersedia']
+                      : []
                   "
                 />
               </VCol>
@@ -1438,17 +1450,16 @@ const formatAmount = (value: number | string | null | undefined): string => {
                 cols="12"
                 md="6"
               >
-                <VTextField
-                v-model.number="form.min_amount"
-                label="Minimal Nilai"
-                placeholder="0"
-                type="number"
-                min="0"
-                density="comfortable"
-                prefix="Rp"
-                :disabled="submitLoading"
-                :error="Boolean(minAmountErrorMessage)"
-                :error-messages="minAmountErrorMessage ? [minAmountErrorMessage] : []"
+                <AppNumberField
+                  v-model="form.min_amount"
+                  label="Minimal Nilai"
+                  placeholder="0"
+
+                  density="comfortable"
+                  prefix="Rp"
+                  :disabled="submitLoading"
+                  :error="Boolean(minAmountErrorMessage)"
+                  :error-messages="minAmountErrorMessage ? [minAmountErrorMessage] : []"
                 />
               </VCol>
 
@@ -1456,17 +1467,16 @@ const formatAmount = (value: number | string | null | undefined): string => {
                 cols="12"
                 md="6"
               >
-                <VTextField
-                v-model.number="form.max_amount"
-                label="Maksimal Nilai"
-                placeholder="Kosongkan untuk tanpa batas"
-                type="number"
-                min="0"
-                density="comfortable"
-                prefix="Rp"
-                :disabled="submitLoading"
-                :error="Boolean(maxAmountErrorMessage)"
-                :error-messages="maxAmountErrorMessage ? [maxAmountErrorMessage] : []"
+                <AppNumberField
+                  v-model="form.max_amount"
+                  label="Maksimal Nilai"
+                  placeholder="Kosongkan untuk tanpa batas"
+
+                  density="comfortable"
+                  prefix="Rp"
+                  :disabled="submitLoading"
+                  :error="Boolean(maxAmountErrorMessage)"
+                  :error-messages="maxAmountErrorMessage ? [maxAmountErrorMessage] : []"
                 />
               </VCol>
 
@@ -1532,99 +1542,99 @@ const formatAmount = (value: number | string | null | undefined): string => {
             </VAlert>
 
             <VRow>
-                <VCol
-                    cols="12"
-                    md="6"
-                >
-                    <VSelect
-                    v-model="form.area_type"
-                    label="Area Type *"
-                    :items="areaTypeOptions"
-                    density="comfortable"
-                    :disabled="submitLoading"
-                    :error="isSubmitted && usesAreaMatrix && !form.area_type"
-                    :error-messages="isSubmitted && usesAreaMatrix && !form.area_type ? ['Area type wajib dipilih'] : []"
-                    />
-                </VCol>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VSelect
+                  v-model="form.area_type"
+                  label="Area Type *"
+                  :items="areaTypeOptions"
+                  density="comfortable"
+                  :disabled="submitLoading"
+                  :error="isSubmitted && usesAreaMatrix && !form.area_type"
+                  :error-messages="isSubmitted && usesAreaMatrix && !form.area_type ? ['Area type wajib dipilih'] : []"
+                />
+              </VCol>
 
-                <VCol
-                    cols="12"
-                    md="6"
-                >
-                    <!--
-                      Satu flow dapat mencakup beberapa department sekaligus,
-                      seperti baris "GA - IT - LOG" pada matriks.
-                    -->
-                    <VAutocomplete
-                    v-model="form.department_ids"
-                    label="Department *"
-                    :items="departmentOptions"
-                    item-title="title"
-                    item-value="id"
-                    :multiple="autocompleteMultiple"
-                    chips
-                    closable-chips
-                    clearable
-                    density="comfortable"
-                    :loading="isLoadingDepartment"
-                    :disabled="submitLoading || form.all_departments"
-                    :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
-                    :error="isSubmitted && usesAreaMatrix && !form.all_departments && !form.department_ids.length"
-                    :error-messages="isSubmitted && usesAreaMatrix && !form.all_departments && !form.department_ids.length ? ['Department wajib dipilih'] : []"
-                    no-data-text="Department tidak ditemukan"
-                    :placeholder="form.all_departments ? 'Berlaku untuk semua department' : 'Pilih satu atau beberapa department'"
-                    />
-
-                    <VSwitch
-                    v-model="form.all_departments"
-                    color="primary"
-                    density="compact"
-                    hide-details
-                    class="mt-1"
-                    label="Semua Divisi"
-                    :disabled="submitLoading"
-                    />
-                </VCol>
-
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <!--
-                  Keterangan transaksi hanya relevan bagi jenis dokumen yang
-                  memakainya (FPU). Penentunya master permission module, bukan
-                  pemeriksaan jenis dokumen di sini.
+                  Satu flow dapat mencakup beberapa department sekaligus,
+                  seperti baris "GA - IT - LOG" pada matriks.
                 -->
-                <VCol
-                    v-if="usesTransactionCategory"
-                    cols="12"
-                >
-                    <VAutocomplete
-                    v-model="form.transaction_category_ids"
-                    label="Keterangan Transaksi *"
-                    :items="transactionCategoryOptions"
-                    item-title="title"
-                    item-value="id"
-                    :multiple="autocompleteMultiple"
-                    chips
-                    closable-chips
-                    clearable
-                    density="comfortable"
-                    :loading="isLoadingTransactionCategory"
-                    :disabled="submitLoading || form.all_transaction_categories"
-                    :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
-                    :error="isSubmitted && usesTransactionCategory && !form.all_transaction_categories && !form.transaction_category_ids.length"
-                    :error-messages="isSubmitted && usesTransactionCategory && !form.all_transaction_categories && !form.transaction_category_ids.length ? ['Keterangan transaksi wajib dipilih'] : []"
-                    no-data-text="Keterangan transaksi tidak ditemukan"
-                    :placeholder="form.all_transaction_categories ? 'Berlaku untuk semua keterangan transaksi' : 'Pilih satu atau beberapa keterangan transaksi'"
-                    />
+                <VAutocomplete
+                  v-model="form.department_ids"
+                  label="Department *"
+                  :items="departmentOptions"
+                  item-title="title"
+                  item-value="id"
+                  :multiple="autocompleteMultiple"
+                  chips
+                  closable-chips
+                  clearable
+                  density="comfortable"
+                  :loading="isLoadingDepartment"
+                  :disabled="submitLoading || form.all_departments"
+                  :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+                  :error="isSubmitted && usesAreaMatrix && !form.all_departments && !form.department_ids.length"
+                  :error-messages="isSubmitted && usesAreaMatrix && !form.all_departments && !form.department_ids.length ? ['Department wajib dipilih'] : []"
+                  no-data-text="Department tidak ditemukan"
+                  :placeholder="form.all_departments ? 'Berlaku untuk semua department' : 'Pilih satu atau beberapa department'"
+                />
 
-                    <VSwitch
-                    v-model="form.all_transaction_categories"
-                    color="primary"
-                    density="compact"
-                    hide-details
-                    class="mt-1"
-                    label="Semua Keterangan Transaksi"
-                    :disabled="submitLoading"
-                    />
-                </VCol>
+                <VSwitch
+                  v-model="form.all_departments"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  class="mt-1"
+                  label="Semua Divisi"
+                  :disabled="submitLoading"
+                />
+              </VCol>
+
+              <!--
+                Keterangan transaksi hanya relevan bagi jenis dokumen yang
+                memakainya (FPU). Penentunya master permission module, bukan
+                pemeriksaan jenis dokumen di sini.
+              -->
+              <VCol
+                v-if="usesTransactionCategory"
+                cols="12"
+              >
+                <VAutocomplete
+                  v-model="form.transaction_category_ids"
+                  label="Keterangan Transaksi *"
+                  :items="transactionCategoryOptions"
+                  item-title="title"
+                  item-value="id"
+                  :multiple="autocompleteMultiple"
+                  chips
+                  closable-chips
+                  clearable
+                  density="comfortable"
+                  :loading="isLoadingTransactionCategory"
+                  :disabled="submitLoading || form.all_transaction_categories"
+                  :menu-props="{ location: 'bottom', offset: 8, maxHeight: 300 }"
+                  :error="isSubmitted && usesTransactionCategory && !form.all_transaction_categories && !form.transaction_category_ids.length"
+                  :error-messages="isSubmitted && usesTransactionCategory && !form.all_transaction_categories && !form.transaction_category_ids.length ? ['Keterangan transaksi wajib dipilih'] : []"
+                  no-data-text="Keterangan transaksi tidak ditemukan"
+                  :placeholder="form.all_transaction_categories ? 'Berlaku untuk semua keterangan transaksi' : 'Pilih satu atau beberapa keterangan transaksi'"
+                />
+
+                <VSwitch
+                  v-model="form.all_transaction_categories"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  class="mt-1"
+                  label="Semua Keterangan Transaksi"
+                  :disabled="submitLoading"
+                />
+              </VCol>
             </VRow>
           </VCardText>
         </VCard>
@@ -1828,10 +1838,10 @@ const formatAmount = (value: number | string | null | undefined): string => {
                     >
                       <VRow>
                         <VCol
-                        cols="12"
-                        md="3"
+                          cols="12"
+                          md="3"
                         >
-                        <VSelect
+                          <VSelect
                             v-model="approver.approver_type"
                             label="Tipe Approver *"
                             :items="approverTypeOptions"
@@ -1841,7 +1851,7 @@ const formatAmount = (value: number | string | null | undefined): string => {
                             density="comfortable"
                             :disabled="submitLoading"
                             @update:model-value="() => onApproverTypeChange(stepIndex, approverIndex)"
-                            />
+                          />
                         </VCol>
 
                         <VCol
@@ -1875,9 +1885,9 @@ const formatAmount = (value: number | string | null | undefined): string => {
                                 ? 'Pilih department approver'
                                 : 'Pilih user approver'"
                             @update:model-value="value => {
-                                approver.approver_id = normalizeApproverId(value)
+                              approver.approver_id = normalizeApproverId(value)
                             }"
-                            />
+                          />
                         </VCol>
 
                         <VCol
@@ -1947,8 +1957,8 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               isSubmitted
                                 && approver.approver_scope === 'SELECTED_BRANCHES'
                                 && approver.branch_ids.length === 0
-                                  ? ['Minimal pilih 1 cabang']
-                                  : []
+                                ? ['Minimal pilih 1 cabang']
+                                : []
                             "
                             no-data-text="Cabang tidak ditemukan"
                             placeholder="Pilih satu atau lebih cabang"
@@ -2032,7 +2042,10 @@ const formatAmount = (value: number | string | null | undefined): string => {
                             :key="`special-${stepIndex}-${approverIndex}-${specialIndex}`"
                             class="align-center"
                           >
-                            <VCol cols="12" md="4">
+                            <VCol
+                              cols="12"
+                              md="4"
+                            >
                               <VAutocomplete
                                 v-model="special.special_document_type_id"
                                 label="Tipe Dokumen *"
@@ -2046,7 +2059,10 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               />
                             </VCol>
 
-                            <VCol cols="12" md="3">
+                            <VCol
+                              cols="12"
+                              md="3"
+                            >
                               <VSelect
                                 v-model="special.approver_type"
                                 label="Tipe Approver *"
@@ -2059,7 +2075,10 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               />
                             </VCol>
 
-                            <VCol cols="12" md="4">
+                            <VCol
+                              cols="12"
+                              md="4"
+                            >
                               <VAutocomplete
                                 v-model="special.approver_id"
                                 label="Approver Pengganti *"
@@ -2074,7 +2093,11 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               />
                             </VCol>
 
-                            <VCol cols="12" md="1" class="d-flex justify-end">
+                            <VCol
+                              cols="12"
+                              md="1"
+                              class="d-flex justify-end"
+                            >
                               <VBtn
                                 icon
                                 size="small"
@@ -2088,7 +2111,6 @@ const formatAmount = (value: number | string | null | undefined): string => {
                             </VCol>
                           </VRow>
                         </VCol>
-
                       </VRow>
                     </div>
                   </div>
@@ -2166,23 +2188,23 @@ const formatAmount = (value: number | string | null | undefined): string => {
 
               <template v-if="usesAreaMatrix">
                 <div class="summary-item">
-                    <div class="summary-label">
+                  <div class="summary-label">
                     Area
-                    </div>
-                    <div class="summary-value">
+                  </div>
+                  <div class="summary-value">
                     {{ form.area_type || '-' }}
-                    </div>
+                  </div>
                 </div>
 
                 <div class="summary-item">
-                    <div class="summary-label">
+                  <div class="summary-label">
                     Department
-                    </div>
-                    <div class="summary-value">
+                  </div>
+                  <div class="summary-value">
                     {{ selectedDepartmentName }}
-                    </div>
+                  </div>
                 </div>
-            </template>
+              </template>
 
               <div
                 v-if="usesTransactionCategory"

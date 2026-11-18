@@ -2,28 +2,29 @@
 import { computed, onMounted, reactive, ref, toRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useDisplay } from 'vuetify'
 import axios from '@axios'
 import {
+  closeAlert,
   showConfirmAlert,
   showErrorToast,
   showLoadingAlert,
   showSuccessToast,
   showWarningToast,
-  closeAlert,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
 import type { RevisionEntry } from '@/components/fund_request/revision'
 import {
-  onlyNumberKeypress,
-  formatSanitizedNumberInput,
-  sanitizeDecimalInput,
-  parseDecimalInput,
-  toTitleCase,
   formatDecimalQty,
+  formatSanitizedNumberInput,
+  onlyNumberKeypress,
+  parseDecimalInput,
+  sanitizeDecimalInput,
+  toTitleCase,
 } from '@/utils/textFormatter'
 import { useNativeDatePicker } from '@core/composable/useNativeDatePicker'
-import { useDisplay } from 'vuetify'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 interface PrItem {
   nama_item: string
@@ -188,7 +189,8 @@ const loadSpecialDocumentTypes = async (): Promise<void> => {
       name: item.name || '-',
       title: item.title || item.name || '-',
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Special Document Types] FETCH ERROR:', error)
     specialDocumentTypes.value = []
   }
@@ -232,6 +234,7 @@ const errors = reactive<PurchaseRequestErrors>({
 })
 
 const kategoriList = ['Baru', 'Perbaikan', 'Improvement', 'Regular', 'Lain-lain']
+
 const prTypeList = [
   'Rutin',
   'Non Rutin',
@@ -248,9 +251,10 @@ const getExtension = (fileName: string): string => {
 }
 
 const formatMoney = (value: number | null | undefined): string => {
-  if (!value) return ''
+  if (!value)
+    return ''
 
-  return new Intl.NumberFormat('id-ID').format(Number(value))
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(Number(value))
 }
 
 const onlyNumber = (e: KeyboardEvent): void => {
@@ -313,9 +317,8 @@ const updateDepartmentListByBranch = (
       form.id_department
       && !departmentStillAvailable
     )
-  ) {
+  )
     form.id_department = null
-  }
 }
 
 const fetchCabangList = async (showAlert = true): Promise<void> => {
@@ -331,27 +334,27 @@ const fetchCabangList = async (showAlert = true): Promise<void> => {
 
     accessAssignmentList.value = Array.isArray(payload.assignments)
       ? payload.assignments.map((item: any) => ({
-          id: item.id !== null && item.id !== undefined
-            ? Number(item.id)
-            : null,
-          branch_id: Number(item.branch_id),
-          branch_name: item.branch_name || '-',
-          branch_code: item.branch_code || '',
-          department_id: Number(item.department_id),
-          department_code: item.department_code || '',
-          department_name: item.department_name || '-',
-          is_primary: Boolean(item.is_primary),
-        }))
+        id: item.id !== null && item.id !== undefined
+          ? Number(item.id)
+          : null,
+        branch_id: Number(item.branch_id),
+        branch_name: item.branch_name || '-',
+        branch_code: item.branch_code || '',
+        department_id: Number(item.department_id),
+        department_code: item.department_code || '',
+        department_name: item.department_name || '-',
+        is_primary: Boolean(item.is_primary),
+      }))
       : []
 
     cabangList.value = Array.isArray(payload.branches)
       ? payload.branches.map((item: UserAccessBranchItem) => ({
-          id: Number(item.id),
-          value: Number(item.id),
-          title: item.title || formatBranchTitle(item.code, item.name),
-          nama_cabang: item.name || item.title || '-',
-          inisial_cabang: item.code || '',
-        }))
+        id: Number(item.id),
+        value: Number(item.id),
+        title: item.title || formatBranchTitle(item.code, item.name),
+        nama_cabang: item.name || item.title || '-',
+        inisial_cabang: item.code || '',
+      }))
       : []
 
     const rawDepartmentsByBranch = payload.departments_by_branch || {}
@@ -360,18 +363,19 @@ const fetchCabangList = async (showAlert = true): Promise<void> => {
     Object.entries(rawDepartmentsByBranch).forEach(([branchId, departments]) => {
       normalizedDepartmentsByBranch[String(branchId)] = Array.isArray(departments)
         ? departments.map((item: any) => ({
-            id: Number(item.id),
-            code: item.code || '',
-            name: item.name || item.title || '-',
-            title: item.title || formatDepartmentLabel(item.code, item.name),
-          }))
+          id: Number(item.id),
+          code: item.code || '',
+          name: item.name || item.title || '-',
+          title: item.title || formatDepartmentLabel(item.code, item.name),
+        }))
         : []
     })
 
     departmentsByBranch.value = normalizedDepartmentsByBranch
 
     updateDepartmentListByBranch(form.cabang, true)
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Access Assignment] FETCH ERROR:', error)
 
     accessAssignmentList.value = []
@@ -385,7 +389,8 @@ const fetchCabangList = async (showAlert = true): Promise<void> => {
         text: getApiErrorMessage(error, t('purchaseRequest.create.toast.loadAccessFailed')),
       })
     }
-  } finally {
+  }
+  finally {
     isLoadingCabang.value = false
     isLoadingDepartment.value = false
   }
@@ -402,7 +407,8 @@ const fetchDepartmentList = async (showAlert = true): Promise<void> => {
     }
 
     updateDepartmentListByBranch(form.cabang, true)
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Department Access] FETCH ERROR:', error)
     departmentList.value = []
 
@@ -412,7 +418,8 @@ const fetchDepartmentList = async (showAlert = true): Promise<void> => {
         text: getApiErrorMessage(error, t('purchaseRequest.create.toast.loadDepartmentFailed')),
       })
     }
-  } finally {
+  }
+  finally {
     isLoadingDepartment.value = false
   }
 }
@@ -443,7 +450,8 @@ const loadVendors = async (showAlert = true): Promise<void> => {
       jenis_pembayaran: item.jenis_pembayaran || null,
       top: Number(item.top || 0),
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Vendor] FETCH ERROR:', error)
     vendorList.value = []
 
@@ -453,7 +461,8 @@ const loadVendors = async (showAlert = true): Promise<void> => {
         text: getApiErrorMessage(error, t('purchaseRequest.create.toast.loadVendorFailed')),
       })
     }
-  } finally {
+  }
+  finally {
     isLoadingVendor.value = false
   }
 }
@@ -462,9 +471,8 @@ const handleDepartmentChange = async (): Promise<void> => {
   form.recommended_vendor_id = null
   vendorList.value = []
 
-  if (form.id_department) {
+  if (form.id_department)
     await loadVendors(false)
-  }
 }
 
 const handleBranchChange = async (): Promise<void> => {
@@ -497,7 +505,8 @@ const loadUnits = async (showAlert = true): Promise<void> => {
       nama: item.nama || '-',
       kategori: item.kategori || '',
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Units] FETCH ERROR:', error)
     units.value = []
 
@@ -507,7 +516,8 @@ const loadUnits = async (showAlert = true): Promise<void> => {
         text: getApiErrorMessage(error, t('purchaseRequest.create.toast.loadUnitFailed')),
       })
     }
-  } finally {
+  }
+  finally {
     isLoadingUnits.value = false
   }
 }
@@ -534,7 +544,8 @@ const loadMaterialGroups = async (showAlert = true): Promise<void> => {
       name: item.name || '-',
       title: item.title || `${item.code} - ${item.name}`,
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Material Groups] FETCH ERROR:', error)
     materialGroups.value = []
 
@@ -547,7 +558,8 @@ const loadMaterialGroups = async (showAlert = true): Promise<void> => {
         ),
       })
     }
-  } finally {
+  }
+  finally {
     isLoadingMaterialGroups.value = false
   }
 }
@@ -619,6 +631,7 @@ const revisiTerbuka = ref<RevisionEntry | null>(null)
 const loadPurchaseRequestDetail = async (): Promise<void> => {
   if (!publicId.value) {
     loadError.value = t('purchaseRequest.edit.publicIdNotFound')
+
     return
   }
 
@@ -632,9 +645,8 @@ const loadPurchaseRequestDetail = async (): Promise<void> => {
 
     const detail = response.data?.data
 
-    if (!detail) {
+    if (!detail)
       throw new Error('Data purchase requisition tidak ditemukan.')
-    }
 
     revisiTerbuka.value = detail.revision_open || null
 
@@ -669,19 +681,21 @@ const loadPurchaseRequestDetail = async (): Promise<void> => {
 
     existingLampiranRequests.value = Array.isArray(detail.attachments)
       ? detail.attachments.map((file: any) => ({
-          id: Number(file.id),
-          filename: file.filename || '-',
-          original_filename: file.original_filename || '-',
-          filepath: file.filepath || '#',
-          file_size: Number(file.file_size || file.filesize || 0),
-          mime_type: file.mime_type || file.filetype || '',
-        }))
+        id: Number(file.id),
+        filename: file.filename || '-',
+        original_filename: file.original_filename || '-',
+        filepath: file.filepath || '#',
+        file_size: Number(file.file_size || file.filesize || 0),
+        mime_type: file.mime_type || file.filetype || '',
+      }))
       : []
 
     await loadVendors(false)
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     loadError.value = getApiErrorMessage(error, 'Gagal memuat detail Purchase Requisition.')
-  } finally {
+  }
+  finally {
     isLoadingDetail.value = false
   }
 }
@@ -694,14 +708,16 @@ const resetItems = async (): Promise<void> => {
     cancelButtonText: 'Batal',
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   form.items = [createEmptyItem()]
 }
 
 const updateItemSubtotal = (index: number): void => {
   const item = form.items[index]
-  if (!item) return
+  if (!item)
+    return
 
   const qty = Number(item.qty || 0)
   const hargaUnit = Number(item.harga_unit || 0)
@@ -717,7 +733,8 @@ const handleItemPriceInput = (event: Event, index: number): void => {
     emptyAsZero: true,
   })
 
-  if (!form.items[index]) return
+  if (!form.items[index])
+    return
 
   form.items[index].harga_unit = result.numeric ?? 0
   updateItemSubtotal(index)
@@ -739,7 +756,8 @@ const handleItemPricePaste = (event: ClipboardEvent, index: number): void => {
     return
   }
 
-  if (!form.items[index]) return
+  if (!form.items[index])
+    return
 
   const target = event.target as HTMLInputElement
   const harga = Number(pastedText)
@@ -751,7 +769,8 @@ const handleItemPricePaste = (event: ClipboardEvent, index: number): void => {
 }
 
 const handleTempQtyInput = (value: string | number, index: number): void => {
-  if (!tempItems.value[index]) return
+  if (!tempItems.value[index])
+    return
 
   const sanitized = sanitizeDecimalInput(value, {
     maxIntegerLength: 12,
@@ -773,9 +792,8 @@ const normalizeVendorStatusPkp = (value: unknown): string => {
     'YA',
     'YES',
     'TRUE',
-  ].includes(normalized)) {
+  ].includes(normalized))
     return 'PKP'
-  }
 
   return 'NON_PKP'
 }
@@ -841,6 +859,7 @@ const closeItemDialog = (): void => {
   if (itemDialogSaved.value) {
     tempItems.value = []
     itemDialog.value = false
+
     return
   }
 
@@ -882,6 +901,7 @@ const saveItemsFromDialog = (): void => {
     })
 
     isSubmitted.value = true
+
     return
   }
 
@@ -907,14 +927,16 @@ const addTempItemRow = (): void => {
 }
 
 const removeTempItemRow = (index: number): void => {
-  if (tempItems.value.length <= 1) return
+  if (tempItems.value.length <= 1)
+    return
 
   tempItems.value.splice(index, 1)
 }
 
 const updateTempItemSubtotal = (index: number): void => {
   const item = tempItems.value[index]
-  if (!item) return
+  if (!item)
+    return
 
   const qty = Number(item.qty || 0)
   const hargaUnit = Number(item.harga_unit || 0)
@@ -930,7 +952,8 @@ const handleTempItemPriceInput = (event: Event, index: number): void => {
     emptyAsZero: true,
   })
 
-  if (!tempItems.value[index]) return
+  if (!tempItems.value[index])
+    return
 
   tempItems.value[index].harga_unit = result.numeric ?? 0
   updateTempItemSubtotal(index)
@@ -952,7 +975,8 @@ const handleTempItemPricePaste = (event: ClipboardEvent, index: number): void =>
     return
   }
 
-  if (!tempItems.value[index]) return
+  if (!tempItems.value[index])
+    return
 
   const target = event.target as HTMLInputElement
   const harga = Number(pastedText)
@@ -975,7 +999,8 @@ const triggerFileInput = (): void => {
 
 const handleFileUpload = async (event: Event): Promise<void> => {
   const input = event.target as HTMLInputElement
-  if (!input.files) return
+  if (!input.files)
+    return
 
   errors.lampiran_request = ''
 
@@ -1000,7 +1025,8 @@ const handleFileUpload = async (event: Event): Promise<void> => {
       existing => existing.name === file.name && existing.size === file.size,
     )
 
-    if (!exists) form.lampiran_requests.push(file)
+    if (!exists)
+      form.lampiran_requests.push(file)
   }
 
   if (invalidMessages.length) {
@@ -1028,7 +1054,8 @@ const formatFileSize = (bytes: number): string => {
 }
 
 const formatExistingFileSize = (bytes: number): string => {
-  if (!bytes) return '-'
+  if (!bytes)
+    return '-'
 
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`
 }
@@ -1041,7 +1068,8 @@ const getExistingFileType = (file: ExistingPrAttachment): string => {
   const type = String(file.mime_type || '').toLowerCase()
   const name = String(file.filename || '').toLowerCase()
 
-  if (type.includes('pdf') || name.endsWith('.pdf')) return 'PDF'
+  if (type.includes('pdf') || name.endsWith('.pdf'))
+    return 'PDF'
 
   return 'IMAGE'
 }
@@ -1077,18 +1105,16 @@ watch(
     if (
       !form.id_department
       || !selectedDepartment.value
-    ) {
+    )
       return
-    }
 
     /*
     |--------------------------------------------------------------------------
     | PR selain Department IT tidak menyimpan kategori
     |--------------------------------------------------------------------------
     */
-    if (!isITDepartment.value) {
+    if (!isITDepartment.value)
       form.kategori = null
-    }
   },
   {
     immediate: true,
@@ -1232,12 +1258,14 @@ const buildFormData = (): FormData => {
 }
 
 const updatePurchaseRequest = async (event?: Event): Promise<void> => {
-  if (isSaving.value) return
+  if (isSaving.value)
+    return
 
   isSubmitted.value = true
 
   const isValid = await validateForm()
-  if (!isValid) return
+  if (!isValid)
+    return
 
   const confirm = await showConfirmAlert({
     title: t('purchaseRequest.edit.toast.updateConfirmTitle'),
@@ -1246,7 +1274,8 @@ const updatePurchaseRequest = async (event?: Event): Promise<void> => {
     cancelButtonText: 'Batal',
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   isSaving.value = true
 
@@ -1254,12 +1283,13 @@ const updatePurchaseRequest = async (event?: Event): Promise<void> => {
     showLoadingAlert(t('purchaseRequest.edit.updatingData'), t('common.alert.pleaseWait'))
 
     const formData = buildFormData()
+
     formData.append('_method', 'PUT')
 
     const response = await axios.post(`/transaction/purchase-request/${publicId.value}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
-        Accept: 'application/json',
+        'Accept': 'application/json',
       },
     })
 
@@ -1269,7 +1299,8 @@ const updatePurchaseRequest = async (event?: Event): Promise<void> => {
       path: '/non_stock/purchase_request',
       query: { success: 'updated' },
     })
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     closeAlert()
 
     const err = error as AxiosErrorShape
@@ -1278,7 +1309,8 @@ const updatePurchaseRequest = async (event?: Event): Promise<void> => {
       title: t('common.alert.error'),
       text: err?.response?.data?.message || getApiErrorMessage(error, t('purchaseRequest.create.toast.updateFailed')),
     })
-  } finally {
+  }
+  finally {
     isSaving.value = false
   }
 }
@@ -1291,9 +1323,8 @@ const confirmCancel = async (): Promise<void> => {
     cancelButtonText: 'Tidak',
   })
 
-  if (confirm.isConfirmed) {
+  if (confirm.isConfirmed)
     await goBack()
-  }
 }
 
 const goBack = async (): Promise<void> => {
@@ -1317,32 +1348,34 @@ onMounted(async () => {
     ])
 
     await loadPurchaseRequestDetail()
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     loadError.value = getApiErrorMessage(error, 'Gagal memuat data Purchase Requisition.')
-  } finally {
+  }
+  finally {
     pageLoading.value = false
   }
 })
 </script>
 
 <template>
-    <!--
-      Alasan pengembaliannya, paling atas.
+  <!--
+    Alasan pengembaliannya, paling atas.
 
-      Hanya bagian "sedang berjalan" dari komponen riwayat: di form
-      edit yang dibutuhkan bukan riwayat, melainkan satu hal yang harus
-      diperbaiki sekarang.
-    -->
-    <RevisionHistory
-      v-if="revisiTerbuka"
-      :open-revision="revisiTerbuka"
-    />
+    Hanya bagian "sedang berjalan" dari komponen riwayat: di form
+    edit yang dibutuhkan bukan riwayat, melainkan satu hal yang harus
+    diperbaiki sekarang.
+  -->
+  <RevisionHistory
+    v-if="revisiTerbuka"
+    :open-revision="revisiTerbuka"
+  />
 
-    <VCard
-      v-if="pageLoading || isLoadingDetail"
-      class="mb-6 rounded-lg"
-      elevation="2"
-    >
+  <VCard
+    v-if="pageLoading || isLoadingDetail"
+    class="mb-6 rounded-lg"
+    elevation="2"
+  >
     <VCardText class="pa-6">
       <div class="d-flex align-center">
         <VProgressCircular
@@ -1411,8 +1444,8 @@ onMounted(async () => {
             variant="tonal"
             color="secondary"
             prepend-icon="tabler-arrow-left"
-            @click="goBack"
             class="text-none"
+            @click="goBack"
           >
             {{ t('purchaseRequest.edit.backButton') }}
           </VBtn>
@@ -1420,7 +1453,7 @@ onMounted(async () => {
       </div>
     </VCardText>
   </VCard>
-  
+
   <section v-else>
     <VRow>
       <VCol cols="12">
@@ -1439,8 +1472,8 @@ onMounted(async () => {
               prepend-icon="mdi-arrow-left"
               variant="text"
               color="secondary"
-              @click="goBack"
               class="text-none"
+              @click="goBack"
             >
               {{ t('purchaseRequest.edit.backButton') }}
             </VBtn>
@@ -1450,7 +1483,10 @@ onMounted(async () => {
 
           <VCardText>
             <VRow>
-              <VCol cols="12" md="4">
+              <VCol
+                cols="12"
+                md="4"
+              >
                 <AppDateTimePicker
                   v-model="form.tanggal_pr"
                   :label="t('purchaseRequest.create.fields.tanggalPr')"
@@ -1461,7 +1497,10 @@ onMounted(async () => {
                 />
               </VCol>
 
-              <VCol cols="12" md="4">
+              <VCol
+                cols="12"
+                md="4"
+              >
                 <VAutocomplete
                   v-model="form.cabang"
                   :label="t('purchaseRequest.create.fields.cabang')"
@@ -1505,7 +1544,10 @@ onMounted(async () => {
                 </VAutocomplete>
               </VCol>
 
-              <VCol cols="12" md="4">
+              <VCol
+                cols="12"
+                md="4"
+              >
                 <VAutocomplete
                   v-model="form.id_department"
                   :label="t('purchaseRequest.create.fields.department')"
@@ -1575,13 +1617,13 @@ onMounted(async () => {
                   }"
                   :error="
                     isSubmitted
-                    && isITDepartment
-                    && !form.kategori
+                      && isITDepartment
+                      && !form.kategori
                   "
                   :error-messages="
                     isSubmitted
-                    && isITDepartment
-                    && !form.kategori
+                      && isITDepartment
+                      && !form.kategori
                       ? [t('purchaseRequest.create.validation.kategori')]
                       : []
                   "
@@ -1590,7 +1632,10 @@ onMounted(async () => {
                 />
               </VCol>
 
-              <VCol cols="12" md="4">
+              <VCol
+                cols="12"
+                md="4"
+              >
                 <VAutocomplete
                   v-model="form.pr_type"
                   :label="t('purchaseRequest.create.fields.tipePr')"
@@ -1665,8 +1710,8 @@ onMounted(async () => {
                       variant="tonal"
                       size="small"
                       prepend-icon="tabler-list-details"
-                      @click="openItemFullscreen"
                       class="text-none"
+                      @click="openItemFullscreen"
                     >
                       {{ t('purchaseRequest.create.items.addButton') }}
                     </VBtn>
@@ -1676,8 +1721,8 @@ onMounted(async () => {
                       color="error"
                       variant="outlined"
                       size="small"
-                      @click="resetItems"
                       class="text-none"
+                      @click="resetItems"
                     >
                       {{ t('purchaseRequest.create.items.resetButton') }}
                     </VBtn>
@@ -1698,7 +1743,10 @@ onMounted(async () => {
                       {{ t('purchaseRequest.create.items.emptyAlert', { action: t('purchaseRequest.create.items.addButton') }) }}
                     </VAlert>
 
-                    <div v-else class="d-flex flex-column gap-3">
+                    <div
+                      v-else
+                      class="d-flex flex-column gap-3"
+                    >
                       <div
                         v-for="(item, index) in form.items"
                         :key="`summary-item-${index}`"
@@ -1725,8 +1773,8 @@ onMounted(async () => {
                               <strong>
                                 {{
                                   units.find(unit => Number(unit.id) === Number(item.satuan))?.nama
-                                  || item.satuan
-                                  || '-'
+                                    || item.satuan
+                                    || '-'
                                 }}
                               </strong>
                               <span class="mx-1">•</span>
@@ -1811,7 +1859,10 @@ onMounted(async () => {
                 <VDivider class="mb-4" />
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VAutocomplete
                   v-model="form.recommended_vendor_id"
                   :label="t('purchaseRequest.create.fields.vendorRecommended')"
@@ -1903,7 +1954,10 @@ onMounted(async () => {
                 </VAutocomplete>
               </VCol>
 
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VCard
                   flat
                   class="vendor-tax-card"
@@ -1961,150 +2015,150 @@ onMounted(async () => {
               </VCol>
 
               <!-- LAMPIRAN -->
-            <VCol cols="12">
-              <div class="mt-4">
-                <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-2">
-                  <div>
-                    <div class="text-subtitle-1 font-weight-bold">
-                      {{ t('purchaseRequest.create.attachment.title') }}
+              <VCol cols="12">
+                <div class="mt-4">
+                  <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-2">
+                    <div>
+                      <div class="text-subtitle-1 font-weight-bold">
+                        {{ t('purchaseRequest.create.attachment.title') }}
+                      </div>
+                      <div class="text-caption text-medium-emphasis">
+                        {{ t('purchaseRequest.edit.attachmentExistingHint') }}
+                      </div>
                     </div>
-                    <div class="text-caption text-medium-emphasis">
-                      {{ t('purchaseRequest.edit.attachmentExistingHint') }}
+
+                    <div class="d-flex gap-2">
+                      <input
+                        ref="fileRef"
+                        type="file"
+                        multiple
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        class="d-none"
+                        @change="handleFileUpload"
+                      >
+
+                      <VBtn
+                        type="button"
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                        class="text-none"
+                        @click="triggerFileInput"
+                      >
+                        + Tambah Lampiran
+                      </VBtn>
                     </div>
                   </div>
 
-                  <div class="d-flex gap-2">
-                    <input
-                      ref="fileRef"
-                      type="file"
-                      multiple
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      class="d-none"
-                      @change="handleFileUpload"
-                    />
+                  <VDivider class="mb-4" />
 
-                    <VBtn
-                      type="button"
-                      color="primary"
-                      variant="outlined"
-                      size="small"
-                      @click="triggerFileInput"
-                      class="text-none"
+                  <VAlert
+                    v-if="errors.lampiran_request"
+                    type="warning"
+                    variant="tonal"
+                    class="mb-4"
+                  >
+                    {{ errors.lampiran_request }}
+                  </VAlert>
+
+                  <VAlert
+                    v-if="!existingLampiranRequests.length && !form.lampiran_requests.length"
+                    type="info"
+                    variant="tonal"
+                  >
+                    {{ t('purchaseRequest.create.attachment.empty') }}
+                  </VAlert>
+
+                  <VList
+                    v-else
+                    density="comfortable"
+                    border
+                    rounded
+                  >
+                    <!-- Lampiran lama dari BE -->
+                    <VListItem
+                      v-for="(file, index) in existingLampiranRequests"
+                      :key="`existing-${file.id}-${index}`"
                     >
-                      + Tambah Lampiran
-                    </VBtn>
-                  </div>
+                      <template #prepend>
+                        <VIcon
+                          :icon="getExistingFileType(file) === 'PDF'
+                            ? 'mdi-file-pdf-box'
+                            : 'mdi-file-image-outline'"
+                          :color="getExistingFileType(file) === 'PDF' ? 'error' : 'primary'"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-body-2">
+                        <a
+                          :href="file.filepath"
+                          target="_blank"
+                          class="text-decoration-none"
+                        >
+                          {{ file.original_filename || file.filename || 'Lampiran lama' }}
+                        </a>
+                      </VListItemTitle>
+
+                      <VListItemSubtitle>
+                        {{ getExistingFileType(file) }}
+                        •
+                        {{ formatExistingFileSize(file.file_size) }}
+                        • File Lama
+                      </VListItemSubtitle>
+
+                      <template #append>
+                        <VBtn
+                          type="button"
+                          color="error"
+                          variant="text"
+                          size="small"
+                          @click="removeExistingLampiran(index)"
+                        >
+                          {{ t('purchaseRequest.create.attachment.deleteButton') }}
+                        </VBtn>
+                      </template>
+                    </VListItem>
+
+                    <!-- Lampiran baru dari FE -->
+                    <VListItem
+                      v-for="(file, index) in form.lampiran_requests"
+                      :key="`new-${file.name}-${file.size}-${index}`"
+                    >
+                      <template #prepend>
+                        <VIcon
+                          :icon="getFileType(file) === 'PDF'
+                            ? 'mdi-file-pdf-box'
+                            : 'mdi-file-image-outline'"
+                          :color="getFileType(file) === 'PDF' ? 'error' : 'primary'"
+                        />
+                      </template>
+
+                      <VListItemTitle class="text-body-2">
+                        {{ file.name }}
+                      </VListItemTitle>
+
+                      <VListItemSubtitle>
+                        {{ getFileType(file) }}
+                        •
+                        {{ formatFileSize(file.size) }}
+                        • File Baru
+                      </VListItemSubtitle>
+
+                      <template #append>
+                        <VBtn
+                          type="button"
+                          color="error"
+                          variant="text"
+                          size="small"
+                          @click="removeLampiran(index)"
+                        >
+                          {{ t('purchaseRequest.create.attachment.deleteButton') }}
+                        </VBtn>
+                      </template>
+                    </VListItem>
+                  </VList>
                 </div>
-
-                <VDivider class="mb-4" />
-
-                <VAlert
-                  v-if="errors.lampiran_request"
-                  type="warning"
-                  variant="tonal"
-                  class="mb-4"
-                >
-                  {{ errors.lampiran_request }}
-                </VAlert>
-
-                <VAlert
-                  v-if="!existingLampiranRequests.length && !form.lampiran_requests.length"
-                  type="info"
-                  variant="tonal"
-                >
-                  {{ t('purchaseRequest.create.attachment.empty') }}
-                </VAlert>
-
-                <VList
-                  v-else
-                  density="comfortable"
-                  border
-                  rounded
-                >
-                  <!-- Lampiran lama dari BE -->
-                  <VListItem
-                    v-for="(file, index) in existingLampiranRequests"
-                    :key="`existing-${file.id}-${index}`"
-                  >
-                    <template #prepend>
-                      <VIcon
-                        :icon="getExistingFileType(file) === 'PDF'
-                          ? 'mdi-file-pdf-box'
-                          : 'mdi-file-image-outline'"
-                        :color="getExistingFileType(file) === 'PDF' ? 'error' : 'primary'"
-                      />
-                    </template>
-
-                    <VListItemTitle class="text-body-2">
-                      <a
-                        :href="file.filepath"
-                        target="_blank"
-                        class="text-decoration-none"
-                      >
-                        {{ file.original_filename || file.filename || 'Lampiran lama' }}
-                      </a>
-                    </VListItemTitle>
-
-                    <VListItemSubtitle>
-                      {{ getExistingFileType(file) }}
-                      •
-                      {{ formatExistingFileSize(file.file_size) }}
-                      • File Lama
-                    </VListItemSubtitle>
-
-                    <template #append>
-                      <VBtn
-                        type="button"
-                        color="error"
-                        variant="text"
-                        size="small"
-                        @click="removeExistingLampiran(index)"
-                      >
-                        {{ t('purchaseRequest.create.attachment.deleteButton') }}
-                      </VBtn>
-                    </template>
-                  </VListItem>
-
-                  <!-- Lampiran baru dari FE -->
-                  <VListItem
-                    v-for="(file, index) in form.lampiran_requests"
-                    :key="`new-${file.name}-${file.size}-${index}`"
-                  >
-                    <template #prepend>
-                      <VIcon
-                        :icon="getFileType(file) === 'PDF'
-                          ? 'mdi-file-pdf-box'
-                          : 'mdi-file-image-outline'"
-                        :color="getFileType(file) === 'PDF' ? 'error' : 'primary'"
-                      />
-                    </template>
-
-                    <VListItemTitle class="text-body-2">
-                      {{ file.name }}
-                    </VListItemTitle>
-
-                    <VListItemSubtitle>
-                      {{ getFileType(file) }}
-                      •
-                      {{ formatFileSize(file.size) }}
-                      • File Baru
-                    </VListItemSubtitle>
-
-                    <template #append>
-                      <VBtn
-                        type="button"
-                        color="error"
-                        variant="text"
-                        size="small"
-                        @click="removeLampiran(index)"
-                      >
-                        {{ t('purchaseRequest.create.attachment.deleteButton') }}
-                      </VBtn>
-                    </template>
-                  </VListItem>
-                </VList>
-              </div>
-            </VCol>
+              </VCol>
 
               <VCol cols="12">
                 <VTextarea
@@ -2124,8 +2178,8 @@ onMounted(async () => {
                 type="button"
                 color="secondary"
                 variant="outlined"
-                @click.prevent.stop="confirmCancel"
                 class="text-none"
+                @click.prevent.stop="confirmCancel"
               >
                 {{ t('purchaseRequest.create.buttons.cancel') }}
               </VBtn>
@@ -2134,8 +2188,8 @@ onMounted(async () => {
                 type="button"
                 color="primary"
                 :loading="isSaving"
-                @click.prevent.stop="updatePurchaseRequest($event)"
                 class="text-none"
+                @click.prevent.stop="updatePurchaseRequest($event)"
               >
                 {{ t('purchaseRequest.create.buttons.save') }}
               </VBtn>
@@ -2179,14 +2233,30 @@ onMounted(async () => {
             <VTable class="item-fullscreen-table">
               <thead>
                 <tr>
-                  <th class="col-no">{{ t('purchaseRequest.create.itemDialog.tableNo') }}</th>
-                  <th class="col-name">{{ t('purchaseRequest.create.itemDialog.tableNamaItem') }}</th>
-                  <th class="col-qty">{{ t('purchaseRequest.create.itemDialog.tableQty') }}</th>
-                  <th class="col-unit">{{ t('purchaseRequest.create.itemDialog.tableSatuan') }}</th>
-                  <th class="col-price">{{ t('purchaseRequest.create.itemDialog.tableHargaSatuan') }}</th>
-                  <th class="col-subtotal">{{ t('purchaseRequest.create.itemDialog.tableSubtotal') }}</th>
-                  <th class="col-note">{{ t('purchaseRequest.create.itemDialog.tableKeterangan') }}</th>
-                  <th class="col-action text-center">{{ t('purchaseRequest.create.itemDialog.tableAksi') }}</th>
+                  <th class="col-no">
+                    {{ t('purchaseRequest.create.itemDialog.tableNo') }}
+                  </th>
+                  <th class="col-name">
+                    {{ t('purchaseRequest.create.itemDialog.tableNamaItem') }}
+                  </th>
+                  <th class="col-qty">
+                    {{ t('purchaseRequest.create.itemDialog.tableQty') }}
+                  </th>
+                  <th class="col-unit">
+                    {{ t('purchaseRequest.create.itemDialog.tableSatuan') }}
+                  </th>
+                  <th class="col-price">
+                    {{ t('purchaseRequest.create.itemDialog.tableHargaSatuan') }}
+                  </th>
+                  <th class="col-subtotal">
+                    {{ t('purchaseRequest.create.itemDialog.tableSubtotal') }}
+                  </th>
+                  <th class="col-note">
+                    {{ t('purchaseRequest.create.itemDialog.tableKeterangan') }}
+                  </th>
+                  <th class="col-action text-center">
+                    {{ t('purchaseRequest.create.itemDialog.tableAksi') }}
+                  </th>
                 </tr>
               </thead>
 
@@ -2662,5 +2732,4 @@ onMounted(async () => {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-
 </style>

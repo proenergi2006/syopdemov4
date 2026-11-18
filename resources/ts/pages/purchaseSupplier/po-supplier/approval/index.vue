@@ -1,34 +1,36 @@
 <script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from '@axios'
-import { ref, computed, onMounted, watch } from 'vue'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import {
+  closeAlert,
   showConfirmAlert,
   showErrorAlert,
   showLoadingAlert,
   showSuccessAlert,
   showWarningAlert,
-  closeAlert,
 } from '@/utils/alert'
-import { useRouter } from 'vue-router'
 import { usePermissionStore } from '@/stores/permission'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 const permissionStore = usePermissionStore()
 const isCheckingPermission = ref(true)
 
-const canApprovePO= computed(() => {
+const canApprovePO = computed(() => {
   return permissionStore.can('purchase_order_trade.approve')
 })
 
 const router = useRouter()
+
 const onEdit = (item: any) => {
   router.push({
-  path: '/purchaseSupplier/po-supplier/add',
-  query: { id: item }
-})
+    path: '/purchaseSupplier/po-supplier/add',
+    query: { id: item },
+  })
 }
 
-type InventoryPO = {
+interface InventoryPO {
   id_master: number
   nomor_po: string
   tanggal_inven: string
@@ -37,26 +39,25 @@ type InventoryPO = {
   harga_po: number
   disposisi_po?: number
   status_label?: string
-  cfo_result: 0,
-  cfo_pic: '',
-  cfo_tanggal: '',
-  cfo_summary: '',
-  revert_cfo: '',
-  revert_cfo_summary: '',
-  ceo_result: 0,
-  ceo_pic: '',
-  ceo_tanggal: '',
-  is_resubmission:number,
-  resubmission_count:number,
-    total_bl: number,
-  total_ri: number,
-  is_close: number,
-  volume_close: number,
-
+  cfo_result: 0
+  cfo_pic: ''
+  cfo_tanggal: ''
+  cfo_summary: ''
+  revert_cfo: ''
+  revert_cfo_summary: ''
+  ceo_result: 0
+  ceo_pic: ''
+  ceo_tanggal: ''
+  is_resubmission: number
+  resubmission_count: number
+  total_bl: number
+  total_ri: number
+  is_close: number
+  volume_close: number
 
   vendor?: { nama_vendor: string }
-  produk?: { merk_dagang: string, jenis_produk: string }
-  terminal?: { nama_terminal: string, lokasi_terminal:string }
+  produk?: { merk_dagang: string; jenis_produk: string }
+  terminal?: { nama_terminal: string; lokasi_terminal: string }
 }
 
 // STATE
@@ -79,14 +80,18 @@ const search = ref({
 const paginationData = computed(() => {
   const start = (currentPage.value - 1) * rowPerPage.value + 1
   const end = Math.min(currentPage.value * rowPerPage.value, totalData.value)
+
   return `${start}-${end} of ${totalData.value}`
 })
 
 // FORMAT DATE
 const formatDate = (date: string) => {
-  if (!date) return '-'
+  if (!date)
+    return '-'
+
   return new Date(date).toLocaleDateString('id-ID')
 }
+
 const getProfile = async () => {
   try {
     const res = await axios.get('/auth/me')
@@ -94,15 +99,21 @@ const getProfile = async () => {
     userRoles.value = res.data.data.role
 
     // console.log('ROLE:', res.data.role)
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err)
   }
 }
+
 const canApprove = (item: any) => {
-  if (userRoles.value.includes('CFO') && item.disposisi_po === 1) return true
-  if (userRoles.value.includes('CEO') && item.disposisi_po === 2) return true
+  if (userRoles.value.includes('CFO') && item.disposisi_po === 1)
+    return true
+  if (userRoles.value.includes('CEO') && item.disposisi_po === 2)
+    return true
+
   return false
 }
+
 // FETCH DATA
 const getData = async () => {
   try {
@@ -114,26 +125,25 @@ const getData = async () => {
         per_page: rowPerPage.value,
         search: search.value.search,
         status: search.value.status,
-        approval: 1
+        approval: 1,
       },
     })
 
     rows.value = res.data?.data ?? []
     totalData.value = res.data?.total ?? 0
     totalPage.value = res.data?.last_page ?? 1
-
-  } catch (err) {
+  }
+  catch (err) {
     console.error('FETCH ERROR:', err)
     rows.value = []
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
-
 const vendorList = ref<any[]>([])
 const terminalList = ref<any[]>([])
-
 
 const getVendor = async (): Promise<void> => {
   try {
@@ -146,7 +156,8 @@ const getVendor = async (): Promise<void> => {
         : []
 
     vendorList.value = data
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     vendorList.value = []
 
     await showErrorAlert({
@@ -158,6 +169,7 @@ const getVendor = async (): Promise<void> => {
 
 const getTerminal = async () => {
   const res = await axios.get('/terminal')
+
   terminalList.value = res.data.map((p: any) => ({
     id: p.id,
     nama_terminal: p.nama_terminal,
@@ -166,7 +178,7 @@ const getTerminal = async () => {
 }
 
 const formatNumber = (value: number) => {
-  return new Intl.NumberFormat('id-ID', {
+  return new Intl.NumberFormat(LOCALE_ANGKA, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 20,
   }).format(value)
@@ -174,6 +186,7 @@ const formatNumber = (value: number) => {
 
 const goToEdit = (public_id: number): void => {
   router.push(`/purchaseSupplier/po-supplier/approval/${public_id}`)
+
   // router.push({
   // path: `/purchaseSupplier/po-supplier/approve/${po_number}`,
   // query: {
@@ -181,6 +194,7 @@ const goToEdit = (public_id: number): void => {
   // }
 // })
 }
+
 const getRowClass = (item: any) => {
   // CFO role
   // if (userRoles.value.includes('CFO') && item.disposisi_po === 1 && item.cfo_result === 0) {
@@ -193,18 +207,16 @@ const getRowClass = (item: any) => {
   // }
 
   const isCFO = ['CFO', 'Chief Financial Officer']
-    .some(role =>userRoles.value.includes(role))
+    .some(role => userRoles.value.includes(role))
 
   const isCEO = ['CEO', 'Chief Executive Officer']
     .some(role => userRoles.value.includes(role))
 
-  if (isCFO && item.disposisi_po === 1 && item.cfo_result === 0) {
+  if (isCFO && item.disposisi_po === 1 && item.cfo_result === 0)
     return 'bg-grey-100'
-  }
 
-  if (isCEO && item.disposisi_po === 2 && item.ceo_result === 0) {
+  if (isCEO && item.disposisi_po === 2 && item.ceo_result === 0)
     return 'bg-grey-100'
-  }
 
   return ''
 }
@@ -213,7 +225,8 @@ const refreshTable = async () => {
   loading.value = true
   try {
     await getData()
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -232,9 +245,8 @@ watch(
   async () => {
     await getData()
   },
-  { deep: true }
+  { deep: true },
 )
-
 
 // kalau per page berubah
 // watch(rowPerPage, () => {
@@ -261,6 +273,7 @@ const chipColor: Record<number, string> = {
   4: 'success',
   5: 'error',
 }
+
 const statusItems = [
   { title: 'Semua', value: '' },
   { title: 'Pending CFO', value: '1' },
@@ -268,26 +281,33 @@ const statusItems = [
   { title: 'Approved', value: '4' },
   { title: 'Reject CEO', value: '5' },
 ]
-
 </script>
+
 <template>
   <section>
     <!-- Filters -->
-    
 
     <VCard class="mb-4 pa-4">
-      <h3 class="mb-3">PENCARIAN</h3>
+      <h3 class="mb-3">
+        PENCARIAN
+      </h3>
 
       <VRow>
-        <VCol cols="12" md="6">
+        <VCol
+          cols="12"
+          md="6"
+        >
           <VTextField
             v-model="search.search"
             label="Kata Kunci"
             density="comfortable"
           />
         </VCol>
-      
-        <VCol cols="12" sm="3">
+
+        <VCol
+          cols="12"
+          sm="3"
+        >
           <VSelect
             v-model="search.status"
             label="Status"
@@ -299,16 +319,18 @@ const statusItems = [
         </VCol>
       </VRow>
 
-      <!-- <div class="d-flex gap-2 mt-4">
+      <!--
+        <div class="d-flex gap-2 mt-4">
         <VBtn color="info">
-          Cari
+        Cari
         </VBtn>
-      </div> -->
+        </div>
+      -->
     </VCard>
     <!-- Table -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
-      <VTooltip location="bottom">
+        <VTooltip location="bottom">
           <template #activator="{ props }">
             <VBtn
               v-bind="props"
@@ -324,27 +346,31 @@ const statusItems = [
         </VTooltip>
         <VSpacer />
 
-        <VChip v-if="loading" size="small" variant="tonal">
+        <VChip
+          v-if="loading"
+          size="small"
+          variant="tonal"
+        >
           Loading...
         </VChip>
       </VCardText>
 
       <VDivider />
 
-      <VTable >
+      <VTable>
         <thead>
-         <tr>
-           <th>No </th>
-           <th>Nomor PO</th>
-           <th>Tanggal</th>
-           <th>Vendor / Terminal</th>
-           <th>Produk</th>
-           <th>Volume</th>
-           <th>Harga Tebus</th>
-           <th>Disposisi</th>
-           <th>Aksi</th>
-         </tr>
-       </thead>
+          <tr>
+            <th>No </th>
+            <th>Nomor PO</th>
+            <th>Tanggal</th>
+            <th>Vendor / Terminal</th>
+            <th>Produk</th>
+            <th>Volume</th>
+            <th>Harga Tebus</th>
+            <th>Disposisi</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
         <tbody>
           <tr
             v-for="(v, index) in rows"
@@ -355,38 +381,42 @@ const statusItems = [
               {{ (currentPage - 1) * rowPerPage + index + 1 }}
             </td>
 
-            <td class="text-no-wrap">{{ v.nomor_po || '-' }}
+            <td class="text-no-wrap">
+              {{ v.nomor_po || '-' }}
               <br>
-                <VChip v-if="v.is_resubmission == 1"
-                  size="small"
-                  color="warning"
-                  class="mb-0"
-                >
-                   Pengajuan ulang ke - {{ v.resubmission_count }}
-                </VChip>
+              <VChip
+                v-if="v.is_resubmission == 1"
+                size="small"
+                color="warning"
+                class="mb-0"
+              >
+                Pengajuan ulang ke - {{ v.resubmission_count }}
+              </VChip>
 
-                  <VChip v-if="v.is_close == 1"
-                    size="small"
-                    color="error"
-                    class="mb-0"
-                  >
-                     Close PO : Rp {{ formatNumber(v.volume_close) }}
-                  </VChip>
-
+              <VChip
+                v-if="v.is_close == 1"
+                size="small"
+                color="error"
+                class="mb-0"
+              >
+                Close PO : Rp {{ formatNumber(v.volume_close) }}
+              </VChip>
             </td>
 
             <td>{{ formatDate(v.tanggal_inven) }}</td>
 
-            <td> 
+            <td>
               <div><strong>{{ v.vendor?.nama_vendor || '-' }}</strong></div>
               <div class="text-caption text-grey">
-                {{ v.terminal?.nama_terminal+' - '+ v.terminal?.lokasi_terminal|| '-' }}
+                {{ `${v.terminal?.nama_terminal} - ${v.terminal?.lokasi_terminal}` || '-' }}
               </div>
             </td>
 
-            <td class="text-no-wrap">{{ v.produk?.jenis_produk +' - '+v.produk?.merk_dagang  || '-' }}</td>
+            <td class="text-no-wrap">
+              {{ `${v.produk?.jenis_produk} - ${v.produk?.merk_dagang}` || '-' }}
+            </td>
 
-             <td class="text-end text-no-wrap">
+            <td class="text-end text-no-wrap">
               PO : {{ formatNumber(v.volume_po ?? 0) }}
               <br>
               BL : {{ formatNumber(v.total_bl ?? 0) }}
@@ -394,38 +424,58 @@ const statusItems = [
               RI : {{ formatNumber(v.total_ri ?? 0) }}
             </td>
 
-            <td class="text-right text-no-wrap">PO: {{ formatNumber(v.harga_po) }}
+            <td class="text-right text-no-wrap">
+              PO: {{ formatNumber(v.harga_po) }}
               <br> RI: {{ formatNumber(v.harga_tebus) }}
             </td>
 
             <td>
-              <VChip size="small"  :color="chipColor[v.disposisi_po??0]">
-               {{ getStatusLabel(v.disposisi_po) }}
+              <VChip
+                size="small"
+                :color="chipColor[v.disposisi_po ?? 0]"
+              >
+                {{ getStatusLabel(v.disposisi_po) }}
               </VChip>
             </td>
 
-              <td class="text-center" style="width: 5rem;">
-                <VBtn v-if="canApprovePO" size="34" class="mr-1" variant="tonal" color="primary" @click="goToEdit(v.id_master)">
-                  <VIcon icon="ri-information-2-line"/>
-                </VBtn>
-              </td>
+            <td
+              class="text-center"
+              style="width: 5rem;"
+            >
+              <VBtn
+                v-if="canApprovePO"
+                size="34"
+                class="mr-1"
+                variant="tonal"
+                color="primary"
+                @click="goToEdit(v.id_master)"
+              >
+                <VIcon icon="ri-information-2-line" />
+              </VBtn>
+            </td>
           </tr>
         </tbody>
 
-       <tfoot v-if="!rows.length && !loading">
-        <tr>
-          <td colspan="9" class="text-center">
-            No data available
-          </td>
-        </tr>
-      </tfoot>
+        <tfoot v-if="!rows.length && !loading">
+          <tr>
+            <td
+              colspan="9"
+              class="text-center"
+            >
+              No data available
+            </td>
+          </tr>
+        </tfoot>
       </VTable>
 
       <VDivider />
 
       <!-- Footer pagination -->
       <VCardText class="d-flex align-center flex-wrap justify-end gap-4 pa-2">
-        <div class="d-flex align-center me-3" style="width: 220px;">
+        <div
+          class="d-flex align-center me-3"
+          style="width: 220px;"
+        >
           <span class="text-no-wrap me-3">Rows per page:</span>
 
           <VSelect
@@ -453,6 +503,7 @@ const statusItems = [
     </VCard>
   </section>
 </template>
+
 <style>
 .row-pending {
   background-color: #f5f5f5 !important;

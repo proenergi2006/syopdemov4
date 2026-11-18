@@ -118,3 +118,56 @@ if (!function_exists('terbilang_inggris')) {
         return '';
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Format angka -- satu tempat untuk seluruh keluaran PHP
+|--------------------------------------------------------------------------
+| Pemisah ribuan koma, pemisah desimal titik: 1,250,000.75
+|
+| Pasangannya di sisi layar adalah resources/ts/utils/numberFormatter.ts.
+| Keduanya harus menulis angka yang sama persis: orang yang mencetak sebuah
+| dokumen sedang mencocokkannya dengan yang baru saja dilihatnya di layar,
+| dan dua cara menulis angka membuat pencocokan itu gagal tanpa sebab.
+|
+| Bila formatnya berubah lagi, yang diubah cukup dua tetapan di bawah.
+|--------------------------------------------------------------------------
+*/
+
+if (!defined('ANGKA_PEMISAH_RIBUAN')) {
+    define('ANGKA_PEMISAH_RIBUAN', ',');
+    define('ANGKA_PEMISAH_DESIMAL', '.');
+}
+
+if (!function_exists('angka')) {
+
+    /**
+     * Angka tanpa lambang mata uang: 1,250,000.75
+     */
+    function angka($nilai, int $desimal = 0): string
+    {
+        return number_format(
+            (float) ($nilai ?? 0),
+            $desimal,
+            ANGKA_PEMISAH_DESIMAL,
+            ANGKA_PEMISAH_RIBUAN
+        );
+    }
+}
+
+if (!function_exists('rupiah')) {
+
+    /**
+     * Nominal uang beserta lambangnya: Rp 1,250,000
+     *
+     * Tanda minus ditulis sebelum lambangnya ("-Rp 50,000"), bukan di antara
+     * lambang dan angkanya, supaya terbacanya tetap satu nominal utuh.
+     */
+    function rupiah($nilai, int $desimal = 0): string
+    {
+        $angka = (float) ($nilai ?? 0);
+        $tanda = $angka < 0 ? '-' : '';
+
+        return $tanda . 'Rp ' . angka(abs($angka), $desimal);
+    }
+}

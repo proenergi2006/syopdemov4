@@ -6,6 +6,7 @@ import axios from '@axios'
 import { getApiErrorMessage } from '@/utils/apiHelper'
 import { showConfirmAlert, showErrorToast, showSuccessToast } from '@/utils/alert'
 import { usePermissionStore } from '@/stores/permission'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 /*
 |--------------------------------------------------------------------------
@@ -103,13 +104,13 @@ const statusLabel = computed(() => {
 })
 
 const formatNumber = (value: number | null | undefined): string =>
-  new Intl.NumberFormat('id-ID').format(Number(value ?? 0))
+  new Intl.NumberFormat(LOCALE_ANGKA).format(Number(value ?? 0))
 
 const formatMinutes = (value: number | null | undefined): string => {
   if (value === null || value === undefined)
     return '—'
 
-  return `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(value)} ${t('queueHealth.units.minutes')}`
+  return `${new Intl.NumberFormat(LOCALE_ANGKA, { maximumFractionDigits: 1 }).format(value)} ${t('queueHealth.units.minutes')}`
 }
 
 const formatDateTime = (value: string | null | undefined): string => {

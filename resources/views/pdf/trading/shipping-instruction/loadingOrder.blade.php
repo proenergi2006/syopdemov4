@@ -483,7 +483,7 @@
 
                 <td class="b3 b4" style="text-align: right;">
                     {{ !empty($data->bl_lo_jumlah)
-                        ? number_format((float) $data->bl_lo_jumlah, 0, '', '.')
+                        ? angka($data->bl_lo_jumlah, 0)
                         : '' }}
                 </td>
 
@@ -495,7 +495,7 @@
             <tr>
                 <td class="b3 b4" style="text-align: right;">
                     {{ !empty($data->bl_lc_jumlah)
-                        ? number_format((float) $data->bl_lc_jumlah, 0, '', '.')
+                        ? angka($data->bl_lc_jumlah, 0)
                         : '' }}
                 </td>
 
@@ -507,7 +507,7 @@
             <tr>
                 <td class="b3 b4" style="text-align: right;">
                     {{ !empty($data->bl_mt_jumlah)
-                        ? number_format((float) $data->bl_mt_jumlah, 0, '', '.')
+                        ? angka($data->bl_mt_jumlah, 0)
                         : '' }}
                 </td>
 

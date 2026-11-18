@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import axios from '@axios'
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { tglIndo, formatRangeDate } from '@/utils/dateFormatter'
+import axios from '@axios'
+import { formatRangeDate, tglIndo } from '@/utils/dateFormatter'
 import {
+  closeAlert,
   showConfirmAlert,
   showErrorAlert,
   showLoadingAlert,
   showSuccessAlert,
   showWarningAlert,
-  closeAlert,
 } from '@/utils/alert'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -31,15 +33,14 @@ const data = ref<any>({
 // ======================
 const fetchDetail = async () => {
   try {
-
     const res = await axios.get(
-      `/inventory/shipping-instruction/${route.params.id}`
+      `/inventory/shipping-instruction/${route.params.id}`,
     )
 
-    data.value = res.data 
+    data.value = res.data
     data.value.items = res.data.po_supplier ?? []
-
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Failed fetch detail:', err)
   }
 }
@@ -83,31 +84,37 @@ const currentStatus = computed(() => {
       }
   }
 })
+
 const canPrint = computed(() => {
   return data.value.status === 3
 })
 
-
-
 // ======================
 // FORMAT NUMBER
 // ======================
-const formatNumber = (val: number | string |any) => {
-  return new Intl.NumberFormat('id-ID').format(val)
+const formatNumber = (val: number | string | any) => {
+  return new Intl.NumberFormat(LOCALE_ANGKA).format(val)
 }
+
 const cetak = async (tipe: string) => {
-try {
+  try {
     showLoadingAlert(`Memuat data cetak ${tipe}`, 'Mohon menunggu')
-    const response = await axios.get(`/inventory/shipping-instruction/print/${route.params.id}?tipe=${tipe}`, { responseType: 'blob' });
-    const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+
+    const response = await axios.get(`/inventory/shipping-instruction/print/${route.params.id}?tipe=${tipe}`, { responseType: 'blob' })
+    const fileURL = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+
     window.open(fileURL)
-}catch (error) {
-    console.error(error);
-  }finally {
+  }
+  catch (error) {
+    console.error(error)
+  }
+  finally {
     closeAlert()
   }
 }
+
 const userRoles = ref<string[]>([])
+
 const getProfile = async () => {
   try {
     const res = await axios.get('/auth/me')
@@ -115,10 +122,12 @@ const getProfile = async () => {
     userRoles.value = res.data.role
 
     // console.log('ROLE:', res)
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err)
   }
 }
+
 const canApprove = computed(() => {
   if (
     userRoles.value.includes('Logistic Manager')
@@ -137,11 +146,14 @@ const canApprove = computed(() => {
 
   return false
 })
+
 const loadingApprove = ref(false)
+
 const approvalForm = ref({
   status: 'APPROVED',
   note: '',
 })
+
 const submitApproval = async () => {
   try {
     loadingApprove.value = true
@@ -149,21 +161,23 @@ const submitApproval = async () => {
     await axios.post(
       `/inventory/shipping-instruction/${route.params.id}/approve`,
       {
-      status: approvalForm.value.status,
-      note: approvalForm.value.note,
-      role: userRoles.value
-    }
+        status: approvalForm.value.status,
+        note: approvalForm.value.note,
+        role: userRoles.value,
+      },
     )
 
     await fetchDetail()
-alert()
-  } catch (err: any) {
-alert('gagl')
-
-  } finally {
+    alert()
+  }
+  catch (err: any) {
+    alert('gagl')
+  }
+  finally {
     loadingApprove.value = false
   }
 }
+
 // ======================
 // INIT
 // ======================
@@ -172,15 +186,13 @@ onMounted(() => {
   getProfile()
 })
 </script>
+
 <template>
   <VContainer fluid>
-
     <!-- HEADER -->
     <VCard class="mb-4">
       <VCardText>
-
         <div class="d-flex justify-space-between align-center">
-
           <div>
             <div class="text-overline">
               SHIPPING INSTRUCTION
@@ -195,105 +207,102 @@ onMounted(() => {
             </div>
           </div>
 
-           <div class="d-flex align-center ga-2">
-
-             <VBtn
-                variant="tonal" color="secondary"  @click="router.back()"
-                class="mr-2"
-              >
-                Kembali
+          <div class="d-flex align-center ga-2">
+            <VBtn
+              variant="tonal"
+              color="secondary"
+              class="mr-2"
+              @click="router.back()"
+            >
+              Kembali
             </VBtn>
-             <VMenu v-if="canPrint">
+            <VMenu v-if="canPrint">
               <template #activator="{ props }">
-                  <VBtn
+                <VBtn
                   color="success"
                   prepend-icon="tabler-printer"
                   v-bind="props"
-                  >
+                >
                   Cetak Dokumen
-                  </VBtn>
+                </VBtn>
               </template>
-  
+
               <VList>
-  
-                  <VListItem @click="cetak('shipping_request')">
+                <VListItem @click="cetak('shipping_request')">
                   <VListItemTitle>
-                      Shipping Request
+                    Shipping Request
                   </VListItemTitle>
-                  </VListItem>
-  
-                  <VListItem @click="cetak('shipping_instruction')">
+                </VListItem>
+
+                <VListItem @click="cetak('shipping_instruction')">
                   <VListItemTitle>
-                      Shipping Instruction
+                    Shipping Instruction
                   </VListItemTitle>
-                  </VListItem>
-  
-                  <VListItem @click="cetak('LO')">
+                </VListItem>
+
+                <VListItem @click="cetak('LO')">
                   <VListItemTitle>
-                      LO
+                    LO
                   </VListItemTitle>
-                  </VListItem>
-  
-                  <VListItem @click="cetak('spal')">
+                </VListItem>
+
+                <VListItem @click="cetak('spal')">
                   <VListItemTitle>
-                      SPAL
+                    SPAL
                   </VListItemTitle>
-                  </VListItem>
-  
+                </VListItem>
               </VList>
             </VMenu>
-           </div>
+          </div>
         </div>
-
       </VCardText>
     </VCard>
 
     <!-- SUMMARY -->
 
-
     <!-- DETAIL -->
     <VRow>
-
       <VCol md="8">
-     <!-- <VRow class="mb-4">
+        <!--
+          <VRow class="mb-4">
 
-      <VCol md="4">
-        <VCard>
+          <VCol md="4">
+          <VCard>
           <VCardText>
-            <div class="text-caption">Vessel</div>
-            <div class="font-weight-bold">
-              {{ data.vessel_name }}
-            </div>
+          <div class="text-caption">Vessel</div>
+          <div class="font-weight-bold">
+          {{ data.vessel_name }}
+          </div>
           </VCardText>
-        </VCard>
-      </VCol>
+          </VCard>
+          </VCol>
 
-      <VCol md="4">
-        <VCard>
+          <VCol md="4">
+          <VCard>
           <VCardText>
-            <div class="text-caption">Lead Time</div>
-            <div class="font-weight-bold">
-              {{ data.leadtime }} Hari
-            </div>
+          <div class="text-caption">Lead Time</div>
+          <div class="font-weight-bold">
+          {{ data.leadtime }} Hari
+          </div>
           </VCardText>
-        </VCard>
-      </VCol>
+          </VCard>
+          </VCol>
 
-      <VCol md="4">
-        <VCard>
+          <VCol md="4">
+          <VCard>
           <VCardText>
-            <div class="text-caption">Biaya Demurrage</div>
-            <div class="font-weight-bold">
-              Rp {{ formatNumber(data.demurrage) }}
-            </div>
+          <div class="text-caption">Biaya Demurrage</div>
+          <div class="font-weight-bold">
+          Rp {{ formatNumber(data.demurrage) }}
+          </div>
           </VCardText>
-        </VCard>
-      </VCol>
+          </VCard>
+          </VCol>
 
-    </VRow> -->
+          </VRow>
+        -->
 
         <VCard>
-
           <VCardItem title="Detail Information">
             <template #prepend>
               <VIcon icon="tabler-ship" />
@@ -303,278 +312,311 @@ onMounted(() => {
           <VDivider />
 
           <VCardText>
-
             <VRow>
-
               <VCol md="6">
-                <div class="label">Request Date</div>
-                <div class="value">{{ tglIndo(data.created_at) }}</div>
-              </VCol>
-
-              <VCol md="6">
-                <div class="label">Shipping Line</div>
-                <div class="value">{{ data.transportir.nama_suplier }}</div>
-              </VCol>
-
-              <VCol md="6">
-                <div class="label">Loading Port</div>
-                <div class="value">{{ data.load_port.nama_terminal }}</div>
-              </VCol>
-
-              <VCol md="6">
-                <div class="label">Discharging Port</div>
-                <div class="value">{{ data.discharge_port.nama_terminal }}</div>
-              </VCol>
-
-              <VCol md="6">
-                <div class="label">Laycan</div>
-                <div>
-                {{ formatRangeDate(data.etl_date_first, data.etl_date_last) }}
+                <div class="label">
+                  Request Date
+                </div>
+                <div class="value">
+                  {{ tglIndo(data.created_at) }}
                 </div>
               </VCol>
 
               <VCol md="6">
-                <div class="label">Loss Tolerance</div>
+                <div class="label">
+                  Shipping Line
+                </div>
+                <div class="value">
+                  {{ data.transportir.nama_suplier }}
+                </div>
+              </VCol>
+
+              <VCol md="6">
+                <div class="label">
+                  Loading Port
+                </div>
+                <div class="value">
+                  {{ data.load_port.nama_terminal }}
+                </div>
+              </VCol>
+
+              <VCol md="6">
+                <div class="label">
+                  Discharging Port
+                </div>
+                <div class="value">
+                  {{ data.discharge_port.nama_terminal }}
+                </div>
+              </VCol>
+
+              <VCol md="6">
+                <div class="label">
+                  Laycan
+                </div>
+                <div>
+                  {{ formatRangeDate(data.etl_date_first, data.etl_date_last) }}
+                </div>
+              </VCol>
+
+              <VCol md="6">
+                <div class="label">
+                  Loss Tolerance
+                </div>
                 <div class="value">
                   {{ data.losstype }}
                   {{ data.loss_tolerance }}%
-                ({{ data.satuan }})
+                  ({{ data.satuan }})
                 </div>
               </VCol>
 
               <VCol md="6">
-                <div class="label">Shipper</div>
-                <div class="value">{{ data.shipper }}</div>
+                <div class="label">
+                  Shipper
+                </div>
+                <div class="value">
+                  {{ data.shipper }}
+                </div>
               </VCol>
 
               <VCol md="6">
-                <div class="label">Consignee</div>
-                <div class="value">{{ data.consignee }}</div>
+                <div class="label">
+                  Consignee
+                </div>
+                <div class="value">
+                  {{ data.consignee }}
+                </div>
               </VCol>
               <VCol md="6">
-                <div class="label">Vessel</div>
-                <div class="value">{{ data.vessel.tipe_kapal }} {{ data.vessel.nama_kapal }}</div>
-              </VCol>
-             
-
-              <VCol md="6" v-if="data.id_vessel_tb">
-                <div class="label">Vessel (TB)</div>
-                <div class="value">{{ data.vessel_tb.tipe_kapal }} {{ data.vessel_tb.nama_kapal }}</div>
-              </VCol>
-               <VCol md="6">
-                <div class="label">Lead Time</div>
-                <div class="value">{{ data.leadtime }} Days</div>
+                <div class="label">
+                  Vessel
+                </div>
+                <div class="value">
+                  {{ data.vessel.tipe_kapal }} {{ data.vessel.nama_kapal }}
+                </div>
               </VCol>
 
-              <VCol md="6">
-                <div class="label">Port of Loading</div>
-                <div class="value">{{ data.vessel.asal_angkut }}</div>
+              <VCol
+                v-if="data.id_vessel_tb"
+                md="6"
+              >
+                <div class="label">
+                  Vessel (TB)
+                </div>
+                <div class="value">
+                  {{ data.vessel_tb.tipe_kapal }} {{ data.vessel_tb.nama_kapal }}
+                </div>
               </VCol>
               <VCol md="6">
-                <div class="label">Port of Discharging</div>
-                <div class="value">{{ data.vessel.tujuan_angkut }}</div>
+                <div class="label">
+                  Lead Time
+                </div>
+                <div class="value">
+                  {{ data.leadtime }} Days
+                </div>
               </VCol>
 
-              
               <VCol md="6">
-                <div class="label">Biaya Demurrage</div>
-                <div class="value">Rp {{ data.demurrage }}</div>
+                <div class="label">
+                  Port of Loading
+                </div>
+                <div class="value">
+                  {{ data.vessel.asal_angkut }}
+                </div>
               </VCol>
               <VCol md="6">
-                <div class="label"> BL Ship on Board :</div>
-                <div class="value"> {{ data.bl_ship }}</div>
+                <div class="label">
+                  Port of Discharging
+                </div>
+                <div class="value">
+                  {{ data.vessel.tujuan_angkut }}
+                </div>
               </VCol>
-        
+
+              <VCol md="6">
+                <div class="label">
+                  Biaya Demurrage
+                </div>
+                <div class="value">
+                  Rp {{ data.demurrage }}
+                </div>
+              </VCol>
+              <VCol md="6">
+                <div class="label">
+                  BL Ship on Board :
+                </div>
+                <div class="value">
+                  {{ data.bl_ship }}
+                </div>
+              </VCol>
             </VRow>
-              <div class="mt-6">
-
+            <div class="mt-6">
               <div class="text-subtitle-2 mb-2">
                 Catatan Shipping :
               </div>
 
               <VCard variant="tonal">
                 <VCardText>
-                   {{ data.ket_ship }}
+                  {{ data.ket_ship }}
                 </VCardText>
               </VCard>
-
             </div>
-
           </VCardText>
-
         </VCard>
-
       </VCol>
 
       <!-- APPROVAL FLOW -->
       <VCol md="4">
+        <VCard>
+          <VCardItem title="Approval Flow">
+            <template #prepend>
+              <VIcon icon="tabler-checklist" />
+            </template>
+          </VCardItem>
 
-    <VCard>
-  <VCardItem title="Approval Flow">
-    <template #prepend>
-      <VIcon icon="tabler-checklist" />
-    </template>
-  </VCardItem>
+          <VDivider />
 
-  <VDivider />
+          <VCardText>
+            <VAlert
+              :color="currentStatus.color"
+              variant="tonal"
+              class="mb-4"
+            >
+              {{ currentStatus.text }}
+            </VAlert>
+            <!-- Notes -->
 
-  <VCardText>
+            <div class="text-subtitle-2 mb-3">
+              Approval Notes
+            </div>
 
-  <VAlert
-    :color="currentStatus.color"
-    variant="tonal"
-    class="mb-4"
-  >
-    {{ currentStatus.text }}
-  </VAlert>
-    <!-- Notes -->
+            <VList density="compact">
+              <!-- LOGISTIK -->
 
-    <div class="text-subtitle-2 mb-3">
-      Approval Notes
-    </div>
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    :color="data.status >= 1 ? 'success' : 'warning'"
+                    :icon="data.status >= 1 ? 'tabler-check' : 'tabler-clock'"
+                  />
+                </template>
 
-    <VList density="compact">
+                <VListItemTitle>
+                  Logistics
+                </VListItemTitle>
 
-  <!-- LOGISTIK -->
+                <VListItemSubtitle>
+                  {{
+                    data.status >= 1
+                      ? data.note_logistik || 'Approved'
+                      : 'Waiting Approval'
+                  }}
+                </VListItemSubtitle>
+              </VListItem>
 
-  <VListItem>
+              <!-- CFO -->
 
-    <template #prepend>
-      <VIcon
-        :color="data.status >= 1 ? 'success' : 'warning'"
-        :icon="data.status >= 1 ? 'tabler-check' : 'tabler-clock'"
-      />
-    </template>
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    :color="data.cfo_result == 1 ? 'success' : 'secondary'"
+                    :icon="data.cfo_result == 1 ? 'tabler-check' : 'tabler-minus'"
+                  />
+                </template>
 
-    <VListItemTitle>
-      Logistics
-    </VListItemTitle>
+                <VListItemTitle>
+                  CFO
+                </VListItemTitle>
 
-    <VListItemSubtitle>
-      {{
-        data.status >= 1
-          ? data.note_logistik || 'Approved'
-          : 'Waiting Approval'
-      }}
-    </VListItemSubtitle>
+                <VListItemSubtitle>
+                  {{
+                    data.cfo_result == 1
+                      ? data.cfo_summary || 'Approved'
+                      : 'Pending'
+                  }}
+                </VListItemSubtitle>
+              </VListItem>
 
-  </VListItem>
+              <!-- CEO -->
 
-  <!-- CFO -->
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    :color="data.ceo_result == 1 ? 'success' : 'secondary'"
+                    :icon="data.ceo_result == 1 ? 'tabler-check' : 'tabler-minus'"
+                  />
+                </template>
 
-  <VListItem>
+                <VListItemTitle>
+                  CEO
+                </VListItemTitle>
 
-    <template #prepend>
-      <VIcon
-        :color="data.cfo_result == 1 ? 'success' : 'secondary'"
-        :icon="data.cfo_result == 1 ? 'tabler-check' : 'tabler-minus'"
-      />
-    </template>
+                <VListItemSubtitle>
+                  {{
+                    data.ceo_result == 1
+                      ? data.ceo_summary || 'Approved'
+                      : 'Pending'
+                  }}
+                </VListItemSubtitle>
+              </VListItem>
+            </VList>
+            <VDivider class="my-4" />
 
-    <VListItemTitle>
-      CFO
-    </VListItemTitle>
+            <!-- Form Approval -->
+            <div v-if="canApprove">
+              <div class="text-subtitle-2 mb-3">
+                Approval Decision
+              </div>
 
-    <VListItemSubtitle>
-      {{
-        data.cfo_result == 1
-          ? data.cfo_summary || 'Approved'
-          : 'Pending'
-      }}
-    </VListItemSubtitle>
+              <VRadioGroup
+                v-model="approvalForm.status"
+                inline
+              >
+                <VRadio
+                  label="Approve"
+                  :value="1"
+                />
 
-  </VListItem>
+                <VRadio
+                  label="Reject"
+                  :value="2"
+                />
+              </VRadioGroup>
 
-  <!-- CEO -->
+              <VTextarea
+                v-model="approvalForm.note"
+                label="Approval Notes"
+                rows="3"
+                class="mt-2"
+              />
 
-  <VListItem>
-
-    <template #prepend>
-      <VIcon
-        :color="data.ceo_result == 1 ? 'success' : 'secondary'"
-        :icon="data.ceo_result == 1 ? 'tabler-check' : 'tabler-minus'"
-      />
-    </template>
-
-    <VListItemTitle>
-      CEO
-    </VListItemTitle>
-
-    <VListItemSubtitle>
-      {{
-        data.ceo_result == 1
-          ? data.ceo_summary || 'Approved'
-          : 'Pending'
-      }}
-    </VListItemSubtitle>
-
-  </VListItem>
-
-</VList>
-    <VDivider class="my-4" />
-
-  <!-- Form Approval -->
-  <div v-if="canApprove">
-
-    <div class="text-subtitle-2 mb-3">
-      Approval Decision
-    </div>
-
-    <VRadioGroup
-      inline
-      v-model="approvalForm.status"
-    >
-      <VRadio
-        label="Approve"
-        :value=1
-      />
-
-      <VRadio
-        label="Reject"
-        :value=2
-      />
-    </VRadioGroup>
-
-    <VTextarea
-     v-model="approvalForm.note"
-      label="Approval Notes"
-      rows="3"
-      class="mt-2"
-    />
-
-    <VBtn
-    color="primary"
-    block
-    @click="submitApproval"
-  >
-    Submit Approval
-  </VBtn>
-
-  </div>
-
-  </VCardText>
-</VCard>
+              <VBtn
+                color="primary"
+                block
+                @click="submitApproval"
+              >
+                Submit Approval
+              </VBtn>
+            </div>
+          </VCardText>
+        </VCard>
       </VCol>
-
     </VRow>
 
     <!-- CARGO -->
     <VCard class="mt-4">
-
       <VCardItem title="Other Information">
-
         <template #append>
-          <!-- <VChip color="primary">
+          <!--
+            <VChip color="primary">
             {{ data.items?.length || 0 }} Cargo
-          </VChip> -->
+            </VChip>
+          -->
         </template>
-
       </VCardItem>
 
       <VDivider />
 
       <VTable>
-
         <thead>
           <tr>
             <th>Vendor</th>
@@ -587,20 +629,16 @@ onMounted(() => {
         </thead>
 
         <tbody>
-
-         <tr>
-        <td>{{ data.po_supplier?.vendor?.nama_vendor ?? '-' }}</td>
-        <td>{{ data.po_supplier?.nomor_po ?? '-' }}</td>
-        <td>{{ formatNumber(data.quantity) }}</td>
-        <td>Rp {{ formatNumber(data.freight) }}</td>
-        <td>Rp {{ formatNumber(data.quantity*data.freight) }}</td>
-        <td>{{ data.cargo_name }}</td>
-        </tr>
+          <tr>
+            <td>{{ data.po_supplier?.vendor?.nama_vendor ?? '-' }}</td>
+            <td>{{ data.po_supplier?.nomor_po ?? '-' }}</td>
+            <td>{{ formatNumber(data.quantity) }}</td>
+            <td>Rp {{ formatNumber(data.freight) }}</td>
+            <td>Rp {{ formatNumber(data.quantity * data.freight) }}</td>
+            <td>{{ data.cargo_name }}</td>
+          </tr>
         </tbody>
-
       </VTable>
-
     </VCard>
-
   </VContainer>
 </template>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import axios from '@axios'
 import { computed, ref, watch } from 'vue'
+import axios from '@axios'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
-type HargaJual = {
-  id:number
+interface HargaJual {
+  id: number
   periode_awal: string
   periode_akhir: string
   id_area: number
@@ -32,7 +33,7 @@ type HargaJual = {
   }
 }
 
-type HargaJualForm = {
+interface HargaJualForm {
   id?: number
   periode_awal: string
   periode_akhir: string
@@ -75,10 +76,10 @@ const form = ref<HargaJualForm>({
   id_area: null,
   pbbkb: null,
   produk: null,
-  periode_awal:'',
-  periode_akhir:'',
+  periode_awal: '',
+  periode_akhir: '',
   harga_normal: 0,
-  note_jual:'',
+  note_jual: '',
   harga_ceo: 0,
   harga_om: 0,
   harga_coo: 0,
@@ -112,11 +113,11 @@ const openDelete = (row: HargaJual) => {
   deleteTarget.value = row
   deleteDialog.value = true
 }
+
 const closeDelete = () => {
   deleteDialog.value = false
   deleteTarget.value = null
 }
-
 
 // ------------------------
 // Fetch
@@ -128,10 +129,15 @@ const fetchRows = async () => {
       page: currentPage.value,
       per_page: rowPerPage.value,
     }
-    if (searchQuery.value) params.search = searchQuery.value
-    if (selectedStatus.value !== null) params.is_active = selectedStatus.value
-    if (selectedProduk.value) params.produk = selectedProduk.value
-    if (selectedArea.value) params.id_area = selectedArea.value
+
+    if (searchQuery.value)
+      params.search = searchQuery.value
+    if (selectedStatus.value !== null)
+      params.is_active = selectedStatus.value
+    if (selectedProduk.value)
+      params.produk = selectedProduk.value
+    if (selectedArea.value)
+      params.id_area = selectedArea.value
 
     const { data } = await axios.get('/master/harga-jual', { params })
 
@@ -139,18 +145,21 @@ const fetchRows = async () => {
     totalRows.value = Number(data?.total ?? 0)
 
     const lastPage = Number(data?.last_page ?? 1)
+
     totalPage.value = lastPage > 0 ? lastPage : 1
 
     console.log(data)
     if (currentPage.value > totalPage.value)
       currentPage.value = totalPage.value
-  } catch (e: any) {
+  }
+  catch (e: any) {
     console.error('[Harga Jual] FETCH ERROR:', e?.response?.status, e?.response?.data || e)
     rows.value = []
     totalRows.value = 0
     totalPage.value = 1
     notify('Gagal memuat data Harga Dasar Jual', 'error')
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -176,6 +185,7 @@ fetchRows()
 const paginationData = computed(() => {
   const firstIndex = totalRows.value ? ((currentPage.value - 1) * rowPerPage.value) + 1 : 0
   const lastIndex = rows.value.length + ((currentPage.value - 1) * rowPerPage.value)
+
   return `${firstIndex}-${lastIndex} of ${totalRows.value}`
 })
 
@@ -198,11 +208,10 @@ const openEdit = (row: HargaJual) => {
     label:
       row.getproduk
         ? `${row.getproduk.merk_dagang} - ${row.getproduk.jenis_produk}`
-        : ''
+        : '',
   }
 
   isDialogOpen.value = true
-
 }
 
 const closeDialog = () => {
@@ -239,7 +248,8 @@ const save = async () => {
 
     isDialogOpen.value = false
     fetchRows()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const res = e?.response
 
     if (res?.status === 422 && res.data?.errors) {
@@ -247,18 +257,21 @@ const save = async () => {
         formErrors.value[k] = res.data.errors[k][0]
       })
       notify('Validasi gagal, cek input', 'warning')
+
       return
     }
 
     notify(res?.data?.message || 'Gagal menyimpan data', 'error')
-  } finally {
+  }
+  finally {
     isSaving.value = false
     formLoading.value = false
   }
 }
 
 const confirmDelete = async () => {
-  if (!deleteTarget.value) return
+  if (!deleteTarget.value)
+    return
 
   deleteLoading.value = true
   try {
@@ -266,11 +279,14 @@ const confirmDelete = async () => {
     notify(`Harga Jual - "${deleteTarget.value.harga_normal}" berhasil dihapus`, 'success')
     closeDelete()
     fetchRows()
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const res = e?.response
+
     console.error('[Harga Jual] DELETE ERROR:', res?.status, res?.data || e)
     notify(res?.data?.message || 'Gagal menghapus data', 'error')
-  } finally {
+  }
+  finally {
     deleteLoading.value = false
   }
 }
@@ -280,10 +296,13 @@ const produkList = ref<any[]>([])
 
 const getArea = async () => {
   const res = await axios.get('/area')
+
   areaList.value = res.data
 }
+
 const getProduk = async () => {
   const res = await axios.get('/produk')
+
   produkList.value = res.data
 }
 
@@ -291,29 +310,30 @@ getArea()
 getProduk()
 
 console.log('produkList:', produkList)
+
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
   const day = String(date.getDate()).padStart(2, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0') // bulan mulai dari 0
   const year = date.getFullYear()
+
   return `${day}/${month}/${year}`
 }
-
 </script>
 
 <template>
   <section>
-     <VCard
+    <VCard
       title="Filters"
-      class="mb-6">
-    
+      class="mb-6"
+    >
       <VCardText>
         <VRow>
-            <VCol
+          <VCol
             cols="12"
             sm="4"
           >
-           <VTextField
+            <VTextField
               v-model="searchQuery"
               label="Cari Periode"
               placeholder="Cari Periode"
@@ -325,15 +345,15 @@ const formatDate = (dateStr: string) => {
             cols="12"
             sm="4"
           >
-              <VSelect
-                v-model="selectedArea"
-                :items="areaList"
-                item-title="nama_area"
-                item-value="id"
-                label="Pilih Area"
-                density="compact"
-                clearable
-                />
+            <VSelect
+              v-model="selectedArea"
+              :items="areaList"
+              item-title="nama_area"
+              item-value="id"
+              label="Pilih Area"
+              density="compact"
+              clearable
+            />
           </VCol>
 
           <VCol
@@ -341,17 +361,15 @@ const formatDate = (dateStr: string) => {
             sm="4"
           >
             <VSelect
-            v-model="selectedProduk"
-            :items="produkList"
-             :item-title="produk => `${produk.merk_dagang} - ${produk.jenis_produk}`"
-            item-value="id"
-            label="Pilih Produk"
-            density="compact"
-            clearable
+              v-model="selectedProduk"
+              :items="produkList"
+              :item-title="produk => `${produk.merk_dagang} - ${produk.jenis_produk}`"
+              item-value="id"
+              label="Pilih Produk"
+              density="compact"
+              clearable
             />
           </VCol>
-
-        
         </VRow>
       </VCardText>
     </VCard>
@@ -361,14 +379,23 @@ const formatDate = (dateStr: string) => {
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
         <VBtn
-            to="harga-jual/add"
-          >
-          <VIcon start icon="ri-add-circle-line"/> Tambah Data
-          </VBtn>
+          to="harga-jual/add"
+        >
+          <VIcon
+            start
+            icon="ri-add-circle-line"
+          /> Tambah Data
+        </VBtn>
 
         <VSpacer />
 
-        <VChip v-if="loading" size="small" variant="tonal">Loading...</VChip>
+        <VChip
+          v-if="loading"
+          size="small"
+          variant="tonal"
+        >
+          Loading...
+        </VChip>
       </VCardText>
 
       <VDivider />
@@ -376,29 +403,72 @@ const formatDate = (dateStr: string) => {
       <VTable class="text-no-wrap">
         <thead class="bg-grey-lighten-4">
           <tr>
-            <th scope="col" style="width: 3rem;">NO</th>
-            <th scope="col">PERIODE</th>
-            <th scope="col">AREA</th>
-            <th scope="col">PRODUK</th>
-            <th scope="col">HARGA DASAR</th>
-            <th scope="col" class="text-center" style="width: 5rem;">AKSI</th>
+            <th
+              scope="col"
+              style="width: 3rem;"
+            >
+              NO
+            </th>
+            <th scope="col">
+              PERIODE
+            </th>
+            <th scope="col">
+              AREA
+            </th>
+            <th scope="col">
+              PRODUK
+            </th>
+            <th scope="col">
+              HARGA DASAR
+            </th>
+            <th
+              scope="col"
+              class="text-center"
+              style="width: 5rem;"
+            >
+              AKSI
+            </th>
           </tr>
         </thead>
 
         <tbody>
-           <tr v-for="(p, index) in rows" >
-            <td class="text-center">{{ index + 1 }}</td>
-              <td class="text-medium-emphasis">{{formatDate(p.periode_awal)  +' - '+  formatDate(p.periode_akhir) }}</td>
-            <td class="text-medium-emphasis">{{ p.area?.nama_area ?? '-' }}</td>
-            <td class="text-medium-emphasis">{{ p.getproduk?.jenis_produk+ ' - '+ p.getproduk?.merk_dagang}}</td>
-              <td class="text-medium-emphasis">{{ Number(p.harga_normal).toLocaleString('id-ID') }}</td>
+          <tr v-for="(p, index) in rows">
+            <td class="text-center">
+              {{ index + 1 }}
+            </td>
+            <td class="text-medium-emphasis">
+              {{ `${formatDate(p.periode_awal)} - ${formatDate(p.periode_akhir)}` }}
+            </td>
+            <td class="text-medium-emphasis">
+              {{ p.area?.nama_area ?? '-' }}
+            </td>
+            <td class="text-medium-emphasis">
+              {{ `${p.getproduk?.jenis_produk} - ${p.getproduk?.merk_dagang}` }}
+            </td>
+            <td class="text-medium-emphasis">
+              {{ Number(p.harga_normal).toLocaleString(LOCALE_ANGKA) }}
+            </td>
 
-            <td class="text-center" style="width: 5rem;">
-              <VBtn size="34" class="mr-1" variant="tonal" color="primary" @click="openEdit(p)" >
-                 <VIcon icon="ri-edit-2-line"/>
+            <td
+              class="text-center"
+              style="width: 5rem;"
+            >
+              <VBtn
+                size="34"
+                class="mr-1"
+                variant="tonal"
+                color="primary"
+                @click="openEdit(p)"
+              >
+                <VIcon icon="ri-edit-2-line" />
               </VBtn>
-              <VBtn size="34" variant="tonal" color="error" @click="openDelete(p)" >
-                 <VIcon icon="ri:delete-bin-line"/>
+              <VBtn
+                size="34"
+                variant="tonal"
+                color="error"
+                @click="openDelete(p)"
+              >
+                <VIcon icon="ri:delete-bin-line" />
               </VBtn>
             </td>
           </tr>
@@ -406,7 +476,10 @@ const formatDate = (dateStr: string) => {
 
         <tfoot v-show="!rows.length && !loading">
           <tr>
-            <td colspan="4" class="text-center">
+            <td
+              colspan="4"
+              class="text-center"
+            >
               No data available
             </td>
           </tr>
@@ -417,7 +490,10 @@ const formatDate = (dateStr: string) => {
 
       <!-- Footer pagination -->
       <VCardText class="d-flex align-center flex-wrap justify-end gap-4 pa-2">
-        <div class="d-flex align-center me-3" style="width: 171px;">
+        <div
+          class="d-flex align-center me-3"
+          style="width: 171px;"
+        >
           <span class="text-no-wrap me-3">Rows per page:</span>
 
           <VSelect
@@ -446,136 +522,214 @@ const formatDate = (dateStr: string) => {
 
     <!-- Dialog Form -->
     <template>
-  <VDialog v-model="isDialogOpen" max-width="1000">
-    <VCard>
-      <VCardTitle class="text-h6">
-        Edit Harga Jual
-      </VCardTitle>
+      <VDialog
+        v-model="isDialogOpen"
+        max-width="1000"
+      >
+        <VCard>
+          <VCardTitle class="text-h6">
+            Edit Harga Jual
+          </VCardTitle>
 
-      <VCardText class="d-flex flex-column gap-4">
+          <VCardText class="d-flex flex-column gap-4">
+            <VRow>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VTextField
+                  v-model="form.periode_awal"
+                  type="date"
+                  label="Periode Awal"
+                  :error-messages="formErrors.periode_awal"
+                />
+              </VCol>
 
-        <VRow>
-          <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VTextField
+                  v-model="form.periode_akhir"
+                  type="date"
+                  label="Periode Akhir"
+                  :error-messages="formErrors.periode_akhir"
+                />
+              </VCol>
+            </VRow>
+
+            <VRow>
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VSelect
+                  v-model="form.id_area"
+                  :items="areaList"
+                  item-title="nama_area"
+                  item-value="id"
+                  label="Area"
+                  :error-messages="formErrors.id_area"
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="6"
+              >
+                <VSelect
+                  v-model="form.produk"
+                  :items="produkList"
+                  item-title="merk_dagang"
+                  item-value="id"
+                  :error-messages="formErrors.produk"
+                  label="Produk"
+                />
+              </VCol>
+            </VRow>
+
+            <VRow>
+              <VCol
+                cols="12"
+                md="2"
+              >
+                <AppNumberField
+                  v-model="form.harga_normal"
+                  empty-as-zero
+                  :desimal="2"
+                  label="Harga Normal"
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="2"
+              >
+                <AppNumberField
+                  v-model="form.harga_sm"
+                  empty-as-zero
+                  :desimal="2"
+                  label="Harga SM"
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="2"
+              >
+                <AppNumberField
+                  v-model="form.harga_om"
+                  empty-as-zero
+                  :desimal="2"
+                  label="Harga OM"
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="2"
+              >
+                <AppNumberField
+                  v-model="form.harga_coo"
+                  empty-as-zero
+                  :desimal="2"
+                  label="Harga COO"
+                />
+              </VCol>
+
+              <VCol
+                cols="12"
+                md="2"
+              >
+                <AppNumberField
+                  v-model="form.harga_ceo"
+                  empty-as-zero
+                  :desimal="2"
+                  label="Harga CEO"
+                />
+              </VCol>
+            </VRow>
+
             <VTextField
-              v-model="form.periode_awal"
-              type="date"
-              label="Periode Awal"
-              :error-messages="formErrors.periode_awal"
+              v-model="form.note_jual"
+              label="Catatan"
             />
-          </VCol>
+          </VCardText>
 
-          <VCol cols="12" md="6">
-            <VTextField
-              v-model="form.periode_akhir"
-              type="date"
-              label="Periode Akhir"
-              :error-messages="formErrors.periode_akhir"
-            />
-          </VCol>
-        </VRow>
+          <VCardActions class="justify-end">
+            <VBtn
+              variant="text"
+              @click="closeDialog"
+            >
+              Batal
+            </VBtn>
+            <VBtn
+              color="primary"
+              variant="tonal"
+              :loading="formLoading"
+              @click="save"
+            >
+              Simpan
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VDialog>
 
-        <VRow>
-          <VCol cols="12" md="6">
-            <VSelect
-              v-model="form.id_area"
-              :items="areaList"
-              item-title="nama_area"
-              item-value="id"
-              label="Area"
-              :error-messages="formErrors.id_area"
-            />
-          </VCol>
+      <!-- Delete Confirm -->
+      <VDialog
+        v-model="deleteDialog"
+        max-width="520"
+      >
+        <VCard>
+          <VCardTitle class="text-h6">
+            Konfirmasi Hapus
+          </VCardTitle>
 
-          <VCol cols="12" md="6">
-            <VSelect
-              v-model="form.produk"
-              :items="produkList"
-              item-title="merk_dagang"
-              item-value="id"
-              :error-messages="formErrors.produk"
-              label="Produk"
-            />
-          </VCol>
-        </VRow>
+          <VCardText>
+            Apakah Anda yakin ingin menghapus data
+            <b>{{ `${deleteTarget?.periode_awal} - ${deleteTarget?.periode_awal}` }}</b>?
+            <div class="text-body-2 opacity-70 mt-2">
+              Data yang sudah dihapus tidak dapat dikembalikan.
+            </div>
+          </VCardText>
 
-     
-       <VRow>
-        <VCol cols="12" md="2">
-          <VTextField v-model="form.harga_normal" type="number" label="Harga Normal" />
-        </VCol>
+          <VCardActions class="justify-end">
+            <VBtn
+              variant="text"
+              :disabled="deleteLoading"
+              @click="closeDelete"
+            >
+              Batal
+            </VBtn>
+            <VBtn
+              color="error"
+              :loading="deleteLoading"
+              @click="confirmDelete"
+            >
+              Hapus
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VDialog>
 
-        <VCol cols="12" md="2">
-          <VTextField v-model="form.harga_sm" type="number" label="Harga SM" />
-        </VCol>
-
-        <VCol cols="12" md="2">
-          <VTextField v-model="form.harga_om" type="number" label="Harga OM" />
-        </VCol>
-
-        
-        <VCol cols="12" md="2">
-          <VTextField v-model="form.harga_coo" type="number" label="Harga COO" />
-        </VCol>
-        
-        <VCol cols="12" md="2">
-          <VTextField v-model="form.harga_ceo" type="number" label="Harga CEO" />
-        </VCol>
-      </VRow>
-
-        <VTextField
-          v-model="form.note_jual"
-          label="Catatan"
-        />
-      </VCardText>
-
-      <VCardActions class="justify-end">
-        <VBtn variant="text" @click="closeDialog">Batal</VBtn>
-        <VBtn color="primary" variant="tonal" :loading="formLoading" @click="save">
-          Simpan
-        </VBtn>
-      </VCardActions>
-    </VCard>
-    </VDialog>
-
-    <!-- Delete Confirm -->
-    <VDialog v-model="deleteDialog" max-width="520">
-      <VCard>
-        <VCardTitle class="text-h6">Konfirmasi Hapus</VCardTitle>
-
-        <VCardText>
-          Apakah Anda yakin ingin menghapus data
-          <b>{{ deleteTarget?.periode_awal +" - "+ deleteTarget?.periode_awal  }}</b>?
-          <div class="text-body-2 opacity-70 mt-2">
-            Data yang sudah dihapus tidak dapat dikembalikan.
-          </div>
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn variant="text" :disabled="deleteLoading" @click="closeDelete">Batal</VBtn>
-          <VBtn color="error" :loading="deleteLoading" @click="confirmDelete">Hapus</VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-
-     <VDialog
-          v-model="isSaving"
-          width="300"
-        >
-      <VCard
-        color="primary"
+      <VDialog
+        v-model="isSaving"
         width="300"
       >
-        <VCardText class="pt-3 text-white">
-          Menyimpan Data
-          <VProgressLinear
-            indeterminate
-            class="mt-4"
-            color="#fff"
-          />
-        </VCardText>
-      </VCard>
-    </VDialog>
+        <VCard
+          color="primary"
+          width="300"
+        >
+          <VCardText class="pt-3 text-white">
+            Menyimpan Data
+            <VProgressLinear
+              indeterminate
+              class="mt-4"
+              color="#fff"
+            />
+          </VCardText>
+        </VCard>
+      </VDialog>
     </template>
 
     <!-- Snackbar -->
@@ -588,7 +742,13 @@ const formatDate = (dateStr: string) => {
       {{ snackText }}
 
       <template #actions>
-        <VBtn variant="text" color="white" @click="snackbar = false">Close</VBtn>
+        <VBtn
+          variant="text"
+          color="white"
+          @click="snackbar = false"
+        >
+          Close
+        </VBtn>
       </template>
     </VSnackbar>
   </section>
@@ -605,7 +765,6 @@ const formatDate = (dateStr: string) => {
     padding-block-start: 0.3rem;
   }
 }
-
 </style>
 
 <route lang="yaml">

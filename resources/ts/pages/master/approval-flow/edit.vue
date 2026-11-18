@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import axios from '@axios'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from '@axios'
 
 import {
   closeAlert,
@@ -77,7 +77,7 @@ interface ApprovalFlowResponse {
   permission_module_id?: number | null
 
   permission_module?:
-    PermissionModuleResponse | null
+  PermissionModuleResponse | null
 
   legacy_module_name?: string | null
 
@@ -242,7 +242,8 @@ const loadSpecialDocumentTypes = async (): Promise<void> => {
       code: String(item.code || ''),
       name: String(item.name || '-'),
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Special Document Types] FETCH ERROR:', error)
     specialDocumentTypeOptions.value = []
   }
@@ -263,6 +264,7 @@ const removeSpecialApprover = (
 ): void => {
   form.steps[stepIndex].approvers[approverIndex].special_approvers.splice(specialIndex, 1)
 }
+
 const userOptions = ref<DropdownOption[]>([])
 const departmentOptions = ref<DropdownOption[]>([])
 const branchOptions = ref<DropdownOption[]>([])
@@ -405,7 +407,6 @@ const publicId = computed(() => {
   return String(route.query.id || route.params.id || '').trim()
 })
 
-
 /*
  * PR dan FPU dibedakan per area + department, sehingga kedua field itu wajib
  * diisi. Jenis dokumen lain tidak memakainya.
@@ -454,10 +455,12 @@ const loadTransactionCategories = async (): Promise<void> => {
       code: String(item.code || ''),
       title: String(item.title || item.name || '-'),
     }))
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     console.error('[Transaction Categories] FETCH ERROR:', error)
     transactionCategoryOptions.value = []
-  } finally {
+  }
+  finally {
     isLoadingTransactionCategory.value = false
   }
 }
@@ -639,7 +642,8 @@ onMounted(async () => {
    */
   try {
     await loadApprovalFlowDocumentTypes()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     showErrorToast({
       title: 'Gagal',
       text: getApiErrorMessage(
@@ -672,6 +676,7 @@ const normalizeDropdownItems = (payload: any): DropdownOption[] => {
   return rawItems.map((item: any) => {
     const id = Number(item.id)
     const kode = item.kode ? String(item.kode) : ''
+
     const name = String(
       item.name
         || item.nama
@@ -715,14 +720,16 @@ const loadApproverOptions = async (): Promise<void> => {
 
     roleOptions.value = normalizeDropdownItems(roleResponse.data)
     userOptions.value = normalizeDropdownItems(userResponse.data)
-  } catch (error: any) {
+  }
+  catch (error: any) {
     const err = error as AxiosErrorShape
 
     showErrorToast({
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal memuat data role atau user approver.'),
     })
-  } finally {
+  }
+  finally {
     isLoadingRole.value = false
     isLoadingUser.value = false
   }
@@ -737,7 +744,8 @@ const loadDepartmentOptions = async (): Promise<void> => {
     })
 
     departmentOptions.value = normalizeDropdownItems(response.data)
-  } catch (error: any) {
+  }
+  catch (error: any) {
     departmentOptions.value = []
 
     const err = error as AxiosErrorShape
@@ -746,7 +754,8 @@ const loadDepartmentOptions = async (): Promise<void> => {
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal memuat data department.'),
     })
-  } finally {
+  }
+  finally {
     isLoadingDepartment.value = false
   }
 }
@@ -766,7 +775,8 @@ const loadBranchOptions = async (): Promise<void> => {
         value: Number(item.id),
       }))
       .filter(item => Number(item.id) > 0)
-  } catch (error: any) {
+  }
+  catch (error: any) {
     branchOptions.value = []
 
     const err = error as AxiosErrorShape
@@ -775,7 +785,8 @@ const loadBranchOptions = async (): Promise<void> => {
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal memuat data cabang.'),
     })
-  } finally {
+  }
+  finally {
     isLoadingBranch.value = false
   }
 }
@@ -917,9 +928,9 @@ const assignFlowToForm = (flow: ApprovalFlowResponse): void => {
   )
   form.permission_module_id
   = normalizeNumberInput(
-    flow.permission_module_id
+      flow.permission_module_id
       ?? flow.permission_module?.id,
-  )
+    )
 
   form.permission_module_code
     = String(
@@ -957,7 +968,8 @@ const assignFlowToForm = (flow: ApprovalFlowResponse): void => {
     form.department_ids = Array.isArray(flow.department_ids) && flow.department_ids.length
       ? flow.department_ids.map((id: any) => Number(id))
       : (flow.creator_department_id ? [Number(flow.creator_department_id)] : [])
-  } else {
+  }
+  else {
     form.area_type = ''
     form.cabang = null
     form.all_departments = false
@@ -970,7 +982,8 @@ const assignFlowToForm = (flow: ApprovalFlowResponse): void => {
     form.transaction_category_ids = Array.isArray(flow.transaction_category_ids)
       ? flow.transaction_category_ids.map((id: any) => Number(id))
       : []
-  } else {
+  }
+  else {
     form.all_transaction_categories = true
     form.transaction_category_ids = []
   }
@@ -1005,15 +1018,15 @@ const loadApprovalFlow = async (): Promise<void> => {
 
     const flow = response.data?.data ?? response.data
 
-    if (!flow) {
+    if (!flow)
       throw new Error('Data approval flow tidak ditemukan.')
-    }
 
     assignFlowToForm(flow)
 
     isLoaded.value = true
     isLoadError.value = false
-  } catch (error: any) {
+  }
+  catch (error: any) {
     isLoaded.value = false
     isLoadError.value = true
 
@@ -1026,7 +1039,8 @@ const loadApprovalFlow = async (): Promise<void> => {
       title: 'Gagal Memuat Data',
       text: loadErrorMessage.value,
     })
-  } finally {
+  }
+  finally {
     isLoading.value = false
   }
 }
@@ -1045,7 +1059,8 @@ const reloadApprovalFlow = async (): Promise<void> => {
     ])
 
     await loadApprovalFlow()
-  } catch (error: any) {
+  }
+  catch (error: any) {
     isLoading.value = false
     isLoaded.value = false
     isLoadError.value = true
@@ -1345,6 +1360,7 @@ const buildPayload = () => {
 
     area_type: usesAreaMatrix.value ? form.area_type : null,
     cabang: null,
+
     /*
      * Cakupan flow. Backend menyimpan department_ids ke tabel pivot dan
      * mengisi creator_department_id dari elemen pertama untuk kompatibilitas.
@@ -1427,7 +1443,7 @@ const submit = async (): Promise<void> => {
       buildPayload(),
       {
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       },
@@ -1442,7 +1458,8 @@ const submit = async (): Promise<void> => {
         success: 'updated',
       },
     })
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     const err = error as AxiosErrorShape
@@ -1451,7 +1468,8 @@ const submit = async (): Promise<void> => {
       title: 'Gagal',
       text: getApiErrorMessage(err, 'Gagal memperbarui approval flow.'),
     })
-  } finally {
+  }
+  finally {
     submitLoading.value = false
   }
 }
@@ -1530,9 +1548,9 @@ const formatAmount = (value: number | string | null | undefined): string => {
     </VCard>
 
     <LoadingStateCard
-    v-if="isLoading"
-    title="Memuat data Approval Flow..."
-    subtitle="Mohon tunggu sebentar"
+      v-if="isLoading"
+      title="Memuat data Approval Flow..."
+      subtitle="Mohon tunggu sebentar"
     />
 
     <VCard
@@ -1646,8 +1664,8 @@ const formatAmount = (value: number | string | null | undefined): string => {
                   :error-messages="
                     isSubmitted
                       && !form.permission_module_id
-                        ? ['Module tidak ditemukan']
-                        : []
+                      ? ['Module tidak ditemukan']
+                      : []
                   "
                 />
               </VCol>
@@ -1668,12 +1686,11 @@ const formatAmount = (value: number | string | null | undefined): string => {
                 cols="12"
                 md="6"
               >
-                <VTextField
-                  v-model.number="form.min_amount"
+                <AppNumberField
+                  v-model="form.min_amount"
                   label="Minimal Nilai"
                   placeholder="0"
-                  type="number"
-                  min="0"
+
                   density="comfortable"
                   prefix="Rp"
                   :disabled="submitLoading"
@@ -1686,12 +1703,11 @@ const formatAmount = (value: number | string | null | undefined): string => {
                 cols="12"
                 md="6"
               >
-                <VTextField
-                  v-model.number="form.max_amount"
+                <AppNumberField
+                  v-model="form.max_amount"
                   label="Maksimal Nilai"
                   placeholder="Kosongkan untuk tanpa batas"
-                  type="number"
-                  min="0"
+
                   density="comfortable"
                   prefix="Rp"
                   :disabled="submitLoading"
@@ -2170,8 +2186,8 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               isSubmitted
                                 && approver.approver_scope === 'SELECTED_BRANCHES'
                                 && approver.branch_ids.length === 0
-                                  ? ['Minimal pilih 1 cabang']
-                                  : []
+                                ? ['Minimal pilih 1 cabang']
+                                : []
                             "
                             no-data-text="Cabang tidak ditemukan"
                             placeholder="Pilih satu atau lebih cabang"
@@ -2255,7 +2271,10 @@ const formatAmount = (value: number | string | null | undefined): string => {
                             :key="`special-${stepIndex}-${approverIndex}-${specialIndex}`"
                             class="align-center"
                           >
-                            <VCol cols="12" md="4">
+                            <VCol
+                              cols="12"
+                              md="4"
+                            >
                               <VAutocomplete
                                 v-model="special.special_document_type_id"
                                 label="Tipe Dokumen *"
@@ -2269,7 +2288,10 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               />
                             </VCol>
 
-                            <VCol cols="12" md="3">
+                            <VCol
+                              cols="12"
+                              md="3"
+                            >
                               <VSelect
                                 v-model="special.approver_type"
                                 label="Tipe Approver *"
@@ -2282,7 +2304,10 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               />
                             </VCol>
 
-                            <VCol cols="12" md="4">
+                            <VCol
+                              cols="12"
+                              md="4"
+                            >
                               <VAutocomplete
                                 v-model="special.approver_id"
                                 label="Approver Pengganti *"
@@ -2297,7 +2322,11 @@ const formatAmount = (value: number | string | null | undefined): string => {
                               />
                             </VCol>
 
-                            <VCol cols="12" md="1" class="d-flex justify-end">
+                            <VCol
+                              cols="12"
+                              md="1"
+                              class="d-flex justify-end"
+                            >
                               <VBtn
                                 icon
                                 size="small"
@@ -2311,7 +2340,6 @@ const formatAmount = (value: number | string | null | undefined): string => {
                             </VCol>
                           </VRow>
                         </VCol>
-
                       </VRow>
                     </div>
                   </div>

@@ -82,7 +82,7 @@ class ClaimApprovalGeneratorService
                         . ' Lengkapi matriks approval Claim untuk kombinasi tersebut.',
                         $claim->getApprovalAreaType() ?: '-',
                         $claim->departmentData?->nama ?? '-',
-                        number_format($totalAmount, 0, ',', '.'),
+                        angka($totalAmount, 0),
                     ),
                 ],
             ]);

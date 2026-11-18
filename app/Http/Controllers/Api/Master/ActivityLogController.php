@@ -25,6 +25,12 @@ class ActivityLogController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+
+            /*
+            | Supaya pemeriksa bisa langsung menyaring tindakan yang
+            | dilakukan lewat penyamaran, tanpa menyisir seluruh log.
+            */
+            'only_impersonated' => ['nullable', 'boolean'],
         ]);
 
         $perPage = (int) ($validated['per_page'] ?? 25);
@@ -56,6 +62,12 @@ class ActivityLogController extends Controller
 
         if (!empty($validated['event'])) {
             $query->where('event', $validated['event']);
+        }
+
+        if ($request->boolean('only_impersonated')) {
+            $query->whereRaw(
+                "properties->>'impersonated_by' IS NOT NULL",
+            );
         }
 
         if (!empty($validated['log_name'])) {
@@ -177,6 +189,22 @@ class ActivityLogController extends Controller
             'method' => $activity->properties['method'] ?? null,
             'path' => $activity->properties['path'] ?? null,
             'status_code' => $activity->properties['status_code'] ?? null,
+
+            /*
+            |------------------------------------------------------------------
+            | Siapa yang sebenarnya melakukannya
+            |------------------------------------------------------------------
+            | causer adalah user yang haknya dipakai. Kalau baris ini lahir
+            | dari sesi penyamaran super admin, causer itu BUKAN orang yang
+            | menekan tombolnya -- dan tanpa tiga nilai di bawah, log akan
+            | terbaca seolah-olah dia yang melakukannya sendiri.
+            |------------------------------------------------------------------
+            */
+            'impersonated_by' => $activity->properties['impersonated_by'] ?? null,
+            'impersonated_by_username' => $activity
+                ->properties['impersonated_by_username'] ?? null,
+            'impersonation_session_id' => $activity
+                ->properties['impersonation_session_id'] ?? null,
 
             'created_at' => $activity->created_at,
         ];

@@ -290,7 +290,7 @@
             <td width="2%">:</td>
 
             <td>
-                {{ number_format((float) ($res->quantity ?? 0)) }}
+                {{ angka((float) ($res->quantity ?? 0)) }}
                 ({{ $res->satuan ?? '-' }})
             </td>
         </tr>

@@ -13,6 +13,7 @@ import NavBarNotifications from '@/layouts/components/NavBarNotifications.vue'
 import NavbarShortcuts from '@/layouts/components/NavbarShortcuts.vue'
 import NavbarThemeSwitcher from '@/layouts/components/NavbarThemeSwitcher.vue'
 import NavSearchBar from '@/layouts/components/NavSearchBar.vue'
+import ImpersonationBanner from '@/layouts/components/ImpersonationBanner.vue'
 import UserProfile from '@/layouts/components/UserProfile.vue'
 
 // @layouts plugin
@@ -45,9 +46,8 @@ onMounted(async () => {
   | Jika navigation belum pernah dimuat, ambil dari localStorage lebih dahulu
   |--------------------------------------------------------------------------
   */
-  if (!navigationLoaded.value) {
+  if (!navigationLoaded.value)
     navigationStore.loadFromLocal()
-  }
 
   /*
   |--------------------------------------------------------------------------
@@ -102,6 +102,9 @@ onMounted(async () => {
         <UserProfile />
       </div>
     </template>
+
+    <!-- 👉 Banner penyamaran: harus di atas isi halaman, di semua halaman -->
+    <ImpersonationBanner />
 
     <!-- 👉 Pages -->
     <RouterView v-slot="{ Component, route }">

@@ -2,19 +2,20 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import axios from '@axios'
 import Swal from 'sweetalert2'
+import axios from '@axios'
 import {
+  closeAlert,
+  showConfirmAlert,
+  showErrorToast,
   showLoadingAlert,
   showSuccessToast,
   showWarningToast,
-  showErrorToast,
-  closeAlert,
-  showConfirmAlert,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
-import { formatDate, formatStatusPKP, formatNumberWithoutRp, toTitleCase, formatDecimalQty } from '@/utils/textFormatter'
+import { formatDate, formatDecimalQty, formatNumberWithoutRp, formatStatusPKP, toTitleCase } from '@/utils/textFormatter'
 import { usePermissionStore } from '@/stores/permission'
+import { LOCALE_ANGKA } from '@/utils/numberFormatter'
 
 interface AxiosErrorShape {
   response?: {
@@ -53,7 +54,6 @@ const canCreate = computed(() => {
 })
 
 const isCheckingPermission = ref(true)
-
 
 const router = useRouter()
 const { t } = useI18n()
@@ -131,7 +131,8 @@ const form = ref({
 const items = ref<GrItem[]>([])
 
 const formatFileSize = (size: number): string => {
-  if (!size) return '0 KB'
+  if (!size)
+    return '0 KB'
 
   const units = ['B', 'KB', 'MB', 'GB']
   let fileSize = size
@@ -150,7 +151,8 @@ const removeAttachment = (index: number): void => {
 }
 
 const handleAttachmentChange = (files: File[] | File | null): void => {
-  if (!files) return
+  if (!files)
+    return
 
   const selectedFiles = Array.isArray(files) ? files : [files]
   const validFiles: File[] = []
@@ -194,18 +196,18 @@ const totalItemSelected = computed(() => {
 
 const canSubmit = computed(() => {
   return (
-    !!form.value.po_id &&
-    !!form.value.receive_date &&
-    items.value.length > 0 &&
-    totalReceiveQty.value > 0 &&
-    items.value.every(item => Number(item.receive_qty || 0) <= Number(item.remaining_qty || 0))
+    !!form.value.po_id
+    && !!form.value.receive_date
+    && items.value.length > 0
+    && totalReceiveQty.value > 0
+    && items.value.every(item => Number(item.receive_qty || 0) <= Number(item.remaining_qty || 0))
   )
 })
 
 const formatNumber = (value: number | string | null | undefined): string => {
   const num = Number(value || 0)
 
-  return new Intl.NumberFormat('id-ID', {
+  return new Intl.NumberFormat(LOCALE_ANGKA, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(num)
@@ -219,14 +221,15 @@ const confirmCancel = async (): Promise<void> => {
     cancelButtonText: t('goodsReceive.create.toast.cancelConfirmCancelButton'),
   })
 
-  if (result.isConfirmed) {
+  if (result.isConfirmed)
     router.push('/non_stock/goods_receive')
-  }
 }
 
 const fetchPoOptions = async (forceReload = false): Promise<void> => {
-  if (poLoading.value) return
-  if (!forceReload && poOptions.value.length > 0) return
+  if (poLoading.value)
+    return
+  if (!forceReload && poOptions.value.length > 0)
+    return
 
   poLoading.value = true
 
@@ -248,7 +251,8 @@ const fetchPoOptions = async (forceReload = false): Promise<void> => {
       ].join(' • '),
       raw: row,
     }))
-  } catch (error) {
+  }
+  catch (error) {
     poOptions.value = []
 
     const err = error as AxiosErrorShape
@@ -257,7 +261,8 @@ const fetchPoOptions = async (forceReload = false): Promise<void> => {
       title: t('common.alert.error'),
       text: getApiErrorMessage(err, t('goodsReceive.create.toast.loadPoFailed')),
     })
-  } finally {
+  }
+  finally {
     poLoading.value = false
   }
 }
@@ -296,19 +301,22 @@ const loadPoDetail = async (public_id: number | string): Promise<void> => {
       receive_qty: 0,
       notes: '',
     }))
-  } catch (error) {
+  }
+  catch (error) {
     Swal.fire({
       icon: 'error',
       title: t('goodsReceive.create.toast.loadPoDetailFailedTitle'),
       text: t('goodsReceive.create.toast.loadPoDetailFailedText'),
     })
-  } finally {
+  }
+  finally {
     itemLoading.value = false
   }
 }
 
 watch(selectedPo, async value => {
-  if (!value) return
+  if (!value)
+    return
 
   await loadPoDetail(value)
 })
@@ -364,7 +372,8 @@ const validateItems = (): boolean => {
 }
 
 const submit = async (): Promise<void> => {
-  if (!validateItems()) return
+  if (!validateItems())
+    return
 
   const confirm = await showConfirmAlert({
     title: t('goodsReceive.create.toast.saveConfirmTitle'),
@@ -373,7 +382,8 @@ const submit = async (): Promise<void> => {
     cancelButtonText: t('common.actions.cancel'),
   })
 
-  if (!confirm.isConfirmed) return
+  if (!confirm.isConfirmed)
+    return
 
   submitLoading.value = true
 
@@ -412,7 +422,8 @@ const submit = async (): Promise<void> => {
       path: '/non_stock/goods_receive',
       query: { success: 'created' },
     })
-  } catch (error: any) {
+  }
+  catch (error: any) {
     closeAlert()
 
     const err = error as AxiosErrorShape
@@ -430,6 +441,7 @@ const submit = async (): Promise<void> => {
       localStorage.removeItem('navItems')
 
       await router.replace('/login')
+
       return
     }
 
@@ -437,7 +449,8 @@ const submit = async (): Promise<void> => {
       title: t('common.alert.error'),
       text: err?.response?.data?.message || t('goodsReceive.create.toast.saveFailed'),
     })
-  } finally {
+  }
+  finally {
     submitLoading.value = false
   }
 }
@@ -453,11 +466,12 @@ onMounted(async () => {
 
   if (!canCreate.value) {
     await router.replace('/forbidden')
+
     return
   }
 
   isCheckingPermission.value = false
-  
+
   loading.value = true
   await fetchPoOptions()
   loading.value = false
@@ -467,469 +481,530 @@ onMounted(async () => {
 <template>
   <section>
     <VContainer fluid>
-        <VRow>
-            <VCol cols="12">
-                <VCard class="rounded-lg">
-                <VCardText>
-                    <div class="d-flex flex-wrap align-center justify-space-between gap-4">
-                    <div>
-                        <h2 class="text-h5 font-weight-bold mb-1">
-                        {{ t('goodsReceive.create.pageTitle') }}
-                        </h2>
-                        <div class="text-body-2 text-medium-emphasis">
-                        {{ t('goodsReceive.create.pageSubtitle') }}
-                        </div>
-                    </div>
-
-                    <VBtn
-                        variant="tonal"
-                        color="secondary"
-                        prepend-icon="tabler-arrow-left"
-                        @click="backToIndex"
-                        class="text-none"
-                    >
-                        {{ t('goodsReceive.create.backButton') }}
-                    </VBtn>
-                    </div>
-                </VCardText>
-                </VCard>
-            </VCol>
-
-            <VCol cols="12">
-                <VCard class="rounded-lg">
-                  <VCardText>
-                      <VRow>
-                        <VCol cols="12" md="4">
-                            <AppDateTimePicker
-                            v-model="form.receive_date"
-                            :label="t('goodsReceive.create.fields.receiveDate')"
-                            :placeholder="t('goodsReceive.create.fields.receiveDatePlaceholder')"
-                            :config="{ dateFormat: 'Y-m-d' }"
-                            />
-                        </VCol>
-
-                        <VCol cols="12" md="4">
-                            <VAutocomplete
-                                v-model="selectedPo"
-                                :items="poOptions"
-                                :loading="poLoading"
-                                item-title="title"
-                                item-value="public_id"
-                                :label="t('goodsReceive.create.fields.purchaseOrder')"
-                                :placeholder="t('goodsReceive.create.fields.purchaseOrderPlaceholder')"
-                                clearable
-                                density="compact"
-                                :no-data-text="t('goodsReceive.create.fields.purchaseOrderNoData')"
-                                @click:control="fetchPoOptions()"
-                            >
-                                <template #item="{ props, item }">
-                                <VListItem v-bind="props">
-                                    <VListItemSubtitle>
-                                    {{ item.raw.subtitle }}
-                                    </VListItemSubtitle>
-                                </VListItem>
-                                </template>
-
-                                <template #append-inner>
-                                <VTooltip
-                                    v-if="!poLoading && poOptions.length === 0"
-                                    :text="t('goodsReceive.create.fields.purchaseOrderReloadTooltip')"
-                                    location="top"
-                                >
-                                    <template #activator="{ props }">
-                                    <VBtn
-                                        v-bind="props"
-                                        icon
-                                        size="x-small"
-                                        variant="text"
-                                        color="primary"
-                                        @click.stop.prevent="fetchPoOptions(true)"
-                                    >
-                                        <VIcon icon="tabler-refresh" />
-                                    </VBtn>
-                                    </template>
-                                </VTooltip>
-                                </template>
-                            </VAutocomplete>
-                        </VCol>
-
-                        <!-- <VCol cols="12" md="4">
-                            <VTextField
-                            v-model="form.delivery_note_no"
-                            label="No Surat Jalan"
-                            placeholder="Masukkan nomor surat jalan"
-                            density="compact"
-                            />
-                        </VCol> -->
-
-                        <VCol cols="12" md="4">
-                            <VTextField
-                            v-model="form.vendor_name"
-                            :label="t('goodsReceive.create.fields.vendor')"
-                            readonly
-                            density="compact"
-                            />
-                        </VCol>
-
-                        <VCol cols="12" md="4">
-                            <VTextField
-                            v-model="form.cabang_name"
-                            :label="t('goodsReceive.create.fields.cabang')"
-                            readonly
-                            density="compact"
-                            />
-                        </VCol>
-
-                        <VCol cols="12" md="4">
-                            <VTextField
-                            v-model="form.department_name"
-                            :label="t('goodsReceive.create.fields.department')"
-                            readonly
-                            density="compact"
-                            />
-                        </VCol>
-
-                        <VCol cols="12" md="4">
-                            <VTextField
-                            v-model="form.created_by"
-                            :label="t('goodsReceive.create.fields.receivedBy')"
-                            readonly
-                            :placeholder="t('goodsReceive.create.fields.receivedByPlaceholder')"
-                            density="compact"
-                            prepend-inner-icon="tabler-user"
-                            />
-                        </VCol>
-
-                        <VCol cols="12" md="12">
-                            <VTextarea
-                            v-model="form.notes"
-                            :label="t('goodsReceive.create.fields.notes')"
-                            :placeholder="t('goodsReceive.create.fields.notesPlaceholder')"
-                            rows="2"
-                            density="compact"
-                            />
-                        </VCol>
-                      </VRow>
-                  </VCardText>
-                </VCard>
-            </VCol>
-
-            <VCol>
-              <VCard
-                elevation="2"
-              >
-                <VCardText class="pa-6">
-                  <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
-                    <div>
-                      <h3 class="text-h6 font-weight-bold mb-1">
-                        {{ t('goodsReceive.create.attachment.title') }}
-                      </h3>
-
-                      <div class="text-body-2 text-medium-emphasis">
-                        {{ t('goodsReceive.create.attachment.subtitle') }}
-                      </div>
-                    </div>
-
-                    <VChip
-                      color="primary"
-                      variant="tonal"
-                      prepend-icon="tabler-paperclip"
-                    >
-                      {{ t('goodsReceive.create.attachment.fileCount', { count: attachments.length }) }}
-                    </VChip>
+      <VRow>
+        <VCol cols="12">
+          <VCard class="rounded-lg">
+            <VCardText>
+              <div class="d-flex flex-wrap align-center justify-space-between gap-4">
+                <div>
+                  <h2 class="text-h5 font-weight-bold mb-1">
+                    {{ t('goodsReceive.create.pageTitle') }}
+                  </h2>
+                  <div class="text-body-2 text-medium-emphasis">
+                    {{ t('goodsReceive.create.pageSubtitle') }}
                   </div>
+                </div>
 
-                  <VFileInput
-                    v-model="attachmentInput"
-                    multiple
-                    show-size
-                    clearable
-                    density="comfortable"
-                    variant="outlined"
-                    prepend-icon=""
-                    prepend-inner-icon="tabler-upload"
-                    :label="t('goodsReceive.create.attachment.uploadLabel')"
-                    :placeholder="t('goodsReceive.create.attachment.uploadPlaceholder')"
-                    accept="application/pdf,image/jpeg,image/png,image/webp"
-                    @update:model-value="handleAttachmentChange"
+                <VBtn
+                  variant="tonal"
+                  color="secondary"
+                  prepend-icon="tabler-arrow-left"
+                  class="text-none"
+                  @click="backToIndex"
+                >
+                  {{ t('goodsReceive.create.backButton') }}
+                </VBtn>
+              </div>
+            </VCardText>
+          </VCard>
+        </VCol>
+
+        <VCol cols="12">
+          <VCard class="rounded-lg">
+            <VCardText>
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <AppDateTimePicker
+                    v-model="form.receive_date"
+                    :label="t('goodsReceive.create.fields.receiveDate')"
+                    :placeholder="t('goodsReceive.create.fields.receiveDatePlaceholder')"
+                    :config="{ dateFormat: 'Y-m-d' }"
                   />
+                </VCol>
 
-                  <VAlert
-                    type="info"
-                    variant="tonal"
-                    class="mt-3"
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VAutocomplete
+                    v-model="selectedPo"
+                    :items="poOptions"
+                    :loading="poLoading"
+                    item-title="title"
+                    item-value="public_id"
+                    :label="t('goodsReceive.create.fields.purchaseOrder')"
+                    :placeholder="t('goodsReceive.create.fields.purchaseOrderPlaceholder')"
+                    clearable
+                    density="compact"
+                    :no-data-text="t('goodsReceive.create.fields.purchaseOrderNoData')"
+                    @click:control="fetchPoOptions"
                   >
-                    {{ t('goodsReceive.create.attachment.formatInfo') }}
-                  </VAlert>
+                    <template #item="{ props, item }">
+                      <VListItem v-bind="props">
+                        <VListItemSubtitle>
+                          {{ item.raw.subtitle }}
+                        </VListItemSubtitle>
+                      </VListItem>
+                    </template>
 
-                  <VAlert
-                    v-if="!attachments.length"
-                    type="info"
-                    variant="tonal"
-                    class="mt-4"
-                  >
-                    {{ t('goodsReceive.create.attachment.empty') }}
-                  </VAlert>
-
-                  <VTable
-                    v-else
-                    class="mt-4"
-                  >
-                    <thead>
-                      <tr>
-                        <th width="60">
-                          {{ t('goodsReceive.create.attachment.table.no') }}
-                        </th>
-
-                        <th>
-                          {{ t('goodsReceive.create.attachment.table.fileName') }}
-                        </th>
-
-                        <th width="160">
-                          {{ t('goodsReceive.create.attachment.table.size') }}
-                        </th>
-
-                        <th width="120">
-                          {{ t('goodsReceive.create.attachment.table.type') }}
-                        </th>
-
-                        <th width="100">
-                          {{ t('goodsReceive.create.attachment.table.actions') }}
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      <tr
-                        v-for="(file, index) in attachments"
-                        :key="`${file.name}-${index}`"
+                    <template #append-inner>
+                      <VTooltip
+                        v-if="!poLoading && poOptions.length === 0"
+                        :text="t('goodsReceive.create.fields.purchaseOrderReloadTooltip')"
+                        location="top"
                       >
-                        <td>
-                          {{ index + 1 }}
-                        </td>
-
-                        <td>
-                          <div class="d-flex align-center">
-                            <VIcon
-                              icon="tabler-file"
-                              size="18"
-                              class="me-2"
-                            />
-
-                            <span>{{ file.name }}</span>
-                          </div>
-                        </td>
-
-                        <td>
-                          {{ formatFileSize(file.size) }}
-                        </td>
-
-                        <td>
-                          {{ file.type || '-' }}
-                        </td>
-
-                        <td>
+                        <template #activator="{ props }">
                           <VBtn
+                            v-bind="props"
                             icon
-                            size="small"
-                            color="error"
+                            size="x-small"
                             variant="text"
-                            @click="removeAttachment(index)"
+                            color="primary"
+                            @click.stop.prevent="fetchPoOptions(true)"
                           >
-                            <VIcon icon="tabler-trash" />
+                            <VIcon icon="tabler-refresh" />
                           </VBtn>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </VTable>
-                </VCardText>
-              </VCard>
-            </VCol>
-            <VCol cols="12">
-                <VCard class="rounded-lg">
-                <VCardText>
-                  <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
-                    <div>
-                        <h3 class="text-h6 font-weight-bold mb-1">
-                        {{ t('goodsReceive.create.items.title') }}
-                        </h3>
-                        <div class="text-body-2 text-medium-emphasis">
-                        {{ t('goodsReceive.create.items.subtitle') }}
-                        </div>
-                    </div>
+                        </template>
+                      </VTooltip>
+                    </template>
+                  </VAutocomplete>
+                </VCol>
 
-                    <div class="d-flex gap-2">
-                        <VBtn
-                        variant="tonal"
-                        color="primary"
-                        prepend-icon="tabler-checks"
-                        :disabled="!items.length"
-                        @click="setReceiveAll"
-                        class="text-none"
-                        >
-                        {{ t('goodsReceive.create.items.receiveAllButton') }}
-                        </VBtn>
+                <!--
+                  <VCol cols="12" md="4">
+                  <VTextField
+                  v-model="form.delivery_note_no"
+                  label="No Surat Jalan"
+                  placeholder="Masukkan nomor surat jalan"
+                  density="compact"
+                  />
+                  </VCol>
+                -->
 
-                        <VBtn
-                        variant="tonal"
-                        color="secondary"
-                        prepend-icon="tabler-x"
-                        :disabled="!items.length"
-                        @click="clearReceiveQty"
-                        class="text-none"
-                        >
-                        {{ t('goodsReceive.create.items.resetButton') }}
-                        </VBtn>
-                    </div>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VTextField
+                    v-model="form.vendor_name"
+                    :label="t('goodsReceive.create.fields.vendor')"
+                    readonly
+                    density="compact"
+                  />
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VTextField
+                    v-model="form.cabang_name"
+                    :label="t('goodsReceive.create.fields.cabang')"
+                    readonly
+                    density="compact"
+                  />
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VTextField
+                    v-model="form.department_name"
+                    :label="t('goodsReceive.create.fields.department')"
+                    readonly
+                    density="compact"
+                  />
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VTextField
+                    v-model="form.created_by"
+                    :label="t('goodsReceive.create.fields.receivedBy')"
+                    readonly
+                    :placeholder="t('goodsReceive.create.fields.receivedByPlaceholder')"
+                    density="compact"
+                    prepend-inner-icon="tabler-user"
+                  />
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="12"
+                >
+                  <VTextarea
+                    v-model="form.notes"
+                    :label="t('goodsReceive.create.fields.notes')"
+                    :placeholder="t('goodsReceive.create.fields.notesPlaceholder')"
+                    rows="2"
+                    density="compact"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
+        </VCol>
+
+        <VCol>
+          <VCard
+            elevation="2"
+          >
+            <VCardText class="pa-6">
+              <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
+                <div>
+                  <h3 class="text-h6 font-weight-bold mb-1">
+                    {{ t('goodsReceive.create.attachment.title') }}
+                  </h3>
+
+                  <div class="text-body-2 text-medium-emphasis">
+                    {{ t('goodsReceive.create.attachment.subtitle') }}
                   </div>
+                </div>
 
-                    <VProgressLinear
-                    v-if="itemLoading"
-                    indeterminate
+                <VChip
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="tabler-paperclip"
+                >
+                  {{ t('goodsReceive.create.attachment.fileCount', { count: attachments.length }) }}
+                </VChip>
+              </div>
+
+              <VFileInput
+                v-model="attachmentInput"
+                multiple
+                show-size
+                clearable
+                density="comfortable"
+                variant="outlined"
+                prepend-icon=""
+                prepend-inner-icon="tabler-upload"
+                :label="t('goodsReceive.create.attachment.uploadLabel')"
+                :placeholder="t('goodsReceive.create.attachment.uploadPlaceholder')"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                @update:model-value="handleAttachmentChange"
+              />
+
+              <VAlert
+                type="info"
+                variant="tonal"
+                class="mt-3"
+              >
+                {{ t('goodsReceive.create.attachment.formatInfo') }}
+              </VAlert>
+
+              <VAlert
+                v-if="!attachments.length"
+                type="info"
+                variant="tonal"
+                class="mt-4"
+              >
+                {{ t('goodsReceive.create.attachment.empty') }}
+              </VAlert>
+
+              <VTable
+                v-else
+                class="mt-4"
+              >
+                <thead>
+                  <tr>
+                    <th width="60">
+                      {{ t('goodsReceive.create.attachment.table.no') }}
+                    </th>
+
+                    <th>
+                      {{ t('goodsReceive.create.attachment.table.fileName') }}
+                    </th>
+
+                    <th width="160">
+                      {{ t('goodsReceive.create.attachment.table.size') }}
+                    </th>
+
+                    <th width="120">
+                      {{ t('goodsReceive.create.attachment.table.type') }}
+                    </th>
+
+                    <th width="100">
+                      {{ t('goodsReceive.create.attachment.table.actions') }}
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr
+                    v-for="(file, index) in attachments"
+                    :key="`${file.name}-${index}`"
+                  >
+                    <td>
+                      {{ index + 1 }}
+                    </td>
+
+                    <td>
+                      <div class="d-flex align-center">
+                        <VIcon
+                          icon="tabler-file"
+                          size="18"
+                          class="me-2"
+                        />
+
+                        <span>{{ file.name }}</span>
+                      </div>
+                    </td>
+
+                    <td>
+                      {{ formatFileSize(file.size) }}
+                    </td>
+
+                    <td>
+                      {{ file.type || '-' }}
+                    </td>
+
+                    <td>
+                      <VBtn
+                        icon
+                        size="small"
+                        color="error"
+                        variant="text"
+                        @click="removeAttachment(index)"
+                      >
+                        <VIcon icon="tabler-trash" />
+                      </VBtn>
+                    </td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </VCardText>
+          </VCard>
+        </VCol>
+        <VCol cols="12">
+          <VCard class="rounded-lg">
+            <VCardText>
+              <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
+                <div>
+                  <h3 class="text-h6 font-weight-bold mb-1">
+                    {{ t('goodsReceive.create.items.title') }}
+                  </h3>
+                  <div class="text-body-2 text-medium-emphasis">
+                    {{ t('goodsReceive.create.items.subtitle') }}
+                  </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                  <VBtn
+                    variant="tonal"
                     color="primary"
-                    class="mb-4"
-                    />
+                    prepend-icon="tabler-checks"
+                    :disabled="!items.length"
+                    class="text-none"
+                    @click="setReceiveAll"
+                  >
+                    {{ t('goodsReceive.create.items.receiveAllButton') }}
+                  </VBtn>
 
-                    <VTable class="text-no-wrap">
-                    <thead>
-                        <tr>
-                        <th width="50">{{ t('goodsReceive.create.items.table.no') }}</th>
-                        <th class="gr-item-name">{{ t('goodsReceive.create.items.table.item') }}</th>
-                        <th width="120" class="text-end">{{ t('goodsReceive.create.items.table.qtyPo') }}</th>
-                        <th width="140" class="text-end">{{ t('goodsReceive.create.items.table.sudahGr') }}</th>
-                        <th width="140" class="text-end">{{ t('goodsReceive.create.items.table.sisa') }}</th>
-                        <th width="160" class="text-end">{{ t('goodsReceive.create.items.table.qtyReceive') }}</th>
-                        <th width="220">{{ t('goodsReceive.create.items.table.notes') }}</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        <tr v-if="!items.length">
-                        <td colspan="7" class="text-center py-8 text-medium-emphasis">
-                            {{ t('goodsReceive.create.items.emptyState') }}
-                        </td>
-                        </tr>
-
-                        <tr
-                        v-for="(item, index) in items"
-                        :key="item.po_item_id"
-                        >
-                        <td>{{ index + 1 }}</td>
-
-                        <td class="gr-item-name">
-                            <div class="font-weight-medium">
-                            {{ toTitleCase(item.item_name) }}
-                            </div>
-                            <div class="text-caption text-medium-emphasis">
-                            {{ item.unit }}
-                            </div>
-                        </td>
-
-                        <td class="text-end">
-                            {{ formatNumber(item.ordered_qty) }}
-                        </td>
-
-                        <td class="text-end">
-                            {{ formatNumber(item.received_qty) }}
-                        </td>
-
-                        <td class="text-end">
-                            <VChip
-                            size="small"
-                            color="warning"
-                            variant="tonal"
-                            >
-                            {{ formatNumber(item.remaining_qty) }}
-                            </VChip>
-                        </td>
-
-                        <td>
-                            <VTextField
-                            v-model.number="item.receive_qty"
-                            type="number"
-                            min="0"
-                            :max="item.remaining_qty"
-                            density="compact"
-                            hide-details
-                            class="text-end"
-                            />
-                        </td>
-
-                        <td>
-                            <VTextField
-                            v-model="item.notes"
-                            :placeholder="t('goodsReceive.create.items.notesPlaceholder')"
-                            density="compact"
-                            hide-details
-                            />
-                        </td>
-                        </tr>
-                    </tbody>
-                    </VTable>
-
-                    <VDivider class="my-4" />
-
-                    <VRow>
-                    <VCol cols="12" md="4">
-                        <VAlert
-                        color="primary"
-                        variant="tonal"
-                        density="compact"
-                        >
-                        {{ t('goodsReceive.create.items.totalItemSelected') }}
-                        <strong>{{ totalItemSelected }}</strong>
-                        </VAlert>
-                    </VCol>
-
-                    <VCol cols="12" md="4">
-                        <VAlert
-                        color="success"
-                        variant="tonal"
-                        density="compact"
-                        >
-                        {{ t('goodsReceive.create.items.totalQtyReceive') }}
-                        <strong>{{ formatNumber(totalReceiveQty) }}</strong>
-                        </VAlert>
-                    </VCol>
-
-                    <VCol cols="12" md="4">
-                        <VAlert
-                        color="info"
-                        variant="tonal"
-                        density="compact"
-                        >
-                        {{ t('goodsReceive.create.items.initialStatus') }}
-                        <strong>{{ t('goodsReceive.create.items.statusDraft') }}</strong>
-                        </VAlert>
-                    </VCol>
-                    </VRow>
-                </VCardText>
-
-                <VCardActions class="justify-end pa-6 pt-0">
-                    <VBtn
+                  <VBtn
                     variant="tonal"
                     color="secondary"
-                    @click.prevent.stop="confirmCancel"
+                    prepend-icon="tabler-x"
+                    :disabled="!items.length"
                     class="text-none"
-                    >
-                    {{ t('common.actions.cancel') }}
-                    </VBtn>
+                    @click="clearReceiveQty"
+                  >
+                    {{ t('goodsReceive.create.items.resetButton') }}
+                  </VBtn>
+                </div>
+              </div>
 
-                    <VBtn
-                      color="primary"
-                      prepend-icon="tabler-device-floppy"
-                      :loading="submitLoading"
-                      :disabled="!canSubmit"
-                      @click="submit"
-                      class="text-none"
+              <VProgressLinear
+                v-if="itemLoading"
+                indeterminate
+                color="primary"
+                class="mb-4"
+              />
+
+              <VTable class="text-no-wrap">
+                <thead>
+                  <tr>
+                    <th width="50">
+                      {{ t('goodsReceive.create.items.table.no') }}
+                    </th>
+                    <th class="gr-item-name">
+                      {{ t('goodsReceive.create.items.table.item') }}
+                    </th>
+                    <th
+                      width="120"
+                      class="text-end"
                     >
-                    {{ t('goodsReceive.create.toast.saveButton') }}
-                    </VBtn>
-                </VCardActions>
-                </VCard>
-            </VCol>
-        </VRow>
-  </VContainer>
+                      {{ t('goodsReceive.create.items.table.qtyPo') }}
+                    </th>
+                    <th
+                      width="140"
+                      class="text-end"
+                    >
+                      {{ t('goodsReceive.create.items.table.sudahGr') }}
+                    </th>
+                    <th
+                      width="140"
+                      class="text-end"
+                    >
+                      {{ t('goodsReceive.create.items.table.sisa') }}
+                    </th>
+                    <th
+                      width="160"
+                      class="text-end"
+                    >
+                      {{ t('goodsReceive.create.items.table.qtyReceive') }}
+                    </th>
+                    <th width="220">
+                      {{ t('goodsReceive.create.items.table.notes') }}
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr v-if="!items.length">
+                    <td
+                      colspan="7"
+                      class="text-center py-8 text-medium-emphasis"
+                    >
+                      {{ t('goodsReceive.create.items.emptyState') }}
+                    </td>
+                  </tr>
+
+                  <tr
+                    v-for="(item, index) in items"
+                    :key="item.po_item_id"
+                  >
+                    <td>{{ index + 1 }}</td>
+
+                    <td class="gr-item-name">
+                      <div class="font-weight-medium">
+                        {{ toTitleCase(item.item_name) }}
+                      </div>
+                      <div class="text-caption text-medium-emphasis">
+                        {{ item.unit }}
+                      </div>
+                    </td>
+
+                    <td class="text-end">
+                      {{ formatNumber(item.ordered_qty) }}
+                    </td>
+
+                    <td class="text-end">
+                      {{ formatNumber(item.received_qty) }}
+                    </td>
+
+                    <td class="text-end">
+                      <VChip
+                        size="small"
+                        color="warning"
+                        variant="tonal"
+                      >
+                        {{ formatNumber(item.remaining_qty) }}
+                      </VChip>
+                    </td>
+
+                    <td>
+                      <VTextField
+                        v-model.number="item.receive_qty"
+                        type="number"
+                        min="0"
+                        :max="item.remaining_qty"
+                        density="compact"
+                        hide-details
+                        class="text-end"
+                      />
+                    </td>
+
+                    <td>
+                      <VTextField
+                        v-model="item.notes"
+                        :placeholder="t('goodsReceive.create.items.notesPlaceholder')"
+                        density="compact"
+                        hide-details
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </VTable>
+
+              <VDivider class="my-4" />
+
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VAlert
+                    color="primary"
+                    variant="tonal"
+                    density="compact"
+                  >
+                    {{ t('goodsReceive.create.items.totalItemSelected') }}
+                    <strong>{{ totalItemSelected }}</strong>
+                  </VAlert>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VAlert
+                    color="success"
+                    variant="tonal"
+                    density="compact"
+                  >
+                    {{ t('goodsReceive.create.items.totalQtyReceive') }}
+                    <strong>{{ formatNumber(totalReceiveQty) }}</strong>
+                  </VAlert>
+                </VCol>
+
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VAlert
+                    color="info"
+                    variant="tonal"
+                    density="compact"
+                  >
+                    {{ t('goodsReceive.create.items.initialStatus') }}
+                    <strong>{{ t('goodsReceive.create.items.statusDraft') }}</strong>
+                  </VAlert>
+                </VCol>
+              </VRow>
+            </VCardText>
+
+            <VCardActions class="justify-end pa-6 pt-0">
+              <VBtn
+                variant="tonal"
+                color="secondary"
+                class="text-none"
+                @click.prevent.stop="confirmCancel"
+              >
+                {{ t('common.actions.cancel') }}
+              </VBtn>
+
+              <VBtn
+                color="primary"
+                prepend-icon="tabler-device-floppy"
+                :loading="submitLoading"
+                :disabled="!canSubmit"
+                class="text-none"
+                @click="submit"
+              >
+                {{ t('goodsReceive.create.toast.saveButton') }}
+              </VBtn>
+            </VCardActions>
+          </VCard>
+        </VCol>
+      </VRow>
+    </VContainer>
   </section>
 </template>
 

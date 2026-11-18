@@ -62,7 +62,7 @@ class QueueHealthService
         if ($macet) {
             $alasan[] = sprintf(
                 'Job tertua sudah menunggu %s menit (ambang %d menit) -- worker kemungkinan tidak berjalan.',
-                number_format($menunggu['oldest_waiting_minutes'], 1),
+                angka($menunggu['oldest_waiting_minutes'], 1),
                 $ambangMacet,
             );
         }

@@ -73,7 +73,7 @@ class CashAdvanceRealizationApprovalGeneratorService
                             ?? $realization->departmentData?->name
                             ?? '-',
                         $realization->transactionCategory?->name ?? '-',
-                        number_format($totalAmount, 0, ',', '.'),
+                        angka($totalAmount, 0),
                     ),
                 ],
             ]);

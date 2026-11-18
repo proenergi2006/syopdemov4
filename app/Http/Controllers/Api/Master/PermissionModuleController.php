@@ -157,6 +157,11 @@ class PermissionModuleController extends Controller
                         ),
 
                         'is_active' => (bool) $module->is_active,
+                        /* Pendaftaran module ini sebagai jenis dokumen Approval Flow. */
+                        'approval_document_type' => $module->approval_document_type,
+                        'approval_document_label' => $module->approval_document_label,
+                        'approval_uses_area_matrix' => (bool) $module->approval_uses_area_matrix,
+                        'approval_uses_transaction_category' => (bool) $module->approval_uses_transaction_category,
 
                         'permissions_count' => (int) (
                             $module->permissions_count
@@ -276,6 +281,11 @@ class PermissionModuleController extends Controller
                         'route_prefix' => $module->route_prefix,
                         'sort_order' => (int) $module->sort_order,
                         'is_active' => (bool) $module->is_active,
+                        /* Pendaftaran module ini sebagai jenis dokumen Approval Flow. */
+                        'approval_document_type' => $module->approval_document_type,
+                        'approval_document_label' => $module->approval_document_label,
+                        'approval_uses_area_matrix' => (bool) $module->approval_uses_area_matrix,
+                        'approval_uses_transaction_category' => (bool) $module->approval_uses_transaction_category,
                         'created_at' => $module->created_at,
                         'updated_at' => $module->updated_at,
                     ],
@@ -385,6 +395,37 @@ class PermissionModuleController extends Controller
             ],
 
             'is_active' => [
+                'nullable',
+                'boolean',
+            ],
+
+            /*
+            |------------------------------------------------------------------
+            | Pendaftaran ke Approval Flow
+            |------------------------------------------------------------------
+            | Seluruhnya nullable: module yang tidak punya approval flow cukup
+            | mengosongkan approval_document_type, dan ketiga kolom lainnya
+            | ikut diabaikan.
+            |------------------------------------------------------------------
+            */
+            'approval_document_type' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'approval_document_label' => [
+                'nullable',
+                'string',
+                'max:150',
+            ],
+
+            'approval_uses_area_matrix' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'approval_uses_transaction_category' => [
                 'nullable',
                 'boolean',
             ],
@@ -505,12 +546,25 @@ class PermissionModuleController extends Controller
             ]);
         }
 
+        /*
+        | Diperiksa SEBELUM transaksi, sejajar dengan pemeriksaan code dan
+        | route prefix di atas. Bila dijalankan di dalam transaksi,
+        | ValidationException-nya tertangkap catch Throwable di bawah dan
+        | keluar sebagai 500 -- formulir jadi tidak bisa menandai kolom mana
+        | yang bermasalah, hanya memberi pesan kegagalan umum.
+        */
+        $kolomApproval = $this->approvalFields(
+            $validated,
+            trim((string) $validated['name']),
+        );
+
         try {
             $module = DB::transaction(
                 function () use (
                     $validated,
                     $normalizedCode,
                     $routePrefix,
+                    $kolomApproval,
                 ): PermissionModule {
                     $module = PermissionModule::query()->create([
                         'code' => $normalizedCode,
@@ -544,7 +598,7 @@ class PermissionModuleController extends Controller
                             $validated['is_active']
                             ?? false
                         ),
-                    ]);
+                    ] + $kolomApproval);
 
                     $this->createStandardPermissions($module);
 
@@ -937,6 +991,36 @@ class PermissionModuleController extends Controller
                 'required',
                 'boolean',
             ],
+
+            /*
+            |------------------------------------------------------------------
+            | Pendaftaran ke Approval Flow
+            |------------------------------------------------------------------
+            | Hanya disentuh bila permintaannya memang membawa
+            | approval_document_type. Lihat keterangan di bawah.
+            |------------------------------------------------------------------
+            */
+            'approval_document_type' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'approval_document_label' => [
+                'nullable',
+                'string',
+                'max:150',
+            ],
+
+            'approval_uses_area_matrix' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'approval_uses_transaction_category' => [
+                'nullable',
+                'boolean',
+            ],
         ]);
 
         /*
@@ -1048,6 +1132,28 @@ class PermissionModuleController extends Controller
             }
         }
 
+        /*
+        | Kolom approval HANYA disentuh bila permintaannya memang
+        | membawanya.
+        |
+        | Tombol aktif/nonaktif di layar mengirim ulang nama, deskripsi,
+        | route prefix, dan status saja. Bila kolom approval ikut ditimpa
+        | di setiap update, sekali tekan tombol itu akan menghapus
+        | pendaftaran module tersebut dari Approval Flow -- diam-diam, dan
+        | baru ketahuan ketika ada dokumen yang approval-nya tidak
+        | terbentuk.
+        |
+        | Dihitung di luar transaksi supaya ValidationException dari
+        | pemeriksaan jenis dokumen kembar sampai ke layar sebagai 422,
+        | bukan tertangkap catch di bawah dan berubah menjadi 500.
+        */
+        $kolomApproval = $request->has('approval_document_type')
+            ? $this->approvalFields(
+                $validated,
+                trim((string) $validated['name']),
+                (int) $module->id,
+            )
+            : [];
         try {
             DB::transaction(
                 function () use (
@@ -1055,6 +1161,7 @@ class PermissionModuleController extends Controller
                     $validated,
                     $routePrefix,
                     $willBeActive,
+                    $kolomApproval,
                 ): void {
                     $module->update([
                         'name' => trim(
@@ -1074,7 +1181,7 @@ class PermissionModuleController extends Controller
                         'sort_order' => (int) $validated['sort_order'],
 
                         'is_active' => $willBeActive,
-                    ]);
+                    ] + $kolomApproval);
                 },
             );
 
@@ -1736,5 +1843,77 @@ class PermissionModuleController extends Controller
                     : null,
             ], 500);
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Kolom pendaftaran Approval Flow
+    |--------------------------------------------------------------------------
+    | Dipakai bersama store() dan update() supaya aturannya tidak bercabang.
+    |
+    | approval_document_type adalah penentunya. Bila kosong, module ini
+    | dianggap tidak punya approval flow dan ketiga kolom lain ikut
+    | dikosongkan -- menyimpan "pakai kondisi matrix" pada module yang tidak
+    | punya approval flow hanya menyisakan nilai yang tidak pernah terbaca
+    | dan membingungkan siapa pun yang membacanya nanti.
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function approvalFields(
+        array $validated,
+        string $namaModule,
+        ?int $abaikanId = null,
+    ): array {
+        $jenis = strtoupper(trim((string) ($validated['approval_document_type'] ?? '')));
+
+        if ($jenis === '') {
+            return [
+                'approval_document_type' => null,
+                'approval_document_label' => null,
+                'approval_uses_area_matrix' => false,
+                'approval_uses_transaction_category' => false,
+            ];
+        }
+
+        /*
+        | Satu kode jenis dokumen hanya boleh dimiliki satu module.
+        |
+        | Tanpa penjagaan ini, dua module yang sama-sama mengaku "FPU" akan
+        | membuat ApprovalDocumentTypeService memilih salah satunya secara
+        | sewenang-wenang -- dan yang kalah diam-diam kehilangan aturan
+        | matriksnya, tanpa ada pesan apa pun.
+        */
+        $bentrok = PermissionModule::query()
+            ->whereRaw('UPPER(TRIM(approval_document_type)) = ?', [$jenis])
+            ->when($abaikanId !== null, fn ($q) => $q->whereKeyNot($abaikanId))
+            ->value('code');
+
+        if ($bentrok) {
+            throw ValidationException::withMessages([
+                'approval_document_type' => [
+                    sprintf(
+                        'Jenis dokumen "%s" sudah dipakai module %s.',
+                        $jenis,
+                        $bentrok,
+                    ),
+                ],
+            ]);
+        }
+
+        $label = trim((string) ($validated['approval_document_label'] ?? ''));
+
+        return [
+            'approval_document_type' => $jenis,
+
+            /* Label kosong jatuh ke nama module -- selalu ada isinya di layar. */
+            'approval_document_label' => $label !== '' ? $label : $namaModule,
+
+            'approval_uses_area_matrix' => (bool) ($validated['approval_uses_area_matrix'] ?? false),
+            'approval_uses_transaction_category' => (bool) ($validated['approval_uses_transaction_category'] ?? false),
+        ];
     }
 }

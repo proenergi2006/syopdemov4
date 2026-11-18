@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 use App\Models\PermissionModule;
 use App\Models\Cabang;
+use App\Services\Auth\ImpersonationService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -91,6 +92,19 @@ class AuthController extends Controller
             $user->forceFill([
                 'last_login_at' => now(),
             ])->save();
+
+            /*
+            |------------------------------------------------------------------
+            | Sesi penyamaran yang menggantung
+            |------------------------------------------------------------------
+            | Token penyamaran bisa mati sendiri karena idle atau kedaluwarsa,
+            | dan baris sesinya tertinggal terbuka. Dibereskan saat pemiliknya
+            | login lagi: supaya riwayat tidak terus terlihat "sedang berjalan",
+            | dan supaya ia bisa mulai menyamar lagi -- satu admin hanya boleh
+            | punya satu sesi terbuka, dan itu dijaga unique index.
+            |------------------------------------------------------------------
+            */
+            app(ImpersonationService::class)->bersihkanSesiMenggantung($user);
 
             $remember = $request->boolean('remember');
 
@@ -291,6 +305,18 @@ class AuthController extends Controller
                     'message' => __('auth_messages.logout.user_not_found'),
                 ], 401);
             }
+
+            /*
+            |------------------------------------------------------------------
+            | Logout saat sedang menyamar
+            |------------------------------------------------------------------
+            | Keluar total, bukan kembali ke akun admin. Tombol Logout yang
+            | artinya berubah-ubah tergantung keadaan lebih berbahaya daripada
+            | yang tetap. Sesi ditutup di sini, sebelum tokennya dihapus di
+            | bawah, supaya tidak ada baris yang tertinggal terbuka.
+            |------------------------------------------------------------------
+            */
+            app(ImpersonationService::class)->tutupKarenaLogout($request);
 
             $user->forceFill([
                 'last_logout_at' => now(),

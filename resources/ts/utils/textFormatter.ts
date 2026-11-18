@@ -1,3 +1,5 @@
+import { formatAngka, formatUang, parseAngka } from '@/utils/numberFormatter'
+
 export const toUpper = (value: string | null | undefined): string => {
   return String(value ?? '').toUpperCase()
 }
@@ -50,11 +52,12 @@ export const validateEmail = (value: string | null | undefined): boolean => {
 /**
  * Email validation message
  */
-export const emailValidationMessage =
-  "Format email tidak valid. Contoh penulisan yang benar: contoh@email.com"
+export const emailValidationMessage
+  = 'Format email tidak valid. Contoh penulisan yang benar: contoh@email.com'
 
 export const formatStatusPKP = (value?: string | null): string => {
-  if (!value) return '-'
+  if (!value)
+    return '-'
 
   const normalized = value.toLowerCase()
 
@@ -67,13 +70,14 @@ export const formatStatusPKP = (value?: string | null): string => {
 }
 
 export const formatKategoriVendor = (value?: string | null): string => {
-  if (!value) return '-'
+  if (!value)
+    return '-'
 
   const normalized = value.toLowerCase()
 
   const map: Record<string, string> = {
     trading: 'TRADING',
-    non_trading: 'NON TRADING'
+    non_trading: 'NON TRADING',
   }
 
   return map[normalized] ?? value
@@ -90,13 +94,11 @@ export const onlyNumberKeypress = (e: KeyboardEvent): void => {
     'End',
   ]
 
-  if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
+  if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey)
     return
-  }
 
-  if (!/^\d$/.test(e.key)) {
+  if (!/^\d$/.test(e.key))
     e.preventDefault()
-  }
 }
 
 export const sanitizeNumberInput = (
@@ -106,6 +108,7 @@ export const sanitizeNumberInput = (
   },
 ): string => {
   const maxLength = options?.maxLength ?? 12
+
   return String(value ?? '')
     .replace(/[^\d]/g, '')
     .slice(0, maxLength)
@@ -123,9 +126,8 @@ export const parseNumberInput = (
 
   const raw = sanitizeNumberInput(value, { maxLength })
 
-  if (!raw) {
+  if (!raw)
     return emptyAsZero ? 0 : null
-  }
 
   return Number(raw)
 }
@@ -169,38 +171,35 @@ export const getClipboardText = (event: ClipboardEvent): string => {
 }
 
 export const formatCurrency = (value: number | string | null | undefined): string => {
-  const numberValue = Number(value || 0)
-
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-  }).format(numberValue)
+  return formatUang(value, { maxDesimal: 0 })
 }
 
 export const formatNumberWithoutRp = (
   value: number | string | null | undefined,
 ): string => {
-  const numberValue = Number(value || 0)
-
-  return new Intl.NumberFormat('id-ID', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(numberValue)
+  return formatAngka(value, { maxDesimal: 2 })
 }
 
+/*
+ * Pemisah ribuan sekarang koma dan pemisah desimal titik, jadi nominal tidak
+ * bisa lagi dibaca dengan membuang semua yang bukan digit -- "1,234.56" akan
+ * terbaca 123456. parseAngka yang membedakan keduanya.
+ */
 export const unformatMoney = (value: string | number | null): number => {
-  if (!value) return 0
+  if (!value)
+    return 0
 
-  return Number(String(value).replace(/[^\d]/g, '')) || 0
+  return parseAngka(value)
 }
 
 export const formatDate = (value: string | null): string => {
-  if (!value) return '-'
+  if (!value)
+    return '-'
 
   const date = new Date(value)
 
-  if (Number.isNaN(date.getTime())) return value
+  if (Number.isNaN(date.getTime()))
+    return value
 
   return new Intl.DateTimeFormat('id-ID', {
     day: '2-digit',
@@ -257,13 +256,11 @@ export const sanitizeDecimalInput = (
   integerPart = integerPart.slice(0, maxIntegerLength)
   decimalPart = decimalPart.slice(0, maxDecimalLength)
 
-  if (!integerPart && decimalPart) {
+  if (!integerPart && decimalPart)
     integerPart = '0'
-  }
 
-  if (!allowZero && integerPart === '0' && !decimalPart) {
+  if (!allowZero && integerPart === '0' && !decimalPart)
     return '0'
-  }
 
   return raw.includes('.')
     ? `${integerPart || '0'}.${decimalPart}`
@@ -273,27 +270,14 @@ export const sanitizeDecimalInput = (
 export const parseDecimalInput = (
   value: string | number | null | undefined,
 ): number => {
-  const normalized = String(value ?? '')
-    .replace(',', '.')
-    .replace(/[^\d.]/g, '')
-
-  const parsed = Number(normalized)
-
-  return Number.isFinite(parsed) ? parsed : 0
+  return parseAngka(value)
 }
 
 export const formatDecimalQty = (
   value: string | number | null | undefined,
   maxDecimal = 2,
 ): string => {
-  const numberValue = Number(value ?? 0)
-
-  if (!Number.isFinite(numberValue)) return '0'
-
-  return new Intl.NumberFormat('id-ID', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: maxDecimal,
-  }).format(numberValue)
+  return formatAngka(value, { maxDesimal: maxDecimal })
 }
 
 /**

@@ -78,6 +78,26 @@ return [
         'failed' => 'Penerimaan Claim gagal diproses.',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Claim yang wajib lewat petty cash
+    |--------------------------------------------------------------------------
+    | Pesannya menyebut nominal dan ambangnya, bukan sekadar "tidak boleh".
+    | Yang membacanya adalah Finance yang biasa menerima claim ini setiap hari
+    | dan tiba-tiba ditahan -- ia harus bisa tahu sebabnya dari pesannya
+    | sendiri, tanpa menebak atau bertanya.
+    |--------------------------------------------------------------------------
+    */
+    'petty_cash' => [
+        'receive_holder_only' => 'Claim ini bernominal Rp :amount, tidak melebihi ambang petty cash cabang :branch (Rp :threshold), '
+            . 'sehingga yang menerima dan membayarkannya adalah pemegang kas kecil cabang tersebut.',
+        'pay_via_petty_cash' => 'Claim ini dibayarkan lewat formulir Petty Cash, bukan dari sini. '
+            . 'Pemegang kas kecil cabang :branch yang membuat formulirnya, dan claim ini otomatis menjadi dibayar saat formulir itu dicairkan.',
+        'unreceive_locked' => 'Penerimaan Claim ini tidak bisa ditarik kembali karena sudah masuk formulir Petty Cash :number. '
+            . 'Batalkan dulu formulir petty cash tersebut.',
+        'no_ceiling' => 'Cabang :branch belum punya plafon petty cash yang aktif.',
+    ],
+
     'pay' => [
         'forbidden' => 'Anda tidak memiliki akses untuk menandai Claim sudah dibayarkan.',
         'only_received' => 'Hanya Claim yang sudah diterima yang dapat dibayarkan.',

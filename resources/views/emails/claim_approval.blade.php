@@ -51,7 +51,7 @@
     $accentColor = $currentMode === 'rejected' ? '#b3261e' : '#1f4e78';
 
     $rupiah = static fn ($value): string =>
-        'Rp ' . number_format((float) $value, 0, ',', '.');
+        'Rp ' . angka((float) $value, 0);
 
     $logoUrl = 'https://syop.proenergi.com/proEnergi/libraries/themes/images/logo-proenergi.png';
 @endphp

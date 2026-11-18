@@ -338,7 +338,7 @@
             <td width="5%">:</td>
             <td>
                 &plusmn;
-                {{ number_format((float) ($data['quantity'] ?? 0)) }}
+                {{ angka((float) ($data['quantity'] ?? 0)) }}
                 ({{ $data['satuan'] ?? '-' }})
             </td>
         </tr>
@@ -369,7 +369,7 @@
             <td width="5%">:</td>
             <td>
                 IDR
-                {{ number_format((float) ($data['freight'] ?? 0)) }}
+                {{ angka((float) ($data['freight'] ?? 0)) }}
                 /L (Exclude VAT, include withholding tax)
             </td>
         </tr>
