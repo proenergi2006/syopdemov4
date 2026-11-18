@@ -39,6 +39,13 @@ class CashAdvanceRealizationMailService
 
     private const PERMISSION_RECEIVE = 'cash_advance_realization.receive';
 
+    /*
+    | Memeriksa pengembalian yang dinyatakan pemohon. Izinnya sendiri, bukan
+    | .receive: menerima berkas dan menyatakan uang sudah masuk ke rekening
+    | perusahaan adalah dua penilaian berbeda.
+    */
+    private const PERMISSION_CONFIRM_RETURN = 'cash_advance_realization.confirm_return';
+
     public function __construct(
         private readonly PermissionRecipientService $permissionRecipients,
     ) {
@@ -240,10 +247,35 @@ class CashAdvanceRealizationMailService
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Selisihnya menunggu diselesaikan
+    |--------------------------------------------------------------------------
+    | DUA ARAH, DUA PENERIMA.
+    |
+    | Kekurangan dibayarkan perusahaan: yang dipanggil pemegang izin
+    | pembayarannya. Sisa dana dikembalikan PEMOHON: yang dipanggil pemohonnya
+    | sendiri, karena dialah yang memegang uangnya.
+    |
+    | Cabang pengembalian dahulu pun dikirim ke pemegang izin. Akibatnya
+    | terukur: satu dokumen GA di Kantor Pusat mengirim pemberitahuan ke 38
+    | akun dari 15 role -- Marketing, Service Advisor, Admin Warehouse -- yang
+    | tidak satu pun berurusan dengan uang itu, sedangkan pemohonnya hanya
+    | menerima kabar "berkas Anda sudah diterima" yang tidak menyebut sepeser
+    | pun tentang dana yang harus ia kembalikan.
+    |--------------------------------------------------------------------------
+    */
     public function sendDifferenceSettlementRequest(
         CashAdvanceRealization $realization,
     ): void {
         $differenceType = strtoupper(trim((string) $realization->difference_type));
+
+        if ($differenceType === CashAdvanceRealization::DIFFERENCE_RETURN) {
+            $this->sendReturnRequestToRequester($realization);
+
+            return;
+        }
+
         $permission = self::PERMISSION_BY_DIFFERENCE[$differenceType] ?? null;
 
         if (!$permission) {
@@ -282,6 +314,133 @@ class CashAdvanceRealizationMailService
                 $mode,
             );
         }
+    }
+
+    /** Email ke pemohon: sisa dananya perlu dikembalikan ke Finance. */
+    private function sendReturnRequestToRequester(
+        CashAdvanceRealization $realization,
+    ): void {
+        $requester = $this->resolveRequester($realization);
+
+        if (!$requester) {
+            return;
+        }
+
+        $realization->loadMissing(['items', 'transactionCategory', 'cashAdvance']);
+
+        $this->queue(
+            $requester,
+            new CashAdvanceRealizationApprovalMail(
+                realization: $realization,
+                recipient: $requester,
+                mode: 'return_request',
+            ),
+            $realization,
+            'return_request',
+        );
+    }
+
+    /**
+     * Email ke Finance: pemohon menyatakan sudah mengembalikan dananya.
+     *
+     * Penerimanya pemegang izin PENERIMAAN. Izin pengembalian sekarang milik
+     * pemohon, jadi memakainya di sini akan mengirim surat itu kembali ke
+     * orang yang baru saja menulisnya.
+     */
+    public function sendReturnDeclared(
+        CashAdvanceRealization $realization,
+        User $declarer,
+    ): void {
+        $recipients = $this->permissionRecipients
+            ->mailableUsersWithPermission(self::PERMISSION_CONFIRM_RETURN);
+
+        if ($recipients->isEmpty()) {
+            Log::warning('[Realisasi FPU Mail] Pemegang izin konfirmasi pengembalian ber-email tidak ditemukan', [
+                'cash_advance_realization_id' => $realization->id,
+                'realization_number' => $realization->realization_number,
+                'permission' => self::PERMISSION_CONFIRM_RETURN,
+            ]);
+
+            return;
+        }
+
+        $realization->loadMissing(['items', 'transactionCategory', 'cashAdvance']);
+
+        foreach ($recipients as $recipient) {
+            $this->queue(
+                $recipient,
+                new CashAdvanceRealizationApprovalMail(
+                    realization: $realization,
+                    recipient: $recipient,
+                    mode: 'return_declared',
+                    actor: $declarer,
+                    notes: $realization->return_declaration_notes,
+                ),
+                $realization,
+                'return_declared',
+            );
+        }
+    }
+
+    /**
+     * Email ke pemohon: realisasinya yang nilainya pas sudah disetujui.
+     *
+     * Terpisah dari sendSettled, dan kalimatnya pun berbeda. "Selisih
+     * Realisasi telah diselesaikan" pada dokumen yang tidak punya selisih
+     * menyuruh pembacanya mencari perpindahan uang yang tidak pernah ada.
+     */
+    public function sendFinalized(
+        CashAdvanceRealization $realization,
+        User $approver,
+    ): void {
+        $requester = $this->resolveRequester($realization);
+
+        if (!$requester) {
+            return;
+        }
+
+        $realization->loadMissing(['items', 'transactionCategory', 'cashAdvance']);
+
+        $this->queue(
+            $requester,
+            new CashAdvanceRealizationApprovalMail(
+                realization: $realization,
+                recipient: $requester,
+                mode: 'finalized',
+                actor: $approver,
+                notes: $realization->settlement_notes,
+            ),
+            $realization,
+            'finalized',
+        );
+    }
+
+    /** Email ke pemohon: pernyataan pengembaliannya ditolak Finance. */
+    public function sendReturnRejected(
+        CashAdvanceRealization $realization,
+        User $actor,
+        ?string $reason = null,
+    ): void {
+        $requester = $this->resolveRequester($realization);
+
+        if (!$requester) {
+            return;
+        }
+
+        $realization->loadMissing(['items', 'transactionCategory', 'cashAdvance']);
+
+        $this->queue(
+            $requester,
+            new CashAdvanceRealizationApprovalMail(
+                realization: $realization,
+                recipient: $requester,
+                mode: 'return_rejected',
+                actor: $actor,
+                notes: $reason,
+            ),
+            $realization,
+            'return_rejected',
+        );
     }
 
     /**

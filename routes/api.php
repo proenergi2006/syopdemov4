@@ -3,9 +3,12 @@
 // use App\Http\Api\Master\Controllers\ProdukController as ControllersProdukController;
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AccountSignatureController;
+use App\Http\Controllers\Api\ImpersonationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Api\BdvController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccurateController;
 use App\Http\Controllers\Api\GainLossInventoryController;
@@ -57,6 +60,9 @@ use App\Http\Controllers\Api\CashAdvanceRealizationController;
 use App\Http\Controllers\Api\BusinessTripArrangementController;
 use App\Http\Controllers\Api\BusinessTripController;
 use App\Http\Controllers\Api\ClaimController;
+use App\Http\Controllers\Api\PettyCashController;
+use App\Http\Controllers\Api\PettyCashTopupController;
+use App\Http\Controllers\Api\Master\PettyCashCeilingController;
 use App\Http\Controllers\Api\Master\BusinessTripExpenseCategoryController;
 use App\Http\Controllers\Api\Master\FundRequestTransactionCategoryController;
 use App\Http\Controllers\Api\Master\FundRequestLimitController;
@@ -67,6 +73,10 @@ use App\Http\Controllers\MasterBankController;
 use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\GoodsReturnController;
+use App\Http\Controllers\Api\Dashboard\BusinessTripDashboardController;
+use App\Http\Controllers\Api\Dashboard\CashAdvanceDashboardController;
+use App\Http\Controllers\Api\Dashboard\CashAdvanceRealizationDashboardController;
+use App\Http\Controllers\Api\Dashboard\ClaimDashboardController;
 use App\Http\Controllers\Api\Dashboard\DashboardModuleController;
 use App\Http\Controllers\Api\Dashboard\PurchaseOrderDashboardController;
 use App\Http\Controllers\Api\Dashboard\GoodsReceiptDashboardController;
@@ -76,6 +86,7 @@ use App\Http\Controllers\Api\Monitoring\QueueHealthController;
 use App\Http\Controllers\Monitoring\LogViewerController;
 use App\Http\Controllers\Api\Master\UserAccessAssignmentController;
 use App\Http\Controllers\Api\Master\MenuController as MasterMenuController;
+use App\Http\Controllers\Api\Master\MenuSectionController as MasterMenuSectionController;
 use App\Http\Controllers\Api\Master\DashboardModuleController as MasterDashboardModuleController;
 use App\Http\Controllers\Api\Master\ActivityLogController as MasterActivityLogController;
 
@@ -95,9 +106,62 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/auth/me/permissions', [AuthController::class, 'permissions']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::put('/account/change-password', [AccountController::class, 'changePassword']);
+    /*
+    | Ubah password ditutup saat menyamar: ini mengubah kredensial permanen
+    | milik orang lain, dan akibatnya tidak hilang saat penyamaran berakhir.
+    */
+    Route::put('/account/change-password', [AccountController::class, 'changePassword'])
+        ->middleware('block.impersonation');
     Route::put('/account/locale', [AccountController::class, 'updateLocale']);
     Route::get('/account/access-assignments', [AccountController::class, 'accessAssignments']);
+
+    /*
+    | Tanda tangan digital milik user sendiri -- tidak memakai permission,
+    | sebagaimana ubah password: ini akunnya sendiri.
+    */
+    Route::prefix('account/signatures')->group(function () {
+        /* Melihat tetap boleh saat menyamar -- tidak ada yang berubah. */
+        Route::get('/', [AccountSignatureController::class, 'index']);
+
+        /*
+        | Yang mengubah ditutup saat menyamar. Tanda tangan digital dipakai
+        | sebagai bukti persetujuan pada dokumen keuangan, dan perubahannya
+        | tetap berlaku sesudah penyamaran berakhir -- user bisa mendapati
+        | tanda tangannya berubah tanpa pernah menyentuhnya.
+        */
+        Route::middleware('block.impersonation')->group(function () {
+            Route::post('/', [AccountSignatureController::class, 'store']);
+            Route::post('/preview', [AccountSignatureController::class, 'preview']);
+            Route::put('/{id}/activate', [AccountSignatureController::class, 'activate'])
+                ->whereNumber('id');
+            Route::patch('/{id}', [AccountSignatureController::class, 'update'])
+                ->whereNumber('id');
+            Route::delete('/{id}', [AccountSignatureController::class, 'destroy'])
+                ->whereNumber('id');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Masuk sebagai user lain
+    |--------------------------------------------------------------------------
+    | status, candidates, dan history dijaga permission di controller.
+    |
+    | stop SENGAJA tanpa permission: yang sedang login adalah user yang
+    | disamari, yang tentu tidak punya izin menyamar. Yang memberi izin adalah
+    | baris sesi yang terikat pada id token -- lihat ImpersonationService::stop().
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('auth/impersonate')->group(function () {
+        Route::get('/status', [ImpersonationController::class, 'status']);
+        Route::get('/candidates', [ImpersonationController::class, 'candidates']);
+        Route::get('/history', [ImpersonationController::class, 'history']);
+        Route::get('/history/{id}', [ImpersonationController::class, 'show'])
+            ->whereNumber('id');
+        Route::post('/stop', [ImpersonationController::class, 'stop']);
+        Route::post('/{userId}', [ImpersonationController::class, 'start'])
+            ->whereNumber('userId');
+    });
     Route::get(
         'master/cabang/options',
         [CabangController::class, 'dropdownSelect']
@@ -117,7 +181,12 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
     Route::get('master/roles', [RoleController::class, 'index']);
     Route::prefix('master/user')->middleware('auth:sanctum')->group(function () {
         Route::get('/check-signature', [UserController::class, 'checkUserSignature']);
-        Route::post('/store-signature', [UserController::class, 'storeUserSignature']);
+        /*
+        | Ditutup saat menyamar, sama alasannya dengan account/signatures:
+        | endpoint ini membuat tanda tangan untuk user yang sedang login.
+        */
+        Route::post('/store-signature', [UserController::class, 'storeUserSignature'])
+            ->middleware('block.impersonation');
     });
 
     Route::get('master/dropdown/users', [UserController::class, 'dropdown']);
@@ -184,6 +253,19 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
     |--------------------------------------------------------------------------
     */
     Route::get('/master/menus/navigation', [MasterMenuController::class, 'navigation']);
+
+    /*
+    | Section menu.
+    |
+    | Didaftarkan SEBELUM master/menus/{menu} supaya "menu-sections" tidak
+    | tertangkap sebagai parameter {menu} pada grup di bawahnya.
+    */
+    Route::prefix('master/menu-sections')->group(function () {
+        Route::get('/', [MasterMenuSectionController::class, 'index']);
+        Route::post('/', [MasterMenuSectionController::class, 'store']);
+        Route::put('/{menuSection}', [MasterMenuSectionController::class, 'update']);
+        Route::delete('/{menuSection}', [MasterMenuSectionController::class, 'destroy']);
+    });
 
     // Menu Management
     Route::prefix('master/menus')->group(function () {
@@ -296,6 +378,26 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 '/goods-return',
                 [GoodsReturnDashboardController::class, 'index'],
             )->name('goods-return');
+
+            Route::get(
+                '/cash-advance',
+                [CashAdvanceDashboardController::class, 'index'],
+            )->name('cash-advance');
+
+            Route::get(
+                '/cash-advance-realization',
+                [CashAdvanceRealizationDashboardController::class, 'index'],
+            )->name('cash-advance-realization');
+
+            Route::get(
+                '/claim',
+                [ClaimDashboardController::class, 'index'],
+            )->name('claim');
+
+            Route::get(
+                '/business-trip',
+                [BusinessTripDashboardController::class, 'index'],
+            )->name('business-trip');
         });
 
     // ===================== DATA MASTER =====================
@@ -959,9 +1061,42 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [CashAdvanceRealizationController::class, 'bulkReimburseDifference'],
             );
 
+            /*
+            | Pengembalian sisa dana = DUA peristiwa di dua meja.
+            |
+            | Pemohon menyatakan sudah mengembalikan beserta bukti transfernya,
+            | lalu Finance mengonfirmasi uangnya benar-benar masuk. Dokumennya
+            | baru tertutup pada langkah kedua -- pengakuan pihak yang
+            | berkepentingan tidak menutup apa pun.
+            */
             Route::patch(
                 'cash-advance-realization/{publicId}/return-difference',
                 [CashAdvanceRealizationController::class, 'returnDifference'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/confirm-return-difference',
+                [CashAdvanceRealizationController::class, 'confirmReturnDifference'],
+            );
+
+            /*
+            | Pintu keluar bila uangnya ternyata tidak pernah masuk. Tanpa ini
+            | Finance hanya punya dua pilihan: mengakui yang tidak diterimanya,
+            | atau membiarkan dokumennya menggantung selamanya.
+            */
+            Route::patch(
+                'cash-advance-realization/{publicId}/reject-return-declaration',
+                [CashAdvanceRealizationController::class, 'rejectReturnDeclaration'],
+            );
+
+            /*
+            | Cabang ketiga: realisasi yang nilainya PAS. Tidak ada uang yang
+            | berpindah, jadi yang tersisa hanya memeriksa angkanya lalu
+            | menutupnya -- dan sesudah itu tidak bisa ditarik lagi.
+            */
+            Route::patch(
+                'cash-advance-realization/{publicId}/finalize-no-difference',
+                [CashAdvanceRealizationController::class, 'finalizeNoDifference'],
             );
 
             Route::patch(
@@ -1067,6 +1202,174 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             )->parameters([
                 'claim' => 'publicId',
             ]);
+
+            /*
+            |------------------------------------------------------------------
+            | PETTY CASH
+            |------------------------------------------------------------------
+            | Pembayaran beberapa claim kecil sekaligus dari kas kecil cabang.
+            |
+            | Route statis didaftarkan SEBELUM apiResource, kalau tidak
+            | segmennya akan tertangkap sebagai publicId -- dan karena
+            | web.php:16 punya catch-all SPA, jawaban yang muncul bukan 404
+            | melainkan 405 "Supported methods: GET", yang menyesatkan siapa
+            | pun yang mencari sebabnya.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'petty-cash/eligible-claims',
+                [PettyCashController::class, 'eligibleClaims'],
+            );
+
+            /* Panel dashboard ADH: saldo kas kecilnya dan peringatannya. */
+            Route::get(
+                'petty-cash/my-ceilings',
+                [PettyCashController::class, 'myCeilings'],
+            );
+
+            Route::patch(
+                'petty-cash/{publicId}/submit',
+                [PettyCashController::class, 'submit'],
+            );
+
+            Route::patch(
+                'petty-cash/{publicId}/approve',
+                [PettyCashController::class, 'approve'],
+            );
+
+            Route::patch(
+                'petty-cash/{publicId}/reject',
+                [PettyCashController::class, 'reject'],
+            );
+
+            /* Pencairan: di sini plafon terpotong dan claim menjadi PAID. */
+            Route::patch(
+                'petty-cash/{publicId}/disburse',
+                [PettyCashController::class, 'disburse'],
+            );
+
+            Route::patch(
+                'petty-cash/{publicId}/cancel',
+                [PettyCashController::class, 'cancel'],
+            );
+
+            Route::apiResource(
+                'petty-cash',
+                PettyCashController::class,
+            )->parameters([
+                'petty-cash' => 'publicId',
+            ]);
+
+            /*
+            |------------------------------------------------------------------
+            | TOP UP PETTY CASH
+            |------------------------------------------------------------------
+            | Tidak ada route pencairan: begitu disetujui penuh, saldo langsung
+            | bertambah -- yang menyetujui terakhir adalah Finance yang juga
+            | mengirim uangnya.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'petty-cash-topup/ceiling-state',
+                [PettyCashTopupController::class, 'ceilingState'],
+            );
+
+            Route::patch(
+                'petty-cash-topup/{publicId}/submit',
+                [PettyCashTopupController::class, 'submit'],
+            );
+
+            Route::patch(
+                'petty-cash-topup/{publicId}/approve',
+                [PettyCashTopupController::class, 'approve'],
+            );
+
+            Route::patch(
+                'petty-cash-topup/{publicId}/reject',
+                [PettyCashTopupController::class, 'reject'],
+            );
+
+            Route::patch(
+                'petty-cash-topup/{publicId}/cancel',
+                [PettyCashTopupController::class, 'cancel'],
+            );
+
+            Route::apiResource(
+                'petty-cash-topup',
+                PettyCashTopupController::class,
+            )->parameters([
+                'petty-cash-topup' => 'publicId',
+            ]);
+
+            /*
+            |------------------------------------------------------------------
+            | Master plafon petty cash
+            |------------------------------------------------------------------
+            | Ditempatkan di sini, bukan di grup master, supaya seluruh yang
+            | berhubungan dengan kas kecil terbaca berdekatan -- sama seperti
+            | master batas pengajuan FPU yang juga tinggal di grup ini.
+            |------------------------------------------------------------------
+            */
+            Route::get(
+                'petty-cash-ceilings/{publicId}/ledger',
+                [PettyCashCeilingController::class, 'ledger'],
+            );
+
+            Route::patch(
+                'petty-cash-ceilings/{publicId}/adjust',
+                [PettyCashCeilingController::class, 'adjust'],
+            );
+
+            Route::apiResource(
+                'petty-cash-ceilings',
+                PettyCashCeilingController::class,
+            )->only(['index', 'store', 'update', 'destroy'])
+                ->parameters(['petty-cash-ceilings' => 'publicId']);
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | CASH & BANK
+    |--------------------------------------------------------------------------
+    | Pencairan dan penerimaan uang perusahaan. Berdiri sebagai modul sendiri,
+    | terpisah dari Pengajuan Dana: yang di sana adalah permintaan uang, yang
+    | di sini adalah pengeluarannya.
+    |
+    | Isinya sekarang baru BDV -- voucher pencairan lewat bank atas dokumen
+    | yang sudah disetujui dan berkasnya sudah diterima, untuk sekarang FPU
+    | dan Claim.
+    |
+    | Tahap ini BARU BAGIAN YANG MEMBACA. Menyimpan, mengajukan, dan approval
+    | flow menyusul, jadi belum ada apiResource di sini.
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('cash-bank')
+        ->name('cash-bank.')
+        ->group(function () {
+            /*
+            | Seluruhnya route statis, jadi tidak ada {publicId} yang bisa
+            | menelan segmen seperti 'options' -- jebakan yang disebut pada
+            | blok Petty Cash di grup Pengajuan Dana.
+            */
+            Route::get(
+                'bdv/options',
+                [BdvController::class, 'options'],
+            );
+
+            Route::get(
+                'bdv/available-documents',
+                [BdvController::class, 'availableDocuments'],
+            );
+
+            Route::get(
+                'bdv/document-detail',
+                [BdvController::class, 'documentDetail'],
+            );
+
+            Route::get(
+                'bdv',
+                [BdvController::class, 'index'],
+            );
         });
 
     /*

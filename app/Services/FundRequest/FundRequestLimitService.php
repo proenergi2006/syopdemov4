@@ -120,6 +120,8 @@ class FundRequestLimitService
                         CashAdvanceRealization::STATUS_APPROVED,
                         CashAdvanceRealization::STATUS_RECEIVED,
                         CashAdvanceRealization::STATUS_VERIFIED,
+                        CashAdvanceRealization::STATUS_ON_CHECKING,
+                        CashAdvanceRealization::STATUS_RETURN_DECLARED,
                         CashAdvanceRealization::STATUS_SETTLED,
                     ]);
             });

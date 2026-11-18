@@ -9,7 +9,9 @@
         "settled": "Selesai",
         "received": "Diterima",
         "verified": "Menunggu Pembayaran",
-        "needRevision": "Butuh Revisi"
+        "needRevision": "Butuh Revisi",
+        "returnDeclared": "Menunggu Konfirmasi",
+        "onChecking": "Sedang Diperiksa"
     },
     "difference": {
         "all": "Semua Selisih",
@@ -39,7 +41,9 @@
                 "return": "Menunggu Pengembalian",
                 "reimburse": "Menunggu Pembayaran",
                 "notReceived": "Belum Diterima",
-                "verify": "Menunggu saya periksa"
+                "verify": "Menunggu saya periksa",
+                "confirmReturn": "Menunggu saya konfirmasi",
+                "finalize": "Menunggu saya approve"
             },
             "pendingActionLabel": "Butuh Aksi",
             "resetButton": "Reset Filter",
@@ -74,7 +78,10 @@
             "reimburseDifference": "Bayar Kekurangan",
             "print": "Cetak PDF",
             "receive": "Terima",
-            "notReceivedBadge": "Menunggu Diterima"
+            "notReceivedBadge": "Menunggu Diterima",
+            "confirmReturn": "Konfirmasi Pengembalian",
+            "rejectReturn": "Tolak Pengembalian",
+            "finalize": "Approve Realisasi"
         },
         "toast": {
             "loadingText": "Memuat data...",
@@ -143,7 +150,9 @@
         "pending": {
             "return": "Perlu Dikembalikan",
             "reimburse": "Perlu Dibayar Finance",
-            "verify": "Menunggu diperiksa"
+            "verify": "Menunggu diperiksa",
+            "confirmReturn": "Menunggu dikonfirmasi",
+            "finalize": "Menunggu disetujui"
         },
         "settleAmount": {
             "label": "Nominal yang diserahkan",
@@ -254,6 +263,29 @@
             "failed": "Realisasi gagal diteruskan ke pembayaran.",
             "notesLabel": "Catatan pemeriksaan (opsional)",
             "confirmButton": "Teruskan"
+        },
+        "confirmReturn": {
+            "confirmTitle": "Konfirmasi pengembalian sisa dana?",
+            "confirmText": "Realisasi {nomor} akan ditutup, dengan sisa dana {nominal} dinyatakan sudah diterima Finance.",
+            "confirmButton": "Konfirmasi Diterima",
+            "successFallback": "Pengembalian sisa dana dikonfirmasi dan Realisasi FPU ditutup.",
+            "failedFallback": "Konfirmasi pengembalian sisa dana gagal diproses."
+        },
+        "rejectReturn": {
+            "dialogTitle": "Tolak pernyataan pengembalian {number}",
+            "dialogSubtitle": "Dokumennya akan kembali ke pemohon supaya ia bisa menyatakan ulang. Sebutkan apa yang tidak sesuai -- nominalnya, rekening tujuannya, atau buktinya.",
+            "reasonLabel": "Alasan penolakan",
+            "reasonPlaceholder": "Contoh: dana belum masuk ke rekening perusahaan per hari ini",
+            "confirmButton": "Tolak Pernyataan",
+            "successFallback": "Pernyataan pengembalian ditolak dan dokumennya dikembalikan ke pemohon.",
+            "failedFallback": "Penolakan pernyataan pengembalian gagal diproses."
+        },
+        "finalize": {
+            "confirmTitle": "Approve Realisasi ini?",
+            "confirmText": "Realisasi {nomor} nilainya sama persis dengan pengajuan, jadi tidak ada dana yang perlu dibayarkan maupun dikembalikan. Setelah disetujui, dokumennya selesai dan tidak bisa ditarik lagi.",
+            "confirmButton": "Approve dan Selesaikan",
+            "successFallback": "Realisasi FPU disetujui dan prosesnya selesai.",
+            "failedFallback": "Approve Realisasi FPU gagal diproses."
         }
     },
     "form": {
@@ -445,6 +477,17 @@
         "paymentOnTime": "Dibayarkan tepat pada jadwalnya.",
         "paymentLate": "Dibayarkan setelah jadwalnya.",
         "itemTransactionCategory": "Keterangan Transaksi",
-        "itemSourceAttachment": "Lampiran FPU"
+        "itemSourceAttachment": "Lampiran FPU",
+        "returnHistoryTitle": "Riwayat Pengembalian Sisa Dana",
+        "returnAttempt": "Percobaan ke-{n}",
+        "returnDeclaredBy": "{name} menyatakan sudah mengembalikan {amount}",
+        "returnReviewedBy": "Diperiksa {name} pada {time}",
+        "returnStatus": {
+            "pending": "Menunggu Konfirmasi",
+            "confirmed": "Dikonfirmasi",
+            "rejected": "Ditolak"
+        },
+        "verifiedTitle": "Diteruskan ke Pembayaran Kekurangan",
+        "verifiedBy": "Diperiksa {name} pada {time}"
     }
 }

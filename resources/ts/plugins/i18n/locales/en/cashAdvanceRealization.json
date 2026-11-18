@@ -9,7 +9,9 @@
         "settled": "Settled",
         "received": "Received",
         "verified": "Awaiting Payment",
-        "needRevision": "Needs Revision"
+        "needRevision": "Needs Revision",
+        "returnDeclared": "Awaiting Confirmation",
+        "onChecking": "Being Checked"
     },
     "difference": {
         "all": "All Differences",
@@ -39,7 +41,9 @@
                 "return": "Awaiting Return",
                 "reimburse": "Awaiting Payment",
                 "notReceived": "Not Yet Received",
-                "verify": "Waiting for my check"
+                "verify": "Waiting for my check",
+                "confirmReturn": "Awaiting my confirmation",
+                "finalize": "Awaiting my approval"
             },
             "pendingActionLabel": "Needs Action",
             "resetButton": "Reset Filters",
@@ -74,7 +78,10 @@
             "reimburseDifference": "Pay Shortfall",
             "print": "Print PDF",
             "receive": "Receive",
-            "notReceivedBadge": "Awaiting Receipt"
+            "notReceivedBadge": "Awaiting Receipt",
+            "confirmReturn": "Confirm Return",
+            "rejectReturn": "Reject Return",
+            "finalize": "Approve Realization"
         },
         "toast": {
             "loadingText": "Loading data...",
@@ -143,7 +150,9 @@
         "pending": {
             "return": "Return Pending",
             "reimburse": "Finance Payment Pending",
-            "verify": "Awaiting check"
+            "verify": "Awaiting check",
+            "confirmReturn": "Awaiting confirmation",
+            "finalize": "Awaiting approval"
         },
         "settleAmount": {
             "label": "Amount handed over",
@@ -254,6 +263,29 @@
             "failed": "The realization could not be forwarded for payment.",
             "notesLabel": "Check notes (optional)",
             "confirmButton": "Forward"
+        },
+        "confirmReturn": {
+            "confirmTitle": "Confirm the returned surplus?",
+            "confirmText": "Realization {nomor} will be closed, with the {nominal} surplus recorded as received by Finance.",
+            "confirmButton": "Confirm Received",
+            "successFallback": "The fund return has been confirmed and the realization is closed.",
+            "failedFallback": "Failed to confirm the fund return."
+        },
+        "rejectReturn": {
+            "dialogTitle": "Reject the return declaration for {number}",
+            "dialogSubtitle": "The document goes back to the requester so they can declare it again. Say what does not match -- the amount, the destination account, or the evidence.",
+            "reasonLabel": "Reason for rejection",
+            "reasonPlaceholder": "For example: the money has not reached the company account as of today",
+            "confirmButton": "Reject Declaration",
+            "successFallback": "The return declaration was rejected and the document went back to the requester.",
+            "failedFallback": "Failed to reject the return declaration."
+        },
+        "finalize": {
+            "confirmTitle": "Approve this realization?",
+            "confirmText": "Realization {nomor} matches the request exactly, so nothing needs to be paid or returned. Once approved, the document is complete and cannot be reopened.",
+            "confirmButton": "Approve and Complete",
+            "successFallback": "The realization has been approved and is now complete.",
+            "failedFallback": "Failed to approve the realization."
         }
     },
     "form": {
@@ -445,6 +477,17 @@
         "paymentOnTime": "Paid exactly on schedule.",
         "paymentLate": "Paid after its schedule.",
         "itemTransactionCategory": "Transaction Category",
-        "itemSourceAttachment": "FPU attachments"
+        "itemSourceAttachment": "FPU attachments",
+        "returnHistoryTitle": "Fund Return History",
+        "returnAttempt": "Attempt {n}",
+        "returnDeclaredBy": "{name} declared a return of {amount}",
+        "returnReviewedBy": "Reviewed by {name} on {time}",
+        "returnStatus": {
+            "pending": "Awaiting Confirmation",
+            "confirmed": "Confirmed",
+            "rejected": "Rejected"
+        },
+        "verifiedTitle": "Forwarded for Shortfall Payment",
+        "verifiedBy": "Checked by {name} on {time}"
     }
 }

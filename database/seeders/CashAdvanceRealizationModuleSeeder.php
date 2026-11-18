@@ -119,6 +119,36 @@ class CashAdvanceRealizationModuleSeeder extends Seeder
             ['reimburse', 'Bayar Kekurangan Realisasi FPU', 'Mencatat pembayaran kekurangan Realisasi FPU kepada pemohon.', false],
 
             /*
+            | Pemeriksaan atas pengembalian yang dinyatakan pemohon.
+            |
+            | DIPISAH DARI .receive, walau pada awalnya dipegang orang yang
+            | sama. Menerima berkas dan menyatakan uang sudah masuk ke
+            | rekening perusahaan adalah dua penilaian berbeda, dan yang
+            | kedua menutup dokumen. Selama keduanya satu izin, memisahkan
+            | mejanya kelak berarti mengubah kode, bukan mengubah matriks.
+            |
+            | Menerima dan menolak pun dipisah, sejalan dengan receive dan
+            | unreceive: mengonfirmasi menutup dokumen, menolak melemparnya
+            | kembali ke pemohon beserta alasan yang akan ia baca.
+            */
+            ['confirm_return', 'Konfirmasi Pengembalian Sisa Dana', 'Menyatakan sisa dana yang dikembalikan pemohon benar-benar sudah diterima, lalu menutup Realisasi FPU.', false],
+            ['reject_return', 'Tolak Pengembalian Sisa Dana', 'Menolak pernyataan pengembalian sisa dana beserta alasannya, sehingga dokumennya kembali ke pemohon untuk dinyatakan ulang.', false],
+
+            /*
+            | Penutup bagi realisasi yang nilainya PAS.
+            |
+            | Tidak ada uang yang berpindah, jadi tidak ada izin pembayaran
+            | maupun pengembalian yang bisa dipakai. Yang tersisa justru
+            | pekerjaan yang paling mudah terlupakan: memeriksa bahwa
+            | angkanya memang sudah benar, lalu menutupnya.
+            |
+            | Dahulu dokumen seperti ini ditutup DIAM-DIAM pada saat
+            | diterima, dalam detik yang sama, tanpa ada yang sempat
+            | memeriksanya. Izin ini yang memberinya meja sendiri.
+            */
+            ['finalize', 'Approve Realisasi Tanpa Selisih', 'Menyetujui dan menutup Realisasi FPU yang nilainya sama persis dengan pengajuan, setelah berkasnya diperiksa.', false],
+
+            /*
             | Export tidak memakai scope. Isi file sudah dibatasi visibility
             | permission view, jadi permission ini hanya menjawab boleh atau
             | tidaknya menarik data keluar sistem.

@@ -176,7 +176,10 @@ return [
             'settled' => 'Selisih Realisasi FPU Selesai - :realization_number',
             'received' => 'Realisasi FPU Sudah Diterima - :realization_number',
             'receipt_request' => 'Realisasi FPU Menunggu Diterima - :realization_number',
-            'return_request' => 'Selisih Realisasi Menunggu Pengembalian - :realization_number',
+            'return_request' => 'Sisa Dana Perlu Anda Kembalikan - :realization_number',
+            'return_declared' => 'Pengembalian Sisa Dana Menunggu Konfirmasi - :realization_number',
+            'return_rejected' => 'Pernyataan Pengembalian Ditolak - :realization_number',
+            'finalized' => 'Realisasi FPU Selesai - :realization_number',
             'reimburse_request' => 'Kekurangan Realisasi Menunggu Pembayaran - :realization_number',
 
             'default' => 'Permintaan Approval Realisasi FPU - :realization_number',
@@ -188,7 +191,10 @@ return [
             'settled' => 'Selisih Realisasi FPU Telah Diselesaikan',
             'received' => 'Realisasi FPU Sudah Diterima',
             'receipt_request' => 'Realisasi FPU Menunggu Diterima',
-            'return_request' => 'Selisih Realisasi Menunggu Pengembalian',
+            'return_request' => 'Sisa Dana Perlu Anda Kembalikan',
+            'return_declared' => 'Pengembalian Sisa Dana Menunggu Konfirmasi',
+            'return_rejected' => 'Pernyataan Pengembalian Ditolak',
+            'finalized' => 'Realisasi FPU Telah Selesai',
             'reimburse_request' => 'Kekurangan Realisasi Menunggu Pembayaran',
 
             'default' => 'Approval Realisasi FPU',
@@ -200,7 +206,32 @@ return [
             'settled' => 'Selisih Realisasi FPU Anda telah diselesaikan oleh :actor_name.',
             'received' => 'Realisasi FPU Anda sudah diterima oleh :actor_name.',
             'receipt_request' => 'Terdapat Realisasi FPU yang sudah disetujui dan menunggu Anda terima.',
-            'return_request' => 'Realisasi berikut sudah disetujui dan menyisakan dana yang perlu dikembalikan pemohon ke Finance.',
+            /*
+            | Orang kedua, dan itu disengaja. Kalimat lamanya berbunyi
+            | "dikembalikan pemohon ke Finance" -- ditulis untuk dibaca orang
+            | lain TENTANG si pemohon, lalu dikirim ke 38 pemegang izin
+            | sementara pemohonnya sendiri tidak pernah menerimanya.
+            */
+            'return_request' => 'Realisasi FPU Anda sudah disetujui dan berkasnya sudah diterima Finance.'
+                . ' Masih ada sisa dana sebesar :difference_amount yang perlu Anda kembalikan ke Finance.'
+                . ' Setelah ditransfer, buka dokumennya lalu tandai pengembaliannya dan lampirkan bukti transfernya.',
+
+            'return_declared' => ':actor_name menyatakan sisa dana Realisasi FPU berikut sudah dikembalikan,'
+                . ' beserta bukti transfernya. Mohon diperiksa dan dikonfirmasi bila uangnya benar-benar sudah masuk.',
+
+            'return_rejected' => 'Pernyataan pengembalian sisa dana Anda ditolak oleh :actor_name.'
+                . ' Silakan periksa alasannya di bawah, lalu nyatakan kembali dengan bukti yang sesuai.',
+
+            /*
+            | Dokumen tanpa selisih. Kalimatnya sengaja TIDAK menyebut
+            | penyelesaian selisih -- tidak ada selisih yang bisa
+            | diselesaikan, dan menyebutnya menyuruh pembacanya mencari
+            | perpindahan uang yang tidak pernah ada.
+            */
+            'finalized' => 'Realisasi FPU Anda sudah diperiksa dan disetujui oleh :actor_name.'
+                . ' Nilainya sama persis dengan pengajuan, sehingga tidak ada dana yang perlu dibayarkan'
+                . ' maupun dikembalikan. Proses dokumen ini selesai sampai di sini.',
+
             'reimburse_request' => 'Realisasi berikut sudah disetujui dan kekurangannya perlu dibayarkan kepada pemohon.',
 
             'default' => 'Terdapat Realisasi FPU yang membutuhkan approval Anda.',

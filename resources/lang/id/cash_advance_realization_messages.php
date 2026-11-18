@@ -115,15 +115,56 @@ return [
         'failed' => 'Penerimaan Realisasi FPU gagal diproses.',
     ],
 
+    /*
+    | Pemohon menyatakan sisa dananya sudah dikembalikan.
+    |
+    | Uangnya berpindah di luar sistem; yang dikerjakan di sini penandaannya.
+    | Pengakuan ini TIDAK menutup dokumen -- lihat confirm_return di bawah.
+    */
     'return' => [
-        'forbidden' => 'Anda tidak memiliki akses untuk mencatat pengembalian sisa dana.',
-        'only_received' => 'Hanya Realisasi FPU yang sudah diterima yang dapat diselesaikan selisihnya.',
+        'forbidden' => 'Anda tidak memiliki akses untuk menandai pengembalian sisa dana.',
+        'only_received' => 'Sisa dana baru bisa dikembalikan setelah berkas Realisasi FPU diterima Finance.',
         'only_approved' => 'Hanya Realisasi FPU berstatus approved yang dapat diselesaikan.',
+        'only_requester' => 'Hanya pemohon Realisasi FPU ini yang dapat menandai pengembalian sisa dananya,'
+            . ' karena dialah yang memegang uangnya.',
         'wrong_difference' => 'Realisasi FPU ini tidak menyisakan dana, jadi tidak ada yang perlu dikembalikan.',
-        'attachment_required' => 'Bukti pengembalian dana wajib dilampirkan minimal satu berkas.',
+        'attachment_required' => 'Bukti transfer wajib dilampirkan minimal satu berkas.',
         'amount_mismatch' => 'Nominal pengembalian harus tepat Rp :expected, sedangkan yang diisi Rp :given. Pengembalian sebagian tidak dapat dicatat.',
-        'success' => 'Pengembalian sisa dana berhasil dicatat.',
-        'failed' => 'Pencatatan pengembalian sisa dana gagal diproses.',
+        'success' => 'Pengembalian sisa dana sudah ditandai dan menunggu konfirmasi Finance.',
+        'failed' => 'Penandaan pengembalian sisa dana gagal diproses.',
+    ],
+
+    /* Finance mengonfirmasi uangnya benar-benar masuk -- di sinilah tutupnya. */
+    'confirm_return' => [
+        'forbidden' => 'Anda tidak memiliki akses untuk mengonfirmasi pengembalian sisa dana.',
+        'only_declared' => 'Hanya Realisasi FPU yang pengembaliannya sudah dinyatakan pemohon yang dapat dikonfirmasi.',
+        'success' => 'Pengembalian sisa dana dikonfirmasi dan Realisasi FPU ditutup.',
+        'failed' => 'Konfirmasi pengembalian sisa dana gagal diproses.',
+    ],
+
+    /*
+    | Menolak pernyataan pengembalian. Izinnya terpisah dari konfirmasi,
+    | sejalan dengan receive dan unreceive: yang satu menutup dokumen, yang
+    | lain melemparkannya kembali ke pemohon beserta alasan yang akan ia baca.
+    */
+    'reject_return' => [
+        'forbidden' => 'Anda tidak memiliki akses untuk menolak pernyataan pengembalian sisa dana.',
+        'only_declared' => 'Hanya Realisasi FPU yang pengembaliannya sudah dinyatakan pemohon yang dapat ditolak.',
+        'success' => 'Pernyataan pengembalian ditolak dan dokumennya dikembalikan ke pemohon.',
+        'failed' => 'Penolakan pernyataan pengembalian gagal diproses.',
+        'rejected_note' => 'Pernyataan pengembalian ditolak Finance: :reason',
+    ],
+
+    /*
+    | Cabang ketiga: realisasi yang nilainya PAS. Tidak ada uang yang
+    | berpindah, jadi yang tersisa hanya memeriksa angkanya lalu menutupnya.
+    */
+    'finalize' => [
+        'forbidden' => 'Anda tidak memiliki akses untuk menyetujui Realisasi FPU tanpa selisih.',
+        'only_on_checking' => 'Hanya Realisasi FPU yang sedang diperiksa yang dapat disetujui di sini.',
+        'only_no_difference' => 'Realisasi FPU ini punya selisih, jadi penutupannya lewat pembayaran kekurangan atau pengembalian sisa dana, bukan lewat approve ini.',
+        'success' => 'Realisasi FPU disetujui dan prosesnya selesai.',
+        'failed' => 'Approve Realisasi FPU gagal diproses.',
     ],
 
     'reimburse' => [
@@ -194,6 +235,7 @@ return [
         'attachment_required' => 'Bukti pada baris :row wajib diisi minimal satu berkas.',
         'unknown_source' => 'Baris :row mengacu pada rincian FPU yang tidak dikenali.',
         'duplicate_source' => 'Baris :row mengacu pada rincian FPU yang sudah dipakai baris lain.',
+        'cancelled_reason_required' => 'Baris :row bernilai nol. Tuliskan alasannya -- pengeluaran yang tidak jadi tetap perlu keterangan.',
     ],
 
     /*
@@ -207,6 +249,7 @@ return [
         'category_required' => 'Baris :row: kategori biayanya belum dipilih. Rincian perjalanan dinas dikelompokkan per kategori.',
         'qty_required' => 'Baris :row: Qty wajib diisi dan harus lebih dari nol.',
         'unit_price_required' => 'Baris :row: Rincian Biaya wajib diisi dan harus lebih dari nol.',
+        'cancelled_reason_required' => 'Baris :row bernilai nol. Tuliskan alasannya -- pengeluaran yang tidak jadi tetap perlu keterangan.',
         'arranged_has_items' => 'Kategori :category ditandai diurus GA, jadi tidak boleh punya baris rincian. Hapus barisnya, atau matikan penandanya.',
         'arranged_not_allowed' => 'Kategori :category tidak diurus GA, jadi penandanya tidak bisa dipasang. Rinciannya diisi pemohon sendiri. Pengaturannya ada di master Kategori Biaya Perjalanan Dinas.',
     ],
