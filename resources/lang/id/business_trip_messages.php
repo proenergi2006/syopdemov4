@@ -22,6 +22,16 @@ return [
     'deleted' => 'Perjalanan Dinas berhasil dihapus.',
     'delete_failed' => 'Perjalanan Dinas gagal dihapus.',
     'not_found' => 'Perjalanan Dinas tidak ditemukan.',
+
+    /*
+    | Dokumennya TERLIHAT, tetapi cakupan izin aksinya tidak mencakupnya.
+    |
+    | Dipisahkan dari not_found dengan sengaja. Pemohon yang sedang menatap
+    | dokumennya sendiri lalu diberi tahu bahwa dokumen itu tidak ada akan
+    | mencari bug pengambilan id -- bukan membuka matriks izin, yang justru
+    | satu-satunya tempat keadaan ini bisa diperbaiki.
+    */
+    'action_out_of_scope' => 'Anda tidak bisa melakukan tindakan ini pada Perjalanan Dinas tersebut: cakupan izin tindakannya belum diatur atau tidak mencakup dokumen ini. Hubungi admin untuk memeriksa cakupan izin pada matriks.',
     'forbidden_view' => 'Anda tidak memiliki akses untuk melihat Perjalanan Dinas.',
     'forbidden_create' => 'Anda tidak memiliki akses untuk membuat Perjalanan Dinas.',
     'forbidden_update' => 'Anda tidak memiliki akses untuk mengubah Perjalanan Dinas.',

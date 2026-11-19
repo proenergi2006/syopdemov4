@@ -743,11 +743,13 @@ class BusinessTripController extends Controller
         $trip = $this->findForAction($publicId, $user, 'business_trip.update');
 
         if (!$trip) {
+            [$kode, $pesan] = $this->tolakanAksi($publicId, $user);
+
             return response()->json([
                 'success' => false,
-                'message' => __('business_trip_messages.not_found'),
+                'message' => $pesan,
                 'data' => null,
-            ], 404);
+            ], $kode);
         }
 
         if (!$trip->is_editable) {
@@ -843,11 +845,13 @@ class BusinessTripController extends Controller
         $trip = $this->findForAction($publicId, $user, 'business_trip.delete');
 
         if (!$trip) {
+            [$kode, $pesan] = $this->tolakanAksi($publicId, $user);
+
             return response()->json([
                 'success' => false,
-                'message' => __('business_trip_messages.not_found'),
+                'message' => $pesan,
                 'data' => null,
-            ], 404);
+            ], $kode);
         }
 
         /*
@@ -923,10 +927,13 @@ class BusinessTripController extends Controller
             if (!$trip) {
                 DB::rollBack();
 
+                /* Dihitung SESUDAH rollback -- supaya tidak menahan kunci. */
+                [$kode, $pesan] = $this->tolakanAksi($publicId, $user);
+
                 return response()->json([
                     'success' => false,
-                    'message' => __('business_trip_messages.not_found'),
-                ], 404);
+                    'message' => $pesan,
+                ], $kode);
             }
 
             /*
@@ -1678,10 +1685,13 @@ class BusinessTripController extends Controller
             if (!$trip) {
                 DB::rollBack();
 
+                /* Dihitung SESUDAH rollback -- supaya tidak menahan kunci. */
+                [$kode, $pesan] = $this->tolakanAksi($publicId, $user);
+
                 return response()->json([
                     'success' => false,
-                    'message' => __('business_trip_messages.not_found'),
-                ], 404);
+                    'message' => $pesan,
+                ], $kode);
             }
 
             /*
@@ -2355,6 +2365,34 @@ class BusinessTripController extends Controller
      * tapi bukan milikmu" memberi tahu keberadaan dokumen orang lain kepada
      * yang tidak berhak mengetahuinya.
      */
+    /**
+     * Jawaban penolakan yang membedakan "tidak ada" dari "di luar cakupan".
+     *
+     * KENAPA PERLU DIBEDAKAN.
+     *
+     * findForAction() menolak karena dua sebab yang sangat berbeda:
+     * dokumennya memang tidak terlihat oleh akun ini, atau dokumennya
+     * terlihat tetapi cakupan izin AKSI-nya tidak mencakupnya. Keduanya
+     * dahulu dijawab kalimat yang sama -- "Perjalanan Dinas tidak
+     * ditemukan" -- dan kalimat itu menyesatkan pada sebab yang kedua:
+     * pemohon sedang menatap dokumennya sendiri di layar lalu diberi tahu
+     * bahwa dokumen itu tidak ada. Yang ia cari berikutnya adalah bug
+     * pengambilan id, bukan pengaturan izinnya.
+     *
+     * Menjawab 404 pada dokumen yang TIDAK terlihat tetap dipertahankan:
+     * membedakannya di sana sama saja memberitahukan keberadaan dokumen
+     * orang lain kepada yang tidak berhak mengetahuinya. Yang sudah
+     * terlihat tidak menyembunyikan apa pun lagi.
+     *
+     * @return array{0: int, 1: string} [kode HTTP, pesan]
+     */
+    private function tolakanAksi(string $publicId, $user): array
+    {
+        return $this->findVisible($publicId, $user)
+            ? [403, __('business_trip_messages.action_out_of_scope')]
+            : [404, __('business_trip_messages.not_found')];
+    }
+
     private function findForAction(string $publicId, $user, string $permission): ?BusinessTrip
     {
         $trip = $this->findVisible($publicId, $user);
