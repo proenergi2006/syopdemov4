@@ -3252,8 +3252,8 @@ class CashAdvanceRealizationController extends Controller
     | menjadi milik pemohon, jadi memakainya di sini akan mengembalikan
     | persoalan yang baru saja dipisahkan.
     |
-    | Hari pembayaran diperiksa DI SINI, bukan pada pengakuannya: kalender itu
-    | kalender kasir, dan inilah langkah yang dikerjakan kasir.
+    | Hari kerja kasir TIDAK mengikat langkah ini: uangnya masuk, bukan keluar.
+    | Penjelasan lengkapnya ada di badan fungsinya.
     |--------------------------------------------------------------------------
     */
     public function confirmReturnDifference(
@@ -3306,17 +3306,31 @@ class CashAdvanceRealizationController extends Controller
                 ], 422);
             }
 
-            if (!$this->canPayToday('REALISASI', $realization->transaction_category_id)) {
-                DB::rollBack();
-
-                return response()->json([
-                    'success' => false,
-                    'message' => __('payment_schedule_messages.not_payment_day', [
-                        'days' => $this->paymentDaysText('REALISASI', $realization->transaction_category_id),
-                    ]),
-                ], 422);
-            }
-
+            /*
+            | HARI PEMBAYARAN TIDAK DIPERIKSA DI SINI.
+            |
+            | Saya sempat memasangnya, dengan alasan "kalender itu kalender
+            | kasir, dan inilah langkah yang dikerjakan kasir". Alasan itu
+            | keliru pada satu hal yang menentukan: kalender kasir mengatur
+            | uang yang KELUAR dari kas, sedangkan di sini uangnya MASUK.
+            |
+            | Modul ini sendiri sudah menyatakannya. jadwalBayarRealisasi()
+            | mengembalikan null untuk cabang selain kekurangan, persis
+            | karena "pengembalian sisa dana adalah uang MASUK dari pemohon,
+            | jadi tidak ada pembayaran Finance yang perlu dijadwalkan" --
+            | dan karena itu dokumen cabang ini memang tidak punya
+            | scheduled_payment_date sama sekali. Jadwalnya pun bernama
+            | "Jadwal pembayaran realisasi kekurangan FPU".
+            |
+            | Akibat penjagaan itu: uang pemohon sudah masuk ke rekening
+            | perusahaan, tetapi Finance tidak boleh mengakuinya sampai hari
+            | kasir berikutnya. Dokumennya menggantung bukan karena ada yang
+            | belum dikerjakan, melainkan karena kalender yang tidak ada
+            | urusannya dengan uang masuk.
+            |
+            | Pembayaran kekurangan tetap terikat kalender itu -- di sana
+            | uangnya memang keluar dari kas. Lihat closeDifference().
+            */
             $ditutupPada = now();
             $catatan = $this->clean($validated['notes'] ?? '') ?: null;
 
