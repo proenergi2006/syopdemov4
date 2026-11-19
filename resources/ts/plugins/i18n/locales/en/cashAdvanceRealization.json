@@ -6,12 +6,7 @@
         "approved": "Approved",
         "rejected": "Rejected",
         "cancelled": "Cancelled",
-        "settled": "Settled",
-        "received": "Received",
-        "verified": "Awaiting Payment",
-        "needRevision": "Needs Revision",
-        "returnDeclared": "Awaiting Confirmation",
-        "onChecking": "Being Checked"
+        "needRevision": "Needs Revision"
     },
     "difference": {
         "all": "All Differences",
@@ -41,9 +36,8 @@
                 "return": "Awaiting Return",
                 "reimburse": "Awaiting Payment",
                 "notReceived": "Not Yet Received",
-                "verify": "Waiting for my check",
-                "confirmReturn": "Awaiting my confirmation",
-                "finalize": "Awaiting my approval"
+                "receive": "Awaiting my receipt",
+                "approve": "Awaiting my approval"
             },
             "pendingActionLabel": "Needs Action",
             "resetButton": "Reset Filters",
@@ -51,7 +45,8 @@
             "searchPlaceholder": "Realization number, cash advance number, subject",
             "startDate": "Start Date",
             "statusLabel": "Status",
-            "scheduledPaymentDate": "Scheduled Payment"
+            "scheduledPaymentDate": "Scheduled Payment",
+            "financeStatusLabel": "Finance Process Status"
         },
         "table": {
             "no": "No",
@@ -79,9 +74,8 @@
             "print": "Print PDF",
             "receive": "Receive",
             "notReceivedBadge": "Awaiting Receipt",
-            "confirmReturn": "Confirm Return",
             "rejectReturn": "Reject Return",
-            "finalize": "Approve Realization"
+            "financeApprove": "Approve Document"
         },
         "toast": {
             "loadingText": "Loading data...",
@@ -150,9 +144,8 @@
         "pending": {
             "return": "Return Pending",
             "reimburse": "Finance Payment Pending",
-            "verify": "Awaiting check",
-            "confirmReturn": "Awaiting confirmation",
-            "finalize": "Awaiting approval"
+            "approve": "Awaiting approval",
+            "awaitingReturnProof": "Awaiting proof from requester"
         },
         "settleAmount": {
             "label": "Amount handed over",
@@ -264,13 +257,6 @@
             "notesLabel": "Check notes (optional)",
             "confirmButton": "Forward"
         },
-        "confirmReturn": {
-            "confirmTitle": "Confirm the returned surplus?",
-            "confirmText": "Realization {nomor} will be closed, with the {nominal} surplus recorded as received by Finance.",
-            "confirmButton": "Confirm Received",
-            "successFallback": "The fund return has been confirmed and the realization is closed.",
-            "failedFallback": "Failed to confirm the fund return."
-        },
         "rejectReturn": {
             "dialogTitle": "Reject the return declaration for {number}",
             "dialogSubtitle": "The document goes back to the requester so they can declare it again. Say what does not match -- the amount, the destination account, or the evidence.",
@@ -280,12 +266,19 @@
             "successFallback": "The return declaration was rejected and the document went back to the requester.",
             "failedFallback": "Failed to reject the return declaration."
         },
-        "finalize": {
+        "financeApprove": {
             "confirmTitle": "Approve this realization?",
-            "confirmText": "Realization {nomor} matches the request exactly, so nothing needs to be paid or returned. Once approved, the document is complete and cannot be reopened.",
-            "confirmButton": "Approve and Complete",
-            "successFallback": "The realization has been approved and is now complete.",
+            "confirmText": "Realization {nomor} will be approved. For shortfalls, it is forwarded for payment at the same time.",
+            "confirmButton": "Approve",
+            "successFallback": "The realization has been approved.",
             "failedFallback": "Failed to approve the realization."
+        },
+        "forwardPayment": {
+            "confirmTitle": "Forward for payment?",
+            "confirmText": "Realization {nomor} will be forwarded for payment of its {nominal} shortfall.",
+            "confirmButton": "Forward",
+            "successFallback": "The realization has been forwarded for payment.",
+            "failedFallback": "The realization could not be forwarded for payment."
         }
     },
     "form": {
@@ -488,6 +481,23 @@
             "rejected": "Rejected"
         },
         "verifiedTitle": "Forwarded for Shortfall Payment",
-        "verifiedBy": "Checked by {name} on {time}"
+        "verifiedBy": "Checked by {name} on {time}",
+        "financeHistoryTitle": "Finance Process History",
+        "financeEvent": {
+            "received": "Paperwork received by Finance",
+            "unreceived": "Receipt withdrawn",
+            "return_declared": "Requester uploaded the return receipt",
+            "return_rejected": "Return receipt rejected",
+            "approved": "Approved by Finance",
+            "reimbursed": "Shortfall paid",
+            "forwarded": "Forwarded for payment"
+        },
+        "financeBy": "by {name}"
+    },
+    "financeStatus": {
+        "all": "All",
+        "waiting": "Waiting Approval",
+        "onChecking": "On Checking",
+        "approved": "Approved"
     }
 }

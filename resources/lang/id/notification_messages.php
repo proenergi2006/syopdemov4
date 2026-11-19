@@ -317,6 +317,16 @@ return [
             'message' => 'Realisasi FPU :realization_number sudah diperiksa dan disetujui oleh :actor_name. Nilainya sama persis dengan pengajuan, jadi tidak ada dana yang perlu dibayarkan maupun dikembalikan.',
         ],
 
+        'finance_approved_return' => [
+            'title' => 'Pengembalian Dana Dikonfirmasi',
+            'message' => 'Finance menyatakan sisa dana Rp :difference_amount pada Realisasi FPU :realization_number sudah diterima. Prosesnya selesai.',
+        ],
+
+        'finance_approved_reimburse' => [
+            'title' => 'Realisasi FPU Disetujui Finance',
+            'message' => 'Realisasi FPU :realization_number sudah diperiksa dan disetujui :actor_name. Kekurangan sebesar Rp :difference_amount akan dibayarkan kepada Anda.',
+        ],
+
         'return_rejected' => [
             'title' => 'Pernyataan Pengembalian Ditolak',
             'message' => 'Pernyataan pengembalian sisa dana Realisasi FPU :realization_number ditolak oleh :actor_name. Alasan: :reason',

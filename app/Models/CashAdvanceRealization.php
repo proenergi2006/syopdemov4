@@ -80,6 +80,7 @@ class CashAdvanceRealization extends Model
         'return_declared_by',
         'return_declared_at',
         'return_declaration_notes',
+        'finance_status',
         'receipt_reverted_by',
         'receipt_reverted_at',
         'receipt_reversal_notes',
@@ -141,61 +142,52 @@ class CashAdvanceRealization extends Model
     */
     public const STATUS_NEED_REVISION = 'NEED REVISION';
     /*
-    | Dokumen sudah disetujui penuh dan berkasnya diterima, tetapi belum
-    | tuntas. Tahap antara ini yang membedakan "berkasnya sudah di tangan"
-    | dari "selisihnya sudah diselesaikan".
+    |--------------------------------------------------------------------------
+    | Status proses di Finance -- TERPISAH dari status approval di atas
+    |--------------------------------------------------------------------------
+    | Dahulu kelima tahap Finance ikut ditulis ke kolom status yang sama,
+    | sehingga satu kolom menampung dua pertanyaan yang berbeda: sudah
+    | disetujui siapa, dan sudah sampai mana di Finance. Akibatnya dokumen
+    | yang sedang diperiksa Finance berhenti terbaca sebagai APPROVED --
+    | padahal persetujuannya tidak pernah dicabut -- dan satu daftar saring
+    | di layar harus mencampur dua belas nilai yang tidak sejenis.
+    |
+    | Sekarang status berhenti di APPROVED dan tidak bergerak lagi; yang
+    | berjalan sesudahnya finance_status, dan nilainya hanya TIGA.
+    |
+    | Ketiga cabang selisih memakai ketiga nilai yang sama persis. Yang
+    | membedakan mereka bukan jumlah statusnya, melainkan siapa yang
+    | mengerjakan dan berapa aksi yang dibutuhkan:
+    |
+    |   Nilainya PAS    : Finance terima -> Finance approve
+    |   Realisasi KURANG: Finance terima -> diteruskan -> pembayar membayar
+    |   Realisasi LEBIH : pemohon unggah bukti -> Finance terima ->
+    |                     Finance konfirmasi
+    |--------------------------------------------------------------------------
     */
-    public const STATUS_RECEIVED = 'RECEIVED';
+
+    /** Sudah disetujui, menunggu berkasnya diterima Finance. Merah. */
+    public const FINANCE_WAITING = 'WAITING APPROVAL';
+
+    /** Berkasnya di tangan Finance dan sedang dikerjakan. Kuning. */
+    public const FINANCE_ON_CHECKING = 'ON CHECKING';
 
     /*
-    | Berkasnya diterima dan sedang diperiksa, pada realisasi yang nilainya
-    | PAS.
+    | Proses Finance-nya tuntas. Hijau, dan inilah ujung dokumennya.
     |
-    | HANYA ADA PADA CABANG TANPA SELISIH, dan ia sepadan dengan RECEIVED di
-    | dua cabang lain: tempat dokumennya menunggu sementara seseorang
-    | mengerjakan sesuatu atasnya.
-    |
-    | Dahulu cabang ini tidak punya tahap antara sama sekali -- dokumennya
-    | ditutup SETTLED dalam detik yang sama dengan diterimanya, dengan alasan
-    | tidak ada uang yang perlu berpindah. Yang terlewat di situ: tidak ada
-    | uang yang berpindah bukan berarti tidak ada yang perlu diperiksa.
-    | Angka yang kebetulan pas justru yang paling mudah dilewatkan begitu
-    | saja, dan sekali tertutup dokumennya tidak bisa dibuka lagi.
+    | Bernama APPROVED, bukan SETTLED atau SELESAI, dan itu permintaan yang
+    | disengaja: bagi yang membacanya, "disetujui Finance" adalah kalimat
+    | yang sama untuk ketiga cabang -- yang dibayarkan, yang dikembalikan,
+    | maupun yang nilainya pas.
     */
-    public const STATUS_ON_CHECKING = 'ON CHECKING';
+    public const FINANCE_APPROVED = 'APPROVED';
 
-    /*
-    | Sudah diperiksa, menunggu kekurangannya dibayarkan.
-    |
-    | HANYA ADA PADA CABANG KELEBIHAN. Realisasi yang nilainya melebihi
-    | FPU-nya dikerjakan dua orang: yang pertama menerima dan memeriksa,
-    | yang kedua membayarkan. Tahap ini yang memisahkan keduanya -- tanpa
-    | ia, pembayar bisa mendahului pemeriksa dan pemeriksaannya tidak
-    | terekam di mana pun.
-    |
-    | Dua cabang lain tidak pernah melewatinya: yang nilainya pas tertutup
-    | saat diterima, dan yang kurang ditutup orang yang sama begitu uang
-    | sisanya kembali. Keduanya memang tidak berpindah meja.
-    */
-    public const STATUS_VERIFIED = 'VERIFIED';
-
-    /*
-    | Pemohon menyatakan sisa dananya sudah dikembalikan, menunggu Finance
-    | mengonfirmasi uangnya benar-benar masuk.
-    |
-    | HANYA ADA PADA CABANG PENGEMBALIAN, dan ia cermin dari VERIFIED di
-    | seberangnya: yang kurang dibayarkan perusahaan setelah diperiksa, yang
-    | lebih dikembalikan pemohon lalu diperiksa.
-    |
-    | Uangnya berpindah di luar sistem, jadi yang direkam di sini hanya
-    | pengakuan beserta bukti transfernya. Pengakuan itu sengaja TIDAK
-    | menutup dokumennya: yang mengaku adalah pihak yang berkepentingan, dan
-    | dokumen yang ditutup oleh pengakuan sendiri tidak pernah dihitung
-    | siapa pun.
-    */
-    public const STATUS_RETURN_DECLARED = 'RETURN DECLARED';
-
-    public const STATUS_SETTLED = 'SETTLED';
+    /** Ketiganya berurutan, dipakai menyusun pilihan saring di layar. */
+    public const FINANCE_STATUSES = [
+        self::FINANCE_WAITING,
+        self::FINANCE_ON_CHECKING,
+        self::FINANCE_APPROVED,
+    ];
 
     /**
      * Status yang membuat realisasi dianggap sudah mati.
@@ -352,6 +344,22 @@ class CashAdvanceRealization extends Model
     public function returnDeclarer()
     {
         return $this->belongsTo(User::class, 'return_declared_by');
+    }
+
+    /**
+     * Riwayat proses Finance, terlama lebih dulu.
+     *
+     * Urutannya dipasang di relasinya supaya tiap layar membacanya dengan
+     * urutan yang sama. Diurutkan menurut WAKTU peristiwanya, bukan menurut
+     * id: baris hasil pemindahan data lama lahir belakangan walau
+     * peristiwanya terjadi lebih dulu.
+     */
+    public function financeLogs()
+    {
+        return $this->hasMany(
+            CashAdvanceRealizationFinanceLog::class,
+            'cash_advance_realization_id',
+        )->orderBy('occurred_at')->orderBy('id');
     }
 
     /**

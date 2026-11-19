@@ -595,6 +595,48 @@ class CashAdvanceRealizationNotificationService
         );
     }
 
+    /**
+     * Pemohon diberi tahu Finance sudah menyetujui realisasinya.
+     *
+     | Satu aksi, tiga kalimat. Yang disetujui memang satu pekerjaan yang
+     | sama, tetapi yang perlu diketahui pemohon berbeda per cabang:
+     |
+     |   Nilainya PAS    : selesai, tidak ada uang yang berpindah.
+     |   Realisasi LEBIH : uang yang ia kembalikan dinyatakan sudah masuk.
+     |   Realisasi KURANG: belum selesai -- kekurangannya baru akan dibayar.
+     |
+     | Menyeragamkannya menjadi "disetujui" saja akan membuat pemohon cabang
+     | kekurangan mengira uangnya sudah dikirim.
+     */
+    public function notifyFinanceApproved(
+        CashAdvanceRealization $realization,
+        User $approver,
+    ): void {
+        $requesterId = $this->getRequesterUserId($realization);
+
+        if (!$requesterId) {
+            return;
+        }
+
+        $grup = match (strtoupper(trim((string) $realization->difference_type))) {
+            CashAdvanceRealization::DIFFERENCE_REIMBURSE => 'finance_approved_reimburse',
+            CashAdvanceRealization::DIFFERENCE_RETURN => 'finance_approved_return',
+            default => 'finalized',
+        };
+
+        $this->buatSekali(
+            $requesterId,
+            'cash_advance_realization_' . $grup,
+            $realization,
+            $grup,
+            [
+                'realization_number' => $realization->realization_number,
+                'actor_name' => $approver->name ?? '-',
+                'difference_amount' => angka(abs((float) $realization->difference_amount), 0),
+            ],
+        );
+    }
+
     /** Pemohon diberi tahu pernyataannya ditolak Finance. */
     public function notifyReturnRejected(
         CashAdvanceRealization $realization,

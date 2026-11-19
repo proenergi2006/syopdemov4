@@ -180,6 +180,10 @@ return [
             'return_declared' => 'Returned Surplus Awaiting Confirmation - :realization_number',
             'return_rejected' => 'Return Declaration Rejected - :realization_number',
             'finalized' => 'Realization Completed - :realization_number',
+            'receipt_reverted' => 'Realization Receipt Withdrawn - :realization_number',
+            'finance_approved_return' => 'Fund Return Confirmed - :realization_number',
+            'finance_approved_reimburse' => 'Realization Approved by Finance - :realization_number',
+
             'reimburse_request' => 'Realization Shortfall Awaiting Payment - :realization_number',
 
             'default' => 'Realization Approval Request - :realization_number',
@@ -195,6 +199,9 @@ return [
             'return_declared' => 'Returned Surplus Awaiting Confirmation',
             'return_rejected' => 'Return Declaration Rejected',
             'finalized' => 'Realization Completed',
+            'receipt_reverted' => 'Realization Receipt Withdrawn',
+            'finance_approved_return' => 'Fund Return Confirmed',
+            'finance_approved_reimburse' => 'Realization Approved by Finance',
             'reimburse_request' => 'Realization Shortfall Awaiting Payment',
 
             'default' => 'Realization Approval',
@@ -228,6 +235,13 @@ return [
             'finalized' => 'Your realization has been checked and approved by :actor_name.'
                 . ' Its value matches the request exactly, so nothing needs to be paid or returned.'
                 . ' This document is complete.',
+
+            'receipt_reverted' => 'The receipt of your realization was withdrawn by :actor_name, so the document is waiting to be received by Finance again. Any payment date promised earlier is cancelled with it.',
+
+            'finance_approved_return' => 'Finance states that the surplus on your realization has been received. The process is complete.',
+
+            'finance_approved_reimburse' => 'Your realization has been checked and approved by :actor_name.'
+                . ' The shortfall will be paid to you according to the payment schedule.',
 
             'reimburse_request' => 'The realization below has been approved and its shortfall must be paid to the requester.',
 

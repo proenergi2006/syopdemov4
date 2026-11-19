@@ -1047,11 +1047,6 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [CashAdvanceRealizationController::class, 'unreceive'],
             );
 
-            Route::patch(
-                'cash-advance-realization/{publicId}/verify',
-                [CashAdvanceRealizationController::class, 'verify'],
-            );
-
             /*
             | Dua peristiwa berbeda, bukan satu aksi generik: sisa dikembalikan
             | pemohon, atau kekurangan dibayarkan Finance.
@@ -1074,11 +1069,6 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 [CashAdvanceRealizationController::class, 'returnDifference'],
             );
 
-            Route::patch(
-                'cash-advance-realization/{publicId}/confirm-return-difference',
-                [CashAdvanceRealizationController::class, 'confirmReturnDifference'],
-            );
-
             /*
             | Pintu keluar bila uangnya ternyata tidak pernah masuk. Tanpa ini
             | Finance hanya punya dua pilihan: mengakui yang tidak diterimanya,
@@ -1094,9 +1084,27 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
             | berpindah, jadi yang tersisa hanya memeriksa angkanya lalu
             | menutupnya -- dan sesudah itu tidak bisa ditarik lagi.
             */
+            /*
+            | SATU tombol Approve untuk ketiga cabang.
+            |
+            | Menggantikan verify, confirm-return-difference, dan
+            | finalize-no-difference. Bagi yang mengerjakannya ketiganya satu
+            | pekerjaan yang sama -- memeriksa lalu menyatakan beres -- dan
+            | yang berbeda hanya apa yang terjadi sesudahnya. Izinnya tetap
+            | terpisah menurut cabang; lihat financeApprove().
+            */
+            /*
+            | Meneruskan ke meja pembayar. Langkah SESUDAH disetujui, hanya
+            | pada cabang kekurangan.
+            */
             Route::patch(
-                'cash-advance-realization/{publicId}/finalize-no-difference',
-                [CashAdvanceRealizationController::class, 'finalizeNoDifference'],
+                'cash-advance-realization/{publicId}/verify',
+                [CashAdvanceRealizationController::class, 'verify'],
+            );
+
+            Route::patch(
+                'cash-advance-realization/{publicId}/finance-approve',
+                [CashAdvanceRealizationController::class, 'financeApprove'],
             );
 
             Route::patch(

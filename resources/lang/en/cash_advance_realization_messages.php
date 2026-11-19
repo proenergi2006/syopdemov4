@@ -98,13 +98,15 @@ return [
     */
     'verify' => [
         'forbidden' => 'You do not have access to forward this realization for payment.',
-        'only_received' => 'Only a realization whose documents have been received can be forwarded for payment.',
+        'only_received' => 'Only a realization approved by Finance can be forwarded for payment.',
+        'already_forwarded' => 'This realization has already been forwarded for payment.',
         'only_reimburse' => 'Only a realization with a shortfall needs forwarding. One that matches exactly is already closed on receipt, and one with money left over closes when that money comes back.',
         'success' => 'The realization has been forwarded for payment of its shortfall.',
         'failed' => 'The realization could not be forwarded for payment.',
     ],
 
     'receive' => [
+        'awaiting_return_proof' => 'This realization leaves a surplus to be returned, and the requester has not uploaded the transfer receipt yet. The paperwork can only be received once the receipt is there, so that it is checked once.',
         'forbidden' => 'You do not have access to receive realizations.',
         'only_approved' => 'Only approved realizations can be marked as received.',
         'success' => 'The realization was marked as received.',
@@ -127,6 +129,20 @@ return [
         'amount_mismatch' => 'The returned amount must be exactly Rp :expected, but Rp :given was entered. Partial returns cannot be recorded.',
         'success' => 'The fund return has been marked and is awaiting confirmation by Finance.',
         'failed' => 'Failed to mark the fund return.',
+    ],
+
+    /*
+    | One Approve button for all three branches -- see financeApprove().
+    |
+    | The permission behind it still differs by branch, so "no access" here
+    | can mean three different permissions. Said generically on purpose: the
+    | reader does not need the permission's name, they need to know who to ask.
+    */
+    'finance_approve' => [
+        'forbidden' => 'You do not have permission to approve this realization at the Finance stage.',
+        'only_on_checking' => 'Only realizations currently being processed by Finance can be approved.',
+        'success' => 'The realization has been approved.',
+        'failed' => 'Failed to approve the realization.',
     ],
 
     /* Finance confirms the money actually arrived -- this is where it closes. */

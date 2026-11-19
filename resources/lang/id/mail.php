@@ -180,6 +180,10 @@ return [
             'return_declared' => 'Pengembalian Sisa Dana Menunggu Konfirmasi - :realization_number',
             'return_rejected' => 'Pernyataan Pengembalian Ditolak - :realization_number',
             'finalized' => 'Realisasi FPU Selesai - :realization_number',
+            'receipt_reverted' => 'Penerimaan Realisasi FPU Dibatalkan - :realization_number',
+            'finance_approved_return' => 'Pengembalian Dana Dikonfirmasi - :realization_number',
+            'finance_approved_reimburse' => 'Realisasi FPU Disetujui Finance - :realization_number',
+
             'reimburse_request' => 'Kekurangan Realisasi Menunggu Pembayaran - :realization_number',
 
             'default' => 'Permintaan Approval Realisasi FPU - :realization_number',
@@ -195,6 +199,9 @@ return [
             'return_declared' => 'Pengembalian Sisa Dana Menunggu Konfirmasi',
             'return_rejected' => 'Pernyataan Pengembalian Ditolak',
             'finalized' => 'Realisasi FPU Telah Selesai',
+            'receipt_reverted' => 'Penerimaan Realisasi FPU Dibatalkan',
+            'finance_approved_return' => 'Pengembalian Dana Dikonfirmasi',
+            'finance_approved_reimburse' => 'Realisasi FPU Disetujui Finance',
             'reimburse_request' => 'Kekurangan Realisasi Menunggu Pembayaran',
 
             'default' => 'Approval Realisasi FPU',
@@ -231,6 +238,13 @@ return [
             'finalized' => 'Realisasi FPU Anda sudah diperiksa dan disetujui oleh :actor_name.'
                 . ' Nilainya sama persis dengan pengajuan, sehingga tidak ada dana yang perlu dibayarkan'
                 . ' maupun dikembalikan. Proses dokumen ini selesai sampai di sini.',
+
+            'receipt_reverted' => 'Penerimaan berkas Realisasi FPU Anda dibatalkan oleh :actor_name, sehingga dokumennya kembali menunggu diterima Finance. Jadwal pembayaran yang sempat dijanjikan ikut batal.',
+
+            'finance_approved_return' => 'Finance menyatakan sisa dana Realisasi FPU Anda sudah diterima. Prosesnya selesai sampai di sini.',
+
+            'finance_approved_reimburse' => 'Realisasi FPU Anda sudah diperiksa dan disetujui :actor_name.'
+                . ' Kekurangannya akan dibayarkan kepada Anda sesuai jadwal pembayaran.',
 
             'reimburse_request' => 'Realisasi berikut sudah disetujui dan kekurangannya perlu dibayarkan kepada pemohon.',
 

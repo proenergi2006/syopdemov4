@@ -29,6 +29,15 @@ interface AxiosErrorShape {
 
 interface SelectOption {
   id: number | string
+
+  /*
+  | Nilai yang dipakai v-model kolom pilihannya.
+  |
+  | Sudah lama diisi dan dibaca lewat item-value="public_id", tetapi tidak
+  | pernah disebut di tipenya -- sehingga pemeriksa tipe tidak bisa menolong
+  | ketika nilainya dipakai keliru.
+  */
+  public_id: number | string
   title: string
   subtitle?: string
   raw?: any
@@ -65,6 +74,26 @@ const itemLoading = ref(false)
 
 const poOptions = ref<SelectOption[]>([])
 const selectedPo = ref<number | string | null>(null)
+
+/*
+|--------------------------------------------------------------------------
+| Pilihan PO yang sedang dipakai, disimpan terpisah dari daftarnya
+|--------------------------------------------------------------------------
+| public_id adalah hasil Crypt::encryptString, dan enkripsi itu memakai IV
+| acak -- ciphertext untuk PO YANG SAMA berbeda pada setiap permintaan.
+|
+| Akibatnya nilai yang tersimpan di v-model hanya cocok dengan daftar yang
+| sedang ditampilkan saat ia dipilih. Begitu daftarnya diambil ulang, tidak
+| ada satu pun item yang nilainya sama lagi -- dan Vuetify yang tidak
+| menemukan itemnya berhenti menampilkan judul, lalu menggambar nilainya apa
+| adanya: ciphertext sepanjang tiga baris di kolom Nomor PO.
+|
+| Pilihannya disimpan di sini supaya bisa dipasang kembali ke daftar yang
+| baru. Yang dikirim saat simpan TIDAK terpengaruh -- itu memakai
+| form.po_id dari endpoint detail, dan ciphertext lama tetap sah didekripsi.
+|--------------------------------------------------------------------------
+*/
+const selectedPoOption = ref<SelectOption | null>(null)
 const userData = JSON.parse(localStorage.getItem('userData') || '{}')
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3 MB
@@ -225,6 +254,18 @@ const confirmCancel = async (): Promise<void> => {
     router.push('/non_stock/goods_receive')
 }
 
+/*
+| forceReload WAJIB dipanggil dengan sengaja.
+|
+| Dahulu pemicunya ditulis @click:control="fetchPoOptions", dan Vuetify
+| meneruskan objek MouseEvent sebagai argumen pertama. Objek itu truthy,
+| sehingga SETIAP klik pada kolomnya menjadi muat-ulang paksa -- termasuk
+| klik untuk sekadar membuka daftarnya setelah sebuah PO dipilih.
+|
+| Muat ulang itu yang merusak tampilannya: ciphertext public_id berganti,
+| pilihan yang tersimpan tidak lagi cocok dengan satu pun item, dan Vuetify
+| menggambar nilainya apa adanya.
+*/
 const fetchPoOptions = async (forceReload = false): Promise<void> => {
   if (poLoading.value)
     return
@@ -251,6 +292,27 @@ const fetchPoOptions = async (forceReload = false): Promise<void> => {
       ].join(' • '),
       raw: row,
     }))
+
+    /*
+    | Pilihan yang sedang dipakai dipasang kembali bila ciphertext-nya sudah
+    | tidak ada di daftar yang baru. Tanpa ini, mengambil ulang daftar akan
+    | menghapus judul dari kolom yang sudah terisi.
+    */
+    if (selectedPo.value && !poOptions.value.some(o => o.public_id === selectedPo.value)) {
+      poOptions.value.unshift(
+        selectedPoOption.value ?? {
+          id: selectedPo.value,
+          public_id: selectedPo.value,
+
+          /* Nomor PO-nya sudah dibawa endpoint detail; itu yang dipakai. */
+          title: form.value.po_number || '-',
+          subtitle: [form.value.vendor_name, form.value.cabang_name, form.value.department_name]
+            .filter(Boolean)
+            .join(' • '),
+          raw: null,
+        },
+      )
+    }
   }
   catch (error) {
     poOptions.value = []
@@ -315,8 +377,14 @@ const loadPoDetail = async (public_id: number | string): Promise<void> => {
 }
 
 watch(selectedPo, async value => {
-  if (!value)
+  if (!value) {
+    selectedPoOption.value = null
+
     return
+  }
+
+  /* Dipotret sebelum daftarnya sempat berubah. */
+  selectedPoOption.value = poOptions.value.find(o => o.public_id === value) ?? null
 
   await loadPoDetail(value)
 })
@@ -540,7 +608,7 @@ onMounted(async () => {
                     clearable
                     density="compact"
                     :no-data-text="t('goodsReceive.create.fields.purchaseOrderNoData')"
-                    @click:control="fetchPoOptions"
+                    @click:control="() => fetchPoOptions()"
                   >
                     <template #item="{ props, item }">
                       <VListItem v-bind="props">

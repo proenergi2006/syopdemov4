@@ -102,7 +102,8 @@ return [
     */
     'verify' => [
         'forbidden' => 'Anda tidak punya akses untuk meneruskan Realisasi FPU ke pembayaran.',
-        'only_received' => 'Hanya Realisasi FPU yang berkasnya sudah diterima yang bisa diteruskan ke pembayaran.',
+        'only_received' => 'Hanya Realisasi FPU yang sudah disetujui Finance yang bisa diteruskan ke pembayaran.',
+        'already_forwarded' => 'Realisasi FPU ini sudah pernah diteruskan ke pembayaran.',
         'only_reimburse' => 'Hanya Realisasi FPU yang kekurangannya perlu dibayarkan yang perlu diteruskan. Yang nilainya pas sudah selesai saat diterima, dan yang lebih ditutup saat uang sisanya kembali.',
         'success' => 'Realisasi FPU diteruskan ke pembayaran kekurangan.',
         'failed' => 'Realisasi FPU gagal diteruskan ke pembayaran.',
@@ -110,6 +111,7 @@ return [
 
     'receive' => [
         'forbidden' => 'Anda tidak memiliki akses untuk menerima Realisasi FPU.',
+        'awaiting_return_proof' => 'Realisasi ini menyisakan dana yang harus dikembalikan, dan pemohon belum mengunggah bukti transfernya. Berkasnya baru bisa diterima setelah buktinya ada, supaya pemeriksaannya cukup sekali.',
         'only_approved' => 'Hanya Realisasi FPU berstatus approved yang dapat ditandai diterima.',
         'success' => 'Realisasi FPU berhasil ditandai sudah diterima.',
         'failed' => 'Penerimaan Realisasi FPU gagal diproses.',
@@ -132,6 +134,21 @@ return [
         'amount_mismatch' => 'Nominal pengembalian harus tepat Rp :expected, sedangkan yang diisi Rp :given. Pengembalian sebagian tidak dapat dicatat.',
         'success' => 'Pengembalian sisa dana sudah ditandai dan menunggu konfirmasi Finance.',
         'failed' => 'Penandaan pengembalian sisa dana gagal diproses.',
+    ],
+
+    /*
+    | Satu tombol Approve untuk ketiga cabang -- lihat financeApprove().
+    |
+    | Izinnya tetap terpisah menurut arah uangnya, jadi kalimat "tidak punya
+    | akses" di sini bisa berarti tiga izin yang berbeda. Disebut umum dengan
+    | sengaja: yang membacanya tidak perlu tahu nama izinnya, ia perlu tahu
+    | harus menghubungi siapa.
+    */
+    'finance_approve' => [
+        'forbidden' => 'Anda tidak memiliki akses untuk menyetujui Realisasi FPU ini di tahap Finance.',
+        'only_on_checking' => 'Hanya Realisasi FPU yang berkasnya sedang diproses Finance yang dapat disetujui.',
+        'success' => 'Realisasi FPU disetujui.',
+        'failed' => 'Persetujuan Realisasi FPU gagal diproses.',
     ],
 
     /* Finance mengonfirmasi uangnya benar-benar masuk -- di sinilah tutupnya. */

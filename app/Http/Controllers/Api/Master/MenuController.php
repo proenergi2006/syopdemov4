@@ -1386,55 +1386,79 @@ class MenuController extends Controller
                 'approval_foreign_key' => 'cash_advance_realization_id',
 
                 'queues' => [
-                    ['permission' => 'cash_advance_realization.receive', 'status' => 'APPROVED'],
-
                     /*
-                    | Tiga antrean berbeda pada dua status, dibedakan arah
-                    | selisihnya -- lihat alur dua PIC, 9 Oktober 2026.
+                    |----------------------------------------------------
+                    | Angkanya hanya menghitung yang MENGGANTUNG
+                    |----------------------------------------------------
+                    | Bagi pemegang izin terima, yang menggantung adalah
+                    | dokumen yang belum ia terima. Yang sudah di mejanya
+                    | -- menunggu disetujui atau diteruskan -- tidak ikut
+                    | dihitung: ia sudah memegangnya, dan angka yang
+                    | mengingatkan sesuatu yang sudah ada di tangan hanya
+                    | membuat angkanya tidak pernah turun.
+                    |
+                    | Cabang pengembalian dipisah barisnya sendiri, dan
+                    | menuntut buktinya sudah ada. Yang buktinya belum
+                    | diunggah memang belum bisa diterima siapa pun --
+                    | menghitungnya berarti menjanjikan pekerjaan yang
+                    | tombolnya pun tidak muncul.
+                    |----------------------------------------------------
                     */
+
+                    /* Nilainya pas -- tidak ada syarat tambahan. */
                     [
-                        'permission' => 'cash_advance_realization.verify',
-                        'status' => 'RECEIVED',
+                        'permission' => 'cash_advance_realization.receive',
+                        'status' => 'APPROVED',
+                        'finance_status' => 'WAITING APPROVAL',
+                        'difference_type' => 'NONE',
+                    ],
+
+                    /* Kurang dana -- juga tanpa syarat tambahan. */
+                    [
+                        'permission' => 'cash_advance_realization.receive',
+                        'status' => 'APPROVED',
+                        'finance_status' => 'WAITING APPROVAL',
                         'difference_type' => 'REIMBURSE',
                     ],
+
+                    /* Lebih dana -- hanya yang buktinya sudah diunggah pemohon. */
+                    [
+                        'permission' => 'cash_advance_realization.receive',
+                        'status' => 'APPROVED',
+                        'finance_status' => 'WAITING APPROVAL',
+                        'difference_type' => 'RETURN',
+                        'not_null_column' => 'return_declared_at',
+                    ],
+
                     /*
                     | Menunggu DIKEMBALIKAN PEMOHON, bukan menunggu Finance.
                     |
                     | own_only bukan hiasan. Uang sisanya dipegang satu orang,
                     | dan hanya orang itu yang bisa mengembalikannya; tanpa
                     | saringan ini, siapa pun yang cakupan lihatnya seluruh
-                    | cabang akan melihat angka berisi tagihan orang lain --
-                    | lalu membuka daftarnya dan tidak menemukan satu pun yang
-                    | bisa ia kerjakan.
+                    | cabang akan melihat angka berisi tagihan orang lain.
                     */
                     [
                         'permission' => 'cash_advance_realization.return',
-                        'status' => 'RECEIVED',
+                        'status' => 'APPROVED',
+                        'finance_status' => 'WAITING APPROVAL',
                         'difference_type' => 'RETURN',
+                        'null_column' => 'return_declared_at',
                         'own_only' => true,
                     ],
 
-                    /* Sudah dinyatakan pemohon, menunggu Finance mengonfirmasi. */
-                    [
-                        'permission' => 'cash_advance_realization.confirm_return',
-                        'status' => 'RETURN DECLARED',
-                        'difference_type' => 'RETURN',
-                    ],
-
                     /*
-                    | Nilainya pas, berkasnya sedang diperiksa. Tidak ada uang
-                    | yang berpindah di cabang ini -- yang menunggu justru
-                    | pekerjaan yang paling mudah terlupakan kalau tidak ada
-                    | angka yang mengingatkannya.
+                    | Meja pembayar. Tetap dihitung: bagi yang memegangnya,
+                    | dokumen yang sudah diteruskan dan belum dibayar memang
+                    | menggantung di mejanya sendiri.
                     */
                     [
-                        'permission' => 'cash_advance_realization.finalize',
-                        'status' => 'ON CHECKING',
-                        'difference_type' => 'NONE',
-                    ],
-                    [
                         'permission' => 'cash_advance_realization.reimburse',
-                        'status' => 'VERIFIED',
+                        'status' => 'APPROVED',
+                        'finance_status' => 'APPROVED',
+                        'difference_type' => 'REIMBURSE',
+                        'not_null_column' => 'verified_at',
+                        'null_column' => 'settled_at',
                     ],
                 ],
             ],
@@ -1497,6 +1521,42 @@ class MenuController extends Controller
                 "UPPER(TRIM({$tabel}.status)) = ?",
                 [strtoupper(trim((string) $antrean['status']))],
             );
+
+        /*
+        | Kolom waktu yang harus (atau tidak boleh) kosong.
+        |
+        | Dipakai membedakan dua meja yang duduk pada status yang sama:
+        | "belum diteruskan" dan "sudah diteruskan tapi belum dibayar" sama-
+        | sama berstatus Approved, dan yang membedakannya justru jejak
+        | waktunya.
+        */
+        foreach (['null_column' => true, 'not_null_column' => false] as $kunci => $harusKosong) {
+            if (!isset($antrean[$kunci])) {
+                continue;
+            }
+
+            $kolom = (string) $antrean[$kunci];
+
+            if (!Schema::hasColumn($tabel, $kolom)) {
+                continue;
+            }
+
+            $harusKosong
+                ? $query->whereNull("{$tabel}.{$kolom}")
+                : $query->whereNotNull("{$tabel}.{$kolom}");
+        }
+
+        /*
+        | Status proses Finance, bila antreannya menyebutnya. Hanya Realisasi
+        | yang punya kolom ini: di sana perjalanan approval dan perjalanan
+        | Finance tinggal di kolom yang berbeda.
+        */
+        if (isset($antrean['finance_status']) && Schema::hasColumn($tabel, 'finance_status')) {
+            $query->whereRaw(
+                "UPPER(TRIM({$tabel}.finance_status)) = ?",
+                [strtoupper(trim((string) $antrean['finance_status']))],
+            );
+        }
 
         /*
         | Arah selisihnya, bila antreannya membedakannya. Hanya Realisasi yang

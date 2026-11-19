@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Exports\PurchaseRequestExport;
+use App\Support\ModuleApproverCheck;
 use App\Http\Controllers\Controller;
 use App\Models\ApprovalHistoryPR;
 use App\Models\ApprovalMatrix;
@@ -238,6 +239,16 @@ class PurchaseRequestController extends Controller
             |--------------------------------------------------------------------------
             */
             $abilities = [
+                /*
+                | Berdiri di rantai approval modul ini.
+                |
+                | Penentu tampil tidaknya saringan "hanya yang menunggu approval
+                | saya". Bagi yang tidak pernah menyetujui apa pun di sini,
+                | saringan itu hanya tombol yang selalu mengosongkan daftar --
+                | dan yang menyalakannya akan mengira datanya hilang.
+                */
+                'is_approver' => ModuleApproverCheck::isApprover($user, 'purchase_request_approvals'),
+
                 'can_view' => $user->hasPermission(
                     'purchase_request.view',
                 ),

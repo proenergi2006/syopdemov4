@@ -313,6 +313,16 @@ return [
             'message' => 'Realization :realization_number has been checked and approved by :actor_name. Its value matches the request exactly, so nothing needs to be paid or returned.',
         ],
 
+        'finance_approved_return' => [
+            'title' => 'Fund Return Confirmed',
+            'message' => 'Finance states that the Rp :difference_amount surplus on realization :realization_number has been received. The process is complete.',
+        ],
+
+        'finance_approved_reimburse' => [
+            'title' => 'Realization Approved by Finance',
+            'message' => 'Realization :realization_number has been checked and approved by :actor_name. The Rp :difference_amount shortfall will be paid to you.',
+        ],
+
         'return_rejected' => [
             'title' => 'Return Declaration Rejected',
             'message' => 'Your return declaration for realization :realization_number was rejected by :actor_name. Reason: :reason',
