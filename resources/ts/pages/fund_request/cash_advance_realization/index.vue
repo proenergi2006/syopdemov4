@@ -2324,10 +2324,19 @@ const openVerify = async (row: RealizationRow): Promise<void> => {
 | hari pembayaran" -- dan spanduknya mengumumkan ada yang menunggu
 | dicairkan padahal tidak ada satu pun.
 */
+/*
+| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia hanya
+| berarti bagi yang memang punya tombol berjadwal.
+|
+| Hanya pembayaran kekurangan yang terikat hari kasir. Konfirmasi
+| pengembalian dan approve tanpa selisih tidak -- memunculkan spanduk bagi
+| mereka berarti mengumumkan penghalang yang tidak pernah menghalangi apa pun.
+*/
 const blockedByPaymentDay = computed<boolean>(() =>
-  (canConfirmReturn.value || canReimburse.value)
+  canReimburse.value
   && rows.value.some(row =>
-    row.can_pay_today === false && differenceActionState(row) !== null))
+    row.can_pay_today === false
+    && differenceActionState(row)?.mode === 'REIMBURSE'))
 
 const paymentDeviation = (row: RealizationRow): 'EARLY' | 'LATE' | null => {
   if (!row.scheduled_payment_date)
@@ -2428,11 +2437,16 @@ const askPaymentConfirmation = async (
 const MODE_WAJIB_BUKTI: DifferenceMode[] = ['RETURN']
 
 /*
-| Tidak terikat hari kerja kasir. Pernyataan pemohon menyusul transfer
-| yang sudah terjadi, dan approve tanpa selisih tidak memindahkan
-| sepeser pun -- keduanya tidak ada urusan dengan kalender kasir.
+| Tidak terikat hari kerja kasir.
+|
+| Kalender itu mengatur uang yang KELUAR dari kas. Pernyataan pemohon
+| menyusul transfer yang sudah terjadi, konfirmasi Finance mengakui uang yang
+| MASUK, dan approve tanpa selisih tidak memindahkan sepeser pun.
+|
+| Yang tersisa di luar daftar ini hanya pembayaran kekurangan -- satu-satunya
+| langkah di modul ini yang benar-benar mengeluarkan uang dari kas.
 */
-const MODE_TANPA_KALENDER_KASIR: DifferenceMode[] = ['RETURN', 'FINALIZE']
+const MODE_TANPA_KALENDER_KASIR: DifferenceMode[] = ['RETURN', 'CONFIRM_RETURN', 'FINALIZE']
 
 /** Mengirim nominal; yang lain hanya menyetujui angka yang sudah ada. */
 const MODE_KIRIM_NOMINAL: DifferenceMode[] = ['RETURN', 'REIMBURSE']
@@ -3818,7 +3832,6 @@ onMounted(async () => {
                   <!-- Milik Finance: menyatakan uangnya benar-benar masuk. -->
                   <VListItem
                     v-if="pendingDifferenceMode(row) === 'CONFIRM_RETURN'"
-                    :disabled="!canPayTodayRow(row)"
                     href="javascript:void(0)"
                     @click="openSettle(row, 'CONFIRM_RETURN')"
                   >
