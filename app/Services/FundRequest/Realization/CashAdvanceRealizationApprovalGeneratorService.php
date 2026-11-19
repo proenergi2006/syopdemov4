@@ -43,15 +43,34 @@ class CashAdvanceRealizationApprovalGeneratorService
 
         $totalAmount = $this->calculateTotalAmount($realization);
 
-        if ($totalAmount <= 0) {
+        /*
+        | NOL DIIZINKAN DI SINI, berbeda dari FPU dan Claim.
+        |
+        | FPU sebesar nol adalah permintaan uang yang tidak meminta apa-apa,
+        | dan Claim sebesar nol adalah penggantian yang tidak perlu diganti --
+        | keduanya memang tidak masuk akal, dan penjaganya tetap berdiri di
+        | sana.
+        |
+        | Realisasi nol justru peristiwa yang wajar: dananya sudah cair,
+        | pengeluarannya ternyata tidak jadi sama sekali, dan seluruhnya
+        | dikembalikan ke Finance. Menolaknya berarti memaksa pemohon
+        | mengarang pengeluaran supaya dokumennya bisa diajukan -- lalu
+        | uangnya tidak pernah punya jalan pulang.
+        |
+        | Yang tetap ditolak hanya nilai negatif: itu bukan "tidak jadi
+        | dipakai", melainkan angka yang keliru.
+        */
+        if ($totalAmount < 0) {
             throw ValidationException::withMessages([
                 'total_amount' => [
-                    'Total nilai realisasi harus lebih besar dari 0.',
+                    'Total nilai realisasi tidak boleh kurang dari 0.',
                 ],
             ]);
         }
 
-        $approvalFlow = $this->findMatchingFlow($realization, $totalAmount);
+        $nominalFlow = $this->nominalPemilihFlow($realization, $totalAmount);
+
+        $approvalFlow = $this->findMatchingFlow($realization, $nominalFlow);
 
         if (!$approvalFlow) {
             /*
@@ -73,7 +92,15 @@ class CashAdvanceRealizationApprovalGeneratorService
                             ?? $realization->departmentData?->name
                             ?? '-',
                         $realization->transactionCategory?->name ?? '-',
-                        angka($totalAmount, 0),
+
+                        /*
+                        | Nominal yang BENAR-BENAR dipakai mencocokkan, bukan
+                        | total realisasinya. Pada realisasi nol keduanya
+                        | berbeda, dan menyebut angka yang tidak dipakai
+                        | menyuruh admin mencari flow yang mencakup Rp 0 --
+                        | padahal yang dicari flow sebesar dana cairnya.
+                        */
+                        angka($nominalFlow, 0),
                     ),
                 ],
             ]);
@@ -682,6 +709,53 @@ class CashAdvanceRealizationApprovalGeneratorService
      * FPU yang dicairkan -- yang disetujui pada dokumen ini adalah angka
      * pengeluaran yang benar-benar terjadi.
      */
+    /**
+     * Nominal yang dipakai MEMILIH approval flow.
+     *
+     * Biasanya sama dengan total realisasinya. Yang berbeda hanya satu
+     * keadaan: realisasi yang nilainya NOL.
+     *
+     * KENAPA TIDAK MEMAKAI NOL APA ADANYA.
+     *
+     * Seluruh flow Realisasi bertingkat menurut nominal, dan tingkat
+     * terendahnya mulai dari Rp 1. Mencocokkan nol ke sana tidak akan
+     * menemukan satu flow pun, sehingga pemohon yang baru saja lolos dari
+     * penjaga di atas langsung tertahan penjaga berikutnya -- dengan kalimat
+     * yang menyuruhnya melengkapi matriks approval, pekerjaan yang bukan
+     * miliknya dan tidak akan pernah ia bisa lakukan.
+     *
+     * KENAPA NILAI PENCAIRANNYA.
+     *
+     * Yang sedang disetujui pada realisasi nol bukan "pengeluaran nol",
+     * melainkan kembalinya SELURUH dana yang pernah dicairkan. Uang sebesar
+     * itulah yang berpindah, jadi tingkat nominalnya mengikuti uang itu.
+     *
+     * YANG DIPINJAM HANYA ANGKANYA, BUKAN PENYETUJUNYA.
+     *
+     * Flow yang dicari tetap flow REALISASI -- lihat findMatchingFlow(), yang
+     * menyaring document_type REALISASI dan tidak pernah menyentuh matriks
+     * FPU. Penyetuju realisasi memang berbeda orang dari penyetuju
+     * pengajuannya, dan perbedaan itu tidak boleh hilang hanya karena
+     * nominalnya dipinjam. Yang disamakan dengan pengajuannya semata-mata
+     * ketentuan nominalnya.
+     *
+     * Realisasi yang sebagian barisnya saja dinolkan tidak tersentuh aturan
+     * ini: totalnya masih di atas nol, jadi tingkatnya tetap mengikuti yang
+     * benar-benar dibelanjakan.
+     */
+    private function nominalPemilihFlow(
+        CashAdvanceRealization $realization,
+        float $totalAmount,
+    ): float {
+        if ($totalAmount > 0) {
+            return $totalAmount;
+        }
+
+        $dicairkan = (float) ($realization->total_advance_amount ?? 0);
+
+        return $dicairkan > 0 ? $dicairkan : 0.0;
+    }
+
     private function calculateTotalAmount(CashAdvanceRealization $realization): float
     {
         $realization->loadMissing('items');

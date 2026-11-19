@@ -52,16 +52,40 @@ use App\Models\User;
 */
 class BusinessTripDependentDocumentService
 {
-    /** Status dokumen yang masih bisa digugurkan tanpa merugikan siapa pun. */
+    /*
+    | Status dokumen yang masih bisa digugurkan tanpa merugikan siapa pun.
+    |
+    | NEED REVISION IKUT, dan dahulu tidak.
+    |
+    | Dokumen yang sedang dikembalikan kepada pemohonnya jatuh di antara dua
+    | jaring: tidak digugurkan karena tidak ada di daftar ini, tidak pula
+    | menahan karena belum sampai ke tangan Finance. Ia selamat, menunjuk
+    | perdin yang sudah mati, dan tidak seorang pun diberi tahu.
+    |
+    | Yang terjadi sesudahnya bukan sekadar membeku. Submit FPU tidak
+    | memeriksa status perdinnya, dan tidak satu pun langkah approval
+    | memeriksanya -- jadi dokumennya berjalan utuh melewati seluruh rantai
+    | persetujuan, memakan waktu beberapa orang untuk menyetujui biaya
+    | perjalanan yang sudah tidak ada, lalu baru mati di meja kasir ketika
+    | pencairannya menolak perdin yang batal.
+    |
+    | Tidak dijadikan penahan seperti RECEIVED, dan itu disengaja: belum ada
+    | uang yang disiapkan siapa pun. Menahan pembatalan perdin hanya karena
+    | dokumennya sedang direvisi akan memaksa pemohon memperbaiki lalu
+    | mengajukan ulang dokumen yang sudah pasti batal, semata-mata supaya
+    | ada yang bisa dibatalkan.
+    */
     private const FPU_MASIH_GUGUR = [
         CashAdvance::STATUS_DRAFT,
         CashAdvance::STATUS_IN_PROGRESS,
+        CashAdvance::STATUS_NEED_REVISION,
         CashAdvance::STATUS_APPROVED,
     ];
 
     private const CLAIM_MASIH_GUGUR = [
         Claim::STATUS_DRAFT,
         Claim::STATUS_IN_PROGRESS,
+        Claim::STATUS_NEED_REVISION,
         Claim::STATUS_APPROVED,
     ];
 
