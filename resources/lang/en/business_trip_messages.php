@@ -22,6 +22,14 @@ return [
     'deleted' => 'Business trip deleted successfully.',
     'delete_failed' => 'Failed to delete the business trip.',
     'not_found' => 'Business trip not found.',
+
+    /*
+    | The document IS visible, but the action permission's scope does not
+    | cover it. Deliberately separate from not_found: telling someone that
+    | the document they are looking at does not exist sends them hunting for
+    | an id bug instead of opening the permission matrix.
+    */
+    'action_out_of_scope' => 'You cannot perform this action on that business trip: the action permission scope is unset or does not cover this document. Ask an admin to check the scope in the permission matrix.',
     'forbidden_view' => 'You do not have access to view business trips.',
     'forbidden_create' => 'You do not have access to create business trips.',
     'forbidden_update' => 'You do not have access to update business trips.',
