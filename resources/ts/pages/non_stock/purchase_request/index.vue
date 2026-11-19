@@ -2496,7 +2496,15 @@ onBeforeUnmount(() => {
             />
           </VCol>
 
+          <!--
+            Hanya bagi yang memang berdiri di rantai approval modul ini.
+
+            Bagi yang tidak pernah menyetujui apa pun di sini, saringan ini
+            hanya tombol yang selalu mengosongkan daftar -- dan yang
+            menyalakannya akan mengira datanya hilang.
+          -->
           <VCol
+            v-if="abilities.is_approver"
             cols="12"
             md="6"
           >

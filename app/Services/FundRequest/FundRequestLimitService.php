@@ -117,12 +117,8 @@ class FundRequestLimitService
                     ->whereColumn('r.cash_advance_id', 'cash_advances.id')
                     ->whereNull('r.deleted_at')
                     ->whereIn('r.status', [
+                        /* Tahap Finance punya kolomnya sendiri; APPROVED sudah mencakupnya. */
                         CashAdvanceRealization::STATUS_APPROVED,
-                        CashAdvanceRealization::STATUS_RECEIVED,
-                        CashAdvanceRealization::STATUS_VERIFIED,
-                        CashAdvanceRealization::STATUS_ON_CHECKING,
-                        CashAdvanceRealization::STATUS_RETURN_DECLARED,
-                        CashAdvanceRealization::STATUS_SETTLED,
                     ]);
             });
     }

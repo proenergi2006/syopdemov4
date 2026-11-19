@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Exports\BusinessTripExport;
+use App\Support\ModuleApproverCheck;
 use App\Http\Controllers\Controller;
 use App\Services\FundRequest\CombinedPrintComposer;
 use App\Models\BusinessTrip;
@@ -95,6 +96,16 @@ class BusinessTripController extends Controller
             $context = $this->resolveViewContext($user);
 
             $abilities = [
+                /*
+                | Berdiri di rantai approval modul ini.
+                |
+                | Penentu tampil tidaknya saringan "hanya yang menunggu approval
+                | saya". Bagi yang tidak pernah menyetujui apa pun di sini,
+                | saringan itu hanya tombol yang selalu mengosongkan daftar --
+                | dan yang menyalakannya akan mengira datanya hilang.
+                */
+                'is_approver' => ModuleApproverCheck::isApprover($user, 'business_trip_approvals'),
+
                 'can_view' => $user->hasPermission('business_trip.view'),
                 'view_scope' => $context['scope'],
                 'can_create' => $user->hasPermission('business_trip.create'),
@@ -2787,6 +2798,9 @@ class BusinessTripController extends Controller
     {
         return [
             'can_view' => false,
+
+            /* Tanpa izin lihat, tidak ada saringan apa pun yang perlu tampil. */
+            'is_approver' => false,
             'view_scope' => 'NONE',
             'can_create' => false,
             'can_update' => false,

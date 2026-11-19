@@ -47,6 +47,14 @@ class ReceiptReversalService
      *
      * @param  string  $approvedStatus  Status tujuan, milik modelnya masing-masing
      * @param  string  $receivedStatus  Satu-satunya status asal yang sah
+     * @param  string  $statusColumn    Kolom tempat kedua status itu tinggal.
+     *                                  Bawaannya "status", dan Realisasi FPU
+     *                                  memakai "finance_status": di sana
+     *                                  perjalanan Finance punya kolomnya
+     *                                  sendiri, sedangkan kolom status hanya
+     *                                  merekam perjalanan approval dan tidak
+     *                                  boleh ikut bergeser saat penerimaan
+     *                                  berkas ditarik.
      * @return array{
      *     ok: bool,
      *     message_key: string|null,
@@ -61,6 +69,7 @@ class ReceiptReversalService
         mixed $user,
         string $permission,
         ?string $notes,
+        string $statusColumn = 'status',
     ): array {
         $tolak = static fn (string $kunci, int $kode): array => [
             'ok' => false,
@@ -81,7 +90,7 @@ class ReceiptReversalService
         | keluar dari Diterima. Menyebut mereka satu per satu hanya menambah
         | daftar yang harus diingat orang saat kelak ada status baru.
         */
-        if (strtoupper((string) $document->status) !== $receivedStatus) {
+        if (strtoupper((string) $document->{$statusColumn}) !== $receivedStatus) {
             return $tolak('fund_request_messages.receipt_reversal.only_received', 422);
         }
 
@@ -94,7 +103,7 @@ class ReceiptReversalService
             ? \Carbon\Carbon::parse($document->scheduled_payment_date)->format('d/m/Y')
             : null;
 
-        $document->status = $approvedStatus;
+        $document->{$statusColumn} = $approvedStatus;
 
         $document->received_by = null;
         $document->received_at = null;

@@ -55,30 +55,33 @@ class CashAdvanceRealizationDashboardService
     | sedang kembali ke pemohon.
     */
     private const STATUS_DISETUJUI = [
+        /*
+        | Cukup APPROVED.
+        |
+        | Dahulu enam nilai, karena tiap tahap Finance menimpa kolom status
+        | dan membuat dokumen yang sudah disetujui berhenti terbaca sebagai
+        | APPROVED. Sejak tahap Finance punya kolomnya sendiri, persetujuan
+        | dokumen tidak pernah lagi hilang dari sini -- dan daftar yang
+        | panjang itu justru menjadi tempat nilai baru paling mudah lupa
+        | didaftarkan.
+        */
         CashAdvanceRealization::STATUS_APPROVED,
-        CashAdvanceRealization::STATUS_RECEIVED,
-        CashAdvanceRealization::STATUS_VERIFIED,
-        CashAdvanceRealization::STATUS_ON_CHECKING,
-        CashAdvanceRealization::STATUS_RETURN_DECLARED,
-        CashAdvanceRealization::STATUS_SETTLED,
     ];
 
     /*
     | Sudah disetujui tetapi belum ditutup. Selama di sini, selisihnya -- uang
     | yang harus dikembalikan atau dibayar -- masih menggantung.
     */
-    private const STATUS_BELUM_TUNTAS = [
-        CashAdvanceRealization::STATUS_APPROVED,
-        CashAdvanceRealization::STATUS_RECEIVED,
-        CashAdvanceRealization::STATUS_VERIFIED,
-
-        /*
-        | Pengakuan pemohon belum menutup apa pun. Uangnya baru dianggap
-        | kembali setelah Finance mengonfirmasinya, jadi selama di sini
-        | selisihnya masih menggantung persis seperti sebelum dinyatakan.
-        */
-        CashAdvanceRealization::STATUS_ON_CHECKING,
-        CashAdvanceRealization::STATUS_RETURN_DECLARED,
+    /*
+    | Sudah disetujui tetapi proses Finance-nya belum tuntas.
+    |
+    | Sekarang ditanyakan pada finance_status, bukan pada status: selama
+    | Finance belum menyatakan selesai, selisihnya -- uang yang harus
+    | dikembalikan atau dibayarkan -- masih menggantung.
+    */
+    private const FINANCE_BELUM_TUNTAS = [
+        CashAdvanceRealization::FINANCE_WAITING,
+        CashAdvanceRealization::FINANCE_ON_CHECKING,
     ];
 
     /** Ambang dokumen menggantung yang dianggap perlu ditindaklanjuti. */
@@ -156,7 +159,8 @@ class CashAdvanceRealizationDashboardService
             ->first();
 
         $selesai = (clone $base())
-            ->where('cash_advance_realizations.status', CashAdvanceRealization::STATUS_SETTLED)
+            /* Tuntas = proses Finance-nya sudah disetujui, bukan status approval. */
+            ->where('cash_advance_realizations.finance_status', CashAdvanceRealization::FINANCE_APPROVED)
             ->selectRaw('COUNT(*) AS jumlah')
             ->selectRaw('COALESCE(SUM(cash_advance_realizations.total_realization_amount), 0) AS nilai')
             ->first();
@@ -338,7 +342,7 @@ class CashAdvanceRealizationDashboardService
     private function selisihMenggantung(array $filters): array
     {
         $row = $this->currentStateQuery($filters)
-            ->whereIn('cash_advance_realizations.status', self::STATUS_BELUM_TUNTAS)
+            ->whereIn('cash_advance_realizations.finance_status', self::FINANCE_BELUM_TUNTAS)
             ->whereIn('cash_advance_realizations.difference_type', [
                 CashAdvanceRealization::DIFFERENCE_RETURN,
                 CashAdvanceRealization::DIFFERENCE_REIMBURSE,
@@ -469,8 +473,8 @@ class CashAdvanceRealizationDashboardService
             ->selectRaw('COALESCE(SUM(cash_advance_realizations.total_advance_amount), 0) AS uang_muka')
             ->selectRaw('COALESCE(SUM(cash_advance_realizations.total_realization_amount), 0) AS realisasi')
             ->selectRaw(
-                'SUM(CASE WHEN cash_advance_realizations.status = ? THEN 1 ELSE 0 END) AS selesai',
-                [CashAdvanceRealization::STATUS_SETTLED],
+                'SUM(CASE WHEN cash_advance_realizations.finance_status = ? THEN 1 ELSE 0 END) AS selesai',
+                [CashAdvanceRealization::FINANCE_APPROVED],
             )
             ->groupByRaw($bucket)
             ->orderByRaw($bucket)
@@ -687,7 +691,7 @@ class CashAdvanceRealizationDashboardService
         $rows = $this->currentStateQuery($filters)
             ->leftJoin('cabang', DB::raw('CAST(cabang.id AS VARCHAR)'), '=', 'cash_advance_realizations.branch')
             ->leftJoin('departments', 'departments.id', '=', 'cash_advance_realizations.department_id')
-            ->whereIn('cash_advance_realizations.status', self::STATUS_BELUM_TUNTAS)
+            ->whereIn('cash_advance_realizations.finance_status', self::FINANCE_BELUM_TUNTAS)
             ->whereIn('cash_advance_realizations.difference_type', [
                 CashAdvanceRealization::DIFFERENCE_RETURN,
                 CashAdvanceRealization::DIFFERENCE_REIMBURSE,
@@ -768,8 +772,8 @@ class CashAdvanceRealizationDashboardService
                 [CashAdvanceRealization::STATUS_IN_PROGRESS],
             )
             ->selectRaw(
-                'SUM(CASE WHEN cash_advance_realizations.status = ? THEN 1 ELSE 0 END) AS selesai',
-                [CashAdvanceRealization::STATUS_SETTLED],
+                'SUM(CASE WHEN cash_advance_realizations.finance_status = ? THEN 1 ELSE 0 END) AS selesai',
+                [CashAdvanceRealization::FINANCE_APPROVED],
             )
             ->selectRaw(
                 'COALESCE(SUM(ABS(cash_advance_realizations.difference_amount)), 0) AS selisih',

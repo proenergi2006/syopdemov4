@@ -6,12 +6,7 @@
         "approved": "Approved",
         "rejected": "Rejected",
         "cancelled": "Cancelled",
-        "settled": "Selesai",
-        "received": "Diterima",
-        "verified": "Menunggu Pembayaran",
-        "needRevision": "Butuh Revisi",
-        "returnDeclared": "Menunggu Konfirmasi",
-        "onChecking": "Sedang Diperiksa"
+        "needRevision": "Butuh Revisi"
     },
     "difference": {
         "all": "Semua Selisih",
@@ -41,9 +36,8 @@
                 "return": "Menunggu Pengembalian",
                 "reimburse": "Menunggu Pembayaran",
                 "notReceived": "Belum Diterima",
-                "verify": "Menunggu saya periksa",
-                "confirmReturn": "Menunggu saya konfirmasi",
-                "finalize": "Menunggu saya approve"
+                "receive": "Menunggu saya terima",
+                "approve": "Menunggu saya approve"
             },
             "pendingActionLabel": "Butuh Aksi",
             "resetButton": "Reset Filter",
@@ -51,7 +45,8 @@
             "searchPlaceholder": "Nomor realisasi, nomor FPU, perihal",
             "startDate": "Tanggal Awal",
             "statusLabel": "Status",
-            "scheduledPaymentDate": "Jadwal Pembayaran"
+            "scheduledPaymentDate": "Jadwal Pembayaran",
+            "financeStatusLabel": "Status Proses Finance"
         },
         "table": {
             "no": "No",
@@ -79,9 +74,8 @@
             "print": "Cetak PDF",
             "receive": "Terima",
             "notReceivedBadge": "Menunggu Diterima",
-            "confirmReturn": "Konfirmasi Pengembalian",
             "rejectReturn": "Tolak Pengembalian",
-            "finalize": "Approve Realisasi"
+            "financeApprove": "Approve Dokumen"
         },
         "toast": {
             "loadingText": "Memuat data...",
@@ -150,9 +144,8 @@
         "pending": {
             "return": "Perlu Dikembalikan",
             "reimburse": "Perlu Dibayar Finance",
-            "verify": "Menunggu diperiksa",
-            "confirmReturn": "Menunggu dikonfirmasi",
-            "finalize": "Menunggu disetujui"
+            "approve": "Menunggu disetujui",
+            "awaitingReturnProof": "Menunggu bukti dari pemohon"
         },
         "settleAmount": {
             "label": "Nominal yang diserahkan",
@@ -264,13 +257,6 @@
             "notesLabel": "Catatan pemeriksaan (opsional)",
             "confirmButton": "Teruskan"
         },
-        "confirmReturn": {
-            "confirmTitle": "Konfirmasi pengembalian sisa dana?",
-            "confirmText": "Realisasi {nomor} akan ditutup, dengan sisa dana {nominal} dinyatakan sudah diterima Finance.",
-            "confirmButton": "Konfirmasi Diterima",
-            "successFallback": "Pengembalian sisa dana dikonfirmasi dan Realisasi FPU ditutup.",
-            "failedFallback": "Konfirmasi pengembalian sisa dana gagal diproses."
-        },
         "rejectReturn": {
             "dialogTitle": "Tolak pernyataan pengembalian {number}",
             "dialogSubtitle": "Dokumennya akan kembali ke pemohon supaya ia bisa menyatakan ulang. Sebutkan apa yang tidak sesuai -- nominalnya, rekening tujuannya, atau buktinya.",
@@ -280,12 +266,19 @@
             "successFallback": "Pernyataan pengembalian ditolak dan dokumennya dikembalikan ke pemohon.",
             "failedFallback": "Penolakan pernyataan pengembalian gagal diproses."
         },
-        "finalize": {
+        "financeApprove": {
             "confirmTitle": "Approve Realisasi ini?",
-            "confirmText": "Realisasi {nomor} nilainya sama persis dengan pengajuan, jadi tidak ada dana yang perlu dibayarkan maupun dikembalikan. Setelah disetujui, dokumennya selesai dan tidak bisa ditarik lagi.",
-            "confirmButton": "Approve dan Selesaikan",
-            "successFallback": "Realisasi FPU disetujui dan prosesnya selesai.",
-            "failedFallback": "Approve Realisasi FPU gagal diproses."
+            "confirmText": "Realisasi {nomor} akan disetujui. Untuk yang kekurangan dana, dokumennya sekaligus diteruskan ke pembayaran.",
+            "confirmButton": "Approve",
+            "successFallback": "Realisasi FPU disetujui.",
+            "failedFallback": "Persetujuan Realisasi FPU gagal diproses."
+        },
+        "forwardPayment": {
+            "confirmTitle": "Teruskan ke pembayaran?",
+            "confirmText": "Realisasi {nomor} akan diteruskan ke pembayaran kekurangan sebesar {nominal}.",
+            "confirmButton": "Teruskan",
+            "successFallback": "Realisasi FPU diteruskan ke pembayaran kekurangan.",
+            "failedFallback": "Realisasi FPU gagal diteruskan ke pembayaran."
         }
     },
     "form": {
@@ -488,6 +481,23 @@
             "rejected": "Ditolak"
         },
         "verifiedTitle": "Diteruskan ke Pembayaran Kekurangan",
-        "verifiedBy": "Diperiksa {name} pada {time}"
+        "verifiedBy": "Diperiksa {name} pada {time}",
+        "financeHistoryTitle": "Riwayat Proses Finance",
+        "financeEvent": {
+            "received": "Berkas diterima Finance",
+            "unreceived": "Penerimaan berkas ditarik",
+            "return_declared": "Pemohon mengunggah bukti pengembalian",
+            "return_rejected": "Bukti pengembalian ditolak",
+            "approved": "Disetujui Finance",
+            "reimbursed": "Kekurangan dibayarkan",
+            "forwarded": "Diteruskan ke pembayaran"
+        },
+        "financeBy": "oleh {name}"
+    },
+    "financeStatus": {
+        "all": "Semua",
+        "waiting": "Waiting Approval",
+        "onChecking": "On Checking",
+        "approved": "Approved"
     }
 }

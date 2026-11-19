@@ -415,6 +415,87 @@ class CashAdvanceRealizationMailService
         );
     }
 
+    /**
+     * Email ke pemohon: Finance sudah menyetujui realisasinya.
+     *
+     * Mode suratnya dipilih menurut cabangnya, dengan alasan yang sama
+     * seperti notifikasinya: pemohon cabang kekurangan belum menerima
+     * uangnya, dan surat berbunyi "selesai" akan membuatnya berhenti
+     * menunggu sesuatu yang justru belum datang.
+     */
+    public function sendFinanceApproved(
+        CashAdvanceRealization $realization,
+        User $approver,
+    ): void {
+        $requester = $this->resolveRequester($realization);
+
+        if (!$requester) {
+            return;
+        }
+
+        $mode = match (strtoupper(trim((string) $realization->difference_type))) {
+            CashAdvanceRealization::DIFFERENCE_REIMBURSE => 'finance_approved_reimburse',
+            CashAdvanceRealization::DIFFERENCE_RETURN => 'finance_approved_return',
+            default => 'finalized',
+        };
+
+        $realization->loadMissing(['items', 'transactionCategory', 'cashAdvance']);
+
+        $this->queue(
+            $requester,
+            new CashAdvanceRealizationApprovalMail(
+                realization: $realization,
+                recipient: $requester,
+                mode: $mode,
+                actor: $approver,
+                notes: $realization->settlement_notes ?? $realization->verification_notes,
+            ),
+            $realization,
+            $mode,
+        );
+    }
+
+    /**
+     * Email ke pemohon: penerimaan berkasnya ditarik kembali Finance.
+     *
+     * DAHULU HANYA NOTIFIKASI DALAM APLIKASI, dan itu tidak cukup.
+     *
+     * Menarik penerimaan membatalkan tanggal pembayaran yang SUDAH pernah
+     * dikirim ke pemohon lewat email. Yang ia pegang sekarang satu janji
+     * tertulis di kotak masuknya dan satu pembatalan yang hanya ada di dalam
+     * aplikasi -- dan yang ia percayai tentu yang tertulis. Akibatnya ia
+     * menunggu uang pada hari yang tidak akan pernah datang.
+     *
+     * Pembatalan sebuah janji harus sampai lewat jalan yang sama dengan
+     * janjinya.
+     */
+    public function sendReceiptReverted(
+        CashAdvanceRealization $realization,
+        User $actor,
+        ?string $reason = null,
+    ): void {
+        $requester = $this->resolveRequester($realization);
+
+        if (!$requester) {
+            return;
+        }
+
+        $realization->loadMissing(['items', 'transactionCategory', 'cashAdvance']);
+
+        $this->queue(
+            $requester,
+            new CashAdvanceRealizationApprovalMail(
+                realization: $realization,
+                recipient: $requester,
+                mode: 'receipt_reverted',
+                actor: $actor,
+                notes: $reason,
+            ),
+            $realization,
+            'receipt_reverted',
+        );
+    }
+
     /** Email ke pemohon: pernyataan pengembaliannya ditolak Finance. */
     public function sendReturnRejected(
         CashAdvanceRealization $realization,

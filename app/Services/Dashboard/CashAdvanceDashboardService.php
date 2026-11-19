@@ -67,12 +67,17 @@ class CashAdvanceDashboardService
 
     /** Realisasi yang dianggap sudah menggugurkan kewajiban pemohon. */
     private const REALISASI_SAH = [
+        /*
+        | Cukup APPROVED.
+        |
+        | Dahulu enam nilai, karena tiap tahap Finance menimpa kolom status
+        | dan membuat dokumen yang sudah disetujui berhenti terbaca sebagai
+        | APPROVED. Sejak tahap Finance punya kolomnya sendiri, persetujuan
+        | dokumen tidak pernah lagi hilang dari sini -- dan daftar yang
+        | panjang itu justru menjadi tempat nilai baru paling mudah lupa
+        | didaftarkan.
+        */
         CashAdvanceRealization::STATUS_APPROVED,
-        CashAdvanceRealization::STATUS_RECEIVED,
-        CashAdvanceRealization::STATUS_VERIFIED,
-        CashAdvanceRealization::STATUS_ON_CHECKING,
-        CashAdvanceRealization::STATUS_RETURN_DECLARED,
-        CashAdvanceRealization::STATUS_SETTLED,
     ];
 
     /** Ambang FPU menggantung yang dianggap perlu ditindaklanjuti. */

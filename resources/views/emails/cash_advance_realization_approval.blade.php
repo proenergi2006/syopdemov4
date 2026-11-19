@@ -12,7 +12,7 @@
 
     $translationMode = in_array(
         $currentMode,
-        ['returned_for_revision', 'final_approved', 'rejected', 'settled', 'return_request', 'return_declared', 'return_rejected', 'reimburse_request', 'received', 'receipt_request', 'finalized'],
+        ['returned_for_revision', 'final_approved', 'rejected', 'settled', 'return_request', 'return_declared', 'return_rejected', 'reimburse_request', 'received', 'receipt_request', 'finalized', 'finance_approved_return', 'finance_approved_reimburse', 'receipt_reverted'],
         true,
     ) ? $currentMode : 'default';
 
@@ -48,10 +48,11 @@
         */
         'received', 'return_request', 'return_rejected', 'reimburse_request' => 'RECEIVED',
         'return_declared' => 'RETURN DECLARED',
-        'finalized' => 'SETTLED',
+        'finalized', 'finance_approved_return', 'finance_approved_reimburse' => 'APPROVED',
         'rejected' => 'REJECTED',
         'settled' => 'SETTLED',
         'returned_for_revision' => 'NEED REVISION',
+        'receipt_reverted' => 'APPROVED',
         default => 'IN PROGRESS',
     };
 
@@ -59,11 +60,12 @@
         'final_approved', 'receipt_request' => '#1b7f4f',
         'received', 'return_request', 'reimburse_request' => '#0d6b7d',
         'return_declared' => '#6b4fa0',
-        'finalized' => '#1f4e78',
+        'finalized', 'finance_approved_return', 'finance_approved_reimburse' => '#1b7f4f',
         'return_rejected' => '#b3261e',
         'rejected' => '#b3261e',
         'settled' => '#1f4e78',
         'returned_for_revision' => '#b26a00',
+        'receipt_reverted' => '#b26a00',
         default => '#8a6d1f',
     };
 

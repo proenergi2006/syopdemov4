@@ -145,6 +145,13 @@ interface TripRow {
 
 interface Abilities {
   can_view: boolean
+
+  /*
+  | Berdiri di rantai approval modul ini. Penentu tampil tidaknya saringan
+  | "hanya yang menunggu approval saya" -- bagi yang bukan penyetuju,
+  | saringan itu hanya tombol yang selalu mengosongkan daftar.
+  */
+  is_approver: boolean
   view_scope: string
   can_create: boolean
   can_update: boolean
@@ -167,6 +174,7 @@ const loadError = ref(false)
 
 const defaultAbilities = (): Abilities => ({
   can_view: false,
+  is_approver: false,
   view_scope: 'NONE',
   can_create: false,
   can_update: false,
@@ -1509,7 +1517,16 @@ onMounted(async () => {
               />
             </VCol>
 
+            <!--
+              Hanya bagi yang memang berdiri di rantai approval modul ini.
+
+              Bagi yang tidak pernah menyetujui apa pun di sini -- pemohon,
+              Finance, GA -- saringan ini hanya tombol yang selalu
+              mengosongkan daftar. Yang menyalakannya akan mengira datanya
+              hilang, bukan mengira dirinya memang bukan penyetuju.
+            -->
             <VCol
+              v-if="abilities.is_approver"
               cols="12"
               md="4"
             >

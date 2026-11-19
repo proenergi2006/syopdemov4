@@ -11,6 +11,15 @@ export interface ModuleAbilities {
   can_create: boolean
   can_update: boolean
   can_delete: boolean
+
+  /*
+  | Berdiri di rantai approval modul ini.
+  |
+  | Penentu tampil tidaknya saringan "hanya yang menunggu approval saya".
+  | Bagi yang tidak pernah menyetujui apa pun di sana, saringan itu hanya
+  | tombol yang selalu mengosongkan daftar.
+  */
+  is_approver: boolean
 }
 
 const allowedPermissionScopes: PermissionScope[] = [
@@ -46,6 +55,7 @@ export const defaultModuleAbilities = (): ModuleAbilities => ({
   can_create: false,
   can_update: false,
   can_delete: false,
+  is_approver: false,
 })
 
 export const normalizeModuleAbilities = (
@@ -75,6 +85,10 @@ export const normalizeModuleAbilities = (
 
     can_delete: normalizeBoolean(
       abilities.can_delete,
+    ),
+
+    is_approver: normalizeBoolean(
+      abilities.is_approver,
     ),
   }
 }
