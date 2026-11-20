@@ -305,10 +305,26 @@ class CashAdvanceRealizationApprovalService
 
     /*
     |--------------------------------------------------------------------------
-    | Final approved
+    | Final approved -- SEKALIGUS PINTU MASUK KE TAHAP FINANCE
     |--------------------------------------------------------------------------
-    | Berhenti di APPROVED. Penyelesaian selisih oleh Finance adalah aksi
-    | terpisah yang memindahkan status ke SETTLED.
+    | Perjalanan approval berhenti di sini. Yang dimulai justru di sini:
+    | dokumennya masuk ke meja Finance.
+    |
+    | Sejak kedua perjalanan itu punya kolomnya sendiri, status saja tidak
+    | lagi cukup. Dokumen yang disetujui tanpa finance_status terisi tidak
+    | berada di tahap mana pun -- ia tidak menunggu diterima, tidak sedang
+    | diperiksa, dan tidak pula selesai. Akibatnya TIDAK SATU PUN tombol
+    | muncul: bukan tombol pemohon untuk mengembalikan sisa dana, bukan pula
+    | tombol Finance untuk menerima berkasnya. Dokumennya hidup tetapi tidak
+    | bisa disentuh siapa pun.
+    |
+    | Itu persis yang terjadi pada dokumen yang disetujui sesudah kolomnya
+    | lahir: migrasinya mengisi dokumen yang SUDAH disetujui saat itu, dan
+    | tidak ada apa pun yang mengisi yang disetujui sesudahnya.
+    |
+    | Ditulis dalam satu update bersama status, bukan di pemanggilnya: dua
+    | perintah terpisah bisa tersela, dan yang tersela di antara keduanya
+    | meninggalkan dokumen tersangkut yang sama.
     |--------------------------------------------------------------------------
     */
     public function markRealizationApproved(
@@ -319,6 +335,9 @@ class CashAdvanceRealizationApprovalService
             'status' => CashAdvanceRealization::STATUS_APPROVED,
             'final_approved_by' => $user->id,
             'final_approved_at' => now(),
+
+            /* Menunggu berkasnya diterima Finance -- tahap pertama. */
+            'finance_status' => CashAdvanceRealization::FINANCE_WAITING,
         ]);
     }
 
