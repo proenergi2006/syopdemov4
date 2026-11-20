@@ -3830,7 +3830,22 @@ class CashAdvanceController extends Controller
         if ($action === 'NOT_REALIZED') {
             $query
                 ->where('cash_advances.status', CashAdvance::STATUS_DISBURSED)
-                ->whereDoesntHave('realization');
+
+                /*
+                | "Belum direalisasi" dihitung dari realisasi yang MASIH
+                | HIDUP, sama seperti pemilih FPU di modul Realisasi.
+                |
+                | Yang ditolak atau dibatalkan tidak menggugurkan kewajiban
+                | pertanggungjawabannya -- justru sebaliknya. Menghitungnya
+                | sebagai "sudah direalisasi" menyembunyikan dokumen yang
+                | justru paling perlu dikerjakan ulang.
+                */
+                ->whereDoesntHave('realization', function ($realizationQuery): void {
+                    $realizationQuery->whereNotIn(
+                        'cash_advance_realizations.status',
+                        CashAdvanceRealization::RELEASED_STATUSES,
+                    );
+                });
         }
     }
 
@@ -4900,7 +4915,9 @@ class CashAdvanceController extends Controller
             | belum dipertanggungjawabkan. Dihitung dari relasi, bukan disimpan,
             | supaya tidak pernah basi.
             */
-            'has_realization' => $cashAdvance->realization()->exists(),
+            'has_realization' => $cashAdvance->realization()
+                ->whereNotIn('status', CashAdvanceRealization::RELEASED_STATUSES)
+                ->exists(),
 
             'items' => $this->transformItems($cashAdvance),
 

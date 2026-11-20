@@ -542,7 +542,22 @@ class CashAdvanceRealizationController extends Controller
                     'attachments',
                 ])
                 ->where('status', CashAdvance::STATUS_DISBURSED)
-                ->whereDoesntHave('realization');
+
+                /*
+                | Yang menahan FPU hanyalah realisasi yang MASIH HIDUP.
+                |
+                | Realisasi yang ditolak approver atau dibatalkan pemohon
+                | tidak menahan apa pun: penolakan memulangkan dokumennya,
+                | bukan memulangkan uangnya, dan dana yang sudah cair tetap
+                | harus dipertanggungjawabkan. Tanpa pengecualian ini satu
+                | penolakan mengunci FPU-nya selamanya.
+                */
+                ->whereDoesntHave('realization', function ($realizationQuery): void {
+                    $realizationQuery->whereNotIn(
+                        'cash_advance_realizations.status',
+                        CashAdvanceRealization::RELEASED_STATUSES,
+                    );
+                });
 
             $this->applyCashAdvanceVisibilityScope(
                 $query,
@@ -4605,9 +4620,14 @@ class CashAdvanceRealizationController extends Controller
         /*
         | Dijaga juga oleh unique index parsial pada tabel, tapi diperiksa di
         | sini supaya pesannya jelas alih-alih error constraint.
+        |
+        | Aturannya harus SAMA PERSIS dengan indeksnya: yang menahan hanya
+        | realisasi yang masih hidup. Kalau yang di sini lebih ketat, pemohon
+        | ditolak di layar atas sesuatu yang sebenarnya diizinkan basis data.
         */
         $alreadyRealized = CashAdvanceRealization::query()
             ->where('cash_advance_id', $cashAdvance->id)
+            ->whereNotIn('status', CashAdvanceRealization::RELEASED_STATUSES)
             ->exists();
 
         if ($alreadyRealized) {
