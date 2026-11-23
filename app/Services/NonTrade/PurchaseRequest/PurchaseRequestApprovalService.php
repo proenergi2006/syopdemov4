@@ -85,6 +85,21 @@ class PurchaseRequestApprovalService
         User $user,
         bool $lockForUpdate = false,
     ): ?PurchaseRequestApproval {
+        /*
+        | Pemohon tidak pernah menjadi approver PR-nya sendiri.
+        |
+        | Generator sudah membuang step-nya saat PR diajukan, tetapi itu hanya
+        | menjaga keadaan pada SAAT ITU. Baris bertipe ROLE disimpan sebagai
+        | role, dan seseorang bisa DIBERI role itu sesudah PR-nya diajukan --
+        | sejak saat itu ia bisa menyetujui pengajuannya sendiri, dan tidak
+        | ada satu pun catatan yang memperlihatkannya.
+        |
+        | Penjaga yang sama sudah ada di FPU, Claim, Realisasi, dan BDV.
+        */
+        if ($this->isRequester($purchaseRequest, $user)) {
+            return null;
+        }
+
         return $this
             ->getCurrentWaitingApprovals(
                 $purchaseRequest,
@@ -94,6 +109,23 @@ class PurchaseRequestApprovalService
                 fn(PurchaseRequestApproval $approval): bool =>
                 $this->userCanApprove($approval, $user),
             );
+    }
+
+    /**
+     * Orang ini yang mengajukan PR-nya.
+     *
+     * submitted_by lebih dipercaya daripada created_by: yang menekan tombol
+     * Ajukan-lah yang mengajukan, sekalipun PR-nya diketik orang lain.
+     */
+    public function isRequester(PurchaseRequest $dokumen, User $user): bool
+    {
+        $pemohon = (int) (
+            $dokumen->submitted_by
+            ?? $dokumen->created_by
+            ?? 0
+        );
+
+        return $pemohon > 0 && $pemohon === (int) $user->id;
     }
 
     /*

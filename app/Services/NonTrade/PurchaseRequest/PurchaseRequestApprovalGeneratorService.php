@@ -8,10 +8,37 @@ use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestApproval;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\FundRequest\ApprovalStepRuleService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
+/*
+|--------------------------------------------------------------------------
+| Generator snapshot approval Purchase Requisition
+|--------------------------------------------------------------------------
+| DUA ATURAN TINGKAT YANG SEMPAT TERTINGGAL DI SINI.
+|
+| "Lewati step ini bila pemohon ber-role X" (skip_for_role_ids) dan "Boleh
+| disetujui rekan setingkat" (allow_peer_approval) sudah lama bisa diisi dari
+| layar matriks approval, dan sudah tersimpan rapi di basis data untuk FPU,
+| Claim, Realisasi, dan Perdin. Tetapi generator PR tidak pernah membacanya:
+| kedua kolom itu diisi, disimpan, lalu diabaikan diam-diam.
+|
+| Akibatnya yang dilaporkan: seorang Finance Accounting Supervisor yang
+| mengajukan PR tetap masuk ke step yang approver-nya Finance Accounting
+| Supervisor -- ia diminta menyetujui pengajuannya sendiri. Tidak ada galat,
+| tidak ada peringatan; setelannya hanya tidak berlaku.
+|
+| Keduanya sekarang dijalankan lewat ApprovalStepRuleService, layanan yang
+| sama persis dengan yang dipakai modul-modul di atas. Satu aturan, satu
+| tempat -- bukan dua tafsir yang perlahan menyimpang.
+|
+| CATATAN: PurchaseOrder dan MasterVendor MASIH mengabaikan kedua aturan itu.
+| Keduanya sengaja ditinggalkan untuk sekarang atas permintaan, bukan karena
+| sudah benar.
+|--------------------------------------------------------------------------
+*/
 class PurchaseRequestApprovalGeneratorService
 {
     public function generate(
@@ -116,10 +143,112 @@ class PurchaseRequestApprovalGeneratorService
 
         /*
         |--------------------------------------------------------------------------
-        | Tentukan step pertama
+        | Rencana rantainya, sebelum satu baris pun ditulis
+        |--------------------------------------------------------------------------
+        | Step bisa gugur karena dua sebab:
+        |
+        |   1. role pemohon tercantum pada "Lewati step ini bila pemohon
+        |      ber-role" milik step itu;
+        |   2. step boleh disetujui rekan setingkat, dan sesudah pemohon
+        |      dikeluarkan tidak ada rekan lain yang tersisa.
+        |
+        | Keduanya HARUS diketahui sekarang, sebelum apa pun disimpan. Status
+        | "menunggu" melekat pada step pertama yang BERTAHAN; kalau step
+        | pertama baru gugur di tengah perulangan, PR-nya berakhir tanpa satu
+        | pun baris berstatus WAITING -- dokumen yang diam selamanya, tanpa
+        | pesan, dan baru ketahuan ketika seseorang bertanya kenapa PR-nya
+        | tidak maju-maju.
+        |
+        | Pemohonnya dibaca dari submitted_by, dengan created_by sebagai
+        | cadangan: yang menekan tombol Ajukan-lah yang mengajukan, sekalipun
+        | PR-nya diketik orang lain.
         |--------------------------------------------------------------------------
         */
-        $firstStepOrder = (int) $flowSteps
+        $aturanStep = app(ApprovalStepRuleService::class);
+
+        $pemohonId = (int) (
+            $purchaseRequest->submitted_by
+            ?? $purchaseRequest->created_by
+            ?? 0
+        );
+
+        $rencanaStep = $aturanStep->planSteps(
+            $flowSteps,
+            $pemohonId,
+            $aturanStep->roleIdsOf($pemohonId),
+
+            /*
+            | Step bercakupan cabang dicairkan lebih dulu supaya keputusan
+            | "pemohon ada di dalamnya atau tidak" diambil atas orang yang
+            | benar-benar akan menjadi approver PR ini -- bukan atas role pada
+            | kertasnya, yang pemegangnya bisa berada di cabang lain dan memang
+            | tidak pernah ikut.
+            */
+            function (ApprovalFlowStep $step) use ($purchaseRequest) {
+                $scope = strtoupper(
+                    trim(
+                        (string) (
+                            $step->approver_scope
+                            ?: ApprovalFlowStep::APPROVER_SCOPE_GLOBAL
+                        ),
+                    ),
+                );
+
+                $tipe = strtoupper(trim((string) $step->approver_type));
+
+                if ($scope === ApprovalFlowStep::APPROVER_SCOPE_SAME_BRANCH) {
+                    return $this->resolveSameBranchApprovers(
+                        $step,
+                        $purchaseRequest,
+                        $tipe,
+                    );
+                }
+
+                if ($scope === ApprovalFlowStep::APPROVER_SCOPE_SELECTED_BRANCHES) {
+                    return $this->resolveSelectedBranchApprovers(
+                        $step,
+                        $purchaseRequest,
+                        $tipe,
+                    );
+                }
+
+                return null;
+            },
+        );
+
+        /*
+        | Tingkat yang bertahan tetapi tidak punya seorang pun di dalamnya.
+        | Ditahan di sini, bukan dibiarkan tersimpan -- alasannya sama seperti
+        | di atas: dokumen yang masuk ke tingkat tanpa approver akan menunggu
+        | selamanya tanpa pesan.
+        */
+        $aturanStep->assertApproverAda($rencanaStep, 'Purchase Requisition');
+
+        $stepHidup = $flowSteps->reject(
+            fn (ApprovalFlowStep $satu): bool
+            => isset($rencanaStep['skipped'][(int) $satu->id]),
+        );
+
+        if ($stepHidup->isEmpty()) {
+            throw ValidationException::withMessages([
+                'approval_flow' => [
+                    'Tidak ada approver yang tersisa pada approval flow Purchase'
+                    . ' Requisition ini untuk Anda. Hubungi admin untuk memeriksa'
+                    . ' matriks approval-nya.',
+                ],
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Tentukan step pertama
+        |--------------------------------------------------------------------------
+        | Dihitung dari step yang BERTAHAN, bukan dari seluruh step flow.
+        | Inilah inti perbaikannya: bila step 1 gugur karena pemohonnya
+        | ber-role yang dikecualikan, yang menunggu harus step 2.
+        |--------------------------------------------------------------------------
+        */
+        $firstStepOrder = (int) $stepHidup
             ->min('step_order');
 
         /*
@@ -149,6 +278,25 @@ class PurchaseRequestApprovalGeneratorService
 
         foreach ($flowSteps as $flowStep) {
             $stepOrder = (int) $flowStep->step_order;
+
+            /*
+            | Dilewati SEBELUM didaftarkan sebagai step yang wajib berisi.
+            |
+            | Urutannya menentukan: kalau didaftarkan lebih dulu, step yang
+            | sengaja dilewati akan menolak PR-nya sendiri di pemeriksaan
+            | "setiap step wajib punya approver" di bawah -- gugur karena
+            | aturan, lalu dianggap rusak karena gugur.
+            */
+            if (isset($rencanaStep['skipped'][(int) $flowStep->id])) {
+                Log::info('[PR Approval Generator] Step dilewati', [
+                    'purchase_request_id' => $purchaseRequest->id,
+                    'step_order' => $stepOrder,
+                    'label' => $flowStep->label,
+                    'sebab' => $rencanaStep['skipped'][(int) $flowStep->id],
+                ]);
+
+                continue;
+            }
 
             $requiredSteps[$stepOrder] = $requiredSteps[$stepOrder]
                 ?? ($flowStep->label ?: sprintf('Step %d', $stepOrder));
@@ -252,6 +400,60 @@ class PurchaseRequestApprovalGeneratorService
                     approvalFlow: $approvalFlow,
                     flowStep: $flowStep,
                     resolvedUsers: $resolvedUsers,
+                    stepOrder: $stepOrder,
+                    approvalMode: $approvalMode,
+                    status: $status,
+                    resolvedSnapshotKeys: $resolvedSnapshotKeys,
+                    createdApproversPerStep: $createdApproversPerStep,
+                );
+
+                continue;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Approver yang sudah dicairkan oleh rencana di atas
+            |--------------------------------------------------------------------------
+            | Dua keadaan bermuara ke sini: step bertipe DEPARTMENT, dan step
+            | yang pemohonnya baru saja dikeluarkan karena "boleh disetujui
+            | rekan setingkat".
+            |
+            | Yang kedua itulah yang membedakannya dari jalur GLOBAL biasa.
+            | Step bertipe ROLE yang disimpan apa adanya sebagai ROLE akan
+            | tetap bisa disetujui pemohon -- ia memegang role itu juga. Yang
+            | disimpan di sini sudah berupa daftar orang KONKRET tanpa
+            | pemohon di dalamnya, sehingga saringannya tidak hilang begitu
+            | barisnya tersimpan.
+            |
+            | Hanya untuk scope GLOBAL. Kedua sifat itu bekerja pada daftar
+            | orang, sementara scope cabang menyaring daftar yang sama dengan
+            | aturan lain -- menggabungkan keduanya tanpa memikirkannya
+            | menghasilkan daftar yang tidak pernah diminta siapa pun.
+            |--------------------------------------------------------------------------
+            */
+            $rencanaBaris = $rencanaStep['users'][(int) $flowStep->id] ?? null;
+
+            if ($rencanaBaris !== null) {
+                if (
+                    $approverScope
+                    !== ApprovalFlowStep::APPROVER_SCOPE_GLOBAL
+                ) {
+                    throw ValidationException::withMessages([
+                        'approval_flow' => [
+                            sprintf(
+                                'Step "%s" memakai department atau aturan rekan setingkat,'
+                                . ' sehingga scope-nya harus Global.',
+                                $flowStep->label ?? '-',
+                            ),
+                        ],
+                    ]);
+                }
+
+                $this->createResolvedUserSnapshots(
+                    purchaseRequest: $purchaseRequest,
+                    approvalFlow: $approvalFlow,
+                    flowStep: $flowStep,
+                    resolvedUsers: $rencanaBaris,
                     stepOrder: $stepOrder,
                     approvalMode: $approvalMode,
                     status: $status,
