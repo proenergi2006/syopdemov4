@@ -3438,6 +3438,23 @@ class PurchaseRequestController extends Controller
 
             /*
         |--------------------------------------------------------------------------
+        | Siapa pemohonnya, ditetapkan SEBELUM generator jalan
+        |--------------------------------------------------------------------------
+        | Generator memakai submitted_by untuk mengeluarkan pemohon dari rantai
+        | approval-nya sendiri -- itulah yang membuat "Lewati step ini bila
+        | pemohon ber-role X" dan "Boleh disetujui rekan setingkat" berlaku.
+        |
+        | Dulu diisi beberapa baris di bawah, sesudah generate(). Akibatnya
+        | generator membacanya masih kosong dan jatuh ke created_by. Untuk PR
+        | yang diketik orang lain lalu diajukan pemohonnya, yang dikeluarkan
+        | dari rantai adalah orang yang salah -- dan tidak ada satu pun pesan
+        | yang memberitahukannya.
+        |--------------------------------------------------------------------------
+        */
+            $pr->submitted_by = $user->id;
+
+            /*
+        |--------------------------------------------------------------------------
         | Generate snapshot approval PR
         |--------------------------------------------------------------------------
         */
@@ -3469,7 +3486,8 @@ class PurchaseRequestController extends Controller
                 : null;
 
             $pr->status = PurchaseRequest::STATUS_IN_PROGRESS;
-            $pr->submitted_by = $user->id;
+
+            /* submitted_by sudah ditetapkan sebelum generate() -- lihat di atas. */
 
             /*
         |--------------------------------------------------------------------------
