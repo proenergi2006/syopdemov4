@@ -22,6 +22,41 @@ class Handler extends ExceptionHandler
         return redirect()->guest(route('login'));
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Permintaan ke API SELALU dijawab JSON
+    |--------------------------------------------------------------------------
+    | Bawaannya menentukan bentuk jawaban dari header Accept. Begitu header itu
+    | tidak menyebut json -- dibuang proxy, ditimpa gateway, atau permintaannya
+    | diulang tanpa header aslinya -- galat validasi tidak lagi dijawab 422,
+    | melainkan PENGALIHAN HALAMAN 302 ke beranda.
+    |
+    | Bagi layar, 302 bukan kegagalan. Browser mengikutinya, mendarat di
+    | halaman yang menjawab 200, dan axios menganggap pengirimannya berhasil.
+    |
+    | AKIBATNYA TERUKUR PADA REALISASI FPU: lampirannya tidak sampai di server,
+    | dokumennya TIDAK tersimpan, namun pengisinya tetap dipindahkan ke daftar
+    | beserta pesan "berhasil dibuat" -- lalu mencari dokumen yang tidak pernah
+    | ada. Penjelasan yang sudah disiapkan ExplainUploadFailure ikut hilang
+    | bersama pengalihan itu, padahal justru kalimat itulah yang dibutuhkan.
+    |
+    | Dipasang di sini, bukan di satu controller: galat yang dilempar MIDDLEWARE
+    | tidak pernah melewati controller mana pun, dan seluruh kegagalan unggah
+    | lampiran dilempar dari sana.
+    |
+    | Tidak ada permintaan ke /api/* yang berguna dijawab halaman HTML --
+    | pemanggilnya selalu kode, tidak pernah mata.
+    |--------------------------------------------------------------------------
+    */
+    protected function shouldReturnJson($request, Throwable $e)
+    {
+        if ($request->is('api/*')) {
+            return true;
+        }
+
+        return parent::shouldReturnJson($request, $e);
+    }
+
     /**
      * A list of exception types with their corresponding custom log levels.
      *

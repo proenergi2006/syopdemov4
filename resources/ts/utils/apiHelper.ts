@@ -30,10 +30,69 @@ const pesanTanpaJawaban = (error: any): string => {
   )
 }
 
+/*
+|--------------------------------------------------------------------------
+| Jawaban 2xx BELUM TENTU berarti tersimpan
+|--------------------------------------------------------------------------
+| Selama ini layar menyimpulkan "berhasil" dari satu hal saja: axios tidak
+| melempar. Itu lebih longgar daripada kelihatannya.
+|
+| Pengalihan 302 diikuti browser sampai mendarat di halaman yang menjawab
+| 200, dan yang sampai ke axios adalah 200 itu -- bukan 302-nya. Gateway dan
+| WAF pun lazim menjawab 200 berisi halaman HTML. Dua-duanya resolve, dan
+| dua-duanya tidak menyimpan apa pun.
+|
+| Maka yang diperiksa bukan statusnya, melainkan JANJI YANG DIBUAT SERVER:
+| success bernilai true, dan ada public_id dokumen yang benar-benar lahir.
+| Jawaban yang tidak memuat keduanya diperlakukan sebagai kegagalan --
+| menebak "mungkin tersimpan" lalu memindahkan halaman adalah cara terburuk
+| untuk salah, sebab isian beserta lampirannya ikut hilang.
+|--------------------------------------------------------------------------
+*/
+export class SimpanTidakTerbukti extends Error {
+  constructor(pesan: string) {
+    super(pesan)
+    this.name = 'SimpanTidakTerbukti'
+  }
+}
+
+/**
+ * Memastikan jawaban server benar-benar menyatakan dokumennya tersimpan.
+ *
+ * Dipanggil SEBELUM halaman berpindah -- sesudah berpindah, formulirnya
+ * sudah kosong dan pengisinya harus menyusun ulang seluruh lampirannya.
+ *
+ * @returns public_id dokumen yang tersimpan
+ * @throws SimpanTidakTerbukti bila jawabannya tidak menyatakan itu
+ */
+export const pastikanDokumenTersimpan = (response: any): string => {
+  const data = response?.data
+
+  if (data?.success === true) {
+    const publicId = data?.data?.public_id
+
+    if (typeof publicId === 'string' && publicId !== '')
+      return publicId
+  }
+
+  throw new SimpanTidakTerbukti(
+    i18n.global.t('common.httpStatus.saveUnconfirmed'),
+  )
+}
+
 export const getApiErrorMessage = (
   error: any,
   fallback?: string,
 ): string => {
+  /*
+  | Kegagalan yang disimpulkan layar sendiri, bukan dijawab server. Ia tidak
+  | punya response, jadi tanpa cabang ini ia akan jatuh ke "Tidak dapat
+  | terhubung ke server." -- kalimat yang justru menyesatkan, sebab
+  | servernya menjawab dengan baik.
+  */
+  if (error instanceof SimpanTidakTerbukti)
+    return error.message
+
   const status = error?.response?.status
   const data = error?.response?.data
 

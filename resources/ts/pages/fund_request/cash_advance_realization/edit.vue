@@ -11,7 +11,7 @@ import {
   showLoadingAlert,
   showWarningToast,
 } from '@/utils/alert'
-import { getApiErrorMessage } from '@/utils/apiHelper'
+import { getApiErrorMessage, pastikanDokumenTersimpan } from '@/utils/apiHelper'
 import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
 import type { RevisionEntry } from '@/components/fund_request/revision'
 import { formatSanitizedNumberInput } from '@/utils/textFormatter'
@@ -1563,7 +1563,7 @@ const save = async (event?: Event): Promise<void> => {
      * Content-Type sengaja tidak diset manual: browser harus menyusun sendiri
      * boundary multipart, kalau ditimpa maka lampiran gagal terkirim.
      */
-    await axios.post(`${ENDPOINT}/${publicId.value}`, buildFormData(), {
+    const jawaban = await axios.post(`${ENDPOINT}/${publicId.value}`, buildFormData(), {
       headers: { Accept: 'application/json' },
 
       /*
@@ -1578,6 +1578,17 @@ const save = async (event?: Event): Promise<void> => {
        */
       timeout: UPLOAD_TIMEOUT_MS,
     })
+
+    /*
+     * DIPERIKSA SEBELUM HALAMAN BERPINDAH.
+     *
+     * Status 2xx saja tidak membuktikan dokumennya tersimpan -- lihat
+     * pastikanDokumenTersimpan(). Kalau belum terbukti, lebih baik tetap
+     * di halaman ini: isian dan lampirannya masih utuh, tinggal disimpan
+     * ulang. Berpindah lebih dulu berarti pengisinya kehilangan semuanya
+     * demi sebuah dokumen yang ternyata tidak ada.
+     */
+    pastikanDokumenTersimpan(jawaban)
 
     closeAlert()
 
