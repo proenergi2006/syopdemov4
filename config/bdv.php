@@ -100,11 +100,28 @@ return [
     | ternyata belum dipakai Finance sehari-hari, menyalakannya berarti
     | menghentikan pembayaran sampai ada yang menerbitkan vouchernya.
     |
-    | Karena itu tombol matinya diletakkan di sini -- bisa dicapai tanpa
-    | menunggu rilis kode, dan tanpa menyentuh dua controller.
+    | SAKELARNYA DI .env, BUKAN DI BERKAS INI.
+    |
+    | Paragraf di atas sudah menjanjikan "bisa dicapai tanpa menunggu rilis
+    | kode", tetapi nilainya dahulu ditulis langsung di sini -- sehingga
+    | mematikannya tetap berarti menyunting berkas lalu menaikkannya. Janjinya
+    | baru benar setelah dibaca dari env.
+    |
+    | BAWAANNYA MATI. BDV baru saja ikut naik ke production sementara Finance
+    | belum memakainya sehari-hari, dan menyala secara bawaan berarti setiap
+    | pemasangan baru -- termasuk yang tidak sengaja -- langsung menghentikan
+    | seluruh pencairan perusahaan. Aturan yang menahan uang perusahaan tidak
+    | pantas menyala karena kelalaian; ia harus dinyalakan dengan sengaja.
+    |
+    | Menyalakannya kelak: BDV_REQUIRE_VOUCHER_BEFORE_DISBURSEMENT=true pada
+    | .env, lalu `php artisan config:clear` (atau `config:cache` ulang bila
+    | config-nya memang di-cache -- tanpa itu nilai lamanya masih terpakai).
     |--------------------------------------------------------------------------
     */
-    'require_voucher_before_disbursement' => true,
+    'require_voucher_before_disbursement' => (bool) env(
+        'BDV_REQUIRE_VOUCHER_BEFORE_DISBURSEMENT',
+        false,
+    ),
 
     /*
     |--------------------------------------------------------------------------

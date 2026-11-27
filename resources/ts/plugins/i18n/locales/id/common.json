@@ -61,6 +61,7 @@
         "forbidden": "Anda tidak memiliki akses.",
         "notFound": "Data tidak ditemukan.",
         "validationError": "Data yang dikirim tidak valid.",
+        "saveUnconfirmed": "Server menjawab tanpa menyatakan dokumennya tersimpan, jadi penyimpanan dianggap GAGAL. Isian Anda tidak dibuang -- periksa koneksi dan lampirannya, lalu simpan ulang.",
         "serverError": "Terjadi kesalahan pada server."
     },
     "days": {
