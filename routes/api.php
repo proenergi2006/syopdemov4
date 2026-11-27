@@ -102,6 +102,36 @@ Route::post(
 
 Route::get('/auth/reset-password/verify', [AuthController::class, 'verifyResetToken']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+/*
+|--------------------------------------------------------------------------
+| Cetakan BDV
+|--------------------------------------------------------------------------
+| DIDAFTARKAN SEBELUM GROUP AUTH DI BAWAH, dan urutan itu bukan selera.
+|
+| Laravel mencocokkan rute menurut urutan pendaftarannya. Di dalam group
+| itu ada 'cash-bank/bdv/{publicId}' bersegmen bebas (.*) -- ia ditulis
+| begitu karena id terenkripsinya memuat garis miring. Didaftarkan
+| sesudahnya, rute ini tidak akan pernah tercapai: yang di atas lebih dulu
+| mencocoki 'bdv/<id>/print-signed' dengan publicId = '<id>/print-signed',
+| lalu middleware auth-nya menjawab "Unauthenticated." pada tautan yang
+| justru sengaja dibuat tanpa token.
+|
+| Yang menjaganya bukan token melainkan tanda tangan URL yang berlaku
+| sepuluh menit -- sama seperti cetakan PR, PO, FPU, Claim, dan Perdin.
+| Bedanya hanya satu: yang lain aman di bawah karena publicId-nya tidak
+| bersegmen bebas.
+|
+| where('publicId', '.*') tetap perlu di sini juga, kalau tidak Laravel
+| memotong id-nya pada garis miring pertama dan menjawab 404.
+|--------------------------------------------------------------------------
+*/
+Route::get(
+    '/cash-bank/bdv/{publicId}/print-signed',
+    [BdvController::class, 'printSigned']
+)->name('cash-bank.bdv.print-signed')
+    ->where('publicId', '.*')
+    ->middleware('signed:relative');
+
 Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activity'])->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/auth/me/permissions', [AuthController::class, 'permissions']);
@@ -1378,6 +1408,102 @@ Route::middleware(['auth:sanctum', 'auth.token.idle', 'set.locale', 'log.activit
                 'bdv',
                 [BdvController::class, 'index'],
             );
+
+            /*
+            | Menyimpan. Selalu lahir sebagai DRAFT -- mengajukan, membatalkan,
+            | dan approval flow-nya menyusul sebagai pintu tersendiri.
+            */
+            Route::post(
+                'bdv',
+                [BdvController::class, 'store'],
+            );
+
+            Route::put(
+                'bdv/{publicId}',
+                [BdvController::class, 'update'],
+            )->where('publicId', '.*');
+
+            /*
+            | Menghapus. Hanya draft, dan dokumennya ikut dihapus di Accurate
+            | lebih dulu -- lihat keterangan panjang pada BdvController::destroy.
+            */
+            Route::delete(
+                'bdv/{publicId}',
+                [BdvController::class, 'destroy'],
+            )->where('publicId', '.*');
+
+            /*
+            | Mengajukan dan memutuskan.
+            |
+            | Ketiganya didaftarkan SEBELUM 'bdv/{publicId}' yang bersegmen
+            | bebas, dan itu bukan kerapian belaka: publicId berupa hasil
+            | enkripsi yang bisa memuat '/', sehingga pola bebas di bawah akan
+            | menelan 'submit', 'approve', dan 'reject' sebagai bagian dari id
+            | bila urutannya dibalik.
+            |
+            | Memakai POST, bukan PATCH: ketiganya bukan penyuntingan sebagian
+            | atas dokumennya, melainkan tindakan yang melahirkan baris
+            | approval dan memindahkan statusnya.
+            */
+            Route::post(
+                'bdv/{publicId}/submit',
+                [BdvController::class, 'submit'],
+            )->where('publicId', '.*');
+
+            Route::post(
+                'bdv/{publicId}/approve',
+                [BdvController::class, 'approve'],
+            )->where('publicId', '.*');
+
+            Route::post(
+                'bdv/{publicId}/reject',
+                [BdvController::class, 'reject'],
+            )->where('publicId', '.*');
+
+            /*
+            | Kembalikan ke pemohon untuk direvisi.
+            |
+            | Pintu KETIGA di meja yang sama dengan Setujui dan Tolak, bukan
+            | pintu Finance seperti pada FPU dan Claim. BDV tidak punya meja
+            | penerimaan berkas: begitu disetujui penuh ia langsung menjadi
+            | dasar pencairan, jadi satu-satunya yang pernah berhak menyuruh
+            | memperbaikinya adalah approver yang sedang memegangnya.
+            |
+            | POST, bukan PATCH, supaya seragam dengan submit/approve/reject
+            | di atasnya -- di modul ini ketiganya POST. Dan didaftarkan
+            | sebelum 'bdv/{publicId}' yang bersegmen bebas, dengan alasan
+            | yang sama seperti ketiganya.
+            */
+            Route::post(
+                'bdv/{publicId}/return-for-revision',
+                [BdvController::class, 'returnForRevision'],
+            )->where('publicId', '.*');
+
+            /*
+            | Pembuat tautan cetak. Yang mengembalikan PDF-nya bukan ini,
+            | melainkan rute bertanda tangan di luar group auth -- lihat di
+            | bawah berkas ini. Yang di sini hanya menandatangani tautannya,
+            | jadi ia tetap butuh token seperti pintu lainnya.
+            */
+            Route::post(
+                'bdv/{publicId}/print-url',
+                [BdvController::class, 'generatePrintUrl'],
+            )->where('publicId', '.*');
+
+            /*
+            | Didaftarkan PALING AKHIR. Ia satu-satunya yang punya segmen
+            | bebas, jadi bila ditaruh lebih dulu ia akan menelan 'options',
+            | 'available-documents', dan 'document-detail' sebagai publicId --
+            | jebakan yang sama seperti pada blok Petty Cash.
+            |
+            | publicId berupa hasil enkripsi yang bisa memuat '/', jadi
+            | pemanggilnya membungkusnya dengan encodeURIComponent, seperti
+            | modul pengajuan dana.
+            */
+            Route::get(
+                'bdv/{publicId}',
+                [BdvController::class, 'show'],
+            )->where('publicId', '.*');
         });
 
     /*

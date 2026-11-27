@@ -101,6 +101,9 @@ return [
     'pay' => [
         'forbidden' => 'Anda tidak memiliki akses untuk menandai Claim sudah dibayarkan.',
         'only_received' => 'Hanya Claim yang sudah diterima yang dapat dibayarkan.',
+
+
+        'needs_bdv' => 'Claim ini belum punya Bank Disbursement Voucher, jadi belum bisa dibayarkan. Terbitkan BDV atas Claim ini lebih dulu -- BDV itulah dokumen pembayarannya. Menandainya dibayar sekarang justru menutup pintunya: Claim yang sudah dibayar tidak bisa lagi diangkat menjadi BDV.',
         'only_approved' => 'Hanya Claim berstatus approved yang dapat dibayarkan.',
         'success' => 'Claim berhasil ditandai sudah dibayarkan.',
         'failed' => 'Pembayaran Claim gagal diproses.',

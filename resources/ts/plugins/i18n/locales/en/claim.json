@@ -331,9 +331,6 @@
             "noteLabel": "Note (optional)",
             "placeholder": "May be left blank. For example, why it was brought forward or delayed."
         },
-        "paymentDay": {
-            "blockedNotice": "Payment is only possible on {days}. Some claims are waiting, but today is not a payment day — the button becomes available again on those days."
-        },
         "revise": {
             "title": "Receive Claim {nomor}",
             "subtitle": "Check the line items. If an amount needs correcting, change it in the right-hand column — the amount the requester submitted is kept for comparison.",

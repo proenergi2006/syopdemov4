@@ -9,7 +9,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,9 +49,17 @@ class FundRequestLimitController extends Controller
         }
 
         $batas = FundRequestLimit::query()
-            ->with('department:id,nama')
-            ->orderByRaw('CASE WHEN department_id IS NOT NULL THEN 0 ELSE 1 END')
-            ->orderByRaw('CASE WHEN area_type IS NOT NULL THEN 0 ELSE 1 END')
+            ->with(['branches:id,nama_cabang', 'departments:id,nama'])
+            ->withCount(['branches', 'departments'])
+
+            /*
+            | Yang paling khusus di atas, batas umum di bawah. Urutannya
+            | mengikuti bobot yang sama dengan pencocokan -- daftar yang
+            | tersusun berbeda dari urutan kemenangannya membuat orang
+            | menyimpulkan aturan yang salah hanya dari melihat tabelnya.
+            */
+            ->orderByDesc('departments_count')
+            ->orderByDesc('branches_count')
             ->orderBy('id')
             ->get();
 
@@ -68,12 +75,16 @@ class FundRequestLimitController extends Controller
             ],
 
             'options' => [
-                'area_types' => collect(FundRequestLimit::areaTypeOptions())
-                    ->map(fn (string $label, string $value): array => [
-                        'value' => $value,
-                        'label' => $label,
-                    ])
-                    ->values()
+                /*
+                | Seluruh cabang yang masih aktif, bukan lagi dua pilihan
+                | "HO" dan "Cabang". Yang nonaktif tidak ditawarkan: memilih
+                | cabang yang sudah tutup hanya menghasilkan batas yang tidak
+                | pernah cocok dengan dokumen mana pun.
+                */
+                'branches' => DB::table('cabang')
+                    ->where('is_active', true)
+                    ->orderBy('nama_cabang')
+                    ->get(['id', 'nama_cabang as name'])
                     ->all(),
 
                 'departments' => DB::table('departments')
@@ -125,8 +136,8 @@ class FundRequestLimitController extends Controller
         */
         if ($batas->is_fallback) {
             $lain = FundRequestLimit::query()
-                ->whereNull('area_type')
-                ->whereNull('department_id')
+                ->whereDoesntHave('branches')
+                ->whereDoesntHave('departments')
                 ->where('id', '!=', $batas->id)
                 ->exists();
 
@@ -165,25 +176,38 @@ class FundRequestLimitController extends Controller
         }
 
         $validated = $request->validate([
-            'area_type' => ['nullable', Rule::in(FundRequestLimit::AREA_TYPES)],
             'department_id' => ['nullable', 'integer'],
         ]);
 
         $service = app(FundRequestLimitService::class);
+
+        $departmentId = isset($validated['department_id'])
+            ? (int) $validated['department_id']
+            : null;
+
+        /*
+        | Satu baris per cabang aktif. Dahulu dua baris saja (HO dan Cabang);
+        | sejak cakupannya dipilih per cabang, dua baris tidak lagi
+        | menggambarkan apa pun -- justru perbedaan ANTAR-CABANG yang perlu
+        | terlihat sebelum batasnya disimpan.
+        */
         $hasil = [];
 
-        foreach (FundRequestLimit::AREA_TYPES as $area) {
-            $batas = $service->resolve(
-                $area,
-                isset($validated['department_id']) ? (int) $validated['department_id'] : null,
-            );
+        $cabang = DB::table('cabang')
+            ->where('is_active', true)
+            ->orderBy('nama_cabang')
+            ->get(['id', 'nama_cabang']);
+
+        foreach ($cabang as $satu) {
+            $batas = $service->resolve((int) $satu->id, $departmentId);
 
             $hasil[] = [
-                'area_type' => $area,
-                'area_label' => FundRequestLimit::areaTypeLabel($area),
+                'branch_id' => (int) $satu->id,
+                'branch_name' => (string) $satu->nama_cabang,
                 'limit_name' => $batas?->name,
                 'max_outstanding' => $batas?->max_outstanding,
                 'max_realization_days' => $batas?->max_realization_days,
+                'is_unlimited' => $batas ? (bool) $batas->is_unlimited : false,
             ];
         }
 
@@ -216,8 +240,17 @@ class FundRequestLimitController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'area_type' => ['nullable', Rule::in(FundRequestLimit::AREA_TYPES)],
-            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+
+            /*
+            | Keduanya BOLEH KOSONG, dan kosong di sini berarti "berlaku untuk
+            | semua" -- bukan "tidak berlaku untuk siapa pun". Itulah yang
+            | membuat batas umum menjadi batas umum.
+            */
+            'branch_ids' => ['sometimes', 'array'],
+            'branch_ids.*' => ['integer', 'exists:cabang,id'],
+
+            'department_ids' => ['sometimes', 'array'],
+            'department_ids.*' => ['integer', 'exists:departments,id'],
 
             /*
             | Minimal satu: batas nol berarti tidak ada yang boleh mengajukan
@@ -240,11 +273,26 @@ class FundRequestLimitController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $idCabang = $this->daftarId($validated['branch_ids'] ?? []);
+        $idDepartment = $this->daftarId($validated['department_ids'] ?? []);
+
+        /*
+        | Cakupan kembar dicari dengan MEMBANDINGKAN HIMPUNAN, bukan kolom.
+        | Dua batas yang menyebut cabang yang sama dalam urutan berbeda adalah
+        | cakupan yang sama; yang membandingkan teks apa adanya akan
+        | meloloskannya, dan sejak itu mana yang menang ditentukan oleh id --
+        | yaitu kebetulan.
+        */
+        $sidikJari = $this->sidikCakupan($idCabang, $idDepartment);
+
         $kembar = FundRequestLimit::query()
-            ->where('area_type', $validated['area_type'] ?? null)
-            ->where('department_id', $validated['department_id'] ?? null)
+            ->with(['branches:id', 'departments:id'])
             ->when($id !== null, fn ($q) => $q->where('id', '!=', $id))
-            ->exists();
+            ->get()
+            ->contains(fn (FundRequestLimit $lain): bool => $this->sidikCakupan(
+                $lain->branches->pluck('id')->all(),
+                $lain->departments->pluck('id')->all(),
+            ) === $sidikJari);
 
         if ($kembar) {
             return response()->json([
@@ -254,11 +302,9 @@ class FundRequestLimitController extends Controller
         }
 
         try {
-            $hasil = DB::transaction(function () use ($validated, $batas, $user): FundRequestLimit {
+            $hasil = DB::transaction(function () use ($validated, $batas, $user, $idCabang, $idDepartment): FundRequestLimit {
                 $isi = [
                     'name' => trim($validated['name']),
-                    'area_type' => $validated['area_type'] ?? null,
-                    'department_id' => $validated['department_id'] ?? null,
                     'max_outstanding' => (int) $validated['max_outstanding'],
                     'max_realization_days' => (int) $validated['max_realization_days'],
                     'is_unlimited' => (bool) ($validated['is_unlimited'] ?? false),
@@ -269,13 +315,22 @@ class FundRequestLimitController extends Controller
 
                 if ($batas) {
                     $batas->update($isi);
+                } else {
+                    $isi['created_by'] = $user->id;
 
-                    return $batas;
+                    $batas = FundRequestLimit::create($isi);
                 }
 
-                $isi['created_by'] = $user->id;
+                /*
+                | sync() DI DALAM transaksi yang sama dengan barisnya.
+                | Terpisah, sebuah kegagalan di antara keduanya meninggalkan
+                | batas dengan cakupan separuh -- dan cakupan separuh adalah
+                | cakupan yang salah, bukan cakupan yang kurang.
+                */
+                $batas->branches()->sync($idCabang);
+                $batas->departments()->sync($idDepartment);
 
-                return FundRequestLimit::create($isi);
+                return $batas;
             });
         } catch (\Throwable $e) {
             Log::error('[Batas FPU] Simpan gagal', [
@@ -293,7 +348,10 @@ class FundRequestLimitController extends Controller
         return response()->json([
             'success' => true,
             'message' => __("fund_request_limit_messages.{$aksi}.success"),
-            'data' => $this->transform($hasil->fresh('department')),
+            'data' => $this->transform(
+                $hasil->fresh()->loadCount(['branches', 'departments'])
+                    ->load(['branches:id,nama_cabang', 'departments:id,nama']),
+            ),
         ], $id === null ? 201 : 200);
     }
 
@@ -303,11 +361,15 @@ class FundRequestLimitController extends Controller
             'id' => $batas->id,
             'name' => $batas->name,
 
-            'area_type' => $batas->area_type,
-            'area_type_label' => FundRequestLimit::areaTypeLabel($batas->area_type),
+            'branches' => $batas->branches
+                ->map(fn ($c): array => ['id' => (int) $c->id, 'name' => (string) $c->nama_cabang])
+                ->values()
+                ->all(),
 
-            'department_id' => $batas->department_id,
-            'department_name' => $batas->department?->nama,
+            'departments' => $batas->departments
+                ->map(fn ($d): array => ['id' => (int) $d->id, 'name' => (string) $d->nama])
+                ->values()
+                ->all(),
 
             'max_outstanding' => $batas->max_outstanding,
             'max_realization_days' => $batas->max_realization_days,
@@ -319,5 +381,34 @@ class FundRequestLimitController extends Controller
             /* Batas umum tidak boleh dihapus, dan layar perlu tahu itu. */
             'is_fallback' => $batas->is_fallback,
         ];
+    }
+
+    /**
+     * Daftar id yang bersih: bilangan bulat positif, tanpa kembar, terurut.
+     *
+     * @param  array<int, mixed>  $nilai
+     * @return array<int, int>
+     */
+    private function daftarId(array $nilai): array
+    {
+        return collect($nilai)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Sidik jari sebuah cakupan, untuk membandingkan dua batas.
+     *
+     * @param  array<int, mixed>  $cabang
+     * @param  array<int, mixed>  $department
+     */
+    private function sidikCakupan(array $cabang, array $department): string
+    {
+        return 'c:' . implode(',', $this->daftarId($cabang))
+            . '|d:' . implode(',', $this->daftarId($department));
     }
 }

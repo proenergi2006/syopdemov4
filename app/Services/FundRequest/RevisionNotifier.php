@@ -2,6 +2,7 @@
 
 namespace App\Services\FundRequest;
 
+use App\Models\BankDisbursementVoucher;
 use App\Models\BusinessTrip;
 use App\Models\CashAdvance;
 use App\Models\CashAdvanceRealization;
@@ -95,6 +96,25 @@ class RevisionNotifier
             'url' => '/non_stock/purchase_order',
             'number' => 'nomor_po',
             'label' => 'PO',
+        ],
+
+        /*
+        | BDV, sejak 26 Nov 2026.
+        |
+        | Ikut di sini dengan alasan yang sama seperti PR dan PO: yang
+        | disamakan bukan jenis dokumennya, melainkan peristiwanya.
+        | Dikembalikan, dikerjakan, diajukan ulang -- tiga kalimat yang
+        | berbunyi sama di mana pun.
+        |
+        | Bedanya hanya satu, dan itu di pemanggilnya: BDV tidak punya
+        | email, jadi yang dipanggil hanya servis ini, tanpa MailService di
+        | sebelahnya.
+        */
+        BankDisbursementVoucher::class => [
+            'code' => 'bdv',
+            'url' => '/cash_bank/bdv',
+            'number' => 'bdv_number',
+            'label' => 'BDV',
         ],
     ];
 

@@ -202,6 +202,49 @@ class CashAdvanceRealization extends Model
 
     /*
     |--------------------------------------------------------------------------
+    | Kapan sebuah realisasi MELEPASKAN kuota FPU induknya
+    |--------------------------------------------------------------------------
+    | Satu-satunya tempat aturan ini ditulis. Tiga tempat membacanya: penjaga
+    | batas pengajuan (FundRequestLimitService::outstandingQuery), dashboard
+    | FPU, dan dashboard realisasi. Ketiganya WAJIB berbunyi sama -- kalau
+    | berbeda, pemohon diblokir oleh angka yang tidak pernah terlihat di layar
+    | mana pun.
+    |
+    | Aturannya (26 Nov 2026): disetujui final SAJA tidak cukup. Berkasnya
+    | harus sudah sampai ke tangan Finance. Sebelumnya kuota lepas begitu
+    | approver terakhir menyetujui, padahal berkas fisiknya bisa saja belum
+    | diantar ke Finance sama sekali.
+    |
+    | Dua syarat, bukan satu:
+    |   - received_at terisi -- Finance menerima berkasnya. Dikosongkan lagi
+    |     oleh "Batalkan Terima", dan saat itu kuotanya MEMANG harus tertahan
+    |     kembali.
+    |   - ATAU finance_status sudah APPROVED -- jaring pengaman bagi dokumen
+    |     yang prosesnya sudah tuntas tetapi received_at-nya kosong. Hari ini
+    |     tidak ada satu pun; yang dijaga adalah dokumen yang SUDAH SELESAI
+    |     jangan sampai menahan kuota lagi hanya karena satu kolom kosong.
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Menyaring kueri realisasi menjadi "yang melepaskan kuota FPU".
+     *
+     * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $query
+     * @param  string  $alias  Nama atau alias tabel realisasi di dalam kueri itu.
+     */
+    public static function saringPelepasKuota($query, string $alias = 'cash_advance_realizations'): void
+    {
+        $query
+            ->where($alias . '.status', self::STATUS_APPROVED)
+            ->where(function ($q) use ($alias): void {
+                $q
+                    ->whereNotNull($alias . '.received_at')
+                    ->orWhere($alias . '.finance_status', self::FINANCE_APPROVED);
+            });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Jenis selisih
     |--------------------------------------------------------------------------
     | RETURN    : realisasi lebih kecil, sisa dikembalikan pemohon.

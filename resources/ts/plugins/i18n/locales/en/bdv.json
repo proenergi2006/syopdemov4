@@ -21,6 +21,7 @@
     "department": "Department",
     "dateFrom": "Date From",
     "dateTo": "Date To",
+    "onlyMyApproval": "Only those awaiting my approval",
     "dateRangeInvalid": "Date To cannot be earlier than Date From.",
     "addButton": "Create BDV",
     "empty": "No Bank Disbursement Vouchers yet.",
@@ -28,6 +29,7 @@
     "loadFailed": "Failed to load the BDV list.",
     "showing": "Showing {from}-{to} of {total}",
     "columns": {
+      "no": "No",
       "number": "BDV Number",
       "date": "Date",
       "documentType": "Document Type",
@@ -35,11 +37,51 @@
       "branch": "Branch",
       "department": "Department",
       "amount": "Amount",
-      "status": "Status",
-      "requester": "Created By",
-      "actions": "Actions"
+      "status": "Status"
     },
-    "notNumbered": "Not numbered yet"
+    "notNumbered": "Not numbered yet",
+    "notInAccurate": "Its latest content has not reached Accurate. Open its edit page and press Save to send it again.",
+    "menu": {
+      "waitingMyApprovalBadge": "Awaiting your approval",
+      "detail": "View Detail",
+      "edit": "Edit",
+      "submit": "Submit",
+      "print": "Print PDF",
+      "delete": "Delete"
+    },
+    "print": {
+      "dialogTitle": "Print {number}?",
+      "langLabel": "Printout language",
+      "langId": "Bahasa Indonesia",
+      "langEn": "English",
+      "withSources": "Include the FPU/Claim documents being disbursed",
+      "withAttachments": "Include attachments",
+      "attachmentNotice": "Image attachments are placed one per page. PDF attachments cannot be embedded, but their names are still listed on the last page.",
+      "attachmentOnSources": "Attachments follow each source document rather than the voucher. PDF attachments cannot be embedded, but their names are still listed.",
+      "sourceLanguageNotice": "FPU and Claim printouts exist only in Indonesian, so the appended pages stay in Indonesian.",
+      "confirm": "Print",
+      "loading": "Preparing the printout...",
+      "popupBlocked": "The print tab was blocked by the browser. Allow pop-ups for this page and try again.",
+      "windowClosed": "The print tab was closed before the file was ready.",
+      "urlFailed": "Failed to create the print link.",
+      "failed": "Failed to generate the BDV printout."
+    },
+    "submit": {
+      "confirmTitle": "Submit this BDV?",
+      "confirmText": "{number} will go to its approvers, and from then on it cannot be changed until someone sends it back.",
+      "confirmButton": "Yes, submit",
+      "loading": "Submitting the voucher...",
+      "success": "Bank Disbursement Voucher submitted.",
+      "failed": "The Bank Disbursement Voucher could not be submitted."
+    },
+    "delete": {
+      "confirmTitle": "Delete this BDV?",
+      "confirmText": "{number} will be deleted, and its document will be deleted from Accurate Online as well. This cannot be undone.",
+      "confirmButton": "Yes, delete",
+      "loading": "Deleting the voucher and its document in Accurate...",
+      "success": "Bank Disbursement Voucher deleted.",
+      "failed": "The Bank Disbursement Voucher could not be deleted."
+    }
   },
 
   "create": {
@@ -48,9 +90,13 @@
     "back": "Back to list",
 
     "step1": {
-      "title": "Document Type",
-      "subtitle": "Decide which kind of document this voucher will disburse.",
+      "title": "Department, Branch & Document Type",
+      "subtitle": "Choose all three first. The document list is then narrowed to this selection.",
       "label": "Document Type",
+      "branch": "Branch",
+      "department": "Department",
+      "filterHint": "Only documents from this department and branch are offered. Every document on one BDV must match all three.",
+      "typeLocked": "Locked because documents are already chosen. Remove them to change the type.",
       "loadFailed": "Failed to load document types."
     },
 
@@ -59,6 +105,9 @@
       "subtitle": "Only documents that are fully approved and whose paperwork has been received appear here.",
       "label": "Document Number",
       "hint": "Type part of the number or subject to search.",
+      "hintMulti": "Choose them one at a time. One BDV may disburse several documents.",
+      "branchLocked": "Every document must come from branch {branch}.",
+      "mixedType": "One BDV may only disburse a single document type. Remove the chosen documents to switch type.",
       "empty": "No document of this type can be raised right now.",
       "emptySearch": "No document matches that search.",
       "waitingType": "Choose the document type first.",
@@ -67,11 +116,14 @@
     },
 
     "step3": {
+      "count": "{count} documents",
+      "waiting": "Choose the document number first.",
+      "mixedBranch": "That document is not from branch {branch}. Every document on one BDV must come from the same branch.",
       "title": "Document Details",
       "subtitle": "Check this before continuing. The amount shown will be copied onto the BDV.",
-      "waiting": "Choose the document number first.",
       "loadFailed": "Failed to load the document details.",
-      "changeDocument": "Change document"
+      "changeDocument": "Change document",
+      "documentsTotal": "Total document value"
     },
 
     "detail": {
@@ -101,9 +153,14 @@
       "branchFromDocument": "Follows the branch of the selected document.",
       "required": "This field is required.",
       "invalid": "Some required fields are still empty. Check the ones marked with an asterisk.",
+      "confirmTitle": "Save this BDV?",
+      "confirmText": "This voucher is posted to Accurate Online as soon as it is saved, even while it is still a draft. Make sure the cash/bank account, the payee and every line account are right.",
+      "confirmButton": "Yes, save",
       "saveButton": "Save",
-      "notSavedTitle": "Not saved yet",
-      "notSavedText": "The form is complete, but saving a BDV is not wired to the server yet.",
+      "saving": "Saving the voucher and sending it to Accurate...",
+      "saved": "Bank Disbursement Voucher saved.",
+      "saveFailed": "The Bank Disbursement Voucher could not be saved.",
+      "accurateFailed": "The BDV was saved, but it has not reached Accurate. Press Save again to retry.",
       "fields": {
         "cashBank": "Cash / Bank",
         "bdvNumber": "BDV Number",
@@ -117,8 +174,11 @@
     "items": {
       "title": "Line Items",
       "subtitle": "Taken as-is from the source document and not editable here.",
+      "subtitleMulti": "Grouped per document. An Accurate account is chosen for every line.",
+      "missingAccount": "{count} lines have no account yet",
       "count": "{count} items",
       "empty": "This document has no line items.",
+      "subtotal": "Total for this document",
       "total": "Items total",
       "mismatch": "The items total {items} differs from the document amount {document}. The document amount can be revised when the paperwork is received by Finance, so this gap is not necessarily wrong.",
       "accountLoadFailed": "Failed to load the account list from Accurate.",
@@ -136,5 +196,79 @@
         "account": "Accurate Account"
       }
     }
+  },
+  "detail": {
+    "title": "Bank Disbursement Voucher Detail",
+    "subtitle": "Read-only. Nothing can be changed from this page.",
+    "accurate": "Accurate Online",
+    "accurateNotSent": "Not in Accurate yet",
+    "accurateStale": "Latest changes have not reached Accurate",
+    "noAccount": "No account chosen",
+    "itemsSubtitle": "Amounts come from the source document, accounts from this voucher.",
+    "requester": "Created By",
+    "attachments": "Proof",
+    "attachmentProgress": "{sent} of {total} are in Accurate",
+    "attachmentPending": "Incomplete",
+    "approvalTitle": "Approval History",
+    "approvalEmpty": "No approval history yet. This voucher has not been submitted.",
+    "approvalResetByRevision": "The approval chain was rebuilt when this voucher was returned for revision. Signatures from the previous round are kept in the Revision History below, and a new chain is created once the voucher is submitted again.",
+    "approve": {
+      "button": "Approve",
+      "dialogTitle": "Approve BDV {number}?",
+      "dialogSubtitle": "Make sure the cash/bank account, the payee and every line account are right before approving.",
+      "confirmButton": "Approve",
+      "notesLabel": "Notes (optional)",
+      "notesPlaceholder": "Add an approval note if needed",
+      "loading": "Saving the approval...",
+      "success": "Bank Disbursement Voucher approved.",
+      "failed": "The Bank Disbursement Voucher could not be approved."
+    },
+    "reject": {
+      "button": "Reject",
+      "dialogTitle": "Reject BDV {number}?",
+      "dialogSubtitle": "Rejecting stops the entire approval process for this voucher.",
+      "confirmButton": "Reject",
+      "notesLabel": "Reason for rejection",
+      "notesPlaceholder": "Explain the reason for rejection",
+      "notesRequired": "A reason for the rejection is required.",
+      "loading": "Saving the rejection...",
+      "success": "Bank Disbursement Voucher rejected.",
+      "failed": "The Bank Disbursement Voucher could not be rejected."
+    }
+  },
+  "edit": {
+    "title": "Edit Bank Disbursement Voucher",
+    "subtitle": "Change the voucher data and the list of documents it disburses.",
+    "back": "Back to list",
+    "loading": "Loading voucher...",
+    "loadFailed": "Failed to load the Bank Disbursement Voucher.",
+    "notFound": "That Bank Disbursement Voucher was not found.",
+    "missingId": "No voucher was given to edit.",
+    "locked": {
+      "title": "This voucher cannot be edited",
+      "text": "Only draft BDVs can be edited. This one is {status}.",
+      "textScope": "This voucher is still a draft, but it falls outside the scope of your edit permission. Ask an administrator if you do need to change it."
+    },
+    "step1": {
+      "title": "Source Document",
+      "subtitle": "The documents this voucher disburses. They can be added or removed while it is still a draft.",
+      "unavailable": "The source document detail cannot be shown right now.",
+      "emptied": "No document selected yet. A voucher must disburse at least one document.",
+      "unreadable": "Details unreadable"
+    },
+    "step2": {
+      "title": "Voucher Data",
+      "subtitle": "The voucher's own fields, not a copy of the document."
+    },
+    "step3": {
+      "title": "Line Items",
+      "subtitle": "Taken from the source document. The Accurate account for each line is chosen here.",
+      "unavailable": "The source document detail cannot be shown right now."
+    },
+    "confirmTitle": "Save these changes?",
+    "confirmText": "These changes overwrite the document that already exists in Accurate Online; they do not create a new one. Make sure the cash/bank account, the payee and every line account are right.",
+    "confirmButton": "Yes, save changes",
+    "saving": "Saving the changes and updating them in Accurate...",
+    "saveButton": "Save Changes"
   }
 }

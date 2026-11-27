@@ -232,9 +232,6 @@
             "noteLabel": "Note (optional)",
             "placeholder": "May be left blank. For example, why it was brought forward or delayed."
         },
-        "paymentDay": {
-            "blockedNotice": "Payment is only possible on {days}. Some documents are waiting, but today is not a payment day — the button becomes available again on those days."
-        },
         "unreceive": {
             "menu": "Undo Receive",
             "title": "Undo the receipt of this document?",

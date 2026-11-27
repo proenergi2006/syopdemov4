@@ -4,19 +4,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Area
+    | Cakupan
     |--------------------------------------------------------------------------
-    | Nilainya sama persis dengan yang dipakai mesin approval, jadi kodenya
-    | tidak boleh diterjemahkan -- hanya labelnya.
+    | Sumbu "area" (HO/Cabang) DICABUT 26 Nov 2026. Sebuah batas kini menyebut
+    | cabang satu per satu, dan boleh menyebut beberapa sekaligus.
     |--------------------------------------------------------------------------
     */
-    'area_types' => [
-        'HO' => 'Kantor Pusat',
-        'CABANG' => 'Cabang',
-    ],
-
     'scope' => [
-        'all_areas' => 'Semua area',
+        'all_branches' => 'Semua cabang',
         'all_departments' => 'Semua department',
         'fallback' => 'Berlaku umum',
     ],
@@ -29,7 +24,7 @@ return [
     | baris -- sesuatu yang tidak bisa ditebak siapa pun dari layar.
     |--------------------------------------------------------------------------
     */
-    'duplicate_scope' => 'Sudah ada batas lain dengan cakupan yang sama persis. Ubah area atau department-nya, atau sunting batas yang sudah ada.',
+    'duplicate_scope' => 'Sudah ada batas lain dengan cakupan yang sama persis. Ubah pilihan cabang atau department-nya, atau sunting batas yang sudah ada.',
 
     'index' => [
         'forbidden' => 'Anda tidak memiliki akses untuk melihat master batas pengajuan.',

@@ -119,11 +119,27 @@ return [
         'time_start' => 'Start time',
         'time_end' => 'End time',
         'timezone' => 'Time zone',
+        /* BDV */
+        'bdv_number' => 'BDV Number',
+        'cash_bank_account_no' => 'Cash/Bank Account No.',
+        'cash_bank_account_name' => 'Cash/Bank Account Name',
+        'check_number' => 'Check Number',
+        'payee' => 'Payee',
+        'line_no' => 'Line No.',
+        'item_date' => 'Line Date',
+        'category' => 'Category',
+        'accurate_account_no' => 'Accurate Account No.',
+        'accurate_account_name' => 'Accurate Account Name',
+        'document_type' => 'Document Type',
+        'source_number' => 'Source Document Number',
+        'bdv_source_id' => 'Source Document of This Line',
+        'sort_order' => 'Order',
     ],
 
     'revision_relations' => [
         'items' => 'Line items',
         'attachments' => 'Attachments',
         'itineraries' => 'Itinerary',
+        'sources' => 'Disbursed Documents',
     ],
 ];

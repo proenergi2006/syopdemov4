@@ -2,9 +2,10 @@
 
 namespace App\Services\Bdv;
 
-use App\Models\BankDisbursementVoucher;
+use App\Models\BdvSource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /*
@@ -89,18 +90,33 @@ class BdvSourceRegistry
     |
     | BDV yang dibatalkan tidak menahan dokumennya: yang batal memang tidak
     | jadi mencairkan apa pun, jadi dokumennya harus bisa diangkat ulang.
+    |
+    | $kecualiBdvId dipakai halaman UBAH: dokumen milik voucher yang sedang
+    | diubah memang sudah tidak "layak diangkat" -- justru karena sudah
+    | diangkat voucher itu sendiri. Tanpa pengecualian ini, dokumen yang
+    | sudah terpilih tidak muncul di pilihannya sendiri, dan yang membuka
+    | halaman ubah akan melihat daftarnya seolah kosong.
     |--------------------------------------------------------------------------
     */
-    public function eligibleQuery(string $kode): Builder
+    public function eligibleQuery(string $kode, ?int $kecualiBdvId = null): Builder
     {
         $jenis = $this->get($kode);
 
         /** @var class-string<Model> $model */
         $model = $jenis['model'];
 
-        $sudahTerpakai = BankDisbursementVoucher::query()
+        /*
+        | Dibaca dari bdv_sources, bukan dari kepala voucher: satu BDV bisa
+        | mencairkan beberapa dokumen sekaligus, dan daftarnya ada di sana.
+        |
+        | Saringannya cukup released_at -- nisan itu DIISI saat vouchernya
+        | dihapus atau dibatalkan, jadi ia sekaligus mewakili kedua keadaan
+        | yang dulu diperiksa terpisah lewat deleted_at dan status.
+        */
+        $sudahTerpakai = BdvSource::query()
             ->where('document_type', $jenis['code'])
-            ->where('status', '<>', BankDisbursementVoucher::STATUS_CANCELLED)
+            ->whereNull('released_at')
+            ->when($kecualiBdvId !== null, fn ($q) => $q->where('bdv_id', '!=', $kecualiBdvId))
             ->select('source_id');
 
         return $model::query()
@@ -114,6 +130,38 @@ class BdvSourceRegistry
     public function findEligible(string $kode, int $id): ?Model
     {
         return $this->eligibleQuery($kode)->find($id);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Satu dokumen sumber, TANPA syarat kelayakan
+    |--------------------------------------------------------------------------
+    | Dipakai untuk membaca dokumen yang SUDAH terikat pada sebuah BDV.
+    |
+    | Kenapa perlu pintu tersendiri: eligibleQuery justru MENGECUALIKAN dokumen
+    | yang sudah dipakai BDV lain -- itulah gunanya. Tetapi begitu sebuah BDV
+    | terbit, dokumen sumbernya sendiri ikut tersaring keluar, sehingga halaman
+    | ubah dan halaman detail BDV itu tidak bisa lagi membaca rincian dokumen
+    | yang justru menjadi isinya. Halaman ubahnya terbuka dengan rincian
+    | kosong, dan sebabnya tidak kelihatan dari layar.
+    |
+    | BERBEDA DARI findEligible, INI TIDAK MENJAGA APA PUN.
+    |
+    | Ia hanya mencari menurut jenis dan id. Pemanggilnya yang harus sudah
+    | memastikan orangnya memang berhak membaca dokumen itu -- di BdvController
+    | kepastian itu datang dari BDV-nya sendiri, yang sudah lolos batas akses
+    | sebelum method ini dipanggil. Jangan memanggilnya dengan id yang berasal
+    | langsung dari layar.
+    |--------------------------------------------------------------------------
+     */
+    public function cari(string $kode, int $id): ?Model
+    {
+        $jenis = $this->get($kode);
+
+        /** @var class-string<Model> $model */
+        $model = $jenis['model'];
+
+        return $model::query()->find($id);
     }
 
     /*
@@ -177,6 +225,17 @@ class BdvSourceRegistry
             }
         }
 
+        /*
+        | Lampiran dimuat SEKALI di sini, lalu dikelompokkan menurut baris.
+        |
+        | Bukan diambil per baris di dalam perulangan: dokumen dengan dua puluh
+        | rincian akan menjadi dua puluh query, dan halaman yang terasa lambat
+        | tanpa sebab yang jelas adalah yang paling jarang diperbaiki.
+        */
+        if (method_exists($dokumen, 'attachments')) {
+            $dokumen->loadMissing('attachments');
+        }
+
         return [
             'document_type' => $jenis['code'],
             'document_type_label' => $jenis['label'],
@@ -213,7 +272,7 @@ class BdvSourceRegistry
             'received_at' => $dokumen->received_at,
             'scheduled_payment_date' => $dokumen->scheduled_payment_date,
 
-            'items' => $this->rincianItem($dokumen),
+            'items' => $this->rincianItem($dokumen, $jenis),
         ];
     }
 
@@ -230,11 +289,13 @@ class BdvSourceRegistry
     | kolom kosong yang selalu bergaris hanya menambah lebar tanpa isi.
     |--------------------------------------------------------------------------
     */
-    private function rincianItem(Model $dokumen): array
+    private function rincianItem(Model $dokumen, array $jenis): array
     {
         if (!method_exists($dokumen, 'items')) {
             return [];
         }
+
+        $lampiran = $this->lampiranPerItem($dokumen, $jenis);
 
         return $dokumen->items
             ->sortBy('id')
@@ -257,8 +318,100 @@ class BdvSourceRegistry
                 */
                 'category' => $item->expenseCategory?->name
                     ?? $item->transactionCategory?->name,
+
+                /*
+                | Bukti milik baris ini. Inilah yang dibuka orang Finance
+                | sebelum menandatangani voucher -- nominal tanpa buktinya
+                | hanya angka yang harus dipercaya begitu saja.
+                */
+                'attachments' => $lampiran[$item->getKey()] ?? [],
             ])
             ->all();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lampiran dikelompokkan menurut baris rincian
+    |--------------------------------------------------------------------------
+    | Hanya lampiran PENGAJUAN (REQUEST) dan hanya yang menempel pada sebuah
+    | baris. Dua pembatas itu keduanya perlu:
+    |
+    | - Lampiran tingkat dokumen (item_id null) bukan milik baris mana pun;
+    |   menempelkannya ke semua baris membuat satu berkas tampak berulang di
+    |   setiap baris, seolah-olah tiap pengeluaran punya buktinya sendiri.
+    |
+    | - Lampiran RECEIPT, PAYMENT, dan DISBURSEMENT lahir SESUDAH dokumennya
+    |   dibayar. Pada BDV, uangnya justru belum keluar -- berkas-berkas itu
+    |   belum ada, dan kalaupun ada, ia menjawab pertanyaan yang berbeda.
+    |
+    | @param  array<string, mixed>  $jenis
+    | @return array<int, array<int, array<string, mixed>>>
+    |--------------------------------------------------------------------------
+    */
+    /*
+    |--------------------------------------------------------------------------
+    | Bukti yang menempel pada baris rincian, sebagai model
+    |--------------------------------------------------------------------------
+    | Satu-satunya tempat yang memutuskan bukti MANA yang dianggap milik
+    | sebuah dokumen: hanya lampiran REQUEST, dan hanya yang menunjuk sebuah
+    | baris rincian. Lampiran tingkat dokumen (item_id kosong) dan jenis
+    | RECEIPT/PAYMENT/DISBURSEMENT sengaja dibuang -- yang terakhir itu bukti
+    | transfer yang dilampirkan Finance, bukan bukti pengeluarannya.
+    |
+    | Dipakai bersama oleh dua hal yang harus melihat himpunan yang SAMA
+    | PERSIS: apa yang tampil di layar, dan apa yang diunggah ke Accurate.
+    | Dua aturan penyaring yang berdiri sendiri adalah dua aturan yang cepat
+    | atau lambat menyimpang, dan menyimpangnya tidak akan terlihat -- yang
+    | terjadi hanyalah bukti yang ada di layar tetapi tidak ada di pembukuan.
+    |
+    | @return \Illuminate\Support\Collection
+    |--------------------------------------------------------------------------
+    */
+    public function lampiranBaris(string $kode, Model $dokumen)
+    {
+        $jenis = $this->get($kode);
+
+        $kolom = $jenis['item_attachment_key'] ?? null;
+
+        if (!$kolom || !method_exists($dokumen, 'attachments')) {
+            return collect();
+        }
+
+        $dokumen->loadMissing('attachments');
+
+        return $dokumen->attachments
+            ->filter(fn ($berkas): bool => (bool) ($berkas->{$kolom} ?? null))
+            ->filter(fn ($berkas): bool => strtoupper(trim((string) $berkas->attachment_type)) === 'REQUEST')
+            ->values();
+    }
+
+    private function lampiranPerItem(Model $dokumen, array $jenis): array
+    {
+        $kolom = $jenis['item_attachment_key'] ?? null;
+
+        if (!$kolom || !method_exists($dokumen, 'attachments')) {
+            return [];
+        }
+
+        $hasil = [];
+
+        foreach ($this->lampiranBaris((string) $jenis['code'], $dokumen) as $berkas) {
+            $idItem = $berkas->{$kolom};
+
+            $hasil[(int) $idItem][] = [
+                'id' => $berkas->id,
+                'filename' => $berkas->filename,
+                'original_filename' => $berkas->original_filename,
+                'mime_type' => $berkas->mime_type,
+                'file_size' => $berkas->file_size !== null ? (int) $berkas->file_size : null,
+
+                'url' => $berkas->filepath
+                    ? Storage::disk('public')->url($berkas->filepath)
+                    : null,
+            ];
+        }
+
+        return $hasil;
     }
 
     private function namaCabang(Model $dokumen): ?string

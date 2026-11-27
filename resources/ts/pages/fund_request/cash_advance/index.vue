@@ -13,10 +13,10 @@ import {
   showWarningToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import DecisionDialog from '@/components/approval/DecisionDialog.vue'
 import { formatAuditDateTime, formatDate, formatNumberWithoutRp } from '@/utils/textFormatter'
 import { buildPrintLoadingPage } from '@/utils/printLoadingPage'
 import { usePolling } from '@core/composable/usePolling'
-import { useDayNames } from '@core/composable/useDayNames'
 import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
 import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
@@ -63,12 +63,6 @@ interface CashAdvanceRow {
   */
   scheduled_payment_date?: string | null
   payment_timing?: string | null
-
-  /*
-  | Dihitung server: hari ini termasuk hari pembayaran atau tidak. Kosong
-  | pada dokumen lama, dan diperlakukan sebagai boleh.
-  */
-  can_pay_today?: boolean
 
   /*
    * Perdin yang mendasari FPU ini. Kosong untuk FPU biasa.
@@ -162,7 +156,9 @@ const defaultAbilities = (): CashAdvanceAbilities => ({
 | tahu SEBELUM ia mengisi formulir -- angkanya sama persis dengan yang
 | dipakai penolakan di server.
 */
-interface SubmissionLimit {
+interface SubmissionLimitBranch {
+  branch_id: string
+  branch_name: string
   outstanding: number
   max_outstanding: number | null
   max_days: number | null
@@ -172,19 +168,26 @@ interface SubmissionLimit {
   limit_name: string | null
 }
 
+interface SubmissionLimit {
+  outstanding: number
+  max_outstanding: number | null
+  max_days: number | null
+  overdue: { number: string; days: number }[]
+  blocked: boolean
+  reasons: string[]
+  limit_name: string | null
+
+  /*
+  | Jatahnya dihitung PER CABANG, jadi satu angka di akar tidak bisa lagi
+  | mewakili akun yang memegang beberapa cabang. Yang di akar adalah cabang
+  | utama pemohon; daftar di bawah ini yang lengkap.
+  */
+  branch_id?: string | null
+  branch_name?: string | null
+  branches?: SubmissionLimitBranch[]
+}
+
 const submissionLimit = ref<SubmissionLimit | null>(null)
-
-/*
-| Hari kerja kasir dalam penomoran ISO, dari server. Namanya dirangkai di
-| sini, bukan di server, supaya ikut berganti begitu pengguna menukar
-| bahasa -- tanpa menunggu daftarnya diambil ulang.
-*/
-const paymentDays = ref<number[]>([])
-
-const { dayList } = useDayNames()
-
-/* "Senin dan Rabu". */
-const paymentDaysText = computed<string>(() => dayList(paymentDays.value))
 
 const abilities = ref<CashAdvanceAbilities>(defaultAbilities())
 
@@ -581,7 +584,66 @@ const overdueText = computed<string>(() =>
     .map(d => `${d.number} (${d.days} hari)`)
     .join(', '))
 
-const canPayTodayRow = (row: CashAdvanceRow): boolean => row.can_pay_today !== false
+/*
+|--------------------------------------------------------------------------
+| Kuota per cabang
+|--------------------------------------------------------------------------
+| Satu akun bisa memegang beberapa cabang, dan jatah tiap cabang berdiri
+| sendiri. Spanduk yang hanya menyebut satu angka akan membuat pemohon
+| mengira seluruh jatahnya habis padahal cabang lain masih utuh -- dan,
+| lebih buruk, tombol Buat yang mati karena satu cabang penuh menghalangi
+| pengajuan di cabang yang masih kosong.
+*/
+const cabangKuota = computed<SubmissionLimitBranch[]>(() =>
+  submissionLimit.value?.branches ?? [])
+
+const adaBanyakCabang = computed<boolean>(() => cabangKuota.value.length > 1)
+
+/*
+| Tombol Buat hanya mati kalau SELURUH cabang tertahan. Satu cabang penuh
+| bukan alasan menutup pintu cabang lainnya.
+|
+| Akun bercabang tunggal jatuh ke jawaban lama: daftarnya kosong, dan yang
+| dipakai 'blocked' di akar.
+*/
+const semuaCabangTertahan = computed<boolean>(() => (
+  cabangKuota.value.length > 0
+    ? cabangKuota.value.every(c => c.blocked)
+    : submissionBlocked.value
+))
+
+const adaCabangTertahan = computed<boolean>(() => (
+  cabangKuota.value.length > 0
+    ? cabangKuota.value.some(c => c.blocked)
+    : submissionBlocked.value
+))
+
+/*
+| Spanduknya muncul kalau ada yang perlu dikatakan: sesuatu sedang berjalan,
+| atau ada cabang yang tertahan. Nol di seluruh cabang tidak perlu diumumkan.
+*/
+const tampilkanSpandukKuota = computed<boolean>(() => {
+  if (adaBanyakCabang.value) {
+    return cabangKuota.value.some(c => c.outstanding > 0 || c.blocked)
+  }
+
+  return Boolean(
+    submissionLimit.value
+    && submissionLimit.value.max_outstanding
+    && submissionLimit.value.outstanding > 0,
+  )
+})
+
+/** Sebab yang menahan satu cabang, sudah berupa kalimat siap baca. */
+const sebabCabang = (c: SubmissionLimitBranch): string => {
+  if (c.reasons?.includes('OVERDUE'))
+    return t('cashAdvance.list.submissionLimit.branchOverdue', { days: c.max_days ?? 0 })
+
+  if (c.reasons?.includes('TOO_MANY'))
+    return t('cashAdvance.list.submissionLimit.branchFull')
+
+  return ''
+}
 
 const isStatus = (row: CashAdvanceRow, status: string): boolean =>
   String(row.status || '').trim().toUpperCase() === status
@@ -685,9 +747,6 @@ const fetchCashAdvances = async (): Promise<void> => {
       ...(payload?.abilities || {}),
     }
 
-    paymentDays.value = Array.isArray(payload?.payment_days)
-      ? payload.payment_days.map(Number)
-      : []
     submissionLimit.value = payload?.submission_limit ?? null
 
     totalData.value = Number(payload?.meta?.total ?? rows.value.length ?? 0)
@@ -1375,9 +1434,16 @@ const openApprove = async (row: CashAdvanceRow): Promise<void> => {
   }
 }
 
-const approveCashAdvance = async (): Promise<void> => {
+const approveCashAdvance = async (catatan: string | null): Promise<void> => {
   if (!approveTarget.value?.public_id || approveLoading.value)
     return
+
+  /*
+  | Catatannya datang dari dialognya, lalu ditaruh ke ref yang sudah ada --
+  | sehingga seluruh baris di bawah ini tidak perlu tahu bahwa kotak
+  | catatannya sudah berpindah ke komponen bersama.
+  */
+  approveNotes.value = catatan ?? ''
 
   approveLoading.value = true
 
@@ -1465,9 +1531,11 @@ const openReturn = (row: CashAdvanceRow): void => {
   returnDialog.value = true
 }
 
-const returnForRevision = async (): Promise<void> => {
+const returnForRevision = async (alasan: string | null): Promise<void> => {
   if (!returnTarget.value?.public_id || returnLoading.value)
     return
+
+  returnReason.value = alasan ?? ''
 
   /* Sama dengan penjaga di server: tiga huruf. */
   if (returnReason.value.trim().length < 3) {
@@ -1522,10 +1590,18 @@ const openReject = (row: CashAdvanceRow): void => {
   rejectDialog.value = true
 }
 
-const rejectCashAdvance = async (): Promise<void> => {
+const rejectCashAdvance = async (catatan: string | null): Promise<void> => {
   if (!rejectTarget.value?.public_id || rejectLoading.value)
     return
 
+  rejectNotes.value = catatan ?? ''
+
+  /*
+  | Penjaga ini kini jarang kena: dialognya sudah menolak alasan kosong
+  | lebih dulu, dengan pesan yang sama. Dibiarkan berdiri sebagai jaring
+  | pengaman -- penanganan ini bisa dipanggil dari tempat lain kelak, dan
+  | mengirim penolakan tanpa alasan adalah hal yang tidak boleh lolos.
+  */
   if (!rejectNotes.value.trim()) {
     rejectError.value = t('cashAdvance.list.reject.notesRequired')
 
@@ -1651,8 +1727,7 @@ const rowBulkAction = (row: CashAdvanceRow): 'RECEIVE' | 'DISBURSE' | null => {
   if (canReceive.value && isStatus(row, 'APPROVED'))
     return 'RECEIVE'
 
-  /* Hari ini bukan harinya berarti baris itu tidak bisa diproses sama sekali. */
-  if (canDisburse.value && isStatus(row, 'RECEIVED') && canPayTodayRow(row))
+  if (canDisburse.value && isStatus(row, 'RECEIVED'))
     return 'DISBURSE'
 
   return null
@@ -2157,22 +2232,6 @@ const openReceive = async (row: CashAdvanceRow): Promise<void> => {
 | singkat. Tetap opsional: dikosongkan pun pembayarannya jalan.
 |--------------------------------------------------------------------------
 */
-/** Ada baris yang menunggu dibayar tetapi hari ini bukan harinya. */
-/*
-| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia
-| hanya berarti bagi orang yang punya tombol itu. Hanya yang berwenang mencairkan yang melihatnya.
-|
-| Barisnya disaring menurut status, bukan hanya menurut can_pay_today.
-| Jadwal pembayaran tetap menempel sesudah dokumennya dibayar, jadi tanpa
-| saringan ini dokumen yang sudah lunas pun ikut menjawab "hari ini bukan
-| hari pembayaran" -- dan spanduknya mengumumkan ada yang menunggu
-| dicairkan padahal tidak ada satu pun.
-*/
-const blockedByPaymentDay = computed<boolean>(() =>
-  canDisburse.value
-  && rows.value.some(row =>
-    row.can_pay_today === false && isStatus(row, 'RECEIVED')))
-
 const paymentDeviation = (row: CashAdvanceRow): 'EARLY' | 'LATE' | null => {
   if (!row.scheduled_payment_date)
     return null
@@ -3070,18 +3129,6 @@ onMounted(async () => {
       </VCardText>
     </VCard>
 
-    <!-- Kenapa tombol bayarnya mati hari ini -->
-    <VAlert
-      v-if="blockedByPaymentDay"
-      type="info"
-      variant="tonal"
-      density="comfortable"
-      class="mb-4"
-      icon="tabler-calendar-off"
-    >
-      {{ t('cashAdvance.list.paymentDay.blockedNotice', { days: paymentDaysText }) }}
-    </VAlert>
-
     <!--
       Batas pengajuan: diberitahukan sebelum, bukan setelah ditolak.
 
@@ -3095,68 +3142,115 @@ onMounted(async () => {
       jumlahnya nol.
     -->
     <VAlert
-      v-if="submissionLimit && submissionLimit.max_outstanding && submissionLimit.outstanding > 0"
-      :type="submissionBlocked ? 'warning' : 'info'"
+      v-if="tampilkanSpandukKuota"
+      :type="adaCabangTertahan ? 'warning' : 'info'"
       variant="tonal"
       density="comfortable"
       class="mb-4"
-      :icon="submissionBlocked ? 'tabler-hand-stop' : 'tabler-info-circle'"
+      :icon="adaCabangTertahan ? 'tabler-hand-stop' : 'tabler-info-circle'"
     >
       <!--
-        Judulnya menyebut SEBAB yang menahan, bukan jumlahnya.
-
-        Selama tidak tertahan, jumlahnya memang kabar yang paling berguna.
-        Begitu tertahan, jumlah yang masih di bawah batas justru menyesatkan:
-        pembacanya menyimpulkan ia boleh mengajukan, lalu ditolak server.
+        Akun bercabang banyak: satu baris per cabang, lengkap dengan yang
+        masih kosong. Justru cabang yang masih kosong itu kabar yang dicari
+        pemohon ketika cabang lainnya penuh.
       -->
-      <div class="font-weight-medium">
-        <template v-if="blockedByOverdue">
-          {{ t('cashAdvance.list.submissionLimit.blockedOverdueTitle') }}
-        </template>
+      <template v-if="adaBanyakCabang">
+        <div class="font-weight-medium">
+          {{ t('cashAdvance.list.submissionLimit.perBranchTitle') }}
+        </div>
 
-        <template v-else-if="submissionBlocked">
-          {{ t('cashAdvance.list.submissionLimit.blockedTooManyTitle') }}
-        </template>
+        <div
+          v-for="cabangSatu in cabangKuota"
+          :key="cabangSatu.branch_id"
+          class="text-body-2 mt-1 d-flex align-center gap-1"
+        >
+          <VIcon
+            size="16"
+            :icon="cabangSatu.blocked ? 'tabler-hand-stop' : 'tabler-circle-check'"
+            :color="cabangSatu.blocked ? 'warning' : 'success'"
+          />
 
-        <template v-else>
-          {{ t('cashAdvance.list.submissionLimit.counter', {
+          <span>
+            {{ t('cashAdvance.list.submissionLimit.branchCounter', {
+              branch: cabangSatu.branch_name,
+              count: cabangSatu.outstanding,
+              max: cabangSatu.max_outstanding ?? 0,
+            }) }}
+          </span>
+
+          <span
+            v-if="sebabCabang(cabangSatu)"
+            class="text-medium-emphasis"
+          >
+            — {{ sebabCabang(cabangSatu) }}
+          </span>
+        </div>
+
+        <div
+          v-if="semuaCabangTertahan"
+          class="text-body-2 mt-2"
+        >
+          {{ t('cashAdvance.list.submissionLimit.allBranchesBlocked') }}
+        </div>
+      </template>
+
+      <template v-else-if="submissionLimit">
+        <!--
+          Judulnya menyebut SEBAB yang menahan, bukan jumlahnya.
+
+          Selama tidak tertahan, jumlahnya memang kabar yang paling berguna.
+          Begitu tertahan, jumlah yang masih di bawah batas justru menyesatkan:
+          pembacanya menyimpulkan ia boleh mengajukan, lalu ditolak server.
+        -->
+        <div class="font-weight-medium">
+          <template v-if="blockedByOverdue">
+            {{ t('cashAdvance.list.submissionLimit.blockedOverdueTitle') }}
+          </template>
+
+          <template v-else-if="submissionBlocked">
+            {{ t('cashAdvance.list.submissionLimit.blockedTooManyTitle') }}
+          </template>
+
+          <template v-else>
+            {{ t('cashAdvance.list.submissionLimit.counter', {
+              count: submissionLimit.outstanding,
+              max: submissionLimit.max_outstanding,
+            }) }}
+          </template>
+        </div>
+
+        <div
+          v-if="overdueText"
+          class="text-body-2 mt-1"
+        >
+          {{ t('cashAdvance.list.submissionLimit.overdue', {
+            days: submissionLimit.max_days,
+            documents: overdueText,
+          }) }}
+        </div>
+
+        <div
+          v-if="blockedByCount"
+          class="text-body-2 mt-1"
+        >
+          {{ t('cashAdvance.list.submissionLimit.blocked') }}
+        </div>
+
+        <!--
+          Dan kalau jumlahnya ternyata bukan penyebabnya, itu dikatakan
+          terang-terangan -- pertanyaan pertama yang muncul di kepala
+          pembacanya adalah "tapi kan baru dua dari tiga?".
+        -->
+        <div
+          v-if="blockedButCountIsFine"
+          class="text-body-2 mt-1 text-medium-emphasis"
+        >
+          {{ t('cashAdvance.list.submissionLimit.countIsNotTheCause', {
             count: submissionLimit.outstanding,
             max: submissionLimit.max_outstanding,
           }) }}
-        </template>
-      </div>
-
-      <div
-        v-if="overdueText"
-        class="text-body-2 mt-1"
-      >
-        {{ t('cashAdvance.list.submissionLimit.overdue', {
-          days: submissionLimit.max_days,
-          documents: overdueText,
-        }) }}
-      </div>
-
-      <div
-        v-if="blockedByCount"
-        class="text-body-2 mt-1"
-      >
-        {{ t('cashAdvance.list.submissionLimit.blocked') }}
-      </div>
-
-      <!--
-        Dan kalau jumlahnya ternyata bukan penyebabnya, itu dikatakan
-        terang-terangan -- pertanyaan pertama yang muncul di kepala
-        pembacanya adalah "tapi kan baru dua dari tiga?".
-      -->
-      <div
-        v-if="blockedButCountIsFine"
-        class="text-body-2 mt-1 text-medium-emphasis"
-      >
-        {{ t('cashAdvance.list.submissionLimit.countIsNotTheCause', {
-          count: submissionLimit.outstanding,
-          max: submissionLimit.max_outstanding,
-        }) }}
-      </div>
+        </div>
+      </template>
     </VAlert>
 
     <!-- TABEL -->
@@ -3167,7 +3261,7 @@ onMounted(async () => {
           color="primary"
           prepend-icon="tabler-plus"
           class="text-none"
-          :disabled="submissionBlocked"
+          :disabled="semuaCabangTertahan"
           @click="goToCreate"
         >
           {{ t('cashAdvance.list.createButton') }}
@@ -3548,7 +3642,6 @@ onMounted(async () => {
 
                   <VListItem
                     v-if="isStatus(row, 'RECEIVED') && canDisburse"
-                    :disabled="!canPayTodayRow(row)"
                     href="javascript:void(0)"
                     @click="openDisburse(row)"
                   >
@@ -4843,96 +4936,55 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG APPROVE -->
-    <VDialog
+    <DecisionDialog
       v-model="approveDialog"
-      max-width="520"
+      :title="t('cashAdvance.list.approve.dialogTitle', { number: approveTarget?.advance_number || '-' })"
+      :subtitle="t('cashAdvance.list.approve.dialogSubtitle')"
+      :notes-label="t('cashAdvance.list.approve.notesLabel')"
+      :notes-placeholder="t('cashAdvance.list.approve.notesPlaceholder')"
+      :confirm-text="t('cashAdvance.list.approve.confirmButton')"
+      confirm-color="success"
+      :loading="approveLoading"
+      @confirm="approveCashAdvance"
     >
-      <VCard>
+      <template #konteks>
         <!--
-          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
-          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
-          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
-          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
-          dipastikan sebelum menjawab.
-        -->
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvance.list.approve.dialogTitle', {
-            number: approveTarget?.advance_number || '-',
-          }) }}
-        </VCardTitle>
+          Konteks perdin.
 
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('cashAdvance.list.approve.dialogSubtitle') }}
+          Penyetuju yang sama sering muncul di rantai Perdin dan rantai FPU.
+          Yang ditampilkan di sini BUKAN pengganti persetujuannya: perdin
+          tidak memuat nominal sama sekali, jadi menyetujui perjalanan tidak
+          pernah berarti menyetujui jumlah uangnya. Ini hanya menghemat
+          langkah mencari-cari sebelum memutuskan.
+        -->
+        <VAlert
+          v-if="approveTarget?.business_trip"
+          :type="approveTarget.business_trip.my_approval ? 'success' : 'info'"
+          variant="tonal"
+          density="comfortable"
+          class="mb-4"
+          :icon="approveTarget.business_trip.my_approval ? 'tabler-check' : 'tabler-plane'"
+        >
+          <div class="font-weight-medium">
+            {{ approveTarget.business_trip.trip_number }}
+            &middot; {{ approveTarget.business_trip.destination }}
           </div>
 
-          <!--
-            Konteks perdin.
+          <div class="text-caption mt-1">
+            {{ approveTarget.business_trip.depart_date }}
+            &rarr; {{ approveTarget.business_trip.return_date }}
+          </div>
 
-            Penyetuju yang sama sering muncul di rantai Perdin dan rantai FPU.
-            Yang ditampilkan di sini BUKAN pengganti persetujuannya: perdin
-            tidak memuat nominal sama sekali, jadi menyetujui perjalanan tidak
-            pernah berarti menyetujui jumlah uangnya. Ini hanya menghemat
-            langkah mencari-cari sebelum memutuskan.
-          -->
-          <VAlert
-            v-if="approveTarget?.business_trip"
-            :type="approveTarget.business_trip.my_approval ? 'success' : 'info'"
-            variant="tonal"
-            density="comfortable"
-            class="mb-4"
-            :icon="approveTarget.business_trip.my_approval ? 'tabler-check' : 'tabler-plane'"
-          >
-            <div class="font-weight-medium">
-              {{ approveTarget.business_trip.trip_number }}
-              &middot; {{ approveTarget.business_trip.destination }}
-            </div>
-
-            <div class="text-caption mt-1">
-              {{ approveTarget.business_trip.depart_date }}
-              &rarr; {{ approveTarget.business_trip.return_date }}
-            </div>
-
-            <div class="text-body-2 mt-2">
-              {{ approveTarget.business_trip.my_approval
-                ? t('cashAdvance.list.approve.tripAlreadyApproved', {
-                  when: formatDateTimeShort(approveTarget.business_trip.my_approval.approved_at),
-                })
-                : t('cashAdvance.list.approve.tripContext') }}
-            </div>
-          </VAlert>
-
-          <VTextarea
-            v-model="approveNotes"
-            :label="t('cashAdvance.list.approve.notesLabel')"
-            :placeholder="t('cashAdvance.list.approve.notesPlaceholder')"
-            rows="3"
-            auto-grow
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="approveLoading"
-            @click="approveDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="success"
-            class="text-none"
-            :loading="approveLoading"
-            @click="approveCashAdvance"
-          >
-            {{ t('cashAdvance.list.approve.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          <div class="text-body-2 mt-2">
+            {{ approveTarget.business_trip.my_approval
+              ? t('cashAdvance.list.approve.tripAlreadyApproved', {
+                when: formatDateTimeShort(approveTarget.business_trip.my_approval.approved_at),
+              })
+              : t('cashAdvance.list.approve.tripContext') }}
+          </div>
+        </VAlert>
+      </template>
+    </DecisionDialog>
 
     <!-- DIALOG REJECT -->
     <!--
@@ -5123,112 +5175,33 @@ onMounted(async () => {
       Warnanya bukan merah. Mengembalikan bukan menolak: dokumennya masih
       hidup, dan yang diminta adalah perbaikan.
     -->
-    <VDialog
+    <DecisionDialog
       v-model="returnDialog"
-      max-width="520"
-    >
-      <VCard>
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('common.revision.dialogTitle', {
-            number: returnTarget?.advance_number || '-',
-          }) }}
-        </VCardTitle>
+      :title="t('common.revision.dialogTitle', { number: returnTarget?.advance_number || '-' })"
+      :subtitle="t('common.revision.dialogSubtitle')"
+      :notes-label="t('common.revision.reasonLabel')"
+      :notes-placeholder="t('common.revision.reasonPlaceholder')"
+      :confirm-text="t('common.revision.confirmButton')"
+      confirm-color="warning"
+      :min-length="3"
+      :required-message="t('common.revision.reasonRequired')"
+      :loading="returnLoading"
+      @confirm="returnForRevision"
+    />
 
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('common.revision.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="returnReason"
-            :label="t('common.revision.reasonLabel')"
-            :placeholder="t('common.revision.reasonPlaceholder')"
-            rows="3"
-            auto-grow
-            :error="!!returnError"
-            :error-messages="returnError ? [returnError] : []"
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="returnLoading"
-            @click="returnDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="warning"
-            class="text-none"
-            :loading="returnLoading"
-            @click="returnForRevision"
-          >
-            {{ t('common.revision.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <VDialog
+    <DecisionDialog
       v-model="rejectDialog"
-      max-width="520"
-    >
-      <VCard>
-        <!--
-          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
-          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
-          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
-          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
-          dipastikan sebelum menjawab.
-        -->
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvance.list.reject.dialogTitle', {
-            number: rejectTarget?.advance_number || '-',
-          }) }}
-        </VCardTitle>
-
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('cashAdvance.list.reject.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="rejectNotes"
-            :label="t('cashAdvance.list.reject.notesLabel')"
-            :placeholder="t('cashAdvance.list.reject.notesPlaceholder')"
-            rows="3"
-            auto-grow
-            :error="!!rejectError"
-            :error-messages="rejectError ? [rejectError] : []"
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="rejectLoading"
-            @click="rejectDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="error"
-            class="text-none"
-            :loading="rejectLoading"
-            @click="rejectCashAdvance"
-          >
-            {{ t('cashAdvance.list.reject.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      :title="t('cashAdvance.list.reject.dialogTitle', { number: rejectTarget?.advance_number || '-' })"
+      :subtitle="t('cashAdvance.list.reject.dialogSubtitle')"
+      :notes-label="t('cashAdvance.list.reject.notesLabel')"
+      :notes-placeholder="t('cashAdvance.list.reject.notesPlaceholder')"
+      :confirm-text="t('cashAdvance.list.reject.confirmButton')"
+      confirm-color="error"
+      :min-length="1"
+      :required-message="t('cashAdvance.list.reject.notesRequired')"
+      :loading="rejectLoading"
+      @confirm="rejectCashAdvance"
+    />
 
     <!-- DIALOG CANCEL -->
     <VDialog

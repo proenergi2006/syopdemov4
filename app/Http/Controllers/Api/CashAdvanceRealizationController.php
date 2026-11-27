@@ -437,10 +437,6 @@ class CashAdvanceRealizationController extends Controller
                         'created_by' => $realization->created_by,
                         'received_at' => $realization->received_at,
                         'scheduled_payment_date' => $realization->scheduled_payment_date,
-                        'can_pay_today' => $this->canPayToday(
-                            'REALISASI',
-                            $realization->transaction_category_id,
-                        ),
                         'payment_timing' => $this->paymentTiming(
                             $realization->scheduled_payment_date,
                             $realization->settled_at,
@@ -461,15 +457,6 @@ class CashAdvanceRealizationController extends Controller
                     'total' => $records->total(),
                 ],
                 'abilities' => $abilities,
-
-                /*
-                | Hari kerja kasir, dikirim sekali untuk seluruh daftar -- dipakai
-                | layar menjelaskan kenapa tombol bayarnya mati hari ini.
-                */
-                'payment_days_text' => $this->paymentDaysText('REALISASI'),
-
-                /* Angkanya juga, supaya layar bisa merangkai namanya sendiri. */
-                'payment_days' => $this->paymentDays('REALISASI'),
             ], 200);
         } catch (\Throwable $e) {
             Log::error('[Realisasi FPU] Index error', [
@@ -3126,19 +3113,6 @@ class CashAdvanceRealizationController extends Controller
                         );
                     }
 
-                    /* Pembayaran hanya boleh jatuh pada hari pembayaran. */
-                    if (!$this->canPayToday(
-                        'REALISASI',
-                        $terkunci->transaction_category_id,
-                    )) {
-                        throw new BulkDocumentActionException(
-                            (string) $terkunci->realization_number,
-                            __('payment_schedule_messages.not_payment_day', [
-                                'days' => $this->paymentDaysText('REALISASI', $terkunci->transaction_category_id),
-                            ]),
-                        );
-                    }
-
                     /*
                     | Jenis selisih harus cocok dengan tindakannya, sama seperti
                     | pada versi satuan: kekurangan tidak boleh ditutup lewat
@@ -4061,24 +4035,6 @@ class CashAdvanceRealizationController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => __("cash_advance_realization_messages.{$messageKey}.only_received"),
-                ], 422);
-            }
-
-            /*
-            | Hari ini harus hari pembayaran. Lebih awal maupun terlambat tetap
-            | boleh, tetapi tetap harus jatuh pada hari kerja kasirnya.
-            */
-            if (!$this->canPayToday(
-                'REALISASI',
-                $realization->transaction_category_id,
-            )) {
-                DB::rollBack();
-
-                return response()->json([
-                    'success' => false,
-                    'message' => __('payment_schedule_messages.not_payment_day', [
-                        'days' => $this->paymentDaysText('REALISASI', $realization->transaction_category_id),
-                    ]),
                 ], 422);
             }
 
@@ -5897,14 +5853,6 @@ class CashAdvanceRealizationController extends Controller
 
             'received_at' => $realization->received_at,
             'scheduled_payment_date' => $realization->scheduled_payment_date,
-            'can_pay_today' => $this->canPayToday(
-                'REALISASI',
-                $realization->transaction_category_id,
-            ),
-            'payment_days_text' => $this->paymentDaysText(
-                'REALISASI',
-                $realization->transaction_category_id,
-            ),
             'payment_timing' => $this->paymentTiming(
                 $realization->scheduled_payment_date,
                 $realization->settled_at,

@@ -21,6 +21,7 @@
     "department": "Department",
     "dateFrom": "Tanggal Dari",
     "dateTo": "Tanggal Sampai",
+    "onlyMyApproval": "Hanya yang menunggu approval saya",
     "dateRangeInvalid": "Tanggal Sampai tidak boleh lebih awal dari Tanggal Dari.",
     "addButton": "Buat BDV",
     "empty": "Belum ada Bank Disbursement Voucher.",
@@ -28,6 +29,7 @@
     "loadFailed": "Gagal memuat daftar BDV.",
     "showing": "Menampilkan {from}-{to} dari {total} data",
     "columns": {
+      "no": "No",
       "number": "Nomor BDV",
       "date": "Tanggal",
       "documentType": "Jenis Dokumen",
@@ -35,11 +37,51 @@
       "branch": "Cabang",
       "department": "Department",
       "amount": "Nilai",
-      "status": "Status",
-      "requester": "Dibuat Oleh",
-      "actions": "Aksi"
+      "status": "Status"
     },
-    "notNumbered": "Belum bernomor"
+    "notNumbered": "Belum bernomor",
+    "notInAccurate": "Isi terakhirnya belum masuk Accurate. Buka halaman ubahnya lalu tekan Simpan untuk mengirim ulang.",
+    "menu": {
+      "waitingMyApprovalBadge": "Menunggu approval Anda",
+      "detail": "Lihat Detail",
+      "edit": "Ubah",
+      "submit": "Ajukan",
+      "print": "Cetak PDF",
+      "delete": "Hapus"
+    },
+    "print": {
+      "dialogTitle": "Cetak {number}?",
+      "langLabel": "Bahasa cetakan",
+      "langId": "Bahasa Indonesia",
+      "langEn": "English",
+      "withSources": "Gabungkan dokumen FPU/Claim yang dicairkan",
+      "withAttachments": "Gabungkan lampiran",
+      "attachmentNotice": "Lampiran berupa gambar disisipkan satu per halaman. Yang berformat PDF tidak bisa disisipkan, tetapi namanya tetap didaftarkan di halaman terakhir.",
+      "attachmentOnSources": "Lampiran menempel di belakang masing-masing dokumen sumbernya, bukan di belakang voucher. Yang berformat PDF tidak bisa disisipkan, tetapi namanya tetap didaftarkan.",
+      "sourceLanguageNotice": "Cetakan FPU dan Claim hanya tersedia dalam bahasa Indonesia, jadi halaman lanjutannya tetap berbahasa Indonesia.",
+      "confirm": "Cetak",
+      "loading": "Menyiapkan cetakan...",
+      "popupBlocked": "Tab cetak diblokir peramban. Izinkan pop-up untuk halaman ini lalu coba lagi.",
+      "windowClosed": "Tab cetak sudah ditutup sebelum berkasnya siap.",
+      "urlFailed": "Tautan cetak gagal dibuat.",
+      "failed": "Cetakan BDV gagal dibuat."
+    },
+    "submit": {
+      "confirmTitle": "Ajukan BDV ini?",
+      "confirmText": "{number} akan diteruskan ke penyetuju, dan sejak saat itu tidak bisa diubah lagi sampai ada yang mengembalikannya.",
+      "confirmButton": "Ya, ajukan",
+      "loading": "Mengajukan voucher...",
+      "success": "Bank Disbursement Voucher berhasil diajukan.",
+      "failed": "Bank Disbursement Voucher gagal diajukan."
+    },
+    "delete": {
+      "confirmTitle": "Hapus BDV ini?",
+      "confirmText": "{number} akan dihapus, dan dokumennya ikut dihapus dari Accurate Online. Tindakan ini tidak bisa dibatalkan.",
+      "confirmButton": "Ya, hapus",
+      "loading": "Menghapus voucher dan dokumennya di Accurate...",
+      "success": "Bank Disbursement Voucher berhasil dihapus.",
+      "failed": "Bank Disbursement Voucher gagal dihapus."
+    }
   },
 
   "create": {
@@ -48,9 +90,13 @@
     "back": "Kembali ke daftar",
 
     "step1": {
-      "title": "Jenis Dokumen",
-      "subtitle": "Tentukan dokumen apa yang akan dicairkan lewat voucher ini.",
+      "title": "Department, Cabang & Jenis Dokumen",
+      "subtitle": "Tentukan dulu ketiganya. Daftar nomor dokumen akan disaring ke pilihan ini.",
       "label": "Jenis Dokumen",
+      "branch": "Cabang",
+      "department": "Department",
+      "filterHint": "Nomor dokumen yang muncul hanya dari department dan cabang ini. Seluruh dokumen dalam satu BDV harus sama ketiganya.",
+      "typeLocked": "Terkunci karena sudah ada dokumen terpilih. Keluarkan dokumennya untuk berganti jenis.",
       "loadFailed": "Gagal memuat jenis dokumen."
     },
 
@@ -59,6 +105,9 @@
       "subtitle": "Hanya dokumen yang sudah disetujui penuh dan berkasnya sudah diterima yang muncul di sini.",
       "label": "Nomor Dokumen",
       "hint": "Ketik sebagian nomor atau perihalnya untuk mencari.",
+      "hintMulti": "Pilih satu per satu. Satu BDV boleh mencairkan beberapa dokumen sekaligus.",
+      "branchLocked": "Seluruh dokumen harus dari cabang {branch}.",
+      "mixedType": "Satu BDV hanya boleh mencairkan satu jenis dokumen. Keluarkan dokumen yang sudah dipilih bila hendak berganti jenis.",
       "empty": "Tidak ada dokumen yang bisa diangkat untuk jenis ini.",
       "emptySearch": "Tidak ada dokumen yang cocok dengan pencarian itu.",
       "waitingType": "Pilih jenis dokumennya terlebih dahulu.",
@@ -67,11 +116,14 @@
     },
 
     "step3": {
+      "count": "{count} dokumen",
+      "waiting": "Pilih nomor dokumennya terlebih dahulu.",
+      "mixedBranch": "Dokumen itu bukan dari cabang {branch}. Seluruh dokumen dalam satu BDV harus dari cabang yang sama.",
       "title": "Rincian Dokumen",
       "subtitle": "Periksa kembali sebelum melanjutkan. Nilai yang tertera akan disalin ke BDV.",
-      "waiting": "Pilih nomor dokumennya terlebih dahulu.",
       "loadFailed": "Gagal memuat rincian dokumen.",
-      "changeDocument": "Ganti dokumen"
+      "changeDocument": "Ganti dokumen",
+      "documentsTotal": "Jumlah nilai dokumen"
     },
 
     "detail": {
@@ -101,9 +153,14 @@
       "branchFromDocument": "Mengikuti cabang dokumen yang dipilih.",
       "required": "Wajib diisi.",
       "invalid": "Ada isian wajib yang belum lengkap. Periksa kembali kolom bertanda bintang.",
+      "confirmTitle": "Simpan BDV ini?",
+      "confirmText": "Voucher ini langsung dibukukan ke Accurate Online begitu disimpan, meski statusnya masih draft. Pastikan kas/bank, penerima, dan akun tiap baris sudah benar.",
+      "confirmButton": "Ya, simpan",
       "saveButton": "Simpan",
-      "notSavedTitle": "Belum tersimpan",
-      "notSavedText": "Isian sudah lengkap, tetapi penyimpanan BDV belum tersambung ke server.",
+      "saving": "Menyimpan voucher dan mengirimkannya ke Accurate...",
+      "saved": "Bank Disbursement Voucher berhasil disimpan.",
+      "saveFailed": "Bank Disbursement Voucher gagal disimpan.",
+      "accurateFailed": "BDV tersimpan, tetapi belum masuk Accurate. Tekan Simpan sekali lagi untuk mencoba ulang.",
       "fields": {
         "cashBank": "Kas / Bank",
         "bdvNumber": "Nomor BDV",
@@ -117,8 +174,11 @@
     "items": {
       "title": "Rincian Item",
       "subtitle": "Diambil apa adanya dari dokumen sumber dan tidak bisa diubah dari sini.",
+      "subtitleMulti": "Dikelompokkan per dokumen. Akun Accurate dipilih untuk setiap baris.",
+      "missingAccount": "{count} baris belum ada akunnya",
       "count": "{count} item",
       "empty": "Dokumen ini tidak punya rincian item.",
+      "subtotal": "Jumlah item dokumen ini",
       "total": "Jumlah item",
       "mismatch": "Jumlah item {items} berbeda dari nilai dokumen {document}. Nilai dokumen bisa direvisi saat berkasnya diterima Finance, jadi selisih ini belum tentu keliru.",
       "accountLoadFailed": "Gagal memuat daftar akun dari Accurate.",
@@ -136,5 +196,79 @@
         "account": "Akun Accurate"
       }
     }
+  },
+  "detail": {
+    "title": "Detail Bank Disbursement Voucher",
+    "subtitle": "Tampilan baca saja. Tidak ada yang bisa diubah dari halaman ini.",
+    "accurate": "Accurate Online",
+    "accurateNotSent": "Belum masuk Accurate",
+    "accurateStale": "Perubahan terakhir belum masuk Accurate",
+    "noAccount": "Akun belum dipilih",
+    "itemsSubtitle": "Nominalnya dari dokumen sumber, akunnya dari voucher ini.",
+    "requester": "Dibuat Oleh",
+    "attachments": "Bukti",
+    "attachmentProgress": "{sent} dari {total} sudah di Accurate",
+    "attachmentPending": "Belum lengkap",
+    "approvalTitle": "Riwayat Approval",
+    "approvalEmpty": "Belum ada riwayat approval. Voucher ini belum diajukan.",
+    "approvalResetByRevision": "Rantai approval disusun ulang saat voucher ini dikembalikan untuk revisi. Tanda tangan putaran sebelumnya tercatat pada Riwayat Revisi di bawah, dan rantai baru terbentuk begitu voucher diajukan ulang.",
+    "approve": {
+      "button": "Setujui",
+      "dialogTitle": "Setujui BDV {number}?",
+      "dialogSubtitle": "Pastikan kas/bank, penerima, dan akun tiap baris sudah benar sebelum menyetujui.",
+      "confirmButton": "Setujui",
+      "notesLabel": "Catatan (opsional)",
+      "notesPlaceholder": "Tulis catatan approval bila perlu",
+      "loading": "Menyimpan persetujuan...",
+      "success": "Bank Disbursement Voucher berhasil disetujui.",
+      "failed": "Bank Disbursement Voucher gagal disetujui."
+    },
+    "reject": {
+      "button": "Tolak",
+      "dialogTitle": "Tolak BDV {number}?",
+      "dialogSubtitle": "Penolakan menghentikan seluruh proses approval voucher ini.",
+      "confirmButton": "Tolak",
+      "notesLabel": "Alasan penolakan",
+      "notesPlaceholder": "Jelaskan alasan penolakan",
+      "notesRequired": "Alasan penolakan wajib diisi.",
+      "loading": "Menyimpan penolakan...",
+      "success": "Bank Disbursement Voucher ditolak.",
+      "failed": "Bank Disbursement Voucher gagal ditolak."
+    }
+  },
+  "edit": {
+    "title": "Ubah Bank Disbursement Voucher",
+    "subtitle": "Ubah data voucher beserta daftar dokumen yang dicairkannya.",
+    "back": "Kembali ke daftar",
+    "loading": "Memuat voucher...",
+    "loadFailed": "Gagal memuat Bank Disbursement Voucher.",
+    "notFound": "Bank Disbursement Voucher tersebut tidak ditemukan.",
+    "missingId": "Dokumen yang hendak diubah tidak disebutkan.",
+    "locked": {
+      "title": "Dokumen ini tidak bisa diubah",
+      "text": "Hanya BDV berstatus draft yang bisa diubah. Status dokumen ini {status}.",
+      "textScope": "Dokumen ini masih berstatus draft, tetapi berada di luar cakupan izin ubah Anda. Hubungi admin bila Anda memang perlu mengubahnya."
+    },
+    "step1": {
+      "title": "Dokumen Sumber",
+      "subtitle": "Dokumen yang dicairkan voucher ini. Bisa ditambah atau dikeluarkan selama masih draft.",
+      "unavailable": "Rincian dokumen sumber tidak bisa ditampilkan saat ini.",
+      "emptied": "Belum ada dokumen yang dipilih. Voucher harus mencairkan sedikitnya satu dokumen.",
+      "unreadable": "Rincian tidak terbaca"
+    },
+    "step2": {
+      "title": "Data Voucher",
+      "subtitle": "Isian milik voucher ini sendiri, bukan salinan dokumennya."
+    },
+    "step3": {
+      "title": "Rincian Item",
+      "subtitle": "Diambil dari dokumen sumbernya. Akun Accurate tiap baris dipilih di sini.",
+      "unavailable": "Rincian dokumen sumber tidak bisa ditampilkan saat ini."
+    },
+    "confirmTitle": "Simpan perubahan BDV ini?",
+    "confirmText": "Perubahan ini ikut menimpa dokumen yang sudah ada di Accurate Online, bukan membuat yang baru. Pastikan kas/bank, penerima, dan akun tiap baris sudah benar.",
+    "confirmButton": "Ya, simpan perubahan",
+    "saving": "Menyimpan perubahan dan memperbaruinya di Accurate...",
+    "saveButton": "Simpan Perubahan"
   }
 }

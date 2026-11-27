@@ -1302,6 +1302,37 @@ class MenuController extends Controller
                 'menu_paths' => ['/business_trip/perdin'],
             ],
 
+            /*
+            | Bank Disbursement Voucher.
+            |
+            | Memakai menu_paths dengan alasan yang sama seperti keluarga
+            | Pengajuan Dana: jalurnya '/cash_bank/bdv' sedangkan judulnya
+            | cuma 'BDV' -- tiga huruf yang terlalu pendek untuk dicocokkan
+            | sebagai potongan kata tanpa menyerempet menu lain.
+            |
+            | Angkanya naik ke menu induk Cash & Bank dengan sendirinya:
+            | injectNavigationBadges menjumlahkan badge anak ke induknya.
+            */
+            'bdv' => [
+                'document_table' => 'bank_disbursement_vouchers',
+                'approval_table' => 'bdv_approvals',
+
+                'document_primary_key' => 'id',
+                'approval_foreign_key' => 'bdv_id',
+
+                'document_status_column' => 'status',
+                'document_in_progress_status' => 'IN PROGRESS',
+
+                'approval_status_column' => 'status',
+                'waiting_status' => 'WAITING',
+
+                'step_order_column' => 'step_order',
+                'approver_type_column' => 'approver_type',
+                'approver_id_column' => 'approver_id',
+
+                'menu_paths' => ['/cash_bank/bdv'],
+            ],
+
             'inventory_po' => [
                 'menu_keywords' => [
                     'inventory purchase order',

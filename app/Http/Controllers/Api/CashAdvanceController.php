@@ -8,6 +8,7 @@ use App\Exceptions\BulkDocumentActionException;
 use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Controller;
+use App\Support\BdvDisbursementGuard;
 use App\Support\DocumentActionScope;
 use App\Support\LineAttachment;
 use App\Support\UserHomeAccess;
@@ -414,10 +415,6 @@ class CashAdvanceController extends Controller
 
                         'received_at' => $cashAdvance->received_at,
                         'scheduled_payment_date' => $cashAdvance->scheduled_payment_date,
-                        'can_pay_today' => $this->canPayToday(
-                            'FPU',
-                            $cashAdvance->transaction_category_id,
-                        ),
                         'payment_timing' => $this->paymentTiming(
                             $cashAdvance->scheduled_payment_date,
                             $cashAdvance->disbursed_at,
@@ -458,18 +455,7 @@ class CashAdvanceController extends Controller
                 | ditolak -- memakai angka yang sama persis dengan yang
                 | dipakai penolakannya.
                 */
-                'submission_limit' => $this->ringkasBatasFpu(
-                    app(FundRequestLimitService::class)->evaluate($user->id),
-                ),
-
-                /*
-                | Hari kerja kasir, dikirim sekali untuk seluruh daftar -- dipakai
-                | layar menjelaskan kenapa tombol bayarnya mati hari ini.
-                */
-                'payment_days_text' => $this->paymentDaysText('FPU'),
-
-                /* Angkanya juga, supaya layar bisa merangkai namanya sendiri. */
-                'payment_days' => $this->paymentDays('FPU'),
+                'submission_limit' => $this->ringkasBatasFpuPerCabang($user),
             ], 200);
         } catch (\Throwable $e) {
             Log::error('[FPU] Index error', [
@@ -1499,8 +1485,16 @@ class CashAdvanceController extends Controller
      * yang terlambat, karena itu yang paling mendesak dikerjakan -- sedangkan
      * "sudah 3 dari 3" hanya memberi tahu keadaannya.
      */
-    private function pesanBatasFpu(array $batas): string
+    /*
+    | Nama cabangnya IKUT DISEBUT, dan itu bukan hiasan: kuotanya per cabang,
+    | jadi "sudah 3 dari 3" tanpa menyebut cabang mana membuat pemohon yang
+    | memegang beberapa cabang mengira seluruh jatahnya habis -- padahal
+    | cabang lainnya masih utuh.
+    */
+    private function pesanBatasFpu(array $batas, ?string $namaCabang = null): string
     {
+        $cabang = trim((string) $namaCabang);
+
         if (in_array('OVERDUE', $batas['reasons'], true)) {
             $nomor = collect($batas['overdue'])
                 ->map(fn (array $d): string => $d['number'] . ' (' . $d['days'] . ' hari)')
@@ -1509,13 +1503,33 @@ class CashAdvanceController extends Controller
             return __('cash_advance_messages.submit.limit_overdue', [
                 'days' => $batas['max_days'],
                 'documents' => $nomor,
+                'branch' => $cabang !== '' ? $cabang : '-',
             ]);
         }
 
         return __('cash_advance_messages.submit.limit_too_many', [
             'count' => $batas['outstanding'],
             'max' => $batas['max_outstanding'],
+            'branch' => $cabang !== '' ? $cabang : '-',
         ]);
+    }
+
+    /**
+     * Nama cabang untuk dibaca orang. Id-nya dikembalikan apa adanya bila
+     * cabangnya tidak ketemu -- lebih baik daripada kalimat tanpa cabang.
+     */
+    private function namaCabang(int|string|null $branchId): string
+    {
+        $id = (int) $branchId;
+
+        if ($id <= 0) {
+            return '-';
+        }
+
+        return (string) (
+            DB::table('cabang')->where('id', $id)->value('nama_cabang')
+            ?: ('#' . $id)
+        );
     }
 
     /**
@@ -1535,6 +1549,85 @@ class CashAdvanceController extends Controller
             'reasons' => $batas['reasons'],
             'limit_name' => $batas['limit']?->name,
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Keadaan kuota pemohon, SATU BARIS PER CABANG
+    |--------------------------------------------------------------------------
+    | Kuotanya per cabang, jadi satu angka tunggal tidak bisa lagi mewakilinya.
+    | Akun yang memegang dua cabang punya dua jatah yang berdiri sendiri: habis
+    | di cabang A sama sekali tidak menghalangi pengajuan di cabang B.
+    |
+    | Bentuk lamanya DIPERTAHANKAN di akar jawaban -- diisi cabang utama
+    | pemohon -- supaya layar yang belum tahu soal 'branches' tetap menampilkan
+    | angka yang benar untuk cabang yang paling sering dipakainya, bukan
+    | kosong.
+    |--------------------------------------------------------------------------
+    */
+    private function ringkasBatasFpuPerCabang(object $user): array
+    {
+        $service = app(FundRequestLimitService::class);
+
+        $idCabang = collect();
+
+        if (method_exists($user, 'accessibleBranchIds')) {
+            $idCabang = collect($user->accessibleBranchIds())
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
+                ->unique()
+                ->values();
+        }
+
+        /*
+        | Tidak punya cabang sama sekali -- akun lama atau akun yang belum
+        | di-assign. Dinilai tanpa cabang supaya peringatannya tetap ada;
+        | angkanya meliputi seluruh cabang, dan untuk akun seperti ini memang
+        | itu yang benar.
+        */
+        if ($idCabang->isEmpty()) {
+            return $this->ringkasBatasFpu($service->evaluate((int) $user->id))
+                + ['branches' => []];
+        }
+
+        $nama = DB::table('cabang')
+            ->whereIn('id', $idCabang->all())
+            ->pluck('nama_cabang', 'id');
+
+        $perCabang = [];
+
+        foreach ($idCabang as $id) {
+            $batas = $service->evaluate(
+                (int) $user->id,
+                $id,
+
+                /*
+                | Department sengaja tidak disebut: FPU-nya belum ada, jadi
+                | department-nya belum diketahui. Batas yang dibatasi
+                | department tertentu karena itu tidak ikut dipertimbangkan --
+                | angka di spanduk memakai batas yang berlaku untuk cabang itu
+                | tanpa melihat department.
+                */
+                null,
+            );
+
+            $perCabang[] = $this->ringkasBatasFpu($batas) + [
+                'branch_id' => (string) $id,
+                'branch_name' => (string) ($nama[$id] ?? ('#' . $id)),
+            ];
+        }
+
+        /*
+        | Yang naik ke akar: cabang utama pemohon bila ada di dalam daftar,
+        | selain itu baris pertama.
+        */
+        $utamaId = (int) ($user->cabang_id ?? 0);
+
+        $utama = collect($perCabang)
+            ->firstWhere('branch_id', (string) $utamaId)
+            ?? $perCabang[0];
+
+        return $utama + ['branches' => $perCabang];
     }
     public function submit(
         string $publicId,
@@ -1632,9 +1725,15 @@ class CashAdvanceController extends Controller
             */
             $limitService = app(FundRequestLimitService::class);
 
+            /*
+            | Dinilai terhadap CABANG DOKUMEN INI, bukan seluruh cabang
+            | pemohon. Jatah tiap cabang berdiri sendiri: dua FPU di cabang A
+            | menyisakan satu di cabang A, dan tidak mengurangi apa pun di
+            | cabang B.
+            */
             $batas = $limitService->evaluate(
                 (int) $cashAdvance->created_by,
-                $limitService->areaTypeOf($cashAdvance->branch),
+                $cashAdvance->branch,
                 $cashAdvance->department_id ? (int) $cashAdvance->department_id : null,
             );
 
@@ -1657,8 +1756,16 @@ class CashAdvanceController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => $this->pesanBatasFpu($batas),
-                    'data' => ['limit' => $this->ringkasBatasFpu($batas)],
+                    'message' => $this->pesanBatasFpu(
+                        $batas,
+                        $this->namaCabang($cashAdvance->branch),
+                    ),
+                    'data' => [
+                        'limit' => $this->ringkasBatasFpu($batas) + [
+                            'branch_id' => (string) $cashAdvance->branch,
+                            'branch_name' => $this->namaCabang($cashAdvance->branch),
+                        ],
+                    ],
                 ], 422);
             }
 
@@ -2656,25 +2763,6 @@ class CashAdvanceController extends Controller
                         );
                     }
 
-                    /*
-                    | Pencairan hanya boleh jatuh pada hari pembayaran. Tahap
-                    | penerimaan tidak dibatasi -- berkas boleh diterima kapan saja.
-                    */
-                    if (
-                        $toStatus === CashAdvance::STATUS_DISBURSED
-                        && !$this->canPayToday(
-                            'FPU',
-                            $terkunci->transaction_category_id,
-                        )
-                    ) {
-                        throw new BulkDocumentActionException(
-                            (string) $terkunci->advance_number,
-                            __('payment_schedule_messages.not_payment_day', [
-                                'days' => $this->paymentDaysText('FPU', $terkunci->transaction_category_id),
-                            ]),
-                        );
-                    }
-
                     /* Penjagaan yang sama pada jalur massal -- lihat disburse(). */
                     if ($toStatus === CashAdvance::STATUS_DISBURSED) {
                         $penahan = $this->businessTripBlockingDisbursement($terkunci);
@@ -2683,6 +2771,26 @@ class CashAdvanceController extends Controller
                             throw new BulkDocumentActionException(
                                 (string) $terkunci->advance_number,
                                 $penahan,
+                            );
+                        }
+
+                        /*
+                        | Vouchernya harus sudah terbit -- aturan yang sama
+                        | dengan disburse(). Dipasang di sini juga, sebab
+                        | penjaga yang hanya ada di jalur satuan adalah
+                        | penjaga yang bisa dilewati hanya dengan mencentang
+                        | beberapa baris sekaligus.
+                        */
+                        $penahanVoucher = BdvDisbursementGuard::blocking(
+                            'FPU',
+                            (int) $terkunci->id,
+                            'cash_advance_messages.disburse.needs_bdv',
+                        );
+
+                        if ($penahanVoucher) {
+                            throw new BulkDocumentActionException(
+                                (string) $terkunci->advance_number,
+                                $penahanVoucher,
                             );
                         }
                     }
@@ -3084,24 +3192,6 @@ class CashAdvanceController extends Controller
             }
 
             /*
-            | Hari ini harus hari pembayaran. Lebih awal maupun terlambat tetap
-            | boleh, tetapi tetap harus jatuh pada hari kerja kasirnya.
-            */
-            if (!$this->canPayToday(
-                'FPU',
-                $cashAdvance->transaction_category_id,
-            )) {
-                DB::rollBack();
-
-                return response()->json([
-                    'success' => false,
-                    'message' => __('payment_schedule_messages.not_payment_day', [
-                        'days' => $this->paymentDaysText('FPU', $cashAdvance->transaction_category_id),
-                    ]),
-                ], 422);
-            }
-
-            /*
             | Perjalanannya harus sudah diizinkan sebelum dananya keluar.
             |
             | FPU boleh berjalan paralel dengan perdin yang diajukan tepat
@@ -3115,6 +3205,32 @@ class CashAdvanceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $penahan,
+                ], 422);
+            }
+
+            /*
+            | VOUCHERNYA HARUS SUDAH TERBIT LEBIH DULU.
+            |
+            | BDV-lah dokumen pencairannya -- yang ditandatangani dan yang
+            | dicatat ke Accurate. Menandai FPU cair lebih dulu bukan sekadar
+            | membalik urutan: dokumen yang sudah DISBURSED keluar dari daftar
+            | yang layak diangkat, jadi vouchernya tidak akan pernah bisa
+            | dibuat sementara pembukuan sudah menyatakan uangnya keluar.
+            |
+            | Keterangan lengkapnya di BdvDisbursementGuard.
+            */
+            $penahanVoucher = BdvDisbursementGuard::blocking(
+                'FPU',
+                (int) $cashAdvance->id,
+                'cash_advance_messages.disburse.needs_bdv',
+            );
+
+            if ($penahanVoucher) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $penahanVoucher,
                 ], 422);
             }
 
@@ -4891,14 +5007,6 @@ class CashAdvanceController extends Controller
 
             'received_at' => $cashAdvance->received_at,
             'scheduled_payment_date' => $cashAdvance->scheduled_payment_date,
-            'can_pay_today' => $this->canPayToday(
-                'FPU',
-                $cashAdvance->transaction_category_id,
-            ),
-            'payment_days_text' => $this->paymentDaysText(
-                'FPU',
-                $cashAdvance->transaction_category_id,
-            ),
             'payment_timing' => $this->paymentTiming(
                 $cashAdvance->scheduled_payment_date,
                 $cashAdvance->disbursed_at,

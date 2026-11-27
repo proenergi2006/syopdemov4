@@ -183,3 +183,75 @@ export const showWarningToast = (options: ToastOptions): void => {
 export const showInfoToast = (options: ToastOptions): void => {
   toast.info(buildMessage(options))
 }
+
+/* =========================================================
+ * TOAST YANG MENYEBERANGI PERPINDAHAN HALAMAN
+ * =========================================================
+ * Toast yang ditampilkan tepat sebelum router.push ikut lenyap bersama
+ * halaman yang ditinggalkan: komponennya dilepas sebelum toast sempat
+ * terbaca, sehingga yang terlihat hanya kedipan. Pesannya karena itu
+ * dititipkan dulu, lalu ditampilkan oleh halaman tujuan setelah terpasang.
+ *
+ * Dipakai sessionStorage, bukan variabel modul, dengan dua alasan: muat
+ * ulang penuh sesudah menyimpan tetap membawa pesannya, dan titipannya
+ * hilang sendiri begitu tab ditutup.
+ * ========================================================= */
+type JenisToast = 'success' | 'error' | 'warning' | 'info'
+
+const KUNCI_TOAST_TERTUNDA = 'toastTertunda'
+
+export const queueToast = (jenis: JenisToast, options: ToastOptions): void => {
+  try {
+    sessionStorage.setItem(
+      KUNCI_TOAST_TERTUNDA,
+      JSON.stringify({ jenis, title: options.title, text: options.text }),
+    )
+  }
+  catch {
+    /*
+     * Penyimpanan tab bisa ditolak peramban (mode privat, setelan privasi
+     * ketat). Sebuah toast bukan alasan untuk menggagalkan apa pun.
+     */
+  }
+}
+
+/**
+ * Menampilkan titipan toast, lalu membuangnya.
+ *
+ * Dipanggil dari onMounted halaman tujuan. Titipannya dihapus LEBIH DULU,
+ * sebelum ditampilkan: kalau tidak, pesan yang isinya rusak akan tertinggal
+ * di sana dan mencoba tampil lagi pada setiap kunjungan berikutnya.
+ */
+export const flushQueuedToast = (): void => {
+  let mentah: string | null = null
+
+  try {
+    mentah = sessionStorage.getItem(KUNCI_TOAST_TERTUNDA)
+    sessionStorage.removeItem(KUNCI_TOAST_TERTUNDA)
+  }
+  catch {
+    return
+  }
+
+  if (!mentah)
+    return
+
+  const penampil: Record<JenisToast, (options: ToastOptions) => void> = {
+    success: showSuccessToast,
+    error: showErrorToast,
+    warning: showWarningToast,
+    info: showInfoToast,
+  }
+
+  try {
+    const titipan = JSON.parse(mentah) as { jenis?: JenisToast } & ToastOptions
+
+    const tampilkan = titipan.jenis ? penampil[titipan.jenis] : undefined
+
+    if (tampilkan)
+      tampilkan({ title: titipan.title, text: titipan.text })
+  }
+  catch {
+    /* Titipan yang rusak dibuang diam-diam -- sudah terhapus di atas. */
+  }
+}

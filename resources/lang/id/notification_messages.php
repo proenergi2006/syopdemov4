@@ -534,4 +534,37 @@ return [
             'message' => 'Saldo kas kecil cabang :branch tinggal Rp :balance dari plafon Rp :ceiling, di bawah batas :percentage%. Ajukan top up sebesar Rp :topup supaya claim kecil berikutnya tetap bisa dibayar.',
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | BDV
+    |--------------------------------------------------------------------------
+    | Lonceng saja; BDV sengaja tidak punya email. Kalimatnya menyebut nomor
+    | vouchernya, bukan "sebuah dokumen" -- yang membuka lonceng biasanya
+    | sedang mencari satu dokumen tertentu di antara beberapa.
+    |--------------------------------------------------------------------------
+    */
+    'bdv' => [
+        'approval_request' => [
+            'title' => 'Approval BDV',
+            'message_with_label' => ':bdv_number menunggu approval Anda pada tahap :step_order (:step_label).',
+            'message_without_label' => ':bdv_number menunggu approval Anda pada tahap :step_order.',
+        ],
+
+        'approval_step_pending' => [
+            'title' => 'Tahap Approval BDV Disetujui',
+            'message' => ':bdv_number telah disetujui oleh :approver_name pada tahap :step_order dan masih menunggu approval berikutnya.',
+        ],
+
+        'approval_step_final' => [
+            'title' => 'BDV Disetujui',
+            'message' => ':bdv_number telah final disetujui oleh :approver_name.',
+        ],
+
+        'rejected' => [
+            'title' => 'BDV Ditolak',
+            'message' => ':bdv_number telah ditolak oleh :rejecter_name.',
+        ],
+    ],
+
 ];

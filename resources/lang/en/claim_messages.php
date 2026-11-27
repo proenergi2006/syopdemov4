@@ -86,6 +86,9 @@ return [
 
     'pay' => [
         'only_received' => 'Only received claims can be reimbursed.',
+
+
+        'needs_bdv' => 'This claim has no Bank Disbursement Voucher yet, so it cannot be reimbursed. Raise a BDV for it first -- the BDV is the payment document. Marking it paid now would close that door: a paid claim can no longer be raised into a BDV.',
         'forbidden' => 'You do not have permission to mark a claim as reimbursed.',
         'only_approved' => 'Only approved claims can be reimbursed.',
         'success' => 'Claim marked as reimbursed.',
