@@ -55,6 +55,29 @@
     $perluGanjal = $barisPenyetuju->count() > 1;
 
     /*
+    |--------------------------------------------------------------------------
+    | Label kolomnya, bila pemanggilnya menitipkan yang lain
+    |--------------------------------------------------------------------------
+    | Lahir bersama cetakan BDV, satu-satunya yang bisa berbahasa Inggris.
+    | Bawaannya tetap kalimat Indonesia yang selama ini tertulis di sini,
+    | jadi keempat cetakan lain -- yang tidak menitipkan apa pun -- keluar
+    | sama huruf demi huruf seperti sebelumnya.
+    |
+    | Bukan __() dengan locale aplikasi: itu akan membuat keempat cetakan
+    | lain ikut berganti bahasa pada akun yang kebetulan memilih Inggris,
+    | padahal badan dokumennya tetap Indonesia -- setengah halaman yang
+    | berganti bahasa lebih buruk daripada satu halaman yang tidak.
+    |--------------------------------------------------------------------------
+    */
+    $labelTtd = array_merge([
+        'prepared' => 'Dibuat Oleh',
+        'requester' => 'Pemohon',
+        'approved' => 'Disetujui Oleh',
+        'approver' => 'Penyetuju',
+        'empty' => 'Belum ada persetujuan.',
+    ], $teksTtd ?? []);
+
+    /*
     | Yang memanggil partial ini wajib menyediakan $requester, $approvers, dan
     | $tanggalJam. Sengaja tanpa nilai cadangan: keempat berkas badan dokumen
     | sudah menyediakan ketiganya, dan bila kelak ada pemanggil baru yang lupa,
@@ -78,12 +101,12 @@
     <table class="signature-frame">
         <tr>
             <td style="width: 25%;">
-                <div class="signature-heading">Dibuat Oleh</div>
+                <div class="signature-heading">{{ $labelTtd['prepared'] }}</div>
 
                 <table class="signer-table">
                     <tr>
                         <td>
-                            <div class="signer-role">Pemohon</div>
+                            <div class="signer-role">{{ $labelTtd['requester'] }}</div>
 
                             <div class="signature-area">
                                 @if (!empty($requester->signature_file) && file_exists($requester->signature_file))
@@ -106,7 +129,7 @@
             </td>
 
             <td style="width: 75%;">
-                <div class="signature-heading">Disetujui Oleh</div>
+                <div class="signature-heading">{{ $labelTtd['approved'] }}</div>
 
                 <table class="signer-table">
                     @forelse ($barisPenyetuju as $nomorBaris => $isiBaris)
@@ -114,7 +137,7 @@
                             @foreach ($isiBaris as $approver)
                                 <td style="width: {{ $lebarKolom }}%;">
                                     <div class="signer-role">
-                                        {{ $approver->label ?? 'Penyetuju' }}
+                                        {{ $approver->label ?? $labelTtd['approver'] }}
                                     </div>
 
                                     <div class="signature-area">
@@ -143,7 +166,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td class="signer-empty">Belum ada persetujuan.</td>
+                            <td class="signer-empty">{{ $labelTtd['empty'] }}</td>
                         </tr>
                     @endforelse
                 </table>

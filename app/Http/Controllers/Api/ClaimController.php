@@ -9,6 +9,7 @@ use App\Http\Controllers\Concerns\ProcessesBulkDocumentAction;
 use App\Http\Controllers\Concerns\SchedulesPayment;
 use App\Http\Controllers\Api\BusinessTripController;
 use App\Http\Controllers\Controller;
+use App\Support\BdvDisbursementGuard;
 use App\Support\DocumentActionScope;
 use App\Support\LineAttachment;
 use App\Support\UserHomeAccess;
@@ -353,10 +354,6 @@ class ClaimController extends Controller
 
                         'received_at' => $claim->received_at,
                         'scheduled_payment_date' => $claim->scheduled_payment_date,
-                        'can_pay_today' => $this->canPayToday(
-                            'CLAIM',
-                            $claim->transaction_category_id,
-                        ),
                         'payment_timing' => $this->paymentTiming(
                             $claim->scheduled_payment_date,
                             $claim->paid_at,
@@ -377,15 +374,6 @@ class ClaimController extends Controller
                     'total' => $records->total(),
                 ],
                 'abilities' => $abilities,
-
-                /*
-                | Hari kerja kasir, dikirim sekali untuk seluruh daftar -- dipakai
-                | layar menjelaskan kenapa tombol bayarnya mati hari ini.
-                */
-                'payment_days_text' => $this->paymentDaysText('CLAIM'),
-
-                /* Angkanya juga, supaya layar bisa merangkai namanya sendiri. */
-                'payment_days' => $this->paymentDays('CLAIM'),
             ], 200);
         } catch (\Throwable $e) {
             Log::error('[Claim] Index error', [
@@ -2135,16 +2123,22 @@ class ClaimController extends Controller
                         );
                     }
 
-                    /* Pembayaran hanya boleh jatuh pada hari pembayaran. */
-                    if (!$this->canPayToday(
+                    /*
+                    | Vouchernya harus sudah terbit -- aturan yang sama dengan
+                    | pay(). Dipasang di sini juga, sebab penjaga yang hanya
+                    | ada di jalur satuan adalah penjaga yang bisa dilewati
+                    | hanya dengan mencentang beberapa baris sekaligus.
+                    */
+                    $penahanVoucher = BdvDisbursementGuard::blocking(
                         'CLAIM',
-                        $terkunci->transaction_category_id,
-                    )) {
+                        (int) $terkunci->id,
+                        'claim_messages.pay.needs_bdv',
+                    );
+
+                    if ($penahanVoucher) {
                         throw new BulkDocumentActionException(
                             (string) $terkunci->claim_number,
-                            __('payment_schedule_messages.not_payment_day', [
-                                'days' => $this->paymentDaysText('CLAIM', $terkunci->transaction_category_id),
-                            ]),
+                            $penahanVoucher,
                         );
                     }
 
@@ -2414,20 +2408,28 @@ class ClaimController extends Controller
             }
 
             /*
-            | Hari ini harus hari pembayaran. Lebih awal maupun terlambat tetap
-            | boleh, tetapi tetap harus jatuh pada hari kerja kasirnya.
+            | VOUCHERNYA HARUS SUDAH TERBIT LEBIH DULU -- aturan yang sama
+            | dengan pencairan FPU, dan sengaja dipasang di sini juga.
+            |
+            | Claim sama-sama bisa diangkat BDV, jadi membiarkan pintu ini
+            | terbuka berarti menyisakan persis lubang yang hendak ditutup:
+            | dokumen yang sudah PAID keluar dari daftar yang layak diangkat,
+            | sehingga vouchernya tidak akan pernah bisa dibuat.
+            |
+            | Keterangan lengkapnya di BdvDisbursementGuard.
             */
-            if (!$this->canPayToday(
+            $penahanVoucher = BdvDisbursementGuard::blocking(
                 'CLAIM',
-                $claim->transaction_category_id,
-            )) {
+                (int) $claim->id,
+                'claim_messages.pay.needs_bdv',
+            );
+
+            if ($penahanVoucher) {
                 DB::rollBack();
 
                 return response()->json([
                     'success' => false,
-                    'message' => __('payment_schedule_messages.not_payment_day', [
-                        'days' => $this->paymentDaysText('CLAIM', $claim->transaction_category_id),
-                    ]),
+                    'message' => $penahanVoucher,
                 ], 422);
             }
 
@@ -4329,14 +4331,6 @@ class ClaimController extends Controller
 
             'received_at' => $claim->received_at,
             'scheduled_payment_date' => $claim->scheduled_payment_date,
-            'can_pay_today' => $this->canPayToday(
-                'CLAIM',
-                $claim->transaction_category_id,
-            ),
-            'payment_days_text' => $this->paymentDaysText(
-                'CLAIM',
-                $claim->transaction_category_id,
-            ),
             'payment_timing' => $this->paymentTiming(
                 $claim->scheduled_payment_date,
                 $claim->paid_at,

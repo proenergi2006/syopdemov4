@@ -403,8 +403,15 @@ class CashAdvanceRealizationDashboardService
                 $sub->select(DB::raw(1))
                     ->from('cash_advance_realizations AS r')
                     ->whereColumn('r.cash_advance_id', 'cash_advances.id')
-                    ->whereNull('r.deleted_at')
-                    ->whereIn('r.status', self::STATUS_DISETUJUI);
+                    ->whereNull('r.deleted_at');
+
+                /*
+                | Bukan self::STATUS_DISETUJUI. Konstanta itu menjawab
+                | pertanyaan lain -- "berapa realisasi yang sudah disetujui" --
+                | sedangkan yang di sini "FPU mana yang belum lepas". Keduanya
+                | sempat sama bunyinya, dan karena itu sempat satu konstanta.
+                */
+                CashAdvanceRealization::saringPelepasKuota($sub, 'r');
             });
 
         $this->applyScope($query, $filters, 'cash_advances');
@@ -1096,17 +1103,29 @@ class CashAdvanceRealizationDashboardService
     /**
      * Batas umur realisasi yang berlaku umum.
      *
-     * Master batas pengajuan bisa punya baris khusus per area dan department,
-     * tetapi dashboard membaca banyak dokumen sekaligus dari berbagai
-     * department -- jadi yang dipakai BATAS UMUM. Angkanya dikirim ke layar,
-     * bukan ditulis mati di sana.
+     * Master batas pengajuan bisa punya baris khusus per cabang dan
+     * department, tetapi dashboard membaca banyak dokumen sekaligus dari
+     * berbagai cabang -- jadi yang dipakai BATAS UMUM, yaitu baris yang tidak
+     * menyebut cabang maupun department. Angkanya dikirim ke layar, bukan
+     * ditulis mati di sana.
      */
     private function batasRealisasiHari(): int
     {
+        /*
+        | "Batas umum" dikenali dari CAKUPAN YANG KOSONG, bukan dari kolom
+        | area_type/department_id yang sudah tidak dipakai lagi. Sejak
+        | cakupannya pindah ke tabel tersendiri, kedua kolom itu NULL pada
+        | setiap baris baru -- membacanya akan memilihkan batas milik satu
+        | cabang sebagai kalimat yang dibaca semua orang di dashboard.
+        */
         $umum = DB::table('fund_request_limits')
             ->where('is_active', true)
-            ->whereNull('area_type')
-            ->whereNull('department_id')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('fund_request_limit_branches as flb')
+                ->whereColumn('flb.fund_request_limit_id', 'fund_request_limits.id'))
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('fund_request_limit_departments as fld')
+                ->whereColumn('fld.fund_request_limit_id', 'fund_request_limits.id'))
             ->orderBy('id')
             ->value('max_realization_days');
 

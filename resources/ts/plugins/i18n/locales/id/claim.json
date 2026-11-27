@@ -331,9 +331,6 @@
             "noteLabel": "Catatan (opsional)",
             "placeholder": "Boleh dikosongkan. Misalnya alasan pembayarannya dimajukan atau tertunda."
         },
-        "paymentDay": {
-            "blockedNotice": "Pembayaran hanya bisa dilakukan pada hari {days}. Ada Claim yang menunggu dibayarkan, tetapi hari ini bukan hari pembayaran — tombolnya akan aktif kembali pada hari tersebut."
-        },
         "revise": {
             "title": "Terima Berkas Claim {nomor}",
             "subtitle": "Periksa rinciannya. Bila ada nominal yang perlu dibetulkan, ubah di kolom kanan — angka yang diajukan pemohon tetap tersimpan sebagai pembanding.",

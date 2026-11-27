@@ -13,10 +13,10 @@ import {
   showWarningToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import DecisionDialog from '@/components/approval/DecisionDialog.vue'
 import { formatAuditDateTime, formatDate, formatNumberWithoutRp } from '@/utils/textFormatter'
 import { buildPrintLoadingPage } from '@/utils/printLoadingPage'
 import { usePolling } from '@core/composable/usePolling'
-import { useDayNames } from '@core/composable/useDayNames'
 import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
 import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
@@ -70,12 +70,6 @@ interface ClaimRow {
   */
   scheduled_payment_date?: string | null
   payment_timing?: string | null
-
-  /*
-  | Dihitung server: hari ini termasuk hari pembayaran atau tidak. Kosong
-  | pada dokumen lama, dan diperlakukan sebagai boleh.
-  */
-  can_pay_today?: boolean
 }
 
 interface ClaimAbilities {
@@ -140,18 +134,6 @@ const defaultAbilities = (): ClaimAbilities => ({
   can_cancel: false,
   can_pay: false,
 })
-
-/*
-| Hari kerja kasir dalam penomoran ISO, dari server. Namanya dirangkai di
-| sini, bukan di server, supaya ikut berganti begitu pengguna menukar
-| bahasa -- tanpa menunggu daftarnya diambil ulang.
-*/
-const paymentDays = ref<number[]>([])
-
-const { dayList } = useDayNames()
-
-/* "Senin dan Rabu". */
-const paymentDaysText = computed<string>(() => dayList(paymentDays.value))
 
 const abilities = ref<ClaimAbilities>(defaultAbilities())
 
@@ -424,8 +406,6 @@ const getStatusColor = (status: string | null | undefined): string => {
 */
 const showScheduledPaymentFilter = computed<boolean>(() => canPay.value)
 
-const canPayTodayRow = (row: ClaimRow): boolean => row.can_pay_today !== false
-
 const isStatus = (row: ClaimRow, status: string): boolean =>
   String(row.status || '').trim().toUpperCase() === status
 
@@ -479,10 +459,6 @@ const needsReceipt = (row: ClaimRow): boolean =>
 
 const canPayRow = (row: ClaimRow): boolean =>
   canPay.value && isStatus(row, 'RECEIVED')
-
-/* Layak dibayar DAN hari ini memang harinya. */
-const canPayNowRow = (row: ClaimRow): boolean =>
-  canPayRow(row) && canPayTodayRow(row)
 
 /*
  * Pembatalan juga hanya dari approved: draft cukup dihapus, yang masih
@@ -820,10 +796,6 @@ const fetchClaims = async (): Promise<void> => {
       ...(payload?.abilities || {}),
     }
 
-    paymentDays.value = Array.isArray(payload?.payment_days)
-      ? payload.payment_days.map(Number)
-      : []
-
     totalData.value = Number(payload?.meta?.total || 0)
     totalPage.value = Number(payload?.meta?.last_page || 1)
   }
@@ -1117,9 +1089,16 @@ const openApprove = async (row: ClaimRow): Promise<void> => {
   }
 }
 
-const approveClaim = async (): Promise<void> => {
+const approveClaim = async (catatan: string | null): Promise<void> => {
   if (!approveTarget.value?.public_id || approveLoading.value)
     return
+
+  /*
+  | Catatannya datang dari dialognya, lalu ditaruh ke ref yang sudah ada --
+  | sehingga seluruh baris di bawah ini tidak perlu tahu bahwa kotak
+  | catatannya sudah berpindah ke komponen bersama.
+  */
+  approveNotes.value = catatan ?? ''
 
   approveLoading.value = true
 
@@ -1261,9 +1240,11 @@ const openReturn = (row: ClaimRow): void => {
   returnDialog.value = true
 }
 
-const returnForRevision = async (): Promise<void> => {
+const returnForRevision = async (alasan: string | null): Promise<void> => {
   if (!returnTarget.value?.public_id || returnLoading.value)
     return
+
+  returnReason.value = alasan ?? ''
 
   /* Sama dengan penjaga di server: tiga huruf. */
   if (returnReason.value.trim().length < 3) {
@@ -1318,10 +1299,18 @@ const openReject = (row: ClaimRow): void => {
   rejectDialog.value = true
 }
 
-const rejectClaim = async (): Promise<void> => {
+const rejectClaim = async (catatan: string | null): Promise<void> => {
   if (!rejectTarget.value?.public_id || rejectLoading.value)
     return
 
+  rejectNotes.value = catatan ?? ''
+
+  /*
+  | Penjaga ini kini jarang kena: dialognya sudah menolak alasan kosong
+  | lebih dulu, dengan pesan yang sama. Dibiarkan berdiri sebagai jaring
+  | pengaman -- penanganan ini bisa dipanggil dari tempat lain kelak, dan
+  | mengirim penolakan tanpa alasan adalah hal yang tidak boleh lolos.
+  */
   if (!rejectNotes.value.trim()) {
     rejectError.value = t('claim.list.reject.notesRequired')
 
@@ -1420,7 +1409,7 @@ const rowBulkAction = (row: ClaimRow): 'RECEIVE' | 'PAY' | null => {
   if (canReceive.value && needsReceipt(row))
     return 'RECEIVE'
 
-  if (canPayNowRow(row))
+  if (canPayRow(row))
     return 'PAY'
 
   return null
@@ -1895,22 +1884,6 @@ const openReceive = async (row: ClaimRow): Promise<void> => {
 | singkat. Tetap opsional: dikosongkan pun pembayarannya jalan.
 |--------------------------------------------------------------------------
 */
-/** Ada baris yang menunggu dibayar tetapi hari ini bukan harinya. */
-/*
-| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia
-| hanya berarti bagi orang yang punya tombol itu. Hanya yang berwenang membayarkan yang melihatnya.
-|
-| Barisnya disaring menurut status, bukan hanya menurut can_pay_today.
-| Jadwal pembayaran tetap menempel sesudah dokumennya dibayar, jadi tanpa
-| saringan ini dokumen yang sudah lunas pun ikut menjawab "hari ini bukan
-| hari pembayaran" -- dan spanduknya mengumumkan ada yang menunggu
-| dicairkan padahal tidak ada satu pun.
-*/
-const blockedByPaymentDay = computed<boolean>(() =>
-  canPay.value
-  && rows.value.some(row =>
-    row.can_pay_today === false && isStatus(row, 'RECEIVED')))
-
 const paymentDeviation = (row: ClaimRow): 'EARLY' | 'LATE' | null => {
   if (!row.scheduled_payment_date)
     return null
@@ -2756,18 +2729,6 @@ onMounted(async () => {
       </VCardText>
     </VCard>
 
-    <!-- Kenapa tombol bayarnya mati hari ini -->
-    <VAlert
-      v-if="blockedByPaymentDay"
-      type="info"
-      variant="tonal"
-      density="comfortable"
-      class="mb-4"
-      icon="tabler-calendar-off"
-    >
-      {{ t('claim.list.paymentDay.blockedNotice', { days: paymentDaysText }) }}
-    </VAlert>
-
     <!-- TABEL -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
@@ -3115,7 +3076,7 @@ onMounted(async () => {
 
                   <VListItem
                     v-if="canPayRow(row)"
-                    :disabled="payLoading || !canPayTodayRow(row)"
+                    :disabled="payLoading"
                     href="javascript:void(0)"
                     @click="openPay(row)"
                   >
@@ -3902,60 +3863,17 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG SETUJUI -->
-    <VDialog
+    <DecisionDialog
       v-model="approveDialog"
-      max-width="520"
-    >
-      <VCard>
-        <!--
-          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
-          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
-          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
-          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
-          dipastikan sebelum menjawab.
-        -->
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('claim.list.approve.dialogTitle', {
-            number: approveTarget?.claim_number || '-',
-          }) }}
-        </VCardTitle>
-
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('claim.list.approve.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="approveNotes"
-            :label="t('claim.list.approve.notesLabel')"
-            :placeholder="t('claim.list.approve.notesPlaceholder')"
-            rows="3"
-            auto-grow
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="approveLoading"
-            @click="approveDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="success"
-            class="text-none"
-            :loading="approveLoading"
-            @click="approveClaim"
-          >
-            {{ t('claim.list.approve.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      :title="t('claim.list.approve.dialogTitle', { number: approveTarget?.claim_number || '-' })"
+      :subtitle="t('claim.list.approve.dialogSubtitle')"
+      :notes-label="t('claim.list.approve.notesLabel')"
+      :notes-placeholder="t('claim.list.approve.notesPlaceholder')"
+      :confirm-text="t('claim.list.approve.confirmButton')"
+      confirm-color="success"
+      :loading="approveLoading"
+      @confirm="approveClaim"
+    />
 
     <!-- DIALOG TOLAK -->
     <!--
@@ -4146,112 +4064,33 @@ onMounted(async () => {
       Warnanya bukan merah. Mengembalikan bukan menolak: dokumennya masih
       hidup, dan yang diminta adalah perbaikan.
     -->
-    <VDialog
+    <DecisionDialog
       v-model="returnDialog"
-      max-width="520"
-    >
-      <VCard>
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('common.revision.dialogTitle', {
-            number: returnTarget?.claim_number || '-',
-          }) }}
-        </VCardTitle>
+      :title="t('common.revision.dialogTitle', { number: returnTarget?.claim_number || '-' })"
+      :subtitle="t('common.revision.dialogSubtitle')"
+      :notes-label="t('common.revision.reasonLabel')"
+      :notes-placeholder="t('common.revision.reasonPlaceholder')"
+      :confirm-text="t('common.revision.confirmButton')"
+      confirm-color="warning"
+      :min-length="3"
+      :required-message="t('common.revision.reasonRequired')"
+      :loading="returnLoading"
+      @confirm="returnForRevision"
+    />
 
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('common.revision.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="returnReason"
-            :label="t('common.revision.reasonLabel')"
-            :placeholder="t('common.revision.reasonPlaceholder')"
-            rows="3"
-            auto-grow
-            :error="!!returnError"
-            :error-messages="returnError ? [returnError] : []"
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="returnLoading"
-            @click="returnDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="warning"
-            class="text-none"
-            :loading="returnLoading"
-            @click="returnForRevision"
-          >
-            {{ t('common.revision.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <VDialog
+    <DecisionDialog
       v-model="rejectDialog"
-      max-width="520"
-    >
-      <VCard>
-        <!--
-          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
-          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
-          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
-          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
-          dipastikan sebelum menjawab.
-        -->
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('claim.list.reject.dialogTitle', {
-            number: rejectTarget?.claim_number || '-',
-          }) }}
-        </VCardTitle>
-
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('claim.list.reject.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="rejectNotes"
-            :label="t('claim.list.reject.notesLabel')"
-            :placeholder="t('claim.list.reject.notesPlaceholder')"
-            rows="3"
-            auto-grow
-            :error="!!rejectError"
-            :error-messages="rejectError ? [rejectError] : []"
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="rejectLoading"
-            @click="rejectDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="error"
-            class="text-none"
-            :loading="rejectLoading"
-            @click="rejectClaim"
-          >
-            {{ t('claim.list.reject.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      :title="t('claim.list.reject.dialogTitle', { number: rejectTarget?.claim_number || '-' })"
+      :subtitle="t('claim.list.reject.dialogSubtitle')"
+      :notes-label="t('claim.list.reject.notesLabel')"
+      :notes-placeholder="t('claim.list.reject.notesPlaceholder')"
+      :confirm-text="t('claim.list.reject.confirmButton')"
+      confirm-color="error"
+      :min-length="1"
+      :required-message="t('claim.list.reject.notesRequired')"
+      :loading="rejectLoading"
+      @confirm="rejectClaim"
+    />
 
     <!-- DIALOG BATALKAN -->
     <VDialog

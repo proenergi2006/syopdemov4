@@ -71,6 +71,18 @@ class ApprovalFlow extends Model
     public const DOCUMENT_TYPE_PETTY_CASH = 'PETTY_CASH';
     public const DOCUMENT_TYPE_PETTY_CASH_TOPUP = 'PETTY_CASH_TOPUP';
 
+    /*
+    | BDV = Bank Disbursement Voucher, voucher pencairan lewat bank atas FPU
+    | atau Claim yang sudah disetujui penuh dan berkasnya sudah diterima.
+    |
+    | Alurnya terpisah dari dokumen yang diangkatnya, dan itu memang perlu:
+    | yang disetujui di sini bukan lagi "layak tidaknya pengeluaran ini"
+    | -- itu sudah diputuskan pada FPU/Claim-nya -- melainkan "uangnya boleh
+    | keluar dari kas/bank ini sekarang". Dua pertanyaan berbeda, dua meja
+    | berbeda.
+    */
+    public const DOCUMENT_TYPE_BDV = 'BDV';
+
     public const AREA_HO = 'HO';
     public const AREA_CABANG = 'CABANG';
 

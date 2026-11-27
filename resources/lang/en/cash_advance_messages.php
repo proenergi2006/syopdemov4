@@ -42,8 +42,8 @@ return [
     ],
 
     'submit' => [
-        'limit_too_many' => 'You already have :count of :max cash advances still running. Realize one of them through to approval before submitting a new one.',
-        'limit_overdue' => 'Some of your cash advances are past :days days without realization: :documents. Complete their realization before submitting a new one.',
+        'limit_too_many' => 'At branch :branch you already have :count of :max cash advances still running. The quota is counted per branch, so your other branches are not locked. Realize one of them until Finance has received the paperwork before submitting a new one at this branch.',
+        'limit_overdue' => 'Some of your cash advances at branch :branch are past :days days without realization: :documents. Complete their realization -- until Finance has received the paperwork -- before submitting a new one at this branch.',
         'forbidden' => 'You do not have permission to submit a cash advance.',
         'only_draft' => 'Only draft cash advances can be submitted.',
         'items_unavailable' => 'The cash advance has no request lines yet.',
@@ -83,6 +83,9 @@ return [
 
     'disburse' => [
         'only_received' => 'Only received cash advances can be disbursed.',
+
+
+        'needs_bdv' => 'This cash advance has no Bank Disbursement Voucher yet, so it cannot be disbursed. Raise a BDV for it first -- the BDV is the disbursement document. Marking it disbursed now would close that door: a disbursed cash advance can no longer be raised into a BDV.',
         'forbidden' => 'You do not have permission to disburse a cash advance.',
         'only_approved' => 'Only approved cash advances can be disbursed.',
         'success' => 'Cash advance marked as paid.',

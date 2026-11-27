@@ -66,19 +66,15 @@ class CashAdvanceDashboardService
     ];
 
     /** Realisasi yang dianggap sudah menggugurkan kewajiban pemohon. */
-    private const REALISASI_SAH = [
-        /*
-        | Cukup APPROVED.
-        |
-        | Dahulu enam nilai, karena tiap tahap Finance menimpa kolom status
-        | dan membuat dokumen yang sudah disetujui berhenti terbaca sebagai
-        | APPROVED. Sejak tahap Finance punya kolomnya sendiri, persetujuan
-        | dokumen tidak pernah lagi hilang dari sini -- dan daftar yang
-        | panjang itu justru menjadi tempat nilai baru paling mudah lupa
-        | didaftarkan.
-        */
-        CashAdvanceRealization::STATUS_APPROVED,
-    ];
+    /*
+    | Daftar status di sini DICABUT, bukan diperpanjang.
+    |
+    | "Realisasinya sah" bukan lagi perkara status semata: sejak 26 Nov 2026
+    | berkasnya juga harus sudah diterima Finance. Aturannya tinggal satu
+    | tempat -- CashAdvanceRealization::saringPelepasKuota() -- supaya angka
+    | di layar ini tidak bisa lagi berbeda dari angka yang dipakai penjaga
+    | batas pengajuan.
+    */
 
     /** Ambang FPU menggantung yang dianggap perlu ditindaklanjuti. */
     private const AGING_THRESHOLD_DAYS = 3;
@@ -296,8 +292,9 @@ class CashAdvanceDashboardService
             $query->select(DB::raw(1))
                 ->from('cash_advance_realizations AS r')
                 ->whereColumn('r.cash_advance_id', 'cash_advances.id')
-                ->whereNull('r.deleted_at')
-                ->whereIn('r.status', self::REALISASI_SAH);
+                ->whereNull('r.deleted_at');
+
+            CashAdvanceRealization::saringPelepasKuota($query, 'r');
         };
     }
 
@@ -986,20 +983,32 @@ class CashAdvanceDashboardService
     /**
      * Batas umur realisasi yang berlaku umum.
      *
-     * Master batas pengajuan bisa punya baris khusus per area dan department,
-     * tetapi dashboard membaca banyak dokumen sekaligus dari berbagai
-     * department -- jadi yang dipakai BATAS UMUM, yaitu baris tanpa area dan
-     * tanpa department. Itu pula yang berlaku bagi sebagian besar pemohon.
+     * Master batas pengajuan bisa punya baris khusus per cabang dan
+     * department, tetapi dashboard membaca banyak dokumen sekaligus dari
+     * berbagai cabang dan department -- jadi yang dipakai BATAS UMUM, yaitu
+     * baris yang tidak menyebut cabang maupun department. Itu pula yang
+     * berlaku bagi sebagian besar pemohon.
      *
      * Angkanya dikirim ke layar, bukan ditulis mati di sana: begitu batasnya
      * diubah di master, kalimat di dashboard ikut benar sendiri.
      */
     private function batasRealisasiHari(): int
     {
+        /*
+        | "Batas umum" dikenali dari CAKUPAN YANG KOSONG, bukan dari kolom
+        | area_type/department_id yang sudah tidak dipakai lagi. Sejak
+        | cakupannya pindah ke tabel tersendiri, kedua kolom itu NULL pada
+        | setiap baris baru -- membacanya akan memilihkan batas milik satu
+        | cabang sebagai kalimat yang dibaca semua orang di dashboard.
+        */
         $umum = DB::table('fund_request_limits')
             ->where('is_active', true)
-            ->whereNull('area_type')
-            ->whereNull('department_id')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('fund_request_limit_branches as flb')
+                ->whereColumn('flb.fund_request_limit_id', 'fund_request_limits.id'))
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('fund_request_limit_departments as fld')
+                ->whereColumn('fld.fund_request_limit_id', 'fund_request_limits.id'))
             ->orderBy('id')
             ->value('max_realization_days');
 

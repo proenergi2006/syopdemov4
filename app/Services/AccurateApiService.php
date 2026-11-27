@@ -152,15 +152,31 @@ class AccurateApiService
         return $response->json();
     }
 
-    // POST API
-    public function post($url, $data)
+    /*
+    | POST API
+    |
+    | $timeout diisi hanya oleh pemanggil yang memang berbeda sifatnya dari
+    | permintaan JSON biasa -- sejauh ini satu: unggahan lampiran, yang
+    | mengirim berkas sebagai Base64 di dalam badan permintaan. Berkas 10 MB
+    | menjadi sekitar 13,4 MB, dan batas waktu bawaan Laravel (30 detik)
+    | terlalu pendek untuk itu pada sambungan yang biasa saja.
+    |
+    | Dibiarkan null berarti memakai bawaan, jadi tidak ada satu pun pemanggil
+    | lama yang perlu diubah.
+    */
+    public function post($url, $data, ?int $timeout = null)
     {
         if (!$this->ambilGiliran()) {
             return $this->jawabanDitahan();
         }
 
-        $response = Http::withHeaders($this->headers())
-            ->post($url, $data);
+        $permintaan = Http::withHeaders($this->headers());
+
+        if ($timeout !== null) {
+            $permintaan = $permintaan->timeout($timeout);
+        }
+
+        $response = $permintaan->post($url, $data);
 
         return $response->json();
     }

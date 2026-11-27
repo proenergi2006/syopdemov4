@@ -196,16 +196,18 @@
             "noteLabel": "Catatan (opsional)",
             "placeholder": "Boleh dikosongkan. Misalnya alasan pencairannya dimajukan atau tertunda."
         },
-        "paymentDay": {
-            "blockedNotice": "Pencairan hanya bisa dilakukan pada hari {days}. Ada dokumen yang menunggu dicairkan, tetapi hari ini bukan hari pencairan — tombolnya akan aktif kembali pada hari tersebut."
-        },
         "submissionLimit": {
             "counter": "Anda punya {count} dari {max} FPU yang masih berjalan.",
             "overdue": "Ada yang sudah lewat {days} hari dan belum direalisasi: {documents}. Selesaikan realisasinya sebelum mengajukan yang baru.",
-            "blocked": "Batasnya sudah penuh. Realisasikan salah satunya sampai disetujui sebelum mengajukan yang baru.",
+            "blocked": "Batasnya sudah penuh. Realisasikan salah satunya sampai berkasnya diterima Finance sebelum mengajukan yang baru.",
             "blockedOverdueTitle": "Belum bisa mengajukan FPU baru — ada realisasi yang lewat batas.",
             "blockedTooManyTitle": "Belum bisa mengajukan FPU baru — batas FPU berjalan sudah penuh.",
-            "countIsNotTheCause": "Jumlahnya sendiri masih di bawah batas ({count} dari {max}) — yang menahan realisasinya, bukan jumlahnya."
+            "countIsNotTheCause": "Jumlahnya sendiri masih di bawah batas ({count} dari {max}) — yang menahan realisasinya, bukan jumlahnya.",
+        "perBranchTitle": "Jatah FPU Anda dihitung per cabang:",
+        "branchCounter": "{branch} — {count} dari {max} berjalan",
+        "branchFull": "jatahnya penuh",
+        "branchOverdue": "ada yang lewat {days} hari",
+        "allBranchesBlocked": "Seluruh cabang Anda sedang tertahan, jadi belum ada tempat untuk FPU baru."
         },
         "revise": {
             "title": "Terima Berkas FPU {nomor}",

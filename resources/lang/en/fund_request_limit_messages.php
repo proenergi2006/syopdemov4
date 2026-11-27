@@ -2,20 +2,19 @@
 
 return [
 
-    'area_types' => [
-        'HO' => 'Head Office',
-        'CABANG' => 'Branch',
-    ],
-
+    /*
+    | The "area" axis (HO/Branch) was REMOVED on 26 Nov 2026. A limit now
+    | names branches one by one, and may name several at once.
+    */
     'scope' => [
-        'all_areas' => 'All areas',
+        'all_branches' => 'All branches',
         'all_departments' => 'All departments',
         'fallback' => 'Applies generally',
     ],
 
     'not_found' => 'Submission limit not found.',
 
-    'duplicate_scope' => 'Another limit already covers exactly the same scope. Change the area or department, or edit the existing limit instead.',
+    'duplicate_scope' => 'Another limit already covers exactly the same scope. Change its branches or departments, or edit the existing limit instead.',
 
     'index' => [
         'forbidden' => 'You do not have access to view submission limits.',

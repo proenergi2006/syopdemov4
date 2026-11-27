@@ -31,9 +31,6 @@ return [
         'all_categories' => 'All transaction categories',
         'fallback' => 'Applies generally',
     ],
-    'and' => 'and',
-
-    'not_payment_day' => 'Payments can only be made on :days. Today is not a payment day, so this document cannot be processed yet.',
 
     'not_found' => 'Payment schedule not found.',
 

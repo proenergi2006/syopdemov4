@@ -13,10 +13,10 @@ import {
   showWarningToast,
 } from '@/utils/alert'
 import { getApiErrorMessage } from '@/utils/apiHelper'
+import DecisionDialog from '@/components/approval/DecisionDialog.vue'
 import { formatAuditDateTime, formatDate, formatNumberWithoutRp } from '@/utils/textFormatter'
 import { buildPrintLoadingPage } from '@/utils/printLoadingPage'
 import { usePolling } from '@core/composable/usePolling'
-import { useDayNames } from '@core/composable/useDayNames'
 import { useNavigationStore } from '@/stores/navigation'
 import { usePermissionStore } from '@/stores/permission'
 import RevisionHistory from '@/components/fund_request/RevisionHistory.vue'
@@ -57,12 +57,6 @@ interface RealizationRow {
   */
   scheduled_payment_date?: string | null
   payment_timing?: string | null
-
-  /*
-  | Dihitung server: hari ini termasuk hari pembayaran atau tidak. Kosong
-  | pada dokumen lama, dan diperlakukan sebagai boleh.
-  */
-  can_pay_today?: boolean
 
   /*
   | Pembuka halaman ini adalah pemohon dokumen tersebut. Penentu tombol
@@ -180,18 +174,6 @@ const defaultAbilities = (): RealizationAbilities => ({
   can_finance_approve: false,
   can_verify: false,
 })
-
-/*
-| Hari kerja kasir dalam penomoran ISO, dari server. Namanya dirangkai di
-| sini, bukan di server, supaya ikut berganti begitu pengguna menukar
-| bahasa -- tanpa menunggu daftarnya diambil ulang.
-*/
-const paymentDays = ref<number[]>([])
-
-const { dayList } = useDayNames()
-
-/* "Senin dan Rabu". */
-const paymentDaysText = computed<string>(() => dayList(paymentDays.value))
 
 const abilities = ref<RealizationAbilities>(defaultAbilities())
 
@@ -695,8 +677,6 @@ const rowStatusChip = (row: RealizationRow): { label: string; color: string } =>
 */
 const showScheduledPaymentFilter = computed<boolean>(() => canReimburse.value)
 
-const canPayTodayRow = (row: RealizationRow): boolean => row.can_pay_today !== false
-
 const isStatus = (row: RealizationRow, status: string): boolean =>
   String(row.status || '').trim().toUpperCase() === status
 
@@ -799,10 +779,6 @@ const fetchRealizations = async (): Promise<void> => {
       ...defaultAbilities(),
       ...(payload?.abilities || {}),
     }
-
-    paymentDays.value = Array.isArray(payload?.payment_days)
-      ? payload.payment_days.map(Number)
-      : []
 
     totalData.value = Number(payload?.meta?.total ?? rows.value.length ?? 0)
     totalPage.value = Number(payload?.meta?.last_page ?? 1)
@@ -1398,9 +1374,16 @@ const openApprove = async (row: RealizationRow): Promise<void> => {
   }
 }
 
-const approveRealization = async (): Promise<void> => {
+const approveRealization = async (catatan: string | null): Promise<void> => {
   if (!approveTarget.value?.public_id || approveLoading.value)
     return
+
+  /*
+  | Catatannya datang dari dialognya, lalu ditaruh ke ref yang sudah ada --
+  | sehingga seluruh baris di bawah ini tidak perlu tahu bahwa kotak
+  | catatannya sudah berpindah ke komponen bersama.
+  */
+  approveNotes.value = catatan ?? ''
 
   approveLoading.value = true
 
@@ -1488,9 +1471,11 @@ const openReturn = (row: RealizationRow): void => {
   returnDialog.value = true
 }
 
-const returnForRevision = async (): Promise<void> => {
+const returnForRevision = async (alasan: string | null): Promise<void> => {
   if (!returnTarget.value?.public_id || returnLoading.value)
     return
+
+  returnReason.value = alasan ?? ''
 
   /* Sama dengan penjaga di server: tiga huruf. */
   if (returnReason.value.trim().length < 3) {
@@ -1627,10 +1612,18 @@ const openReject = (row: RealizationRow): void => {
   rejectDialog.value = true
 }
 
-const rejectRealization = async (): Promise<void> => {
+const rejectRealization = async (catatan: string | null): Promise<void> => {
   if (!rejectTarget.value?.public_id || rejectLoading.value)
     return
 
+  rejectNotes.value = catatan ?? ''
+
+  /*
+  | Penjaga ini kini jarang kena: dialognya sudah menolak alasan kosong
+  | lebih dulu, dengan pesan yang sama. Dibiarkan berdiri sebagai jaring
+  | pengaman -- penanganan ini bisa dipanggil dari tempat lain kelak, dan
+  | mengirim penolakan tanpa alasan adalah hal yang tidak boleh lolos.
+  */
   if (!rejectNotes.value.trim()) {
     rejectError.value = t('cashAdvanceRealization.list.reject.notesRequired')
 
@@ -1922,10 +1915,6 @@ const rowBulkAction = (row: RealizationRow): 'RECEIVE' | 'REIMBURSE' | null => {
   */
   if (canReceive.value && needsReceipt(row) && !menungguBuktiPengembalian(row))
     return 'RECEIVE'
-
-  /* Hari ini bukan harinya berarti baris itu tidak bisa diproses sama sekali. */
-  if (!canPayTodayRow(row))
-    return null
 
   const mode = pendingDifferenceMode(row)
 
@@ -2369,31 +2358,6 @@ const openReceive = async (row: RealizationRow): Promise<void> => {
 | singkat. Tetap opsional: dikosongkan pun pembayarannya jalan.
 |--------------------------------------------------------------------------
 */
-/** Ada baris yang menunggu dibayar tetapi hari ini bukan harinya. */
-/*
-| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia
-| hanya berarti bagi orang yang punya tombol itu. Hanya yang berwenang menyelesaikan selisihnya yang melihatnya.
-|
-| Barisnya disaring menurut status, bukan hanya menurut can_pay_today.
-| Jadwal pembayaran tetap menempel sesudah dokumennya dibayar, jadi tanpa
-| saringan ini dokumen yang sudah lunas pun ikut menjawab "hari ini bukan
-| hari pembayaran" -- dan spanduknya mengumumkan ada yang menunggu
-| dicairkan padahal tidak ada satu pun.
-*/
-/*
-| Spanduknya menjelaskan kenapa tombol bayarnya mati hari ini, jadi ia hanya
-| berarti bagi yang memang punya tombol berjadwal.
-|
-| Hanya pembayaran kekurangan yang terikat hari kasir. Konfirmasi
-| pengembalian dan approve tanpa selisih tidak -- memunculkan spanduk bagi
-| mereka berarti mengumumkan penghalang yang tidak pernah menghalangi apa pun.
-*/
-const blockedByPaymentDay = computed<boolean>(() =>
-  canReimburse.value
-  && rows.value.some(row =>
-    row.can_pay_today === false
-    && differenceActionState(row)?.mode === 'REIMBURSE'))
-
 const paymentDeviation = (row: RealizationRow): 'EARLY' | 'LATE' | null => {
   if (!row.scheduled_payment_date)
     return null
@@ -3565,18 +3529,6 @@ onMounted(async () => {
       </VCardText>
     </VCard>
 
-    <!-- Kenapa tombol bayarnya mati hari ini -->
-    <VAlert
-      v-if="blockedByPaymentDay"
-      type="info"
-      variant="tonal"
-      density="comfortable"
-      class="mb-4"
-      icon="tabler-calendar-off"
-    >
-      {{ t('cashAdvanceRealization.list.paymentDay.blockedNotice', { days: paymentDaysText }) }}
-    </VAlert>
-
     <!-- TABEL -->
     <VCard>
       <VCardText class="d-flex flex-wrap gap-4 align-center">
@@ -4037,7 +3989,6 @@ onMounted(async () => {
 
                   <VListItem
                     v-if="pendingDifferenceMode(row) === 'REIMBURSE'"
-                    :disabled="!canPayTodayRow(row)"
                     href="javascript:void(0)"
                     @click="openSettle(row, 'REIMBURSE')"
                   >
@@ -5689,60 +5640,17 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG APPROVE -->
-    <VDialog
+    <DecisionDialog
       v-model="approveDialog"
-      max-width="520"
-    >
-      <VCard>
-        <!--
-          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
-          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
-          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
-          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
-          dipastikan sebelum menjawab.
-        -->
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvanceRealization.list.approve.dialogTitle', {
-            number: approveTarget?.realization_number || '-',
-          }) }}
-        </VCardTitle>
-
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('cashAdvanceRealization.list.approve.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="approveNotes"
-            :label="t('cashAdvanceRealization.list.approve.notesLabel')"
-            :placeholder="t('cashAdvanceRealization.list.approve.notesPlaceholder')"
-            rows="3"
-            auto-grow
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="approveLoading"
-            @click="approveDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="success"
-            class="text-none"
-            :loading="approveLoading"
-            @click="approveRealization"
-          >
-            {{ t('cashAdvanceRealization.list.approve.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      :title="t('cashAdvanceRealization.list.approve.dialogTitle', { number: approveTarget?.realization_number || '-' })"
+      :subtitle="t('cashAdvanceRealization.list.approve.dialogSubtitle')"
+      :notes-label="t('cashAdvanceRealization.list.approve.notesLabel')"
+      :notes-placeholder="t('cashAdvanceRealization.list.approve.notesPlaceholder')"
+      :confirm-text="t('cashAdvanceRealization.list.approve.confirmButton')"
+      confirm-color="success"
+      :loading="approveLoading"
+      @confirm="approveRealization"
+    />
 
     <!-- DIALOG REJECT -->
     <!--
@@ -5755,55 +5663,19 @@ onMounted(async () => {
       Warnanya bukan merah. Mengembalikan bukan menolak: dokumennya masih
       hidup, dan yang diminta adalah perbaikan.
     -->
-    <VDialog
+    <DecisionDialog
       v-model="returnDialog"
-      max-width="520"
-    >
-      <VCard>
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('common.revision.dialogTitle', {
-            number: returnTarget?.realization_number || '-',
-          }) }}
-        </VCardTitle>
-
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('common.revision.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="returnReason"
-            :label="t('common.revision.reasonLabel')"
-            :placeholder="t('common.revision.reasonPlaceholder')"
-            rows="3"
-            auto-grow
-            :error="!!returnError"
-            :error-messages="returnError ? [returnError] : []"
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="returnLoading"
-            @click="returnDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="warning"
-            class="text-none"
-            :loading="returnLoading"
-            @click="returnForRevision"
-          >
-            {{ t('common.revision.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      :title="t('common.revision.dialogTitle', { number: returnTarget?.realization_number || '-' })"
+      :subtitle="t('common.revision.dialogSubtitle')"
+      :notes-label="t('common.revision.reasonLabel')"
+      :notes-placeholder="t('common.revision.reasonPlaceholder')"
+      :confirm-text="t('common.revision.confirmButton')"
+      confirm-color="warning"
+      :min-length="3"
+      :required-message="t('common.revision.reasonRequired')"
+      :loading="returnLoading"
+      @confirm="returnForRevision"
+    />
 
     <!--
       Menolak pernyataan pengembalian.
@@ -5862,62 +5734,19 @@ onMounted(async () => {
       </VCard>
     </VDialog>
 
-    <VDialog
+    <DecisionDialog
       v-model="rejectDialog"
-      max-width="520"
-    >
-      <VCard>
-        <!--
-          Judulnya bertanya dan menyebut nomornya sekaligus. Pernyataan
-          seperti "Setujui Realisasi FPU" terbaca sebagai pemberitahuan
-          bahwa dokumennya sedang disetujui, bukan sebagai pertanyaan yang
-          menunggu jawaban -- dan nomornya adalah hal pertama yang perlu
-          dipastikan sebelum menjawab.
-        -->
-        <VCardTitle class="text-h6 font-weight-bold">
-          {{ t('cashAdvanceRealization.list.reject.dialogTitle', {
-            number: rejectTarget?.realization_number || '-',
-          }) }}
-        </VCardTitle>
-
-        <VCardText>
-          <div class="text-body-2 text-medium-emphasis mb-4">
-            {{ t('cashAdvanceRealization.list.reject.dialogSubtitle') }}
-          </div>
-
-          <VTextarea
-            v-model="rejectNotes"
-            :label="t('cashAdvanceRealization.list.reject.notesLabel')"
-            :placeholder="t('cashAdvanceRealization.list.reject.notesPlaceholder')"
-            rows="3"
-            auto-grow
-            :error="!!rejectError"
-            :error-messages="rejectError ? [rejectError] : []"
-          />
-        </VCardText>
-
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            class="text-none"
-            :disabled="rejectLoading"
-            @click="rejectDialog = false"
-          >
-            {{ t('common.actions.cancel') }}
-          </VBtn>
-
-          <VBtn
-            color="error"
-            class="text-none"
-            :loading="rejectLoading"
-            @click="rejectRealization"
-          >
-            {{ t('cashAdvanceRealization.list.reject.confirmButton') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      :title="t('cashAdvanceRealization.list.reject.dialogTitle', { number: rejectTarget?.realization_number || '-' })"
+      :subtitle="t('cashAdvanceRealization.list.reject.dialogSubtitle')"
+      :notes-label="t('cashAdvanceRealization.list.reject.notesLabel')"
+      :notes-placeholder="t('cashAdvanceRealization.list.reject.notesPlaceholder')"
+      :confirm-text="t('cashAdvanceRealization.list.reject.confirmButton')"
+      confirm-color="error"
+      :min-length="1"
+      :required-message="t('cashAdvanceRealization.list.reject.notesRequired')"
+      :loading="rejectLoading"
+      @confirm="rejectRealization"
+    />
 
     <!-- DIALOG CANCEL -->
     <VDialog

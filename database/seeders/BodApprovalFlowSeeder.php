@@ -246,7 +246,15 @@ class BodApprovalFlowSeeder extends Seeder
      */
     private function batasTanpaBatas(int $bod): void
     {
-        $sudahAda = DB::table('fund_request_limits')
+        /*
+        | Dicari lewat TABEL CAKUPAN, bukan kolom department_id.
+        |
+        | Sejak 26 Nov 2026 cakupan sebuah batas tinggal di tabel tersendiri
+        | dan kolom lamanya selalu NULL pada baris baru. Mencarinya di kolom
+        | itu membuat seeder ini mengira batas BOD belum ada, lalu membuatnya
+        | lagi setiap kali dijalankan.
+        */
+        $sudahAda = DB::table('fund_request_limit_departments')
             ->where('department_id', $bod)
             ->exists();
 
@@ -256,10 +264,8 @@ class BodApprovalFlowSeeder extends Seeder
             return;
         }
 
-        DB::table('fund_request_limits')->insert([
+        $batasId = DB::table('fund_request_limits')->insertGetId([
             'name' => 'Board of Director – tanpa batas',
-            'area_type' => null,
-            'department_id' => $bod,
 
             /*
             | Kedua angka tetap diisi masuk akal walau tidak dipakai: penanda
@@ -273,6 +279,18 @@ class BodApprovalFlowSeeder extends Seeder
             'is_active' => true,
             'notes' => 'Unlimited berarti bebas dari batas NILAI dan dari batas jumlah'
                 . ' FPU berjalan serta umur realisasi -- bukan bebas dari PERSETUJUAN.',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        /*
+        | Cakupannya: department BOD saja, tanpa menyebut cabang sama sekali.
+        | Tanpa baris cabang berarti berlaku di cabang mana pun -- dan memang
+        | itu yang dimaksud: BOD dibebaskan di mana pun ia mengajukan.
+        */
+        DB::table('fund_request_limit_departments')->insert([
+            'fund_request_limit_id' => $batasId,
+            'department_id' => $bod,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

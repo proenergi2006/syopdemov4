@@ -2,12 +2,17 @@
   "noAccess": "You do not have access to the cash advance limit master.",
   "intro": {
     "title": "How many cash advances may run at once",
-    "body": "This limit forces a requester to account for earlier cash advances before submitting a new one. Two numbers are configured: how many may run at once, and how long one may wait to be realized.",
-    "liveNotice": "This limit is evaluated the moment a requester hits Submit — it is not frozen onto the document. Lowering it takes effect immediately for everyone, including those currently above the new limit."
+    "body": "So that people finish off their older cash advances before asking for a new one. There are two numbers for you to set: how many may run at the same time, and how long one may wait to be realized.",
+    "rulesTitle": "Four things people often get wrong — none of them is visible from the numbers in the table:",
+    "ruleBranch": "The quota belongs to a branch, not to a person. Someone working across two branches has two separate quotas. Running out at one branch does not close the door at the other.",
+    "ruleRelease": "A cash advance only stops using its quota once the realization paperwork reaches Finance. Approval from a manager is not enough on its own. And if Finance undoes the receipt, it goes back to using the quota.",
+    "ruleDays": "The clock starts the day the money is paid out — not the day the cash advance was submitted or approved. Weekends count too.",
+    "ruleScope": "Only cash advances whose money has already gone out are counted. One still waiting for a manager's signature uses no quota, because there is nothing the requester can do about paperwork sitting on someone else's desk.",
+    "liveNotice": "This number is checked the moment a requester hits Submit; it is not stored on the document. So if you lower it, the new rule applies to everyone straight away — including people who happen to be holding more cash advances than the new limit. They cannot submit again until their count comes down."
   },
   "list": {
     "title": "Cash Advance Limit Master",
-    "subtitle": "The most specific limit wins. Department beats area, and area beats the general limit.",
+    "subtitle": "When several limits cover the same person, the most specific one is used: a department limit beats an area limit, and both beat the general limit.",
     "addButton": "Add Limit",
     "previewButton": "Preview",
     "empty": "No submission limits yet.",
@@ -21,7 +26,7 @@
   },
   "table": {
     "name": "Limit Name",
-    "scope": "Scope",
+    "scope": "Branches — Departments",
     "maxOutstanding": "Max Running",
     "maxDays": "Max Days to Realize",
     "status": "Status",
@@ -33,14 +38,14 @@
     "name": "Limit Name",
     "namePlaceholder": "For example: Branch Limit",
     "nameRequired": "The limit name is required.",
-    "areaType": "Applies to Area",
-    "areaTypeHint": "Leave empty to apply to both head office and branches.",
-    "department": "Applies to Department",
-    "departmentHint": "Leave empty to apply to every department.",
+    "branches": "Applies to Branches",
+    "branchesHint": "Pick one or several branches. Left empty, it applies to every branch.",
+    "departments": "Applies to Departments",
+    "departmentsHint": "Pick one or several departments. Left empty, it applies to every department.",
     "maxOutstanding": "Maximum Running Advances",
-    "maxOutstandingHint": "How many cash advances one requester may have running at once.",
+    "maxOutstandingHint": "How many cash advances one person may have running at the same time, at one branch.",
     "maxDays": "Maximum Days to Realize",
-    "maxDaysHint": "Calendar days — weekends are counted too.",
+    "maxDaysHint": "Counted from the day the money is paid out. Weekends count too.",
     "notes": "Notes",
     "notesPlaceholder": "Optional. For example, why this limit differs.",
     "isUnlimited": "No limit",
@@ -58,14 +63,15 @@
   },
   "preview": {
     "title": "Worked Example",
-    "subtitle": "Which limit applies to each area.",
+    "subtitle": "Which limit applies at each branch. Pick a department to see the difference.",
     "limitUsed": "Limit in use",
     "noLimit": "No limit",
     "failed": "Failed to load the worked example."
   },
   "scope": {
-    "allAreas": "All areas",
+    "allBranches": "All branches",
     "allDepartments": "All departments",
+    "andMore": "{names}, +{count} more",
     "fallback": "Applies generally"
   }
 }

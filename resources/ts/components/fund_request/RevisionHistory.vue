@@ -22,6 +22,7 @@
 */
 
 import { useI18n } from 'vue-i18n'
+import { approvalStatusColor } from '@/utils/approvalStatus'
 import { formatAuditDateTime } from '@/utils/textFormatter'
 import type { RevisionEntry } from '@/components/fund_request/revision'
 
@@ -283,9 +284,15 @@ const asal = (r: RevisionEntry): string => {
                   {{ a.approver_name_snapshot || '-' }}
                 </span>
 
+                <!--
+                  Warnanya dari peta bersama, bukan ditulis di sini:
+                  rantai yang sama harus terbaca sama di mana pun ia
+                  ditampilkan.
+                -->
                 <VChip
                   size="x-small"
                   variant="tonal"
+                  :color="approvalStatusColor(a.status)"
                 >
                   {{ a.status }}
                 </VChip>

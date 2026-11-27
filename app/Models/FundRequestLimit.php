@@ -39,60 +39,88 @@ class FundRequestLimit extends Model
         'is_active' => 'boolean',
     ];
 
-    /**
-     * Area yang bisa dicakup.
-     *
-     * Nilainya sama persis dengan yang dihasilkan
-     * CashAdvance::getApprovalAreaType(), supaya pencocokannya tidak
-     * memerlukan penerjemahan apa pun di tengah jalan.
-     */
-    public const AREA_TYPES = ['HO', 'CABANG'];
+    /*
+    |--------------------------------------------------------------------------
+    | Cakupan: dua daftar, bukan dua kolom
+    |--------------------------------------------------------------------------
+    | Sebuah batas boleh menyebut beberapa cabang sekaligus dan beberapa
+    | department sekaligus. Daftar yang KOSONG berarti "berlaku untuk semua" --
+    | bukan "tidak berlaku untuk siapa pun".
+    |
+    | Kolom lama area_type dan department_id masih ada di basis data sebagai
+    | jejak migrasi, tetapi TIDAK ADA LAGI yang membacanya. Menambahkannya
+    | kembali ke pencocokan berarti satu batas punya dua cakupan yang bisa
+    | bertentangan.
+    |--------------------------------------------------------------------------
+    */
 
-    /**
-     * @return array<string, string>
-     */
-    public static function areaTypeOptions(): array
+    public function branches()
     {
-        $label = (array) __('fund_request_limit_messages.area_types');
-
-        return collect(self::AREA_TYPES)
-            ->mapWithKeys(fn (string $kode): array => [$kode => $label[$kode] ?? $kode])
-            ->all();
+        return $this->belongsToMany(
+            Cabang::class,
+            'fund_request_limit_branches',
+            'fund_request_limit_id',
+            'cabang_id',
+        )->withTimestamps();
     }
 
-    public static function areaTypeLabel(?string $kode): ?string
+    public function departments()
     {
-        if ($kode === null) {
-            return null;
-        }
-
-        return self::areaTypeOptions()[$kode] ?? $kode;
+        return $this->belongsToMany(
+            Department::class,
+            'fund_request_limit_departments',
+            'fund_request_limit_id',
+            'department_id',
+        )->withTimestamps();
     }
 
     /**
      * Seberapa khusus cakupan batas ini.
      *
-     * Department diberi bobot lebih besar daripada area: kebiasaan belanja
+     * Department diberi bobot lebih besar daripada cabang: kebiasaan belanja
      * sebuah department cenderung lebih menentukan daripada letak kantornya.
-     * Bobotnya sengaja sama dengan master jadwal pembayaran, supaya seluruh
-     * aplikasi memakai satu aturan yang sama tentang "yang paling khusus
-     * menang".
+     *
+     * Yang dihitung ADA-TIDAKNYA daftar, bukan panjangnya. Batas untuk tiga
+     * cabang sama khususnya dengan batas untuk satu cabang -- keduanya sama-
+     * sama menyebut cabang tertentu, dan panjang daftar bukan ukuran
+     * ketelitian.
      */
     public function getScopeWeightAttribute(): int
     {
-        return ($this->department_id !== null ? 2 : 0)
-            + ($this->area_type !== null ? 1 : 0);
+        return ($this->jumlahDepartment() > 0 ? 2 : 0)
+            + ($this->jumlahCabang() > 0 ? 1 : 0);
     }
 
     /** Batas umum adalah jaring pengaman dan tidak boleh dihapus terakhir. */
     public function getIsFallbackAttribute(): bool
     {
-        return $this->area_type === null && $this->department_id === null;
+        return $this->jumlahCabang() === 0 && $this->jumlahDepartment() === 0;
     }
 
-    public function department()
+    /*
+    | Memakai hitungan yang sudah dimuat bila ada (withCount / with), supaya
+    | menilai sederet batas tidak berubah menjadi sederet kueri.
+    */
+    private function jumlahCabang(): int
     {
-        return $this->belongsTo(Department::class, 'department_id');
+        if ($this->branches_count !== null) {
+            return (int) $this->branches_count;
+        }
+
+        return $this->relationLoaded('branches')
+            ? $this->branches->count()
+            : $this->branches()->count();
+    }
+
+    private function jumlahDepartment(): int
+    {
+        if ($this->departments_count !== null) {
+            return (int) $this->departments_count;
+        }
+
+        return $this->relationLoaded('departments')
+            ? $this->departments->count()
+            : $this->departments()->count();
     }
 
     public function creator()

@@ -48,9 +48,6 @@ return [
         'all_categories' => 'Semua keterangan transaksi',
         'fallback' => 'Berlaku umum',
     ],
-    'and' => 'dan',
-
-    'not_payment_day' => 'Pembayaran hanya bisa dilakukan pada hari :days. Hari ini bukan hari pembayaran, jadi dokumen ini belum bisa diproses.',
 
     'not_found' => 'Jadwal pembayaran tidak ditemukan.',
 

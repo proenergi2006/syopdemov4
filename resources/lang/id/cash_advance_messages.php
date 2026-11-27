@@ -42,8 +42,8 @@ return [
     ],
 
     'submit' => [
-        'limit_too_many' => 'Anda sudah punya :count dari :max FPU yang masih berjalan. Realisasikan salah satunya sampai disetujui sebelum mengajukan yang baru.',
-        'limit_overdue' => 'Ada FPU Anda yang sudah lewat :days hari dan belum direalisasi: :documents. Selesaikan realisasinya lebih dulu sebelum mengajukan yang baru.',
+        'limit_too_many' => 'Di cabang :branch, Anda sudah punya :count dari :max FPU yang masih berjalan. Jatahnya dihitung per cabang, jadi cabang lain tidak ikut terkunci. Realisasikan salah satunya sampai berkasnya diterima Finance sebelum mengajukan yang baru di cabang ini.',
+        'limit_overdue' => 'Ada FPU Anda di cabang :branch yang sudah lewat :days hari dan belum direalisasi: :documents. Selesaikan realisasinya lebih dulu -- sampai berkasnya diterima Finance -- sebelum mengajukan yang baru di cabang ini.',
         'forbidden' => 'Anda tidak memiliki akses untuk mengajukan FPU.',
         'only_draft' => 'Hanya FPU berstatus draft yang dapat diajukan.',
         'items_unavailable' => 'FPU belum memiliki rincian pengajuan.',
@@ -83,6 +83,9 @@ return [
 
     'disburse' => [
         'only_received' => 'Hanya FPU yang sudah diterima yang dapat dicairkan.',
+
+
+        'needs_bdv' => 'FPU ini belum punya Bank Disbursement Voucher, jadi belum bisa dicairkan. Terbitkan BDV atas FPU ini lebih dulu -- BDV itulah dokumen pencairannya. Menandainya cair sekarang justru menutup pintunya: FPU yang sudah dicairkan tidak bisa lagi diangkat menjadi BDV.',
         'forbidden' => 'Anda tidak memiliki akses untuk mencairkan FPU.',
         'only_approved' => 'Hanya FPU berstatus approved yang dapat dicairkan.',
         'success' => 'FPU berhasil ditandai sudah dibayarkan.',

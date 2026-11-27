@@ -196,16 +196,18 @@
             "noteLabel": "Note (optional)",
             "placeholder": "May be left blank. For example, why it was brought forward or delayed."
         },
-        "paymentDay": {
-            "blockedNotice": "Disbursement is only possible on {days}. Some documents are waiting, but today is not a disbursement day — the button becomes available again on those days."
-        },
         "submissionLimit": {
             "counter": "You have {count} of {max} cash advances still running.",
             "overdue": "Some are past {days} days without realization: {documents}. Complete their realization before submitting a new one.",
-            "blocked": "You have reached the limit. Realize one of them through to approval before submitting a new one.",
+            "blocked": "You have reached the limit. Realize one of them until Finance has received the paperwork before submitting a new one.",
             "blockedOverdueTitle": "You cannot submit a new cash advance yet — a realization is past its deadline.",
             "blockedTooManyTitle": "You cannot submit a new cash advance yet — the outstanding limit is full.",
-            "countIsNotTheCause": "The count itself is still under the limit ({count} of {max}) — what is holding you back is the realization, not the count."
+            "countIsNotTheCause": "The count itself is still under the limit ({count} of {max}) — what is holding you back is the realization, not the count.",
+        "perBranchTitle": "Your cash advance quota is counted per branch:",
+        "branchCounter": "{branch} — {count} of {max} running",
+        "branchFull": "quota is full",
+        "branchOverdue": "one is past {days} days",
+        "allBranchesBlocked": "Every one of your branches is held up, so there is no room for a new cash advance yet."
         },
         "revise": {
             "title": "Receive Cash Advance {nomor}",

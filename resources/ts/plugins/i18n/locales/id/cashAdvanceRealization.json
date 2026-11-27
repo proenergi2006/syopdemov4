@@ -232,9 +232,6 @@
             "noteLabel": "Catatan (opsional)",
             "placeholder": "Boleh dikosongkan. Misalnya alasan pembayarannya dimajukan atau tertunda."
         },
-        "paymentDay": {
-            "blockedNotice": "Pembayaran hanya bisa dilakukan pada hari {days}. Ada dokumen yang menunggu dibayarkan, tetapi hari ini bukan hari pembayaran — tombolnya akan aktif kembali pada hari tersebut."
-        },
         "unreceive": {
             "menu": "Batalkan Terima",
             "title": "Batalkan penerimaan berkas ini?",

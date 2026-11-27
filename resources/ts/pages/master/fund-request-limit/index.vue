@@ -28,11 +28,12 @@ interface LimitRow {
   id: number
   name: string
 
-  area_type: string | null
-  area_type_label: string | null
-
-  department_id: number | null
-  department_name: string | null
+  /*
+  | Cakupannya dua DAFTAR. Kosong berarti berlaku untuk semua -- bukan
+  | berlaku untuk tidak seorang pun.
+  */
+  branches: { id: number; name: string }[]
+  departments: { id: number; name: string }[]
 
   max_outstanding: number
   max_realization_days: number
@@ -54,11 +55,6 @@ interface Abilities {
   can_delete: boolean
 }
 
-interface PilihanOpsi {
-  value: string
-  label: string
-}
-
 const { t } = useI18n()
 const permissionStore = usePermissionStore()
 
@@ -74,7 +70,7 @@ const abilities = ref<Abilities>({
   can_delete: false,
 })
 
-const areaTypes = ref<PilihanOpsi[]>([])
+const branches = ref<{ id: number; name: string }[]>([])
 const departments = ref<{ id: number; name: string }[]>([])
 const maxOutstandingCap = ref(50)
 const maxDaysCap = ref(365)
@@ -94,7 +90,7 @@ const fetchRows = async (): Promise<void> => {
 
     const opsi = response.data?.options ?? {}
 
-    areaTypes.value = opsi.area_types ?? []
+    branches.value = opsi.branches ?? []
     departments.value = opsi.departments ?? []
     maxOutstandingCap.value = Number(opsi.max_outstanding ?? 50)
     maxDaysCap.value = Number(opsi.max_days ?? 365)
@@ -122,8 +118,8 @@ const formError = ref('')
 
 const form = reactive({
   name: '',
-  area_type: null as string | null,
-  department_id: null as number | null,
+  branch_ids: [] as number[],
+  department_ids: [] as number[],
   max_outstanding: 3,
   max_realization_days: 14,
   is_unlimited: false,
@@ -133,8 +129,8 @@ const form = reactive({
 
 const resetForm = (): void => {
   form.name = ''
-  form.area_type = null
-  form.department_id = null
+  form.branch_ids = []
+  form.department_ids = []
   form.max_outstanding = 3
   form.max_realization_days = 14
   form.is_unlimited = false
@@ -154,8 +150,8 @@ const openEdit = (row: LimitRow): void => {
 
   editingId.value = row.id
   form.name = row.name
-  form.area_type = row.area_type
-  form.department_id = row.department_id
+  form.branch_ids = (row.branches ?? []).map(c => c.id)
+  form.department_ids = (row.departments ?? []).map(d => d.id)
   form.max_outstanding = row.max_outstanding
   form.max_realization_days = row.max_realization_days
   form.is_unlimited = row.is_unlimited
@@ -165,14 +161,33 @@ const openEdit = (row: LimitRow): void => {
   dialog.value = true
 }
 
-/** Kalimat utuh cakupannya, supaya tidak perlu ditebak dari dua kolom kosong. */
+/*
+| Kalimat utuh cakupannya.
+|
+| Daftar panjang dipendekkan menjadi "A, B, +3 lagi": kolom cakupan di tabel
+| harus tetap terbaca sekilas, dan daftar sepuluh cabang di satu sel membuat
+| barisnya setinggi layar. Yang utuh ada di formulirnya.
+*/
+const ringkasDaftar = (isi: { name: string }[], semua: string): string => {
+  if (isi.length === 0)
+    return semua
+
+  if (isi.length <= 2)
+    return isi.map(x => x.name).join(', ')
+
+  return t('fundRequestLimit.scope.andMore', {
+    names: isi.slice(0, 2).map(x => x.name).join(', '),
+    count: isi.length - 2,
+  })
+}
+
 const scopeLabel = (row: LimitRow): string => {
   if (row.is_fallback)
     return t('fundRequestLimit.scope.fallback')
 
   return [
-    row.area_type_label ?? t('fundRequestLimit.scope.allAreas'),
-    row.department_name ?? t('fundRequestLimit.scope.allDepartments'),
+    ringkasDaftar(row.branches ?? [], t('fundRequestLimit.scope.allBranches')),
+    ringkasDaftar(row.departments ?? [], t('fundRequestLimit.scope.allDepartments')),
   ].join(' — ')
 }
 
@@ -195,8 +210,8 @@ const save = async (): Promise<void> => {
 
     const payload = {
       name: form.name.trim(),
-      area_type: form.area_type,
-      department_id: form.department_id,
+      branch_ids: form.branch_ids,
+      department_ids: form.department_ids,
       max_outstanding: Number(form.max_outstanding),
       max_realization_days: Number(form.max_realization_days),
       is_unlimited: form.is_unlimited,
@@ -280,10 +295,12 @@ const previewLoading = ref(false)
 const previewDepartment = ref<number | null>(null)
 
 const previewRows = ref<{
-  area_label: string
+  branch_id: number
+  branch_name: string
   limit_name: string | null
   max_outstanding: number | null
   max_realization_days: number | null
+  is_unlimited: boolean
 }[]>([])
 
 const loadPreview = async (): Promise<void> => {
@@ -361,6 +378,23 @@ onMounted(() => {
             <div class="text-body-2 text-medium-emphasis">
               {{ t('fundRequestLimit.intro.body') }}
             </div>
+
+            <!--
+              Keempat aturan ini yang paling sering disalahpahami, dan tidak
+              satu pun terlihat dari angka di tabel: jatahnya per cabang,
+              kapan sebuah FPU berhenti memakainya, dari kapan hari realisasi
+              dihitung, dan dokumen mana saja yang ikut dinilai.
+            -->
+            <div class="text-body-2 font-weight-medium mt-3">
+              {{ t('fundRequestLimit.intro.rulesTitle') }}
+            </div>
+
+            <ul class="text-body-2 text-medium-emphasis mt-1 ps-5 d-flex flex-column gap-1">
+              <li>{{ t('fundRequestLimit.intro.ruleBranch') }}</li>
+              <li>{{ t('fundRequestLimit.intro.ruleRelease') }}</li>
+              <li>{{ t('fundRequestLimit.intro.ruleDays') }}</li>
+              <li>{{ t('fundRequestLimit.intro.ruleScope') }}</li>
+            </ul>
 
             <VAlert
               type="warning"
@@ -610,17 +644,26 @@ onMounted(() => {
               cols="12"
               md="6"
             >
-              <VSelect
-                v-model="form.area_type"
-                :label="t('fundRequestLimit.form.areaType')"
-                :items="areaTypes"
-                item-title="label"
-                item-value="value"
+              <!--
+                Seluruh cabang aktif, bisa dipilih beberapa sekaligus.
+                Dikosongkan berarti berlaku untuk semua cabang -- itu yang
+                dikatakan placeholder-nya, supaya kotak kosong tidak terbaca
+                sebagai "belum diisi".
+              -->
+              <VAutocomplete
+                v-model="form.branch_ids"
+                :label="t('fundRequestLimit.form.branches')"
+                :items="branches"
+                item-title="name"
+                item-value="id"
                 density="comfortable"
+                multiple
+                chips
+                closable-chips
                 clearable
-                :placeholder="t('fundRequestLimit.scope.allAreas')"
+                :placeholder="t('fundRequestLimit.scope.allBranches')"
                 persistent-placeholder
-                :hint="t('fundRequestLimit.form.areaTypeHint')"
+                :hint="t('fundRequestLimit.form.branchesHint')"
                 persistent-hint
               />
             </VCol>
@@ -630,16 +673,19 @@ onMounted(() => {
               md="6"
             >
               <VAutocomplete
-                v-model="form.department_id"
-                :label="t('fundRequestLimit.form.department')"
+                v-model="form.department_ids"
+                :label="t('fundRequestLimit.form.departments')"
                 :items="departments"
                 item-title="name"
                 item-value="id"
                 density="comfortable"
+                multiple
+                chips
+                closable-chips
                 clearable
                 :placeholder="t('fundRequestLimit.scope.allDepartments')"
                 persistent-placeholder
-                :hint="t('fundRequestLimit.form.departmentHint')"
+                :hint="t('fundRequestLimit.form.departmentsHint')"
                 persistent-hint
               />
             </VCol>
@@ -804,9 +850,9 @@ onMounted(() => {
             <tbody>
               <tr
                 v-for="baris in previewRows"
-                :key="baris.area_label"
+                :key="baris.branch_id"
               >
-                <td>{{ baris.area_label }}</td>
+                <td>{{ baris.branch_name }}</td>
 
                 <td>
                   <span
@@ -821,7 +867,8 @@ onMounted(() => {
                 </td>
 
                 <td class="text-center">
-                  {{ baris.max_outstanding ?? '—' }}
+                  <span v-if="baris.is_unlimited">{{ t('fundRequestLimit.list.unlimitedChip') }}</span>
+                  <span v-else>{{ baris.max_outstanding ?? '—' }}</span>
                 </td>
 
                 <td class="text-center">

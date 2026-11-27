@@ -120,11 +120,27 @@ return [
         'time_start' => 'Jam mulai',
         'time_end' => 'Jam selesai',
         'timezone' => 'Zona waktu',
+        /* BDV */
+        'bdv_number' => 'Nomor BDV',
+        'cash_bank_account_no' => 'Nomor akun kas/bank',
+        'cash_bank_account_name' => 'Nama akun kas/bank',
+        'check_number' => 'Nomor cek/giro',
+        'payee' => 'Dibayarkan kepada',
+        'line_no' => 'Baris ke',
+        'item_date' => 'Tanggal baris',
+        'category' => 'Kategori',
+        'accurate_account_no' => 'Nomor akun Accurate',
+        'accurate_account_name' => 'Nama akun Accurate',
+        'document_type' => 'Jenis dokumen',
+        'source_number' => 'Nomor dokumen sumber',
+        'bdv_source_id' => 'Dokumen sumber baris ini',
+        'sort_order' => 'Urutan',
     ],
 
     'revision_relations' => [
         'items' => 'Rincian',
         'attachments' => 'Lampiran',
         'itineraries' => 'Itinerary',
+        'sources' => 'Dokumen yang dicairkan',
     ],
 ];

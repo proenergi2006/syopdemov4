@@ -510,4 +510,28 @@ return [
             'message' => 'The branch :branch petty cash balance is down to Rp :balance of its Rp :ceiling ceiling, below the :percentage% mark. Request a top up of Rp :topup so the next small claims can still be paid.',
         ],
     ],
+
+    'bdv' => [
+        'approval_request' => [
+            'title' => 'BDV Approval',
+            'message_with_label' => ':bdv_number is waiting for your approval at step :step_order (:step_label).',
+            'message_without_label' => ':bdv_number is waiting for your approval at step :step_order.',
+        ],
+
+        'approval_step_pending' => [
+            'title' => 'BDV Approval Step Approved',
+            'message' => ':bdv_number was approved by :approver_name at step :step_order and is still waiting for the next approval.',
+        ],
+
+        'approval_step_final' => [
+            'title' => 'BDV Approved',
+            'message' => ':bdv_number has been fully approved by :approver_name.',
+        ],
+
+        'rejected' => [
+            'title' => 'BDV Rejected',
+            'message' => ':bdv_number was rejected by :rejecter_name.',
+        ],
+    ],
+
 ];
